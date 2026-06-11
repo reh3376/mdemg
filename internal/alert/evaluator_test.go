@@ -180,91 +180,104 @@ func TestEvaluator_IntervalGating(t *testing.T) {
 }
 
 func TestRuleFailureStreak_PerRuleAlertAtThreshold(t *testing.T) {
+	// Broken-SQL scenario: this rule fails while peers keep succeeding —
+	// a peer success lands AFTER the streak begins.
 	e := NewEvaluator([]AlertRule{{ID: "r1"}}, nil, nil, time.Second)
-	now := time.Now()
-	e.lastAnySuccess = now // other rules are succeeding → per-rule verdict
+	t0 := time.Now()
 
-	// Below threshold (default 3): silent
-	for i := 1; i <= 2; i++ {
-		v, n := e.recordRuleFailure("r1", now)
-		if v != metaSilent {
-			t.Fatalf("verdict %v at %d consecutive failures (threshold 3)", v, n)
-		}
+	if v, _ := e.recordRuleFailure("r1", t0); v != metaSilent {
+		t.Fatal("verdict at 1 failure should be silent")
 	}
-	// Third consecutive failure fires per-rule exactly once
-	v, n := e.recordRuleFailure("r1", now)
+	e.mu.Lock()
+	e.lastAnySuccess = t0.Add(time.Second) // peer succeeded mid-streak
+	e.mu.Unlock()
+	if v, _ := e.recordRuleFailure("r1", t0.Add(30*time.Second)); v != metaSilent {
+		t.Fatal("verdict at 2 failures should be silent")
+	}
+	v, n := e.recordRuleFailure("r1", t0.Add(60*time.Second))
 	if v != metaFirePerRule || n != 3 {
 		t.Fatalf("expected per-rule meta-alert at 3rd failure, got verdict=%v n=%d", v, n)
 	}
 	// Streak continues — no re-fire
-	if v, _ := e.recordRuleFailure("r1", now); v != metaSilent {
+	if v, _ := e.recordRuleFailure("r1", t0.Add(90*time.Second)); v != metaSilent {
 		t.Fatal("meta-alert re-fired within the same failure streak")
 	}
 }
 
-func TestRuleFailureStreak_GlobalOutageAggregates(t *testing.T) {
-	// No rule has ever succeeded (e.g. TSDB down at startup): the threshold
-	// crossing must produce ONE aggregate alert, not one per rule.
+func TestRuleFailureStreak_OutageOnsetIsGlobal(t *testing.T) {
+	// TSDB-stop drill regression (Epic 5, caught live): rules were
+	// succeeding seconds before the outage, so lastAnySuccess is fresh at
+	// onset — but no success lands AFTER any streak begins, so every rule
+	// at threshold must resolve global, and only the first may fire.
 	e := NewEvaluator([]AlertRule{{ID: "r1"}, {ID: "r2"}}, nil, nil, time.Second)
-	now := time.Now()
+	t0 := time.Now()
+	e.lastAnySuccess = t0.Add(-time.Second) // healthy until just now
 
-	for i := 1; i <= 2; i++ {
-		e.recordRuleFailure("r1", now)
-		e.recordRuleFailure("r2", now)
+	for i := range 3 {
+		ts := t0.Add(time.Duration(i*30) * time.Second)
+		e.recordRuleFailure("r1", ts)
+		if i < 2 {
+			e.recordRuleFailure("r2", ts)
+		}
 	}
-	if v, _ := e.recordRuleFailure("r1", now); v != metaFireGlobal {
-		t.Fatalf("expected global verdict for first rule at threshold, got %v", v)
+	// r1 hit threshold first → global fires once
+	// (the third r1 call above returned the verdict; re-derive via r2)
+	if v, _ := e.recordRuleFailure("r2", t0.Add(60*time.Second)); v != metaSilent {
+		t.Fatalf("second rule at threshold must not duplicate the global alert, got %v", v)
 	}
-	if v, _ := e.recordRuleFailure("r2", now); v != metaSilent {
-		t.Fatalf("second rule must not duplicate the global alert, got %v", v)
+	if !e.globalAlerted {
+		t.Fatal("global outage alert was not recorded")
 	}
 }
 
-func TestRuleFailureStreak_StaleSuccessIsGlobal(t *testing.T) {
-	// lastAnySuccess far older than threshold×interval → global outage path.
+func TestRuleFailureStreak_NeverSucceededIsGlobal(t *testing.T) {
+	// TSDB down at startup: lastAnySuccess is zero — global path.
 	e := NewEvaluator([]AlertRule{{ID: "r1"}}, nil, nil, time.Second)
 	now := time.Now()
-	e.lastAnySuccess = now.Add(-time.Minute)
-
 	e.recordRuleFailure("r1", now)
 	e.recordRuleFailure("r1", now)
 	if v, _ := e.recordRuleFailure("r1", now); v != metaFireGlobal {
-		t.Fatalf("expected global verdict with stale lastAnySuccess, got %v", v)
+		t.Fatalf("expected global verdict with no success ever, got %v", v)
 	}
 }
 
 func TestRuleFailureStreak_RearmsOnSuccess(t *testing.T) {
 	e := NewEvaluator([]AlertRule{{ID: "r1"}}, nil, nil, time.Second)
-	now := time.Now()
-	e.lastAnySuccess = now
+	t0 := time.Now()
 
-	for range 3 {
-		e.recordRuleFailure("r1", now)
+	for i := range 3 {
+		e.recordRuleFailure("r1", t0.Add(time.Duration(i)*time.Second))
 	}
 	// Success resets streak, re-arms both per-rule and global alerts
 	e.mu.Lock()
-	e.recordRuleSuccess(e.state["r1"], now)
+	e.recordRuleSuccess(e.state["r1"], t0.Add(5*time.Second))
 	e.mu.Unlock()
 	if e.globalAlerted {
 		t.Fatal("global alert not re-armed on success")
 	}
 
+	// New streak begins after the success; a peer succeeds mid-streak →
+	// per-rule path, proving the threshold machinery fully re-armed.
+	t1 := t0.Add(10 * time.Second)
 	for i := 1; i <= 2; i++ {
-		if v, _ := e.recordRuleFailure("r1", now); v != metaSilent {
+		if v, _ := e.recordRuleFailure("r1", t1.Add(time.Duration(i)*time.Second)); v != metaSilent {
 			t.Fatalf("meta-alert fired at %d failures after re-arm", i)
 		}
 	}
-	if v, _ := e.recordRuleFailure("r1", now); v != metaFirePerRule {
-		t.Fatal("meta-alert did not fire after re-armed streak reached threshold")
+	e.mu.Lock()
+	e.lastAnySuccess = t1.Add(2500 * time.Millisecond) // peer success inside new streak
+	e.mu.Unlock()
+	if v, _ := e.recordRuleFailure("r1", t1.Add(3*time.Second)); v != metaFirePerRule {
+		t.Fatal("re-armed streak with mid-streak peer success should fire per-rule at threshold")
 	}
 }
 
 func TestRuleFailureStreak_ConfigurableThreshold(t *testing.T) {
 	e := NewEvaluator([]AlertRule{{ID: "r1"}}, nil, nil, time.Second)
-	now := time.Now()
-	e.lastAnySuccess = now
+	t0 := time.Now()
 	e.SetRuleFailureThreshold(1)
-	if v, _ := e.recordRuleFailure("r1", now); v != metaFirePerRule {
+	// No success since streak start → global at threshold=1
+	if v, _ := e.recordRuleFailure("r1", t0); v != metaFireGlobal {
 		t.Fatal("threshold=1 should fire on first failure")
 	}
 	// Non-positive keeps current threshold

@@ -18,6 +18,7 @@ type ruleState struct {
 	lastEval            time.Time // last evaluation time
 	consecutiveFailures int       // SUPERVISOR-002: query failures in a row
 	failureAlerted      bool      // SUPERVISOR-002: meta-alert sent for this failure streak
+	streakStart         time.Time // SUPERVISOR-002: when the current failure streak began
 }
 
 // defaultRuleFailureThreshold is the consecutive-query-failure count at which
@@ -209,10 +210,15 @@ const (
 
 // recordRuleFailure tracks a rule query failure (SUPERVISOR-002): resets the
 // ForDuration state and increments the consecutive-failure streak. At the
-// threshold it returns metaFirePerRule when other rules are still succeeding
-// (broken SQL on this rule), or metaFireGlobal — once per outage — when no
-// rule has succeeded recently (TSDB-level outage; a per-rule alert per rule
-// would be a storm duplicating the health prober's signal).
+// threshold it returns metaFirePerRule when some OTHER rule has succeeded
+// since this rule's streak began (broken SQL on this rule while the rest of
+// the evaluator is healthy), or metaFireGlobal — once per outage — when
+// nothing has succeeded since the streak began (TSDB-level outage; a
+// per-rule alert per rule would be a storm duplicating the health prober's
+// signal). The discriminator is streak-relative, not wall-clock-relative:
+// at outage ONSET lastAnySuccess is always recent, so a freshness window
+// would misclassify the first rules to reach threshold (caught live in the
+// Epic 5 TSDB-stop drill — 2 per-rule alerts leaked before the aggregate).
 func (e *Evaluator) recordRuleFailure(ruleID string, now time.Time) (metaVerdict, int) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -223,23 +229,23 @@ func (e *Evaluator) recordRuleFailure(ruleID string, now time.Time) (metaVerdict
 	}
 	st.conditionFirstTrue = time.Time{}
 	st.fired = false
+	if st.consecutiveFailures == 0 {
+		st.streakStart = now
+	}
 	st.consecutiveFailures++
 	if st.consecutiveFailures < e.failureThreshold || st.failureAlerted {
 		return metaSilent, st.consecutiveFailures
 	}
 	st.failureAlerted = true
 
-	// Global outage: nothing has succeeded within the time it takes a rule
-	// to reach the failure threshold on the base evaluation cadence.
-	staleWindow := time.Duration(e.failureThreshold) * e.interval
-	if e.lastAnySuccess.IsZero() || now.Sub(e.lastAnySuccess) > staleWindow {
-		if e.globalAlerted {
-			return metaSilent, st.consecutiveFailures
-		}
-		e.globalAlerted = true
-		return metaFireGlobal, st.consecutiveFailures
+	if e.lastAnySuccess.After(st.streakStart) {
+		return metaFirePerRule, st.consecutiveFailures
 	}
-	return metaFirePerRule, st.consecutiveFailures
+	if e.globalAlerted {
+		return metaSilent, st.consecutiveFailures
+	}
+	e.globalAlerted = true
+	return metaFireGlobal, st.consecutiveFailures
 }
 
 // recordRuleSuccess re-arms the rule-health meta-alerts after a successful
