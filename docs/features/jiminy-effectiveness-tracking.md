@@ -201,3 +201,29 @@ When disabled, `Guide()` still works normally but doesn't generate `guidance_id`
 - **Jiminy Service (Phase Jiminy)** — `Guide()` method provides the items to track
 - **Consulting Service** — Source of constraint and pattern items
 - **Embedding Provider** — Source of correction and frontier items (for guide context)
+
+## Re-baseline + verdict provenance (JIMINY-OUTCOME-002, 2026-06-11)
+
+**History before 2026-06-11T19:00Z is heuristic-dominated and not comparable
+to later data.** Until SUPERVISOR-002's feedback-detach fix, 94.9% of Tier-2
+outcome-classification LLM calls were context-cancelled by the hook's 5s curl
+and silently fell back to the heuristic, which half-credits the uncertain
+band as `partial_compliance` — manufacturing a flat ~0.45–0.50 effectiveness.
+Post-fix LLM verdicts are honest and the metric dropped to its true range.
+
+Two corrections shipped:
+1. **Tier-2 can now say `not_applicable`** (prompts + grammar schema in
+   `internal/jiminy/outcome_classifier.go`). Previously the LLM enum had no
+   way to say "this guidance doesn't apply to this action," so irrelevant
+   guidance (hooks deliver up to 10 items per action) was scored `ignored`,
+   structurally depressing effectiveness. `not_applicable` is excluded from
+   every sink (escalation, protocol metrics, Neo4j edges, TSDB rows), so
+   denominators self-correct for new data. Live-verified: unrelated actions
+   now yield `not_applicable` with coherent reasoning; genuinely-applicable
+   guidance still classifies `ignored`/`followed`.
+2. **`constraint_outcomes.classifier_source`** (V0026): `tier1` | `llm` |
+   `heuristic` | `explicit` — fallback-derived rows (the artifact class) are
+   forever distinguishable. Historical rows carry `''`.
+
+Effectiveness queries needing the artifact class excluded can filter
+`classifier_source <> 'heuristic'` (post-V0026 data only).

@@ -142,7 +142,7 @@
     },
     {
       "title": "Constraint Eff. (All-Time)",
-      "description": "Volume-weighted effectiveness across constraints with 5+ outcomes (all time). Shows N/A when no constraints meet threshold — this means insufficient data, not 0% effectiveness.",
+      "description": "Volume-weighted effectiveness across constraints with 5+ outcomes (all time). Shows N/A when no constraints meet threshold \u2014 this means insufficient data, not 0% effectiveness.",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -198,7 +198,7 @@
     },
     {
       "title": "Constraint Eff. (Selected Range)",
-      "description": "Dynamically computed from constraint_outcomes within the dashboard time range. Volume-weighted across constraints with 5+ outcomes in the selected interval.",
+      "description": "Dynamically computed from constraint_outcomes within the dashboard time range. Volume-weighted across constraints with 5+ outcomes in the selected interval. RE-BASELINE (JIMINY-OUTCOME-002): history before 2026-06-11T19:00Z is heuristic-dominated \u2014 94.9% of Tier-2 classifier calls were context-cancelled and fell back to half-credit partial_compliance verdicts (fixed by SUPERVISOR-002). Not comparable to post-fix LLM-classified data. Rows now carry classifier_source (tier1|llm|heuristic|explicit) to filter the artifact class.",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -658,13 +658,17 @@
                 "id": "custom.lineStyle",
                 "value": {
                   "fill": "dash",
-                  "dash": [10, 10]
+                  "dash": [
+                    10,
+                    10
+                  ]
                 }
               }
             ]
           }
         ]
-      }
+      },
+      "description": " RE-BASELINE (JIMINY-OUTCOME-002): history before 2026-06-11T19:00Z is heuristic-dominated \u2014 94.9% of Tier-2 classifier calls were context-cancelled and fell back to half-credit partial_compliance verdicts (fixed by SUPERVISOR-002). Not comparable to post-fix LLM-classified data. Rows now carry classifier_source (tier1|llm|heuristic|explicit) to filter the artifact class."
     },
     {
       "title": "Outcome Trends",

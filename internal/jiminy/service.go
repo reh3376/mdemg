@@ -1456,13 +1456,13 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 
 		// B4: Honor explicit outcome from caller, bypassing heuristic/classifier
 		if req.Outcome != "" {
-			cr = ClassificationResult{Outcome: req.Outcome, Confidence: 1.0}
+			cr = ClassificationResult{Outcome: req.Outcome, Confidence: 1.0, Source: "explicit"}
 		} else if s.classifier != nil {
 			// J14: Use semantic classifier returning ClassificationResult if available
 			cr = s.classifier.Classify(ctx, item, req.ActionSummary)
 		} else {
 			outcome, sim := classifyOutcome(item, actionLower)
-			cr = ClassificationResult{Outcome: outcome, Confidence: sim}
+			cr = ClassificationResult{Outcome: outcome, Confidence: sim, Source: "heuristic"}
 		}
 
 		results = append(results, GuidanceItemFeedback{
@@ -1545,7 +1545,7 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 				req.SpaceID, constraintID, item.ConstraintCode,
 				req.GuidanceID, feedbackSessionID,
 				string(outcome), string(item.Type), s.cfg.InstanceID,
-				cr.Confidence,
+				cr.Source, cr.Confidence,
 			)
 		}
 
