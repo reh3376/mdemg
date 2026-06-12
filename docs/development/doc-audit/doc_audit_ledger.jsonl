@@ -13,7 +13,7 @@
 {"path": "cmd/space-transfer/README.md", "tier": "T3", "phase": "001b/c", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
 {"path": "docs/FAQ.md", "tier": "T3", "phase": "001b/c", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
 {"path": "docs/JIMINY_CASCADING_FAILURE_FIX_REPORT.md", "tier": "T3", "phase": "001b/c", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
-{"path": "docs/api/INGEST_CODEBASE_API.md", "tier": "T3", "phase": "001a", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
+{"path": "docs/api/INGEST_CODEBASE_API.md", "tier": "T3", "phase": "001a", "status": "DONE", "audited_commit": "831eb0a", "verdict": "CURRENT", "evidence_paths": [], "notes": ""}
 {"path": "docs/api/api-spec/uats/HASH_VERIFICATION.md", "tier": "T3", "phase": "001b/c", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
 {"path": "docs/api/api-spec/uats/README.md", "tier": "T3", "phase": "001b/c", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
 {"path": "docs/api/api-spec/udts/README.md", "tier": "T3", "phase": "001b/c", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
@@ -610,11 +610,11 @@
 {"path": "docs/features/unified-cli.md", "tier": "T1", "phase": "001a-spotcheck", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
 {"path": "docs/features/uvts-validation.md", "tier": "T1", "phase": "001a-spotcheck", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
 {"path": "docs/gMEM-API.md", "tier": "T3", "phase": "001b/c", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
-{"path": "docs/guides/UXTS_DEVELOPER_GUIDE.md", "tier": "T3", "phase": "001a", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
-{"path": "docs/guides/grafana-dashboard-development.md", "tier": "T3", "phase": "001a", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
-{"path": "docs/guides/ingest-performance.md", "tier": "T3", "phase": "001a", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
-{"path": "docs/guides/nvim/mdemg-plugin/cheatsheet.md", "tier": "T3", "phase": "001a", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
-{"path": "docs/guides/nvim/mdemg-plugin/installation.md", "tier": "T3", "phase": "001a", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
+{"path": "docs/guides/UXTS_DEVELOPER_GUIDE.md", "tier": "T3", "phase": "001a", "status": "DONE", "audited_commit": "831eb0a", "verdict": "CURRENT", "evidence_paths": [], "notes": ""}
+{"path": "docs/guides/grafana-dashboard-development.md", "tier": "T3", "phase": "001a", "status": "DONE", "audited_commit": "831eb0a", "verdict": "CURRENT", "evidence_paths": [], "notes": ""}
+{"path": "docs/guides/ingest-performance.md", "tier": "T3", "phase": "001a", "status": "DONE", "audited_commit": "831eb0a", "verdict": "CURRENT", "evidence_paths": [], "notes": ""}
+{"path": "docs/guides/nvim/mdemg-plugin/cheatsheet.md", "tier": "T3", "phase": "001a", "status": "DONE", "audited_commit": "831eb0a", "verdict": "CURRENT", "evidence_paths": [], "notes": "leader-M vs leader-m case inconsistency, remappable \u2014 cosmetic"}
+{"path": "docs/guides/nvim/mdemg-plugin/installation.md", "tier": "T3", "phase": "001a", "status": "DONE", "audited_commit": "831eb0a", "verdict": "CURRENT", "evidence_paths": [], "notes": ""}
 {"path": "docs/investigations/BENCHMARK_IMPROVEMENTS.md", "tier": "T3", "phase": "001b/c", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
 {"path": "docs/investigations/LEARNING_EDGES_ANALYSIS.md", "tier": "T3", "phase": "001b/c", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
 {"path": "docs/investigations/leakage-tests/leakage-test-spec.md", "tier": "T3", "phase": "001b/c", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
@@ -657,14 +657,14 @@
 {"path": "docs/lang-parser/lang-parse-spec/upts/UPTS_SUMMARY.md", "tier": "T3", "phase": "001b/c", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
 {"path": "docs/lang-parser/lang-parse-spec/upts/fixtures/markdown_test_fixture.md", "tier": "T3", "phase": "001b/c", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
 {"path": "docs/lang-parser/lang-parse-spec/upts/fixtures/scraper_markdown_test_fixture.md", "tier": "T3", "phase": "001b/c", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
-{"path": "docs/operations/campaign-task-activation.md", "tier": "T3", "phase": "001a", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
-{"path": "docs/operations/graph-health-baseline.md", "tier": "T3", "phase": "001a", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
-{"path": "docs/operations/live-validation-detailed-summary.md", "tier": "T3", "phase": "001a", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
-{"path": "docs/operations/live-validation-findings.md", "tier": "T3", "phase": "001a", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
-{"path": "docs/operations/multi-instance-testing-results.md", "tier": "T3", "phase": "001a", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
-{"path": "docs/operations/post-fix-revalidation-results.md", "tier": "T3", "phase": "001a", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
-{"path": "docs/operations/pre-campaign-checklist.md", "tier": "T3", "phase": "001a", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
-{"path": "docs/operations/vllm-mlx-setup.md", "tier": "T3", "phase": "001a", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
+{"path": "docs/operations/campaign-task-activation.md", "tier": "T3", "phase": "001a", "status": "DONE", "audited_commit": "831eb0a", "verdict": "CURRENT", "evidence_paths": [], "notes": ""}
+{"path": "docs/operations/graph-health-baseline.md", "tier": "T3", "phase": "001a", "status": "DONE", "audited_commit": "831eb0a", "verdict": "HISTORICAL_OK", "evidence_paths": [], "notes": "Phase-0 baseline, correctly dated"}
+{"path": "docs/operations/live-validation-detailed-summary.md", "tier": "T3", "phase": "001a", "status": "DONE", "audited_commit": "831eb0a", "verdict": "HISTORICAL_OK", "evidence_paths": [], "notes": "dated 2026-04-02 pre-fix record"}
+{"path": "docs/operations/live-validation-findings.md", "tier": "T3", "phase": "001a", "status": "DONE", "audited_commit": "831eb0a", "verdict": "DRIFT_MINOR", "evidence_paths": [], "notes": "F11 (P3 doc-gap) presented alongside P0-P1 bugs; dated 2026-04-02 framing otherwise ok"}
+{"path": "docs/operations/multi-instance-testing-results.md", "tier": "T3", "phase": "001a", "status": "DONE", "audited_commit": "831eb0a", "verdict": "HISTORICAL_OK", "evidence_paths": [], "notes": "dated 2026-04-03 snapshot; teardown-bug status unverified-live"}
+{"path": "docs/operations/post-fix-revalidation-results.md", "tier": "T3", "phase": "001a", "status": "DONE", "audited_commit": "831eb0a", "verdict": "HISTORICAL_OK", "evidence_paths": [], "notes": "dated 2026-04-03 re-validation record"}
+{"path": "docs/operations/pre-campaign-checklist.md", "tier": "T3", "phase": "001a", "status": "DONE", "audited_commit": "831eb0a", "verdict": "DRIFT_MINOR", "evidence_paths": ["internal/config/config.go"], "notes": "claims schema v8+; real requirement is 26 \u2014 18 versions behind on a LIVE checklist; fix-batch item"}
+{"path": "docs/operations/vllm-mlx-setup.md", "tier": "T3", "phase": "001a", "status": "DONE", "audited_commit": "831eb0a", "verdict": "HISTORICAL_OK", "evidence_paths": [], "notes": "DOC-TRUTH-002 superseded banner verified present"}
 {"path": "docs/original-concept/CONCEPT_MERGING_RESEARCH.md", "tier": "T3", "phase": "001b/c", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
 {"path": "docs/quickstart.md", "tier": "T3", "phase": "001b/c", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
 {"path": "docs/research/EDGE_TYPE_ATTENTION_DESIGN.md", "tier": "T6", "phase": "001b/c", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
