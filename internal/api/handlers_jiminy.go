@@ -576,7 +576,9 @@ func (s *Server) handleJiminyReformulate(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	// JIMINY-BUDGET-001: was a hardcoded 10s — shorter than every other
+	// guidance budget while running the same synthesis-class work.
+	ctx, cancel := context.WithTimeout(r.Context(), s.cfg.EffectiveJiminyReformulateTimeout())
 	defer cancel()
 	ctx = llmclient.WithSessionID(ctx, req.SessionID)
 
