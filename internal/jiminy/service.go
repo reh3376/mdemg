@@ -930,13 +930,15 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 	// Deduplicate by content (semantic if embedder available, exact otherwise)
 	filtered = s.deduplicateItems(filtered)
 
-	// Sort by priority (high > medium > low) then confidence (desc)
+	// Sort by priority (high > medium > low), then within equal priority by
+	// (1-w)·confidence + w·learned signal strength (DORMANT-CENSUS-001).
+	// Ordering only — selection/filtering above is untouched.
 	sort.Slice(filtered, func(i, j int) bool {
 		pi, pj := priorityRank(filtered[i].Priority), priorityRank(filtered[j].Priority)
 		if pi != pj {
 			return pi < pj
 		}
-		return filtered[i].Confidence > filtered[j].Confidence
+		return s.guidanceSortKey(filtered[i]) > s.guidanceSortKey(filtered[j])
 	})
 
 	// Truncate to max items
@@ -2587,6 +2589,26 @@ func firstSourceNode(item GuidanceItem) string {
 		return item.SourceNodes[0]
 	}
 	return ""
+}
+
+// guidanceSortKey computes the within-priority ordering key for Guide()
+// (DORMANT-CENSUS-001): (1-w)·confidence + w·learned signal strength, where
+// w = JIMINY_SIGNAL_STRENGTH_WEIGHT (clamped to [0,1]). Weight 0 — or a nil
+// learner — restores pure confidence, the pre-census behavior. Items whose
+// signal code resolves to nothing blend the learner's 0.5 neutral default.
+func (s *Service) guidanceSortKey(item GuidanceItem) float64 {
+	w := s.cfg.JiminySignalStrengthWeight
+	if w <= 0 || s.signalLearner == nil {
+		return item.Confidence
+	}
+	if w > 1 {
+		w = 1
+	}
+	strength := 0.5
+	if code := guidanceSignalCode(item); code != "" {
+		strength = s.signalLearner.GetStrength(code)
+	}
+	return (1-w)*item.Confidence + w*strength
 }
 
 func guidanceSignalCode(item GuidanceItem) string {

@@ -284,6 +284,13 @@ type Config struct {
 	// GUIDANCE_OUTCOME edge sink went dormant; embedding match links them. Keyword
 	// matching remains the fallback. (default: 0.55)
 	JiminyConstraintCodeSimThreshold float64 // JIMINY_CONSTRAINT_CODE_SIM_THRESHOLD
+	// DORMANT-CENSUS-001 — blend weight for the Hebbian signal strength
+	// (ape.SignalLearner.GetStrength, V0024-persisted) in the Guide() sort:
+	// within equal priority, items order by (1-w)·confidence + w·strength.
+	// Ordering only — selection/filtering untouched. 0 disables (pure
+	// confidence, the pre-census behavior). The learner's emission/response
+	// stream had been live since HOOKWIRE-001 with a never-read read side.
+	JiminySignalStrengthWeight float64 // JIMINY_SIGNAL_STRENGTH_WEIGHT (default: 0.2; 0 = off)
 
 	// Jiminy Warm Store (event-driven pre-computation)
 	JiminyWarmEnabled     bool // JIMINY_WARM_ENABLED — enable warm store for pre-computed guidance (default: true)
@@ -2286,6 +2293,10 @@ func FromEnv() (Config, error) {
 		return Config{}, err
 	}
 	jiminyConstraintCodeSimThreshold, err := atof("JIMINY_CONSTRAINT_CODE_SIM_THRESHOLD", DefaultJiminyConstraintCodeSimThreshold)
+	if err != nil {
+		return Config{}, err
+	}
+	jiminySignalStrengthWeight, err := atof("JIMINY_SIGNAL_STRENGTH_WEIGHT", 0.2)
 	if err != nil {
 		return Config{}, err
 	}
@@ -4456,6 +4467,7 @@ func FromEnv() (Config, error) {
 		JiminyTimeoutMs:                  jiminyTimeoutMs,
 		JiminyMaxItems:                   jiminyMaxItems,
 		JiminyMinConfidence:              jiminyMinConfidence,
+		JiminySignalStrengthWeight:       jiminySignalStrengthWeight,
 		JiminyConstraintCodeSimThreshold: jiminyConstraintCodeSimThreshold,
 		JiminyIncludeFrontiers:           jiminyIncludeFrontiers,
 		JiminyFrontierMinSim:             jiminyFrontierMinSim,
