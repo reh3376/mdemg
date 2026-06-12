@@ -1,0 +1,1126 @@
+{
+  "routes": {
+    "/api/graph/data": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/api/graph/fields": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/api/graph/health": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/healthz": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/readyz": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/ui/": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/admin/breakers": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/admin/breakers/reset": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/admin/config": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/admin/features": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/admin/features/restart": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/admin/features/start": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/admin/features/stop": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/admin/instances": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/admin/logs": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/admin/restart": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/admin/rsic/restart": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/admin/rsic/start": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/admin/rsic/stop": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/admin/spaces": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/admin/spaces/": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/admin/spaces/export": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/admin/spaces/export/preview": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/admin/spaces/import": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/admin/spaces/prune": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/ape/status": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/ape/trigger": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/backup/": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/backup/list": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/backup/manifest/": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/backup/restore": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/backup/restore/status/": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/backup/status/": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/backup/trigger": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/constraints": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/constraints/conflicts": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/constraints/conflicts/": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/constraints/detect-conflicts": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/constraints/effectiveness": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/constraints/scope/": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/constraints/stats": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/conversation/consolidate": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/conversation/correct": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/conversation/graduate": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/conversation/observations/": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/conversation/observe": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/conversation/org-reviews": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/conversation/org-reviews/": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/conversation/org-reviews/stats": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/conversation/recall": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/conversation/resume": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/conversation/session/anomalies": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/conversation/session/health": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/conversation/snapshot": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/conversation/snapshot/": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/conversation/snapshot/cleanup": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/conversation/snapshot/latest": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/conversation/templates": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/conversation/templates/": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/conversation/volatile/stats": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/embedding/health": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/eventgraph/guidance-outcome-neighborhood": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/eventgraph/reinforcement-neighborhood": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/feedback": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/filewatcher/start": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/filewatcher/status": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/filewatcher/stop": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/guardrail/events": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/hash-verification/files": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/hash-verification/files/": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/hash-verification/register": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/hash-verification/revert": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/hash-verification/scan": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/hash-verification/update": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/hash-verification/verify": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/hash-verification/verify-all": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/jiminy/bootstrap": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/jiminy/checkpoint": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/jiminy/classify": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/jiminy/evaluate": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/jiminy/extension": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/jiminy/feedback": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/jiminy/guide": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/jiminy/healthz": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/jiminy/latest": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/jiminy/protocol/feedback": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/jiminy/protocol/learn": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/jiminy/protocol/metrics": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/jiminy/protocol/status": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/jiminy/protocol/tier-effectiveness": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/jiminy/ready": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/jiminy/reformulate": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/jiminy/resume-protocol": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/jiminy/strict": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/jiminy/warm": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/jobs/": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/learning/freeze": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/learning/freeze/status": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/learning/negative-feedback": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/learning/prune": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/learning/stats": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/learning/unfreeze": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/linear/comments": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/linear/issues": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/linear/issues/": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/linear/projects": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/linear/projects/": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/memory/archive/bulk": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/memory/cache": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/memory/cache/stats": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/memory/cleanup/graph-orphans": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/memory/cleanup/orphans": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/memory/cleanup/schedule": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/memory/cleanup/schedules": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/memory/cleanup/stats": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/memory/consolidate": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/memory/consult": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/memory/distribution": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/memory/edges/stale/refresh": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/memory/edges/stale/stats": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/memory/freshness": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/memory/frontiers": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/memory/graph/neighborhood": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/memory/graph/topology": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/memory/guardrail/validate": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/memory/ingest": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/memory/ingest-codebase": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/memory/ingest-codebase/": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/memory/ingest/batch": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/memory/ingest/cancel/": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/memory/ingest/files": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/memory/ingest/jobs": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/memory/ingest/status/": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/memory/ingest/trigger": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/memory/meta-learn": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/memory/node/meta": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/memory/nodes/": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/memory/query/metrics": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/memory/reflect": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/memory/retrieve": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/memory/spaces/": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/memory/stats": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/memory/suggest": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/memory/symbols": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/metrics": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/metrics/determinism": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/metrics/snapshot": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/metrics/trends": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/modules": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/modules/": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/neo4j/overview": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/neural/status": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/plugins": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/plugins/": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/prometheus": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/scraper/jobs": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/scraper/jobs/": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/scraper/spaces": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/self-improve/assess": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/self-improve/calibration": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/self-improve/cycle": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/self-improve/health": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/self-improve/history": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/self-improve/orchestration/reset": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/self-improve/report": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/self-improve/report/": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/self-improve/rollback": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/self-improve/signals": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/skills": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/skills/": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/symbols/": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/symbols/relationships": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/synergy/status": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/system/capability-gaps": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/system/capability-gaps/": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/system/gap-interviews": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/system/gap-interviews/": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/system/pool-metrics": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/training-data/download/": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/training-data/export": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/training-data/status/": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/webhooks/": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/v1/webhooks/linear": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "/viz/topology": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "POST /v1/alerts/clear": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "POST /v1/alerts/grafana": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    },
+    "POST /v1/hooks/event": {
+      "consumers": [],
+      "disposition": "UNREVIEWED",
+      "notes": "",
+      "uats_specs": []
+    }
+  }
+}
