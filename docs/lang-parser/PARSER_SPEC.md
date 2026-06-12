@@ -14,15 +14,16 @@ MDEMG's ingestion system uses language-specific parsers to extract symbols from 
 
 ## Supported Languages
 
-| Language | Status | Extensions | Symbol Types |
-|----------|--------|------------|--------------|
-| Go | Complete | `.go` | function, struct, interface, method, constant, type |
-| Python | Complete | `.py`, `.pyi` | function, class, method, constant, type |
-| TypeScript | Complete | `.ts`, `.tsx` | function, class, interface, enum, type, constant, method |
+**All 28 parsers are shipped and UPTS-validated** (implementations in
+`internal/languages/`, one spec + fixture per language in
+`lang-parse-spec/upts/`): c, cpp, csharp, cuda, cypher, dockerfile, go,
+graphql, ini, java, json, kotlin, lua, makefile, markdown, openapi, php,
+protobuf, python, rust, scraper_markdown, shell, sql, terraform, toml,
+typescript, xml, yaml.
 
-### Planned Languages (Phase 1-3)
-
-See [Parser Roadmap](#parser-roadmap) for 15 additional languages organized by priority.
+The original launch trio (Go, Python, TypeScript) plus every "Phase 1–3
+planned" language below shipped by 2026-02 (PHP added 2026-04). The
+roadmap section is retained as design history of the build order.
 
 ---
 
@@ -164,11 +165,11 @@ python runners/upts_runner.py validate-all \
 ### Go Unit Tests
 
 ```bash
-# Run all parser tests
-go test ./cmd/ingest-codebase/languages/... -v
+# Run the UPTS conformance harness over all 28 parsers
+go test ./internal/languages/ -v -run TestUPTS
 
-# Run specific language test
-go test ./cmd/ingest-codebase/languages/... -v -run TestTypeScriptParser
+# Or via the Makefile target (runs the spec runner against all specs)
+make test-parsers
 ```
 
 ### Test Report Format
@@ -188,7 +189,7 @@ go test ./cmd/ingest-codebase/languages/... -v -run TestTypeScriptParser
 
 ---
 
-## Parser Roadmap
+## Parser Roadmap (historical — all phases shipped)
 
 ### Phase 1: Config Parsers (High Leverage, Low Complexity)
 
@@ -235,7 +236,7 @@ go test ./cmd/ingest-codebase/languages/... -v -run TestTypeScriptParser
 ## Related Files
 
 - `lang-parse-spec/upts/` - UPTS test specifications and fixtures
-- `cmd/ingest-codebase/languages/` - Parser implementations
+- `internal/languages/` - Parser implementations + UPTS harness (upts_test.go)
 - `archive/` - Historical parser iterations
 
 ---

@@ -37,20 +37,32 @@ Where:
 
 ## How Edges Affect Retrieval Scoring
 
-### The Scoring Formula
+### How Learning Edges Reach the Score
+
+**Default scorer (Column-Voting RRF, since Phase 13.1 / 2026-05-03):**
+activation — which spreads through learning edges — feeds the **Graph
+column** of the RRF fusion (`RETRIEVAL_COLUMN_WEIGHT_GRAPH`, default
+0.15), and CO_ACTIVATED_WITH walks feed the **Structural column**
+(weight 0.15). Fused scores top out ~0.49–0.58 for strong matches —
+**never compare RRF scores against the legacy 0–1+ scale or hardcode
+absolute thresholds** (RRF-SCALE-001).
+
+**Legacy linear scorer (fallback / breakdown path):**
 
 ```go
-score = α*vecSim + β*activation + γ*recency + δ*confidence + boosts - penalties
+score = α*vecSim + β*activation + γ_eff*recency + δ*confidence + boosts - penalties
 ```
 
-| Component | Weight | Description |
-|-----------|--------|-------------|
-| Vector Similarity (α) | 55% | Semantic match to query |
-| **Activation (β)** | **30%** | Spreading activation through edges |
-| Recency (γ) | 10% | How recently modified |
-| Confidence (δ) | 5% | Prior retrieval success |
+| Component | Default | Config |
+|-----------|---------|--------|
+| Vector Similarity (α) | 0.60 | `SCORING_ALPHA` |
+| **Activation (β)** | **0.20** | `SCORING_BETA` |
+| Recency (γ) | 0.15 | `SCORING_GAMMA` |
+| Confidence (δ) | 0.05 | `SCORING_DELTA` |
 
-**Key insight:** Activation contributes 30% of the final score.
+**Key insight:** on either path, learning edges influence ranking
+through activation — ~20% of the legacy linear score, and the Graph +
+Structural RRF columns (~30% combined weight) on the default path.
 
 ### Spreading Activation
 
@@ -83,7 +95,7 @@ When a query is issued:
 - Most nodes receive some activation
 - Scores compress toward the middle
 
-### Visualization
+### Visualization (legacy linear scale — illustrative)
 
 ```
 Edge Count:     0         5,000      20,000
@@ -93,9 +105,14 @@ Score Range:  0.3-0.9    0.4-0.8    0.5-0.75
               [wide]    [medium]   [narrow]
 ```
 
+> Note: these ranges describe the legacy linear scale. On the default
+> RRF path the absolute scale is different (strong matches ~0.49–0.58)
+> but the same compression dynamic applies — which is exactly why
+> absolute-threshold consumers break (RRF-SCALE-001).
+
 ### Impact on Confidence Levels
 
-With fixed thresholds (e.g., score > 0.85 = HIGH):
+With fixed thresholds (e.g., legacy score > 0.85 = HIGH):
 
 | Phase | HIGH | MEDIUM | LOW |
 |-------|------|--------|-----|
@@ -176,8 +193,7 @@ MDEMG provides **percentile-based confidence** that's immune to edge density:
 3. **Track edge count alongside scores:**
 
    ```bash
-   curl -X POST http://localhost:9999/v1/memory/learning/stats \
-     -d '{"space_id":"your-space"}'
+   curl "http://localhost:9999/v1/learning/stats?space_id=your-space"
    ```
 
 ### For Production
@@ -188,21 +204,23 @@ MDEMG provides **percentile-based confidence** that's immune to edge density:
 
 2. **Consider learning freeze:**
    - Stop edge creation for stable scoring
-   - Use `POST /v1/memory/learning/freeze` (when implemented)
+   - Use `POST /v1/learning/freeze` (implemented; see route inventory)
 
 3. **Periodic edge pruning:**
    - Remove low-evidence edges (< 3 evidence_count)
    - Prune edges with decayed weight < threshold
 
-4. **Use percentile confidence:**
+4. **Use percentile confidence — with care:**
    - Always include `normalized_confidence` in responses
-   - Base decisions on percentile, not raw score
+   - Prefer percentile over raw score for cross-phase comparisons, but note
+     `normalized_confidence` is a POSITIONAL rank — on uniform-score sets it
+     admits noise, so it is not a safe SOLE gate (RRF-SCALE-001)
 
 ### Interpreting Results
 
 | Scenario | Interpretation |
 |----------|----------------|
-| High raw score (0.85+), HIGH normalized | Strong match, high confidence |
+| High raw score (legacy 0.85+ / RRF ~0.5+), HIGH normalized | Strong match, high confidence |
 | Low raw score (0.5), HIGH normalized | Best available match in compressed distribution |
 | High raw score, MEDIUM normalized | Good match but others are better |
 | Low raw score, LOW normalized | Weak match, consider fallback |
@@ -296,8 +314,8 @@ Observations in the same session are automatically linked:
 
 ## References
 
-- Investigation: `docs/CONFIDENCE_SCORE_INVESTIGATION.md`
-- Benchmark analysis: `docs/BENCHMARK_IMPROVEMENTS.md`
+- Investigation: `docs/archive/investigations/CONFIDENCE_SCORE_INVESTIGATION.md`
+- Benchmark analysis: `docs/investigations/BENCHMARK_IMPROVEMENTS.md`
 - Scoring code: `internal/retrieval/scoring.go`
 - Activation code: `internal/retrieval/activation.go`
 - Learning code: `internal/learning/service.go`
