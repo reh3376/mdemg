@@ -7,6 +7,8 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"strconv"
+	"strings"
 	"path/filepath"
 	"sync"
 	"time"
@@ -290,10 +292,38 @@ func (m *Manager) loadModule(moduleDir string) error {
 }
 
 // startModuleInstance spawns the module binary and performs handshake
+// reapOrphanPluginProcesses kills any process from a previous server
+// generation still holding this module's socket path (MCP-REVIVE-001
+// hygiene). `launchctl kickstart -k` kills the server without running
+// Manager.Stop, orphaning plugin children — 3 stale generations (Apr 30,
+// May 1, May 7) were observed live. Matching the FULL socket path via
+// pgrep -f keeps the kill surgical: only plugin binaries carry it on
+// their command line. Called before spawning, so the new child never
+// matches its own reap.
+func reapOrphanPluginProcesses(socketPath string) {
+	out, err := exec.Command("pgrep", "-f", socketPath).Output()
+	if err != nil {
+		// pgrep exits 1 on no-match — the common, healthy case.
+		return
+	}
+	for _, pidStr := range strings.Fields(string(out)) {
+		pid, convErr := strconv.Atoi(pidStr)
+		if convErr != nil || pid <= 1 || pid == os.Getpid() {
+			continue
+		}
+		slog.Warn("plugins: reaping orphaned plugin process from a previous server generation",
+			"pid", pid, "socket", socketPath)
+		if proc, findErr := os.FindProcess(pid); findErr == nil {
+			_ = proc.Kill()
+		}
+	}
+}
+
 func (m *Manager) startModuleInstance(inst *moduleInstance, binaryPath string) error {
 	info := inst.info
 
-	// Remove stale socket
+	// Reap orphans from prior server generations, then remove the stale socket
+	reapOrphanPluginProcesses(info.SocketPath)
 	os.Remove(info.SocketPath)
 
 	// Spawn binary

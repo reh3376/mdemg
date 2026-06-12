@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -27,7 +28,24 @@ const (
 type mcpServer struct {
 	endpoint   string
 	httpClient *http.Client
+	// defaultSpace is the space used when a tool call omits space_id:
+	// MDEMG_SPACE_ID env > "ide-agent" (back-compat). MCP-REVIVE-001 —
+	// previously hardcoded, stranding MCP-stored observations outside the
+	// spaces hooks recall from.
+	defaultSpace string
 }
+
+// resolveSpace returns the explicit space_id argument when present,
+// otherwise the server's default (MDEMG_SPACE_ID env > ide-agent).
+func (m *mcpServer) resolveSpace(args map[string]any) string {
+	if s, _ := args["space_id"].(string); s != "" {
+		return s
+	}
+	return m.defaultSpace
+}
+
+// spaceParamDesc documents the resolution chain on every tool's space_id param.
+const spaceParamDesc = "Memory space ID (default: MDEMG_SPACE_ID env, falling back to ide-agent)"
 
 func newMCPCmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -50,9 +68,14 @@ func runMCPServer(cmd *cobra.Command, args []string) error {
 	endpoint := config.ResolveEndpoint(defaultMCPEndpoint)
 
 	// Create MCP server state
+	defaultSpace := os.Getenv("MDEMG_SPACE_ID")
+	if defaultSpace == "" {
+		defaultSpace = defaultSpaceID
+	}
 	mcpSrv := &mcpServer{
-		endpoint:   endpoint,
-		httpClient: &http.Client{Timeout: 30 * time.Second},
+		endpoint:     endpoint,
+		httpClient:   &http.Client{Timeout: 30 * time.Second},
+		defaultSpace: defaultSpace,
 	}
 
 	// Create MCP server
@@ -90,6 +113,11 @@ func runMCPServer(cmd *cobra.Command, args []string) error {
 	// Jiminy Guidance tools (Phase Jiminy)
 	mcpSrv.registerJiminyGuideTool(s)
 
+	// Event-graph federation + /strict tools (MCP-REVIVE-001)
+	mcpSrv.registerEventgraphReinforcementTool(s)
+	mcpSrv.registerEventgraphGuidanceOutcomeTool(s)
+	mcpSrv.registerJiminyStrictTool(s)
+
 	// Start server (stdio mode for Cursor integration)
 	if err := server.ServeStdio(s); err != nil {
 		return fmt.Errorf("MCP server error: %w", err)
@@ -124,6 +152,8 @@ The memory system will automatically generate embeddings and link related concep
 			mcp.Description("Comma-separated tags for categorization (e.g., 'golang,error-handling,pattern')")),
 		mcp.WithString("source",
 			mcp.Description("Source of this observation (e.g., 'code-review', 'debugging', 'user-request')")),
+		mcp.WithString("space_id",
+			mcp.Description(spaceParamDesc)),
 	)
 
 	s.AddTool(tool, m.memoryStoreHandler)
@@ -159,7 +189,7 @@ func (m *mcpServer) memoryStoreHandler(ctx context.Context, request mcp.CallTool
 
 	// Build ingest request
 	ingestReq := map[string]any{
-		"space_id":  defaultSpaceID,
+		"space_id":  m.resolveSpace(args),
 		"content":   content,
 		"source":    source,
 		"timestamp": time.Now().UTC().Format(time.RFC3339),
@@ -204,6 +234,8 @@ Returns memories ranked by relevance, with semantic similarity and activation sc
 			mcp.Description("What you're looking for - describe the context or problem")),
 		mcp.WithNumber("limit",
 			mcp.Description("Maximum number of memories to return (default: 10)")),
+		mcp.WithString("space_id",
+			mcp.Description(spaceParamDesc)),
 	)
 
 	s.AddTool(tool, m.memoryRecallHandler)
@@ -224,7 +256,7 @@ func (m *mcpServer) memoryRecallHandler(ctx context.Context, request mcp.CallToo
 
 	// Call MDEMG API
 	retrieveReq := map[string]any{
-		"space_id":   defaultSpaceID,
+		"space_id":   m.resolveSpace(args),
 		"query_text": query,
 		"top_k":      limit,
 	}
@@ -282,6 +314,8 @@ applies to a particular domain).`),
 			mcp.Description("Type of relationship: 'related', 'causes', 'enables', 'similar' (default: 'related')")),
 		mcp.WithString("reason",
 			mcp.Description("Why these concepts are associated")),
+		mcp.WithString("space_id",
+			mcp.Description(spaceParamDesc)),
 	)
 
 	s.AddTool(tool, m.memoryAssociateHandler)
@@ -304,8 +338,9 @@ func (m *mcpServer) memoryAssociateHandler(ctx context.Context, request mcp.Call
 	reason, _ := args["reason"].(string)
 
 	// First, find both memories
+	assocSpace := m.resolveSpace(args)
 	sourceResp, err := m.callMDEMG("/v1/memory/retrieve", map[string]any{
-		"space_id":   defaultSpaceID,
+		"space_id":   assocSpace,
 		"query_text": sourceQuery,
 		"top_k":      1,
 	})
@@ -314,7 +349,7 @@ func (m *mcpServer) memoryAssociateHandler(ctx context.Context, request mcp.Call
 	}
 
 	targetResp, err := m.callMDEMG("/v1/memory/retrieve", map[string]any{
-		"space_id":   defaultSpaceID,
+		"space_id":   assocSpace,
 		"query_text": targetQuery,
 		"top_k":      1,
 	})
@@ -346,7 +381,7 @@ func (m *mcpServer) memoryAssociateHandler(ctx context.Context, request mcp.Call
 	}
 
 	_, err = m.callMDEMG("/v1/memory/ingest", map[string]any{
-		"space_id":  defaultSpaceID,
+		"space_id":  assocSpace,
 		"content":   associationContent,
 		"source":    "explicit-association",
 		"timestamp": time.Now().UTC().Format(time.RFC3339),
@@ -374,6 +409,8 @@ and potentially identifying patterns or abstractions. Use this for:
 			mcp.Description("The topic to reflect on")),
 		mcp.WithNumber("depth",
 			mcp.Description("How deeply to explore (1-3, default: 2)")),
+		mcp.WithString("space_id",
+			mcp.Description(spaceParamDesc)),
 	)
 
 	s.AddTool(tool, m.memoryReflectHandler)
@@ -397,7 +434,7 @@ func (m *mcpServer) memoryReflectHandler(ctx context.Context, request mcp.CallTo
 	topK := 10 * depth
 
 	resp, err := m.callMDEMG("/v1/memory/retrieve", map[string]any{
-		"space_id":    defaultSpaceID,
+		"space_id":    m.resolveSpace(args),
 		"query_text":  topic,
 		"candidate_k": candidateK,
 		"top_k":       topK,
@@ -537,6 +574,8 @@ Returns symbols with their file locations, types, and metadata.`),
 			mcp.Description("Fulltext search query across all symbol metadata")),
 		mcp.WithNumber("limit",
 			mcp.Description("Maximum number of symbols to return (default: 20)")),
+		mcp.WithString("space_id",
+			mcp.Description(spaceParamDesc)),
 	)
 
 	s.AddTool(tool, m.memorySymbolsHandler)
@@ -547,7 +586,7 @@ func (m *mcpServer) memorySymbolsHandler(ctx context.Context, request mcp.CallTo
 
 	// Build query parameters
 	params := make(map[string]string)
-	params["space_id"] = defaultSpaceID
+	params["space_id"] = m.resolveSpace(args)
 
 	if name, ok := args["name"].(string); ok && name != "" {
 		params["name"] = name
@@ -627,6 +666,8 @@ Use this when you want to import or re-import a codebase into memory.`),
 			mcp.Description("Ingestion mode: 'full' (re-ingest everything) or 'incremental' (only changed files). Default: 'full'")),
 		mcp.WithString("exclude_dirs",
 			mcp.Description("Comma-separated directories to exclude (e.g., 'vendor,node_modules')")),
+		mcp.WithString("space_id",
+			mcp.Description(spaceParamDesc)),
 	)
 
 	s.AddTool(tool, m.memoryIngestTriggerHandler)
@@ -646,7 +687,7 @@ func (m *mcpServer) memoryIngestTriggerHandler(ctx context.Context, request mcp.
 	}
 
 	ingestReq := map[string]any{
-		"space_id": defaultSpaceID,
+		"space_id": m.resolveSpace(args),
 		"path":     path,
 	}
 
@@ -819,7 +860,7 @@ More targeted than a full codebase re-ingestion.`),
 			mcp.Required(),
 			mcp.Description("Comma-separated list of file paths to re-ingest")),
 		mcp.WithString("space_id",
-			mcp.Description("Space ID (default: ide-agent)")),
+			mcp.Description(spaceParamDesc)),
 	)
 
 	s.AddTool(tool, m.memoryIngestFilesHandler)
@@ -847,7 +888,7 @@ func (m *mcpServer) memoryIngestFilesHandler(ctx context.Context, request mcp.Ca
 
 	spaceID, _ := args["space_id"].(string)
 	if spaceID == "" {
-		spaceID = defaultSpaceID
+		spaceID = m.defaultSpace
 	}
 
 	ingestReq := map[string]any{
@@ -1315,7 +1356,7 @@ Use this before committing changes to ensure compliance with organizational rule
 			mcp.Required(),
 			mcp.Description("Comma-separated list of changed file paths")),
 		mcp.WithString("space_id",
-			mcp.Description("Space ID to check constraints against (default: ide-agent)")),
+			mcp.Description(spaceParamDesc)),
 	)
 
 	s.AddTool(tool, m.validateChangesHandler)
@@ -1336,7 +1377,7 @@ func (m *mcpServer) validateChangesHandler(ctx context.Context, request mcp.Call
 
 	spaceID, _ := args["space_id"].(string)
 	if spaceID == "" {
-		spaceID = defaultSpaceID
+		spaceID = m.defaultSpace
 	}
 
 	// Parse comma-separated files
@@ -1565,7 +1606,7 @@ working in unfamiliar code.`),
 		mcp.WithString("agent_output",
 			mcp.Description("Your proposed code or action")),
 		mcp.WithString("space_id",
-			mcp.Description("Space ID to check against (default: ide-agent)")),
+			mcp.Description(spaceParamDesc)),
 	)
 
 	s.AddTool(tool, m.jiminyGuideHandler)
@@ -1581,7 +1622,7 @@ func (m *mcpServer) jiminyGuideHandler(ctx context.Context, request mcp.CallTool
 
 	spaceID, _ := args["space_id"].(string)
 	if spaceID == "" {
-		spaceID = defaultSpaceID
+		spaceID = m.defaultSpace
 	}
 
 	filePath, _ := args["file_path"].(string)
@@ -1633,3 +1674,186 @@ func mcpReflectTiers() (high, medium float64) {
 	}
 	return high, medium
 }
+
+// =============================================================================
+// Event-graph federation + /strict tools (MCP-REVIVE-001)
+// =============================================================================
+
+// resolveEventgraphSeed returns the explicit seed_node_id, or resolves one
+// from the top /v1/memory/retrieve result for `query` (the CLI precedent —
+// internal/cli/eventgraph.go). Returns "" with an error message when neither
+// is usable.
+func (m *mcpServer) resolveEventgraphSeed(args map[string]any, spaceID string) (string, string) {
+	if seed, _ := args["seed_node_id"].(string); seed != "" {
+		return seed, ""
+	}
+	query, _ := args["query"].(string)
+	if query == "" {
+		return "", "either seed_node_id or query is required"
+	}
+	resp, err := m.callMDEMG("/v1/memory/retrieve", map[string]any{
+		"space_id":   spaceID,
+		"query_text": query,
+		"top_k":      1,
+	})
+	if err != nil {
+		return "", fmt.Sprintf("seed resolution retrieve failed: %v", err)
+	}
+	results, _ := resp["results"].([]any)
+	if len(results) == 0 {
+		return "", fmt.Sprintf("no retrieval result for query %q — cannot resolve a seed", query)
+	}
+	top, _ := results[0].(map[string]any)
+	nodeID, _ := top["node_id"].(string)
+	if nodeID == "" {
+		return "", "top retrieval result has no node_id"
+	}
+	return nodeID, ""
+}
+
+// eventgraphRequest builds the federation request body. hops/since_hours/
+// limit are OMITTED when unset so the server's config defaults apply
+// (single source of truth — no client-side default copies; the
+// EVENTGRAPH-CLI-001 rule).
+func eventgraphRequest(args map[string]any, spaceID, seed string) map[string]any {
+	body := map[string]any{"space_id": spaceID, "seed_node_id": seed}
+	if hops, ok := args["hops"].(float64); ok && hops > 0 {
+		body["hops"] = int(hops)
+	}
+	if sinceHours, ok := args["since_hours"].(float64); ok && sinceHours > 0 {
+		body["since_seconds"] = int(sinceHours * 3600)
+	}
+	if limit, ok := args["limit"].(float64); ok && limit > 0 {
+		body["limit"] = int(limit)
+	}
+	return body
+}
+
+func (m *mcpServer) registerEventgraphReinforcementTool(s *server.MCPServer) {
+	tool := mcp.NewTool("eventgraph_reinforcement_neighborhood",
+		mcp.WithDescription(`Inspect Hebbian learning activity around a memory: walks the graph from a seed node and returns the reinforcement events (co-activation weight updates) that touched its neighborhood. Use this to understand WHY memories are connected and which sessions strengthened them.`),
+		mcp.WithString("seed_node_id",
+			mcp.Description("Seed node_id to walk from (use this OR query)")),
+		mcp.WithString("query",
+			mcp.Description("Resolve the seed from the top retrieval result for this query text")),
+		mcp.WithNumber("hops",
+			mcp.Description("Graph walk depth (default: server config)")),
+		mcp.WithNumber("since_hours",
+			mcp.Description("Event lookback in hours (default: server config)")),
+		mcp.WithNumber("limit",
+			mcp.Description("Maximum events returned (default: server config)")),
+		mcp.WithString("space_id",
+			mcp.Description(spaceParamDesc)),
+	)
+	s.AddTool(tool, m.eventgraphReinforcementHandler)
+}
+
+func (m *mcpServer) eventgraphReinforcementHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	args := getArgs(request)
+	spaceID := m.resolveSpace(args)
+	seed, errMsg := m.resolveEventgraphSeed(args, spaceID)
+	if errMsg != "" {
+		return newToolResultError(errMsg), nil
+	}
+	resp, err := m.callMDEMG("/v1/eventgraph/reinforcement-neighborhood", eventgraphRequest(args, spaceID, seed))
+	if err != nil {
+		return newToolResultError(fmt.Sprintf("federation query failed: %v", err)), nil
+	}
+	return formatEventgraphResult(resp, "Reinforcement events", seed)
+}
+
+func (m *mcpServer) registerEventgraphGuidanceOutcomeTool(s *server.MCPServer) {
+	tool := mcp.NewTool("eventgraph_guidance_outcome_neighborhood",
+		mcp.WithDescription(`Inspect guidance effectiveness around a constraint: walks the graph from a seed node and returns the followed/ignored/contradicted outcomes recorded for constraints in its neighborhood. Use this to see whether guidance derived from a memory region is actually being followed.`),
+		mcp.WithString("seed_node_id",
+			mcp.Description("Seed node_id to walk from (use this OR query)")),
+		mcp.WithString("query",
+			mcp.Description("Resolve the seed from the top retrieval result for this query text")),
+		mcp.WithNumber("hops",
+			mcp.Description("Graph walk depth (default: server config)")),
+		mcp.WithNumber("since_hours",
+			mcp.Description("Outcome lookback in hours (default: server config)")),
+		mcp.WithNumber("limit",
+			mcp.Description("Maximum outcomes returned (default: server config)")),
+		mcp.WithString("space_id",
+			mcp.Description(spaceParamDesc)),
+	)
+	s.AddTool(tool, m.eventgraphGuidanceOutcomeHandler)
+}
+
+func (m *mcpServer) eventgraphGuidanceOutcomeHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	args := getArgs(request)
+	spaceID := m.resolveSpace(args)
+	seed, errMsg := m.resolveEventgraphSeed(args, spaceID)
+	if errMsg != "" {
+		return newToolResultError(errMsg), nil
+	}
+	resp, err := m.callMDEMG("/v1/eventgraph/guidance-outcome-neighborhood", eventgraphRequest(args, spaceID, seed))
+	if err != nil {
+		return newToolResultError(fmt.Sprintf("federation query failed: %v", err)), nil
+	}
+	return formatEventgraphResult(resp, "Guidance outcomes", seed)
+}
+
+// formatEventgraphResult renders a federation response compactly: counts +
+// the raw JSON (the payload is structured data the agent consumes directly).
+func formatEventgraphResult(resp map[string]any, kind, seed string) (*mcp.CallToolResult, error) {
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("## %s — neighborhood of %s\n\n", kind, seed))
+	if nn, ok := resp["neighbor_node_ids"].([]any); ok {
+		sb.WriteString(fmt.Sprintf("Neighborhood size: %d nodes\n", len(nn)))
+	}
+	if evs, ok := resp["events"].([]any); ok {
+		sb.WriteString(fmt.Sprintf("Events: %d\n\n", len(evs)))
+	}
+	if outs, ok := resp["outcomes"].([]any); ok {
+		sb.WriteString(fmt.Sprintf("Outcomes: %d\n\n", len(outs)))
+	}
+	data, err := json.MarshalIndent(resp, "", "  ")
+	if err != nil {
+		return newToolResultError(fmt.Sprintf("marshal result: %v", err)), nil
+	}
+	sb.WriteString("```json\n")
+	sb.Write(data)
+	sb.WriteString("\n```")
+	return mcp.NewToolResultText(sb.String()), nil
+}
+
+func (m *mcpServer) registerJiminyStrictTool(s *server.MCPServer) {
+	tool := mcp.NewTool("jiminy_strict",
+		mcp.WithDescription(`Toggle Jiminy /strict mode (deterministic governance) for a session. When enabled, prompt hooks deliver imperative directives instead of advisory guidance and escalated constraints block Write/Edit operations. Fail-open: if the MDEMG server is unreachable, actions are allowed.`),
+		mcp.WithString("session_id",
+			mcp.Required(),
+			mcp.Description("Session to toggle strict mode for (e.g., 'claude-core')")),
+		mcp.WithBoolean("enabled",
+			mcp.Required(),
+			mcp.Description("true to enable strict mode, false to disable")),
+	)
+	s.AddTool(tool, m.jiminyStrictHandler)
+}
+
+func (m *mcpServer) jiminyStrictHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	args := getArgs(request)
+	sessionID, _ := args["session_id"].(string)
+	if sessionID == "" {
+		return newToolResultError("session_id is required"), nil
+	}
+	enabled, ok := args["enabled"].(bool)
+	if !ok {
+		return newToolResultError("enabled (boolean) is required"), nil
+	}
+	resp, err := m.callMDEMG("/v1/jiminy/strict", map[string]any{
+		"session_id": sessionID,
+		"enabled":    enabled,
+	})
+	if err != nil {
+		return newToolResultError(fmt.Sprintf("strict toggle failed: %v", err)), nil
+	}
+	state := "disabled"
+	if enabled {
+		state = "enabled"
+	}
+	msg, _ := resp["message"].(string)
+	return mcp.NewToolResultText(fmt.Sprintf("Strict mode %s for session %s. %s", state, sessionID, msg)), nil
+}
+
