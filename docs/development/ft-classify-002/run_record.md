@@ -26,3 +26,27 @@ phase 6a's instrumentation design).
    must hard-fail on 0 successful calls, never report 0.0000 as a score.
 4. Stage timings vary by task ~10× (13 min vs 109 min training) — the
    compute lease should size from corpus stats, not a constant.
+
+## Gate results (2026-06-12 08:15 ET)
+
+Candidate evaluated in its PROMOTION FORM (fused → GGUF Q5_K_M via the
+production conversion path, served by llama-server :18103) after the MLX
+side-server crashed with Metal OOM 1/3 through the sweep — the exact
+crash class that motivated Phase 13.5. **Rule going forward: candidate
+evals always use the GGUF form.** Two more zero-call instances caught
+(mlx model-name 404s; llama-server /v1/models answers before the model
+loads — readiness = /health, never /v1/models). That is FOUR
+zero-call-scored-as-0.0000 instances in one sprint: 6a MUST make the
+benchmark stage hard-fail on zero successful calls.
+
+| Gate | Result |
+|---|---|
+| aggregate ≥ baseline | PASS (0.8520 vs 0.8507) |
+| consulting.classify rises | PASS (0.9228 → 0.9417, +1.9pp) |
+| no task regresses >2pp | FAIL (jiminy.evaluate −3.3pp, 0.8889→0.8556) |
+
+Key finding: under the FIXED reward the classify baseline is 0.9228 —
+the stored 0.668 was largely reward artifact, not model deficiency.
+Recommendation to operator: NO PROMOTE (gate 3); candidate + reports
+archived; the noise hypothesis on jiminy.evaluate (1-2 rows on a 20-row
+slice) is testable cheaply if the operator wants a second opinion.
