@@ -275,7 +275,7 @@ type Config struct {
 
 	// Jiminy Guidance settings (Phase Jiminy)
 	JiminyEnabled       bool    // JIMINY_ENABLED — enable Jiminy inner voice guidance (default: true)
-	JiminyTimeoutMs     int     // JIMINY_TIMEOUT_MS — overall timeout for Guide() in ms (default: 15000)
+	JiminyTimeoutMs            int     // JIMINY_TIMEOUT_MS — direct Guide() budget; 0 = derive from JIMINY_WARM_COMPUTE_TIMEOUT_MS (default: 0; the old independent 15s starved fresh installs)
 	JiminyMaxItems      int     // JIMINY_MAX_ITEMS — max guidance items returned (default: 10)
 	JiminyMinConfidence float64 // JIMINY_MIN_CONFIDENCE — minimum confidence to include item (default: 0.3)
 	// JIMINY-OUTCOME-001 — minimum vector-index cosine similarity for an embedding-based
@@ -295,11 +295,12 @@ type Config struct {
 	// JiminyWarmComputeTimeout() method — do NOT re-default the literal at call
 	// sites. No-hardcoding rule (single source of truth).
 	JiminyWarmComputeTimeoutMs int     // JIMINY_WARM_COMPUTE_TIMEOUT_MS (default: DefaultJiminyWarmComputeTimeoutMs)
+	JiminyReformulateTimeoutMs int     // JIMINY_REFORMULATE_TIMEOUT_MS — /reformulate budget; 0 = derive from warm-compute budget (default: 0; was hardcoded 10s)
 	JiminyFeedbackTimeoutMs    int     // JIMINY_FEEDBACK_TIMEOUT_MS — server-side budget for /v1/jiminy/feedback outcome processing, detached from the hook's connection lifetime (default: 60000; 0 = no timeout)
 	JiminyWarmMaxAgeSec        int     // JIMINY_WARM_MAX_AGE_SEC — max age before guidance is considered stale (default: 300)
 	JiminyIncludeFrontiers     bool    // JIMINY_INCLUDE_FRONTIERS — include frontier node suggestions (default: true)
 	JiminyFrontierMinSim       float64 // JIMINY_FRONTIER_MIN_SIM — min similarity for frontier nodes (default: 0.5)
-	JiminyEffectivenessTTLSec  int     // JIMINY_EFFECTIVENESS_TTL_SEC — TTL for tracked guidance in seconds (default: 1800)
+	JiminyEffectivenessTTLSec  int     // JIMINY_EFFECTIVENESS_TTL_SEC — TTL for tracked guidance in seconds (default: 86400; must exceed realistic feedback delay)
 
 	// Jiminy J7: Full-Spectrum Retrieval
 	JiminyRetrievalEnabled  bool // JIMINY_RETRIEVAL_ENABLED — use full retrieval pipeline (default: true)
@@ -1142,6 +1143,27 @@ func (c Config) JiminyWarmComputeTimeout() time.Duration {
 		ms = DefaultJiminyWarmComputeTimeoutMs
 	}
 	return time.Duration(ms) * time.Millisecond
+}
+
+// EffectiveJiminyTimeout returns the direct-path Guide() budget
+// (JIMINY-BUDGET-001): an explicit positive JIMINY_TIMEOUT_MS wins;
+// otherwise DERIVE from the warm-compute budget — the two paths run the
+// same synthesis work, and the old independent 15s default starved every
+// fresh install (synthesis runs ~50s live; only the warm path had 90s).
+func (c Config) EffectiveJiminyTimeout() time.Duration {
+	if c.JiminyTimeoutMs > 0 {
+		return time.Duration(c.JiminyTimeoutMs) * time.Millisecond
+	}
+	return c.JiminyWarmComputeTimeout()
+}
+
+// EffectiveJiminyReformulateTimeout: same derivation for /reformulate
+// (was a hardcoded 10s — shorter than every other guidance budget).
+func (c Config) EffectiveJiminyReformulateTimeout() time.Duration {
+	if c.JiminyReformulateTimeoutMs > 0 {
+		return time.Duration(c.JiminyReformulateTimeoutMs) * time.Millisecond
+	}
+	return c.JiminyWarmComputeTimeout()
 }
 
 func (c Config) EffectiveLLMEndpoint() string {
@@ -2251,7 +2273,7 @@ func FromEnv() (Config, error) {
 
 	// Jiminy Guidance settings (Phase Jiminy)
 	jiminyEnabled := getBool("JIMINY_ENABLED", true)
-	jiminyTimeoutMs, err := atoi("JIMINY_TIMEOUT_MS", 15000)
+	jiminyTimeoutMs, err := atoi("JIMINY_TIMEOUT_MS", 0)
 	if err != nil {
 		return Config{}, err
 	}
@@ -2287,6 +2309,10 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	jiminyReformulateTimeoutMs, err := atoi("JIMINY_REFORMULATE_TIMEOUT_MS", 0)
+	if err != nil {
+		return Config{}, err
+	}
 	jiminyWarmDebounceSec, err := atoi("JIMINY_WARM_DEBOUNCE_SEC", 10)
 	if err != nil {
 		return Config{}, err
@@ -2309,7 +2335,7 @@ func FromEnv() (Config, error) {
 	jiminySynthesisEnabled := getBool("JIMINY_SYNTHESIS_ENABLED", true) // J15: default changed from false to true
 	jiminySynthesisProvider := get("JIMINY_SYNTHESIS_PROVIDER", llmProvider)
 	jiminySynthesisModel := get("JIMINY_SYNTHESIS_MODEL", llmModel)
-	jiminySynthesisMaxTokens, err := atoi("JIMINY_SYNTHESIS_MAX_TOKENS", 2000) // J15: default changed from 1000 to 2000
+	jiminySynthesisMaxTokens, err := atoi("JIMINY_SYNTHESIS_MAX_TOKENS", 3000) // J15: default changed from 1000 to 2000
 	if err != nil {
 		return Config{}, err
 	}
@@ -2334,7 +2360,7 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	jiminyEvaluateLLMMaxTokens, err := atoi("JIMINY_EVALUATE_LLM_MAX_TOKENS", 2000)
+	jiminyEvaluateLLMMaxTokens, err := atoi("JIMINY_EVALUATE_LLM_MAX_TOKENS", 3000)
 	if err != nil {
 		return Config{}, err
 	}
@@ -2349,7 +2375,7 @@ func FromEnv() (Config, error) {
 		return Config{}, err
 	}
 	// J14: Outcome classifier LLM config
-	jiminyOutcomeLLMMaxTokens, err := atoi("JIMINY_OUTCOME_LLM_MAX_TOKENS", 100)
+	jiminyOutcomeLLMMaxTokens, err := atoi("JIMINY_OUTCOME_LLM_MAX_TOKENS", 3000)
 	if err != nil {
 		return Config{}, err
 	}
@@ -4437,6 +4463,7 @@ func FromEnv() (Config, error) {
 		JiminyWarmEnabled:                jiminyWarmEnabled,
 		JiminyWarmDebounceSec:            jiminyWarmDebounceSec,
 		JiminyWarmComputeTimeoutMs:       jiminyWarmComputeTimeoutMs,
+		JiminyReformulateTimeoutMs:       jiminyReformulateTimeoutMs,
 		JiminyFeedbackTimeoutMs:          jiminyFeedbackTimeoutMs,
 		JiminyWarmMaxAgeSec:              jiminyWarmMaxAgeSec,
 
@@ -5037,6 +5064,14 @@ func ResolveEndpoint(defaultAddr string) string {
 // Validate checks cross-field constraints that individual parsing can't catch.
 // Returns warnings (non-fatal) as a slice and an error if anything is critically wrong.
 func (c Config) Validate() (warnings []string, err error) {
+	// JIMINY-BUDGET-001: an explicit direct-Guide budget shorter than the
+	// warm-compute budget re-creates the fresh-install starvation class the
+	// derivation default exists to kill. Advisory, not fatal.
+	if c.JiminyTimeoutMs > 0 && c.JiminyTimeoutMs < c.JiminyWarmComputeTimeoutMs {
+		slog.Warn("config: JIMINY_TIMEOUT_MS is set below JIMINY_WARM_COMPUTE_TIMEOUT_MS — direct Guide() calls get a tighter budget than warm pre-compute; synthesis (~50s live) may starve",
+			"jiminy_timeout_ms", c.JiminyTimeoutMs,
+			"warm_compute_timeout_ms", c.JiminyWarmComputeTimeoutMs)
+	}
 	var errs []error
 
 	// Weight groups that should sum to ~1.0 (tolerance: 0.01)

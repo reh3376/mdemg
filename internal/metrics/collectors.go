@@ -62,6 +62,11 @@ type StandardMetrics struct {
 	// go/no-go criterion measurable from metric_samples.
 	GuidanceConflicts func(spaceID string) *Counter
 
+	// Surface-vs-outcome split (JIMINY-BUDGET-001): surfaced is the honest
+	// denominator; dropped feedback makes the silent gap observable.
+	JiminyGuidanceSurfaced func(spaceID string) *Counter
+	JiminyFeedbackDropped  func(spaceID string) *Counter
+
 	// Emergence/consolidation cycle wall time (TSDB-CONSUME-001) — the
 	// observable the DBSCAN O(n²) deferral is conditioned on (>60s revisit
 	// threshold). Gauge of the LAST completed cycle, not a histogram: the
@@ -329,6 +334,12 @@ func NewStandardMetrics(r *Registry) *StandardMetrics {
 		return r.NewGauge("tsdb_writer_rows_dropped_total", "Cumulative rows dropped (buffer overflow) per buffered TSDB writer", map[string]string{"writer": writer})
 	}
 
+	m.JiminyGuidanceSurfaced = func(spaceID string) *Counter {
+		return r.NewCounter("jiminy_guidance_surfaced_total", "Guidance items returned by Guide() — the denominator the outcome counts were missing (JIMINY-BUDGET-001)", map[string]string{"space_id": spaceID})
+	}
+	m.JiminyFeedbackDropped = func(spaceID string) *Counter {
+		return r.NewCounter("jiminy_feedback_dropped_total", "Feedback arriving after the guidance_id expired from the tracker", map[string]string{"space_id": spaceID})
+	}
 	m.GuidanceConflicts = func(spaceID string) *Counter {
 		return r.NewCounter("guidance_conflicts_total", "Conflicts detected by consulting.Suggest (idea 09 go/no-go signal)", map[string]string{"space_id": spaceID})
 	}

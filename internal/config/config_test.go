@@ -106,3 +106,29 @@ func TestResolveEndpoint_WhitespaceHandling(t *testing.T) {
 		t.Errorf("ResolveEndpoint() = %q, want %q", got, want)
 	}
 }
+
+// JIMINY-BUDGET-001: the direct Guide() budget derives from the warm-compute
+// budget when unset — the old independent 15s default starved fresh installs.
+func TestEffectiveJiminyTimeout_Derivation(t *testing.T) {
+	c := Config{JiminyWarmComputeTimeoutMs: 90000}
+	if got := c.EffectiveJiminyTimeout(); got.Milliseconds() != 90000 {
+		t.Errorf("unset JiminyTimeoutMs should derive 90000, got %d", got.Milliseconds())
+	}
+	c.JiminyTimeoutMs = 20000
+	if got := c.EffectiveJiminyTimeout(); got.Milliseconds() != 20000 {
+		t.Errorf("explicit override lost: %d", got.Milliseconds())
+	}
+	r := Config{JiminyWarmComputeTimeoutMs: 90000}
+	if got := r.EffectiveJiminyReformulateTimeout(); got.Milliseconds() != 90000 {
+		t.Errorf("reformulate derivation: %d", got.Milliseconds())
+	}
+	r.JiminyReformulateTimeoutMs = 12000
+	if got := r.EffectiveJiminyReformulateTimeout(); got.Milliseconds() != 12000 {
+		t.Errorf("reformulate override lost: %d", got.Milliseconds())
+	}
+	// zero warm budget falls back to the package default (90s)
+	z := Config{}
+	if got := z.EffectiveJiminyTimeout(); got.Milliseconds() != int64(DefaultJiminyWarmComputeTimeoutMs) {
+		t.Errorf("zero-config derivation should hit DefaultJiminyWarmComputeTimeoutMs, got %d", got.Milliseconds())
+	}
+}

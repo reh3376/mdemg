@@ -17,6 +17,7 @@ import (
 	"mdemg/internal/conversation"
 	"mdemg/internal/embeddings"
 	"mdemg/internal/llmclient"
+	"mdemg/internal/metrics"
 	"mdemg/internal/models"
 	"mdemg/internal/sanitize"
 )
@@ -657,11 +658,10 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 		maxItems = s.cfg.JiminyMaxItems
 	}
 
-	timeoutMs := s.cfg.JiminyTimeoutMs
-	if timeoutMs <= 0 {
-		timeoutMs = 6000
-	}
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(timeoutMs)*time.Millisecond)
+	// JIMINY-BUDGET-001: budget derived from the warm-compute budget when
+	// JIMINY_TIMEOUT_MS is unset — the old independent 15s (6s fallback)
+	// starved fresh installs whose synthesis runs ~50s.
+	ctx, cancel := context.WithTimeout(ctx, s.cfg.EffectiveJiminyTimeout())
 	defer cancel()
 
 	// Generate embedding for context
@@ -1197,6 +1197,13 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 		}
 	}
 
+	// JIMINY-BUDGET-001: surfaced is the honest denominator the outcome
+	// counts were missing — TotalGuidanceIssued only counts guidance that
+	// RECEIVED feedback; the surfaced-but-silent gap was invisible.
+	if len(filtered) > 0 {
+		metrics.Metrics().JiminyGuidanceSurfaced(req.SpaceID).Add(int64(len(filtered)))
+	}
+
 	resp := GuidanceResponse{
 		GuidanceID:           guidanceID,
 		Guidance:             filtered,
@@ -1427,6 +1434,7 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 
 	items := s.tracker.Lookup(req.GuidanceID)
 	if items == nil {
+		metrics.Metrics().JiminyFeedbackDropped(req.SpaceID).Inc()
 		slog.Warn("jiminy: feedback dropped — guidance_id expired from tracker",
 			"guidance_id", req.GuidanceID, "session_id", req.SessionID)
 		return &GuidanceFeedbackResponse{
@@ -1521,7 +1529,7 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 		// F3: Persist guidance outcome to Neo4j and update constraint confidence
 		// Skip not_applicable — topically unrelated items should not create edges or decay confidence
 		if s.persistence != nil && outcome != OutcomeUnknown && outcome != OutcomeNotApplicable {
-			if err := s.persistence.PersistGuidanceOutcome(ctx, req.SpaceID, req.GuidanceID, "", item, outcome, cr.Confidence); err != nil {
+			if err := s.persistence.PersistGuidanceOutcome(ctx, req.SpaceID, req.GuidanceID, feedbackSessionID, item, outcome, cr.Confidence); err != nil {
 				slog.Error("jiminy: persist outcome failed", "error", err)
 			}
 			// RSIC-SK1: Update confidence for all guidance types with source nodes
