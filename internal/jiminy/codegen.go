@@ -93,7 +93,12 @@ func (g *ConstraintCodeGenerator) GenerateCode(ctx context.Context, constraintTy
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	if g.existing[code] {
-		return g.fallbackCode(description), nil
+		// Must use the Locked variant here: calling fallbackCode (which
+		// takes g.mu) while holding g.mu self-deadlocked the generator
+		// permanently — every later GenerateCode caller (and therefore
+		// every constraint-typed Observe) queued forever. Caught live in
+		// DORMANT-CENSUS-001 Tier 3 (UATS conversation_observe_pinned).
+		return g.fallbackCodeLocked(description), nil
 	}
 	g.existing[code] = true
 	return code, nil
@@ -115,13 +120,18 @@ func (g *ConstraintCodeGenerator) UnregisterCode(code string) {
 
 // fallbackCode generates a deterministic code from the description hash.
 func (g *ConstraintCodeGenerator) fallbackCode(description string) string {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return g.fallbackCodeLocked(description)
+}
+
+// fallbackCodeLocked is fallbackCode for callers already holding g.mu.
+// sync.Mutex is not reentrant — locking again from the same goroutine
+// deadlocks the generator for the life of the process.
+func (g *ConstraintCodeGenerator) fallbackCodeLocked(description string) string {
 	h := sha256.Sum256([]byte(description))
 	code := "auto-" + hex.EncodeToString(h[:6])
-
-	g.mu.Lock()
 	g.existing[code] = true
-	g.mu.Unlock()
-
 	return code
 }
 

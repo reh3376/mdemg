@@ -1,6 +1,7 @@
 package conversation
 
 import (
+	"log/slog"
 	"context"
 	"math"
 	"regexp"
@@ -76,7 +77,9 @@ func (d *SurpriseDetector) DetectSurprise(ctx context.Context, obs Observation) 
 	if len(obs.Embedding) > 0 {
 		embNovelty, err := d.computeEmbeddingNovelty(ctx, obs.SpaceID, obs.Embedding)
 		if err != nil {
-			// Don't fail, just log and continue
+			// Fail-open with a LOUD log — this path was silent, masking the
+			// query failure class (SURPRISE-TOPK-001).
+			slog.Warn("surprise: embedding novelty query failed", "error", err)
 			embNovelty = 0.0
 		}
 		factors.EmbeddingNovelty = embNovelty
@@ -256,18 +259,42 @@ func (d *SurpriseDetector) computeEmbeddingNovelty(ctx context.Context, spaceID 
 	defer sess.Close(ctx)
 
 	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		// SURPRISE-TOPK-001: novelty is measured against the K NEAREST
+		// neighbors, exact-ranked (was an unordered LIMIT 50 sample — no
+		// ORDER BY, similarity-decoupled; live evidence: every reinforcement
+		// event ever carried surprise_factor=1.0 and node scores averaged
+		// 0.023, because the sample was dominated by EMPTY-ARRAY embeddings
+		// whose cosine() yields NULL). Design notes from live verification:
+		//   - size(n.embedding) = dims guards the 78% empty-embedding rows
+		//     (they pass IS NOT NULL but are uncomparable);
+		//   - db.index.vector.queryNodes was REJECTED: the label-wide index
+		//     is crowded by ~100k non-conversation nodes (the raw top-200
+		//     near a conversation seed were ALL emergent_concept centroids),
+		//     so role-filtered hits prune to zero. Exact ORDER BY scan over
+		//     the ~1.2k real-embedding conversation rows is deterministic and
+		//     O(N·d) ≈ ms; revisit if the role population reaches ~50k.
+		topK := d.cfg.SurpriseEmbeddingNoveltyTopK
+		if topK <= 0 {
+			topK = 50
+		}
 		cypher := `
 			MATCH (n:MemoryNode {space_id: $spaceId})
 			WHERE n.role_type = 'conversation_observation'
-			  AND n.embedding IS NOT NULL
-			WITH n
-			LIMIT 50
-			RETURN avg(vector.similarity.cosine(n.embedding, $embedding)) as avgSimilarity,
+			  AND size(n.embedding) = $dims
+			  AND NOT coalesce(n.is_archived, false)
+			WITH n, vector.similarity.cosine(n.embedding, $embedding) AS sim
+			WHERE sim >= $simFloor
+			ORDER BY sim DESC
+			LIMIT $topK
+			RETURN avg(sim) as avgSimilarity,
 			       count(n) as nodeCount
 		`
 		params := map[string]any{
 			"spaceId":   spaceID,
 			"embedding": embedding,
+			"dims":      len(embedding),
+			"topK":      topK,
+			"simFloor":  d.cfg.SurpriseEmbeddingNoveltySimFloor,
 		}
 
 		res, err := tx.Run(ctx, cypher, params)

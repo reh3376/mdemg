@@ -77,11 +77,11 @@ services:
 
       # LLM / Reranker
       # Phase 11.6 (2026-04-30): production cutover. Defaults moved from gpt-5.4-mini cloud
-      # to mdemg-llm-v1 (Phase 5 dense, served by mlx_lm.server on host:8101). Containers
+      # to mdemg-llm-v1 (Phase 5 dense, served by llama-server on host:8102 (Phase 13.5 cutover, 2026-05-03)). Containers
       # reach the host via host.docker.internal:8101. Override via .env to switch back to cloud.
       LLM_PROVIDER: "${LLM_PROVIDER:-openai}"
       LLM_MODEL: "${LLM_MODEL:-mdemg-llm-v1}"
-      LLM_ENDPOINT: "${LLM_ENDPOINT:-http://host.docker.internal:8101/v1}"
+      LLM_ENDPOINT: "${LLM_ENDPOINT:-http://host.docker.internal:8102/v1}"
       RERANK_ENABLED: "${RERANK_ENABLED:-true}"
       RERANK_PROVIDER: "${RERANK_PROVIDER:-openai}"
       RERANK_MODEL: "${RERANK_MODEL:-mdemg-llm-v1}"
@@ -261,7 +261,6 @@ services:
       GF_PANELS_DISABLE_SANITIZE_HTML: "true"
       GF_INSTALL_PLUGINS: "kniepdennis-neo4j-datasource,hamedkarbasi93-nodegraphapi-datasource"
       TSDB_PASSWORD: "${TSDB_PASSWORD:-mdemg_metrics}"
-      MDEMG_GRAFANA_ALERT_WEBHOOK_URL: "${MDEMG_GRAFANA_ALERT_WEBHOOK_URL:-http://mdemg:9999/v1/alerts/grafana}"
     volumes:
       - grafana_data:/var/lib/grafana
       - ./deploy/docker/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro

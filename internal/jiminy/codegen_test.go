@@ -2,7 +2,13 @@ package jiminy
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
+	"time"
+
+	"mdemg/internal/llmclient"
 )
 
 func TestConstraintCodeGenerator_FallbackCode(t *testing.T) {
@@ -39,6 +45,58 @@ func TestConstraintCodeGenerator_CollisionAvoidance(t *testing.T) {
 	code, _ := gen.GenerateCode(context.Background(), "must", "Test before commit")
 	if code == "no-force-push" || code == "test-first" {
 		t.Errorf("code %q collided with existing codes", code)
+	}
+}
+
+// TestConstraintCodeGenerator_CollisionFallbackNoDeadlock pins the
+// DORMANT-CENSUS-001 live-smoke fix: when the LLM returns a code that is
+// already registered, the collision branch (which holds g.mu) must use
+// fallbackCodeLocked — the old code called fallbackCode, re-locking the
+// non-reentrant mutex and wedging the generator (and every constraint-typed
+// Observe) for the life of the process.
+func TestConstraintCodeGenerator_CollisionFallbackNoDeadlock(t *testing.T) {
+	// Fake OpenAI-compat endpoint that always returns the same code.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"colliding-code"}}]}`))
+	}))
+	defer srv.Close()
+
+	client := llmclient.New(llmclient.Config{
+		Provider:  "openai",
+		Model:     "test",
+		APIKey:    "test",
+		BaseURL:   srv.URL,
+		TimeoutMs: 5000,
+	})
+	gen := NewConstraintCodeGenerator(client)
+	gen.RegisterExistingCode("colliding-code")
+
+	done := make(chan string, 1)
+	go func() {
+		code, err := gen.GenerateCode(context.Background(), "must", "some constraint description")
+		if err != nil {
+			t.Errorf("GenerateCode failed: %v", err)
+		}
+		done <- code
+	}()
+
+	select {
+	case code := <-done:
+		if !strings.HasPrefix(code, "auto-") {
+			t.Errorf("collision path should return a deterministic auto- code, got %q", code)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("GenerateCode deadlocked on the collision-fallback path")
+	}
+
+	// The generator must remain usable afterwards (the wedge was permanent).
+	code2, err := gen.GenerateCode(context.Background(), "must", "another description")
+	if err != nil {
+		t.Fatalf("subsequent GenerateCode failed: %v", err)
+	}
+	if code2 == "" {
+		t.Fatal("subsequent GenerateCode returned empty code")
 	}
 }
 

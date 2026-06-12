@@ -17,6 +17,7 @@ import (
 	"mdemg/internal/conversation"
 	"mdemg/internal/embeddings"
 	"mdemg/internal/llmclient"
+	"mdemg/internal/metrics"
 	"mdemg/internal/models"
 	"mdemg/internal/sanitize"
 )
@@ -657,11 +658,10 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 		maxItems = s.cfg.JiminyMaxItems
 	}
 
-	timeoutMs := s.cfg.JiminyTimeoutMs
-	if timeoutMs <= 0 {
-		timeoutMs = 6000
-	}
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(timeoutMs)*time.Millisecond)
+	// JIMINY-BUDGET-001: budget derived from the warm-compute budget when
+	// JIMINY_TIMEOUT_MS is unset — the old independent 15s (6s fallback)
+	// starved fresh installs whose synthesis runs ~50s.
+	ctx, cancel := context.WithTimeout(ctx, s.cfg.EffectiveJiminyTimeout())
 	defer cancel()
 
 	// Generate embedding for context
@@ -930,13 +930,15 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 	// Deduplicate by content (semantic if embedder available, exact otherwise)
 	filtered = s.deduplicateItems(filtered)
 
-	// Sort by priority (high > medium > low) then confidence (desc)
+	// Sort by priority (high > medium > low), then within equal priority by
+	// (1-w)·confidence + w·learned signal strength (DORMANT-CENSUS-001).
+	// Ordering only — selection/filtering above is untouched.
 	sort.Slice(filtered, func(i, j int) bool {
 		pi, pj := priorityRank(filtered[i].Priority), priorityRank(filtered[j].Priority)
 		if pi != pj {
 			return pi < pj
 		}
-		return filtered[i].Confidence > filtered[j].Confidence
+		return s.guidanceSortKey(filtered[i]) > s.guidanceSortKey(filtered[j])
 	})
 
 	// Truncate to max items
@@ -1197,6 +1199,13 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 		}
 	}
 
+	// JIMINY-BUDGET-001: surfaced is the honest denominator the outcome
+	// counts were missing — TotalGuidanceIssued only counts guidance that
+	// RECEIVED feedback; the surfaced-but-silent gap was invisible.
+	if len(filtered) > 0 {
+		metrics.Metrics().JiminyGuidanceSurfaced(req.SpaceID).Add(int64(len(filtered)))
+	}
+
 	resp := GuidanceResponse{
 		GuidanceID:           guidanceID,
 		Guidance:             filtered,
@@ -1427,6 +1436,7 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 
 	items := s.tracker.Lookup(req.GuidanceID)
 	if items == nil {
+		metrics.Metrics().JiminyFeedbackDropped(req.SpaceID).Inc()
 		slog.Warn("jiminy: feedback dropped — guidance_id expired from tracker",
 			"guidance_id", req.GuidanceID, "session_id", req.SessionID)
 		return &GuidanceFeedbackResponse{
@@ -1521,7 +1531,7 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 		// F3: Persist guidance outcome to Neo4j and update constraint confidence
 		// Skip not_applicable — topically unrelated items should not create edges or decay confidence
 		if s.persistence != nil && outcome != OutcomeUnknown && outcome != OutcomeNotApplicable {
-			if err := s.persistence.PersistGuidanceOutcome(ctx, req.SpaceID, req.GuidanceID, "", item, outcome, cr.Confidence); err != nil {
+			if err := s.persistence.PersistGuidanceOutcome(ctx, req.SpaceID, req.GuidanceID, feedbackSessionID, item, outcome, cr.Confidence); err != nil {
 				slog.Error("jiminy: persist outcome failed", "error", err)
 			}
 			// RSIC-SK1: Update confidence for all guidance types with source nodes
@@ -2579,6 +2589,26 @@ func firstSourceNode(item GuidanceItem) string {
 		return item.SourceNodes[0]
 	}
 	return ""
+}
+
+// guidanceSortKey computes the within-priority ordering key for Guide()
+// (DORMANT-CENSUS-001): (1-w)·confidence + w·learned signal strength, where
+// w = JIMINY_SIGNAL_STRENGTH_WEIGHT (clamped to [0,1]). Weight 0 — or a nil
+// learner — restores pure confidence, the pre-census behavior. Items whose
+// signal code resolves to nothing blend the learner's 0.5 neutral default.
+func (s *Service) guidanceSortKey(item GuidanceItem) float64 {
+	w := s.cfg.JiminySignalStrengthWeight
+	if w <= 0 || s.signalLearner == nil {
+		return item.Confidence
+	}
+	if w > 1 {
+		w = 1
+	}
+	strength := 0.5
+	if code := guidanceSignalCode(item); code != "" {
+		strength = s.signalLearner.GetStrength(code)
+	}
+	return (1-w)*item.Confidence + w*strength
 }
 
 func guidanceSignalCode(item GuidanceItem) string {
