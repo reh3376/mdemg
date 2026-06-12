@@ -733,20 +733,20 @@ func (s *Service) reinforceConversationObservations(ctx context.Context, spaceID
 // Returns immediately if learning is frozen for the space.
 // surpriseHighThreshold / surpriseMediumThreshold return the config-driven
 // edge-multiplier thresholds (SURPRISE-TOPK-001 — were hardcoded 0.7/0.4,
-// unreachable on the live score scale; defaults 0.5/0.3 calibrated to the
+// unreachable on the live score scale; defaults 0.4/0.15 live-calibrated to the
 // exact-top-K novelty scale). Non-positive config falls back to defaults.
 func (s *Service) surpriseHighThreshold() float64 {
 	if v := s.cfg.SurpriseFactorHighThreshold; v > 0 {
 		return v
 	}
-	return 0.5
+	return 0.4
 }
 
 func (s *Service) surpriseMediumThreshold() float64 {
 	if v := s.cfg.SurpriseFactorMediumThreshold; v > 0 {
 		return v
 	}
-	return 0.3
+	return 0.15
 }
 
 func (s *Service) CoactivateSession(ctx context.Context, spaceID, sessionID string) error {

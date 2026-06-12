@@ -1,6 +1,7 @@
 package conversation
 
 import (
+	"log/slog"
 	"context"
 	"math"
 	"regexp"
@@ -76,7 +77,9 @@ func (d *SurpriseDetector) DetectSurprise(ctx context.Context, obs Observation) 
 	if len(obs.Embedding) > 0 {
 		embNovelty, err := d.computeEmbeddingNovelty(ctx, obs.SpaceID, obs.Embedding)
 		if err != nil {
-			// Don't fail, just log and continue
+			// Fail-open with a LOUD log — this path was silent, masking the
+			// query failure class (SURPRISE-TOPK-001).
+			slog.Warn("surprise: embedding novelty query failed", "error", err)
 			embNovelty = 0.0
 		}
 		factors.EmbeddingNovelty = embNovelty

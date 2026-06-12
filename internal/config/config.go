@@ -1081,8 +1081,8 @@ type Config struct {
 	// LIMIT 50 sample that made embedding novelty noise).
 	SurpriseEmbeddingNoveltyTopK     int     // SURPRISE_EMBEDDING_NOVELTY_TOPK — nearest neighbors compared for embedding novelty (default: 50)
 	SurpriseEmbeddingNoveltySimFloor float64 // SURPRISE_EMBEDDING_NOVELTY_SIM_FLOOR — drop neighbors below this cosine sim; 0 = off (default: 0)
-	SurpriseFactorHighThreshold      float64 // SURPRISE_FACTOR_HIGH_THRESHOLD — surprise_score for the 2.0x edge multiplier; calibrated to the post-top-K scale (default: 0.5)
-	SurpriseFactorMediumThreshold    float64 // SURPRISE_FACTOR_MEDIUM_THRESHOLD — surprise_score for the 1.5x multiplier (default: 0.3)
+	SurpriseFactorHighThreshold      float64 // SURPRISE_FACTOR_HIGH_THRESHOLD — surprise_score for the 2.0x edge multiplier; live-calibrated: corrections score ~0.455, noise band 0.02-0.10 (default: 0.4)
+	SurpriseFactorMediumThreshold    float64 // SURPRISE_FACTOR_MEDIUM_THRESHOLD — surprise_score for the 1.5x multiplier, above the live noise band (default: 0.15)
 
 	// NOSILENT-001 — scheduled-job health alerting (no silent failures).
 	JobHealthAlertEnabled   bool // JOB_HEALTH_ALERT_ENABLED — enable scheduled-job staleness/failure alert rules (default: true)
@@ -4169,11 +4169,11 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	surpriseFactorHighThreshold, err := atof("SURPRISE_FACTOR_HIGH_THRESHOLD", 0.5)
+	surpriseFactorHighThreshold, err := atof("SURPRISE_FACTOR_HIGH_THRESHOLD", 0.4)
 	if err != nil {
 		return Config{}, err
 	}
-	surpriseFactorMediumThreshold, err := atof("SURPRISE_FACTOR_MEDIUM_THRESHOLD", 0.3)
+	surpriseFactorMediumThreshold, err := atof("SURPRISE_FACTOR_MEDIUM_THRESHOLD", 0.15)
 	if err != nil {
 		return Config{}, err
 	}
