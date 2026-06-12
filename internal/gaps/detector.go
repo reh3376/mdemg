@@ -190,47 +190,9 @@ func (d *GapDetector) RecordContentIngest(spaceID string, content string) {
 	}
 }
 
-// ProcessFeedback processes explicit negative feedback
-func (d *GapDetector) ProcessFeedback(ctx context.Context, feedback Feedback) error {
-	// Record the feedback as evidence for potential gaps
-	if feedback.IsNegative {
-		d.metrics.mu.Lock()
-		// Track the query pattern that received negative feedback
-		terms := extractKeyTerms(feedback.QueryText)
-		for _, term := range terms {
-			d.metrics.failedPatterns[term]++
-		}
-		d.metrics.mu.Unlock()
-
-		// If feedback includes a specific gap type suggestion, create/update the gap
-		if feedback.SuggestedGapType != "" {
-			gap := CapabilityGap{
-				ID:          "gap-" + uuid.New().String()[:8],
-				Type:        GapType(feedback.SuggestedGapType),
-				Description: feedback.Comment,
-				Evidence:    []string{feedback.QueryText},
-				Priority:    0.7, // User feedback is high priority
-				DetectedAt:  time.Now(),
-				UpdatedAt:   time.Now(),
-				Status:      GapStatusOpen,
-				SpaceID:     feedback.SpaceID,
-			}
-			if err := d.store.SaveGap(ctx, gap); err != nil {
-				return fmt.Errorf("failed to save feedback gap: %w", err)
-			}
-		}
-	}
-	return nil
-}
-
-// Feedback represents user feedback on retrieval results
-type Feedback struct {
-	SpaceID          string `json:"space_id"`
-	QueryText        string `json:"query_text"`
-	IsNegative       bool   `json:"is_negative"`
-	Comment          string `json:"comment,omitempty"`
-	SuggestedGapType string `json:"suggested_gap_type,omitempty"`
-}
+// ProcessFeedback and its Feedback type were pruned in DORMANT-CENSUS-001:
+// the /v1/feedback intake had zero producers (the live feedback channel is
+// /v1/jiminy/feedback via post-tool-observe.py).
 
 // AnalyzeQueryPatterns analyzes query history for capability gaps
 func (d *GapDetector) AnalyzeQueryPatterns(ctx context.Context) ([]CapabilityGap, error) {

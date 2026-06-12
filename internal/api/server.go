@@ -2419,7 +2419,8 @@ func (s *Server) Routes() http.Handler {
 	// Capability gap detection endpoints
 	mux.HandleFunc("/v1/system/capability-gaps", s.handleCapabilityGaps)
 	mux.HandleFunc("/v1/system/capability-gaps/", s.handleCapabilityGapOperation)
-	mux.HandleFunc("/v1/feedback", s.handleFeedback)
+	// /v1/feedback pruned in DORMANT-CENSUS-001 (zero producers; the live
+	// feedback channel is /v1/jiminy/feedback via post-tool-observe.py)
 
 	// Gap interview endpoints (weekly APE job for addressing capability gaps)
 	mux.HandleFunc("/v1/system/gap-interviews", s.handleGapInterviews)
@@ -2554,8 +2555,8 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/webhooks/linear", s.handleLinearWebhook)
 	mux.HandleFunc("/v1/webhooks/", s.handleGenericWebhook)
 
-	// SR-001: Grafana alert webhook
-	mux.HandleFunc("POST /v1/alerts/grafana", s.handleGrafanaAlertWebhook)
+	// POST /v1/alerts/grafana pruned in DORMANT-CENSUS-001 (superseded by
+	// the server-native alert evaluator; contactpoint was commented out)
 	mux.HandleFunc("POST /v1/alerts/clear", s.handleAlertsClear)
 	mux.HandleFunc("POST /v1/hooks/event", s.handleHookEvent)
 
@@ -2568,9 +2569,8 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/memory/spaces/", s.handleSpacesRoute)
 	mux.HandleFunc("/v1/memory/freshness", s.handleBatchFreshness)
 
-	// Codebase ingestion endpoint
-	mux.HandleFunc("/v1/memory/ingest-codebase", s.handleIngestCodebaseRoute)
-	mux.HandleFunc("/v1/memory/ingest-codebase/", s.handleIngestCodebaseRoute)
+	// /v1/memory/ingest-codebase[/] pruned in DORMANT-CENSUS-001 (deprecated
+	// with Deprecation header since Phase 94; successor /v1/memory/ingest/*)
 
 	// Training Data Export (FT-DATA Sprint)
 	mux.Handle("/v1/training-data/export", scopedHandler(auth.ScopeAdminSpaces, s.handleTrainingDataExport))

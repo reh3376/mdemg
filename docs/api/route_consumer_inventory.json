@@ -618,12 +618,10 @@
     },
     "/v1/feedback": {
       "consumers": [],
-      "disposition": "PRUNE_CANDIDATE",
-      "notes": "Gap-detection retrieval-feedback intake (gaps_handlers.go:168) with zero producers; live feedback channel is /v1/jiminy/feedback (hook post-tool-observe.py:366). Superseded - prune after re-verification.",
-      "uats_specs": [
-        "capability_gaps_full.uats.json",
-        "feedback.uats.json"
-      ]
+      "disposition": "PRUNED",
+      "notes": "Pruned in DORMANT-CENSUS-001: zero producers; live channel is /v1/jiminy/feedback (post-tool-observe.py). Handler + gaps.ProcessFeedback removed.",
+      "removed_in": "DORMANT-CENSUS-001",
+      "uats_specs": []
     },
     "/v1/filewatcher/start": {
       "consumers": [],
@@ -1229,22 +1227,17 @@
     },
     "/v1/memory/ingest-codebase": {
       "consumers": [],
-      "disposition": "PRUNE_CANDIDATE",
-      "notes": "CHANGELOG.md:1253: \"Superseded by /v1/memory/ingest/trigger with superior job tracking; responses include Deprecation header\". The live server-triggered ingest path (INGEST-EXEC-001 resolveMdemgBin) is /v1/memory/ingest/trigger (ACTIVE via MCP). Zero consumers; UATS spec exists (ingest_codebase.uats.json) - retire spec with route.",
-      "uats_specs": [
-        "ingest_codebase.uats.json",
-        "ingest_codebase_list.uats.json",
-        "ingest_codebase_status.uats.json"
-      ]
+      "disposition": "PRUNED",
+      "notes": "Pruned in DORMANT-CENSUS-001: deprecated since Phase 94 (Deprecation header); successor /v1/memory/ingest/trigger (ACTIVE).",
+      "removed_in": "DORMANT-CENSUS-001",
+      "uats_specs": []
     },
     "/v1/memory/ingest-codebase/": {
       "consumers": [],
-      "disposition": "PRUNE_CANDIDATE",
-      "notes": "Job status/cancel subroutes of the deprecated ingest-codebase endpoint (CHANGELOG.md:1253); superseded by /v1/memory/ingest/status|cancel.",
-      "uats_specs": [
-        "ingest_codebase_cancel.uats.json",
-        "ingest_codebase_status.uats.json"
-      ]
+      "disposition": "PRUNED",
+      "notes": "Pruned in DORMANT-CENSUS-001: see /v1/memory/ingest-codebase.",
+      "removed_in": "DORMANT-CENSUS-001",
+      "uats_specs": []
     },
     "/v1/memory/ingest/batch": {
       "consumers": [
@@ -1805,11 +1798,10 @@
     },
     "POST /v1/alerts/grafana": {
       "consumers": [],
-      "disposition": "PRUNE_CANDIDATE",
-      "notes": "Superseded by the server-native alert evaluator (SR-001/SNA-001 - \"Grafana NOT required for alerting\"). Only reference is a commented-out backward-compat contactpoint (deploy/docker/grafana/provisioning/notifiers/contactpoints.yml:18, comment at :5 \"kept for backward compatibility\").",
-      "uats_specs": [
-        "grafana_alert_webhook.uats.json"
-      ]
+      "disposition": "PRUNED",
+      "notes": "Pruned in DORMANT-CENSUS-001: superseded by the server-native alert evaluator (SR-001/SNA-001); only ref was a commented-out contactpoint. Compose env MDEMG_GRAFANA_ALERT_WEBHOOK_URL removed.",
+      "removed_in": "DORMANT-CENSUS-001",
+      "uats_specs": []
     },
     "POST /v1/hooks/event": {
       "consumers": [

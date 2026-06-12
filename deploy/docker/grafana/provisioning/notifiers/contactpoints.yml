@@ -1,10 +1,10 @@
 # MDEMG Grafana Contact Points — DISABLED (SNA-001)
 #
-# The MDEMG server now evaluates all alert rules natively and delivers
-# alerts through its own dispatcher. Grafana webhook delivery is no longer
-# needed. The /v1/alerts/grafana endpoint is kept for backward compatibility.
-#
-# To re-enable Grafana webhook delivery, uncomment the block below:
+# The MDEMG server evaluates all alert rules natively and delivers alerts
+# through its own dispatcher. Grafana webhook delivery is not needed.
+# The /v1/alerts/grafana endpoint was PRUNED in DORMANT-CENSUS-001 —
+# re-enabling webhook delivery would require restoring that endpoint
+# (git revert) before uncommenting the block below:
 #
 # apiVersion: 1
 #

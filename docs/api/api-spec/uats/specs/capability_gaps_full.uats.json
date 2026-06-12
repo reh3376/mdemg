@@ -80,61 +80,6 @@
       }
     },
     {
-      "name": "feedback_negative",
-      "description": "Submit negative feedback",
-      "request": {
-        "method": "POST",
-        "path": "/v1/feedback",
-        "headers": {
-          "Content-Type": "application/json"
-        },
-        "body": {
-          "space_id": "{{test_space}}",
-          "query_text": "how to integrate with slack",
-          "is_negative": true,
-          "comment": "No results found for Slack integration"
-        }
-      },
-      "expected": {
-        "status": 200,
-        "body_assertions": [
-          {
-            "path": "$.status",
-            "op": "equals",
-            "expected": "recorded"
-          }
-        ]
-      }
-    },
-    {
-      "name": "feedback_with_gap_suggestion",
-      "description": "Submit feedback with gap type suggestion",
-      "request": {
-        "method": "POST",
-        "path": "/v1/feedback",
-        "headers": {
-          "Content-Type": "application/json"
-        },
-        "body": {
-          "space_id": "{{test_space}}",
-          "query_text": "import jira tickets",
-          "is_negative": true,
-          "comment": "Need Jira integration",
-          "suggested_gap_type": "data_source"
-        }
-      },
-      "expected": {
-        "status": 200,
-        "body_assertions": [
-          {
-            "path": "$.status",
-            "op": "equals",
-            "expected": "recorded"
-          }
-        ]
-      }
-    },
-    {
       "name": "gaps_run_analysis",
       "description": "POST not supported - returns 405 Method Not Allowed",
       "request": {

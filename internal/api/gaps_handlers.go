@@ -165,42 +165,6 @@ func (s *Server) handleCapabilityGapAddress(w http.ResponseWriter, r *http.Reque
 	})
 }
 
-// handleFeedback handles POST /v1/feedback
-// Accepts user feedback on retrieval results for gap detection
-func (s *Server) handleFeedback(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
-
-	var req gaps.Feedback
-	if !readJSON(w, r, &req) {
-		return
-	}
-
-	// Validate required fields
-	if req.SpaceID == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "space_id is required"})
-		return
-	}
-	if req.QueryText == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "query_text is required"})
-		return
-	}
-
-	ctx := r.Context()
-
-	if err := s.gapDetector.ProcessFeedback(ctx, req); err != nil {
-		writeInternalError(w, err, "process feedback")
-		return
-	}
-
-	writeJSON(w, http.StatusOK, map[string]any{
-		"status":  "recorded",
-		"message": "Feedback recorded for capability gap analysis",
-	})
-}
-
 // handleGapAnalyze handles POST /v1/system/capability-gaps/analyze
 // Triggers a full gap analysis
 func (s *Server) handleGapAnalyze(w http.ResponseWriter, r *http.Request) {
