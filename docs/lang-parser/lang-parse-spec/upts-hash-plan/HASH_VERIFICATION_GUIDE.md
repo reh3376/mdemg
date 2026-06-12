@@ -1,5 +1,12 @@
 # UPTS v1.1: SHA256 Fixture Hash Verification
 
+> ⚠️ **DESIGN HISTORY (bannered 2026-06-12, DOC-AUDIT-001b).** This document
+> is a point-in-time plan, analysis, or record of since-completed or
+> superseded work. It is preserved unmodified as design history and is NOT
+> a description of the current system — consult `docs/features/`,
+> `docs/architecture/` (living set), and `CLAUDE.md` for current behavior.
+
+
 **Date:** 2026-01-29  
 **Version:** 1.1.0  
 **Feature:** Fixture integrity verification via SHA256 hashes

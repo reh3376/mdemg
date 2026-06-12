@@ -1,5 +1,12 @@
 # Phase 2: Hebbian Learning for Conversation Observations
 
+> ⚠️ **DESIGN HISTORY (bannered 2026-06-12, DOC-AUDIT-001b).** This document
+> is a point-in-time plan, analysis, or record of since-completed or
+> superseded work. It is preserved unmodified as design history and is NOT
+> a description of the current system — consult `docs/features/`,
+> `docs/architecture/` (living set), and `CLAUDE.md` for current behavior.
+
+
 ## Overview
 
 Phase 2 extends MDEMG's Hebbian learning system to work with conversation observations, enabling the same learning mechanisms used for code knowledge to apply to conversational context.

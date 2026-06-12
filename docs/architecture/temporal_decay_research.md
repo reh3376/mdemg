@@ -1,5 +1,12 @@
 # Temporal Decay Research for MDEMG
 
+> ⚠️ **DESIGN HISTORY (bannered 2026-06-12, DOC-AUDIT-001b).** This document
+> is a point-in-time plan, analysis, or record of since-completed or
+> superseded work. It is preserved unmodified as design history and is NOT
+> a description of the current system — consult `docs/features/`,
+> `docs/architecture/` (living set), and `CLAUDE.md` for current behavior.
+
+
 **Research Date**: 2026-01-30
 **Author**: Claude (Sonnet 4.5)
 **Purpose**: Comprehensive research on temporal decay mechanisms for integration into MDEMG retrieval system

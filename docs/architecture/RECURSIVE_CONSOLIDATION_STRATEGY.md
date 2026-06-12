@@ -1,5 +1,12 @@
 # MDEMG Recursive Consolidation & Semantic Consensus Strategy
 
+> ⚠️ **DESIGN HISTORY (bannered 2026-06-12, DOC-AUDIT-001b).** This document
+> is a point-in-time plan, analysis, or record of since-completed or
+> superseded work. It is preserved unmodified as design history and is NOT
+> a description of the current system — consult `docs/features/`,
+> `docs/architecture/` (living set), and `CLAUDE.md` for current behavior.
+
+
 ## 1. Overview
 
 This strategy explores the "massive upside" of running multiple ingestion and consolidation passes to refine the MDEMG graph. By treating consolidation as an iterative reinforcement process rather than a one-time event, we can identify **Deep Invariants**—architectural truths that persist across different "views" of the codebase.

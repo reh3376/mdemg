@@ -1,5 +1,12 @@
 # Development Space Collaboration — Master Plan
 
+> ⚠️ **DESIGN HISTORY (bannered 2026-06-12, DOC-AUDIT-001b).** This document
+> is a point-in-time plan, analysis, or record of since-completed or
+> superseded work. It is preserved unmodified as design history and is NOT
+> a description of the current system — consult `docs/features/`,
+> `docs/architecture/` (living set), and `CLAUDE.md` for current behavior.
+
+
 **Phase**: Master plan (Phases 1–8)
 **Status**: Draft (Phase 2 complete ✅; Phases 3–8 in progress or planned)
 **Author**: Agent (Cursor)
