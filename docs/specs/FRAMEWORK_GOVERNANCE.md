@@ -16,19 +16,20 @@ Use this governance file as policy, `docs/development/UXTS_FRAMEWORK_MATRIX.md` 
 | ------- | ---- | ----------- | ------------- |
 | UNTS | Universal Hash Test Specification | Hash verification registry, verify-now, revert | active |
 | UDTS | Universal DevSpace Test Specification | gRPC contract and integration tests | active |
-| UATS | Universal API Test Specification | HTTP acceptance contract tests | active (124 specs, CI-gated) |
+| UATS | Universal API Test Specification | HTTP acceptance contract tests | active (214 specs, CI-gated) |
 | UPTS | Universal Parser Test Specification | Parser contract conformance across languages | active (28 specs, CI-gated) |
 | UBTS | Universal Benchmark Test Specification | Throughput/latency/load regression testing | active (CI smoke, soft-fail) |
-| USTS | Universal Security Test Specification | Security behavior and hardening checks | pilot |
+| USTS | Universal Security Test Specification | Security behavior and hardening checks | active (merge-blocking CI since UXTS-CI-001) |
 | UAMS | Universal Auth Method Specification | Auth method contracts and conformance | spec-only (no runner/fixtures) |
 | UOBS | Universal Observability Specification | Runtime observability behavior checks | active |
 | UOTS | Universal Observability Test Specification | Artifact-level observability contracts | active |
-| UVTS | Universal Validation Test Specification | Semantic retrieval quality validation | pilot (setup-only runner) |
+| UVTS | Universal Validation Test Specification | Semantic retrieval quality validation | active (live-gated — full runner + A/B harness; CI step deliberately removed, gates via make test-uvts-*) |
 | UETS | Universal Emergence Test Specification | LLM emergence concept-naming quality | active (E1-E5 all enforced) |
 | UITS | Universal Iterative-Improvement Test Specification | T1 encoding comprehension validation | active (11 specs, soft-fail CI) |
-| ULTS | Universal LLM Task Specification | LLM task contracts, quality metrics, training config | active (16 specs) |
+| ULTS | Universal LLM Task Specification | LLM task contracts, quality metrics, training config | active (17 specs, merge-blocking --verify-hashes) |
 | UTDS | Universal Training Data Specification | Export manifests, privacy gates, archive integrity | active (3 specs) |
 | UAITS | Universal AI Training Specification | Training data curation governance across 4 paradigms (SFT, DPO, RAFT, curriculum) | active (1 spec, 41 checks) |
+| UBENCH | Universal Benchmark Framework (LLM eval) | Aggregate LLM eval wrapping Phase 10 in the UxTS pattern | active (1 spec, 108 rows / 17 tasks, merge-blocking contract) |
 
 ---
 
@@ -108,7 +109,7 @@ Use this governance file as policy, `docs/development/UXTS_FRAMEWORK_MATRIX.md` 
 ### USTS — Security
 
 - Scope: auth boundaries, injection resilience, rate limiting, and sensitive-data handling.
-- Policy: critical/high failures block release once CI gating is enabled.
+- Policy: critical/high failures block release (merge-blocking in CI since UXTS-CI-001).
 - References:
   - `docs/tests/usts/README.md`
   - `docs/tests/usts/schema/usts.schema.json`
@@ -185,7 +186,7 @@ Use this governance file as policy, `docs/development/UXTS_FRAMEWORK_MATRIX.md` 
 ### ULTS — LLM Task Contracts
 
 - Scope: machine-readable contracts for all 16 LLM tasks — system prompt hashes, output schemas, quality metrics, training config.
-- Status: **active** — schema, 16 specs, runner with full parity.
+- Status: **active** — schema, 17 specs, runner with full parity; prompt-hash drift gate merge-blocking.
 - Policy: task contract changes must update ULTS specs and pass runner validation.
 - References:
   - `docs/tests/ults/README.md`

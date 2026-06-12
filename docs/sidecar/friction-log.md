@@ -24,9 +24,11 @@ Documents known limitations, workarounds, and rough edges in v0.1.0. Items here 
 
 ---
 
-## F2: macOS arm64 Only
+## F2: macOS arm64 Only — RESOLVED
 
-**What happens:** Pre-built binaries are only available for macOS arm64 (Apple Silicon). No Linux or Windows binaries are distributed.
+**Original friction:** Pre-built binaries were macOS-arm64-only.
+**Now:** goreleaser ships darwin + linux on arm64 + amd64; Linux installs
+via `scripts/install.sh`. Windows remains WSL2-only.
 
 **Workaround:** Build from source on other platforms:
 
@@ -36,7 +38,7 @@ cd mdemg
 go build -o bin/mdemg ./cmd/mdemg
 ```
 
-Requires Go 1.24+ and CGO-compatible toolchain.
+Requires Go 1.26+ and CGO-compatible toolchain.
 
 ---
 

@@ -1,5 +1,10 @@
 # UPTS Changelog
 
+## v1.6.0 (2026-04-06)
+
+- Added PHP parser (`php_parser.go`) with Laravel and WordPress support + `php.upts.json` spec and fixture — 28/28 parsers passing.
+- (Backfill note, DOC-AUDIT-001b: versions 1.3/1.4 added protobuf/graphql/openapi/markdown/xml on 2026-02-05/06 — recorded in UPTS_SUMMARY's version table.)
+
 ## [1.5.0] - 2026-02-07
 
 ### Added

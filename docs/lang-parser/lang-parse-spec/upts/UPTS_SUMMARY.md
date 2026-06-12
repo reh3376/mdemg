@@ -1,8 +1,8 @@
 # UPTS Parser Summary
 
 **Generated:** 2026-02-07
-**Total Parsers:** 27 UPTS-validated
-**Pass Rate:** 100% (27/27)
+**Total Parsers:** 28 (PHP added 2026-04) UPTS-validated
+**Pass Rate:** 100% (28/28)
 
 ---
 
@@ -11,7 +11,7 @@
 | # | Name | Parser Type | File Extensions | Is Child Of | Has Children | Patterns Covered | Symbol Count | Key Features |
 |---|------|-------------|-----------------|-------------|--------------|------------------|--------------|--------------|
 | 1 | Go | AST-based | `.go` | - | - | P1,P2,P3,P4,P6,P7 (6/7) | 17-22 | Evidence validation enabled; no true enums in Go |
-| 2 | Rust | Regex | `.rs` | - | - | 6 patterns | 27-42 | Evidence validation enabled; traits, macros, modules |
+| 2 | Rust | Regex | `.rs` | - | - | 6 patterns | 27-42 | Traits, macros, modules (evidence validation NOT enabled — go/protobuf/graphql only) |
 | 3 | Python | Regex | `.py`, `.pyi` | - | - | P1-P7 (7/7) | 35-40 | Protocol, dataclass, async support |
 | 4 | TypeScript | Regex | `.ts`, `.tsx`, `.mts`, `.cts` | - | JS/JSX/TSX | P1-P7 (7/7) | 13-18 | Decorators, NestJS patterns, arrow functions |
 | 5 | Java | Regex | `.java` | - | - | 5 patterns | 54-69 | Brace-depth scope tracking; annotations |
@@ -49,7 +49,7 @@
 | C | Foundation for C++ and CUDA; macros, structs, typedefs |
 | C++ | Extends C; templates, namespaces, classes, methods |
 | CUDA | Extends C/C++; GPU kernels, device functions, shared memory |
-| Rust | Traits, macros, modules; evidence validation enabled |
+| Rust | Traits, macros, modules |
 
 ### JVM Languages (2)
 
@@ -185,13 +185,13 @@ Parsers with `validate_evidence: true` run additional structural consistency che
 
 ```bash
 # Run all UPTS tests
-go test ./cmd/ingest-codebase/languages/ -run TestUPTS -v
+go test ./internal/languages/ -run TestUPTS -v
 
 # Run single language test
-go test ./cmd/ingest-codebase/languages/ -run TestUPTS/kotlin -v
+go test ./internal/languages/ -run TestUPTS/kotlin -v
 
 # Run with verbose output
-go test ./cmd/ingest-codebase/languages/ -run TestUPTS -v -count=1
+go test ./internal/languages/ -run TestUPTS -v -count=1
 ```
 
 ---
@@ -202,9 +202,9 @@ go test ./cmd/ingest-codebase/languages/ -run TestUPTS -v -count=1
 |----------|------|
 | UPTS Specs | `docs/lang-parser/lang-parse-spec/upts/specs/*.upts.json` |
 | Test Fixtures | `docs/lang-parser/lang-parse-spec/upts/fixtures/` |
-| Parser Implementations | `cmd/ingest-codebase/languages/*_parser.go` |
-| Test Harness | `cmd/ingest-codebase/languages/upts_test.go` |
-| Type Definitions | `cmd/ingest-codebase/languages/upts_types.go` |
+| Parser Implementations | `internal/languages/*_parser.go` |
+| Test Harness | `internal/languages/upts_test.go` |
+| Type Definitions | `internal/languages/upts_types.go` |
 | JSON Schema | `docs/lang-parser/lang-parse-spec/upts/schema/upts.schema.json` |
 
 ---
