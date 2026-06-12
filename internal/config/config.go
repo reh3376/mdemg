@@ -1077,6 +1077,11 @@ type Config struct {
 	EmergenceCycleAlertThresholdSec float64 // EMERGENCE_CYCLE_ALERT_THRESHOLD_SEC — alert when a cycle exceeds this wall time (default: 60)
 	EmergenceCycleAlertLookbackMin  int     // EMERGENCE_CYCLE_ALERT_LOOKBACK_MIN — window scanned for slow cycles (default: 120)
 
+	// SURPRISE-TOPK-001 — vector-index top-K novelty (replaces the unordered
+	// LIMIT 50 sample that made embedding novelty noise).
+	SurpriseEmbeddingNoveltyTopK     int     // SURPRISE_EMBEDDING_NOVELTY_TOPK — nearest neighbors compared for embedding novelty (default: 50)
+	SurpriseEmbeddingNoveltySimFloor float64 // SURPRISE_EMBEDDING_NOVELTY_SIM_FLOOR — drop neighbors below this cosine sim; 0 = off (default: 0)
+
 	// NOSILENT-001 — scheduled-job health alerting (no silent failures).
 	JobHealthAlertEnabled   bool // JOB_HEALTH_ALERT_ENABLED — enable scheduled-job staleness/failure alert rules (default: true)
 	JobBackupStalenessHours int  // JOB_BACKUP_STALENESS_HOURS — alert if no successful tsdb-backup within this window; 0 = derive from TSDB_BACKUP_INTERVAL_HOURS × 2 (default: 0)
@@ -4154,6 +4159,14 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	surpriseEmbeddingNoveltyTopK, err := atoi("SURPRISE_EMBEDDING_NOVELTY_TOPK", 50)
+	if err != nil {
+		return Config{}, err
+	}
+	surpriseEmbeddingNoveltySimFloor, err := atof("SURPRISE_EMBEDDING_NOVELTY_SIM_FLOOR", 0)
+	if err != nil {
+		return Config{}, err
+	}
 
 	// NOSILENT-001 — scheduled-job health alerting
 	jobHealthAlertEnabled := getBool("JOB_HEALTH_ALERT_ENABLED", true)
@@ -4966,6 +4979,8 @@ func FromEnv() (Config, error) {
 		ConsensusShiftMinSamples:        consensusShiftMinSamples,
 		EmergenceCycleAlertThresholdSec: emergenceCycleAlertThresholdSec,
 		EmergenceCycleAlertLookbackMin:  emergenceCycleAlertLookbackMin,
+		SurpriseEmbeddingNoveltyTopK:     surpriseEmbeddingNoveltyTopK,
+		SurpriseEmbeddingNoveltySimFloor: surpriseEmbeddingNoveltySimFloor,
 
 		// TSDB Writer
 		TSDBWriterBufferMaxSize: tsdbWriterBufferMaxSize,
