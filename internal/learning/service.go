@@ -398,6 +398,8 @@ func (s *Service) ApplyCoactivation(ctx context.Context, spaceID string, resp mo
 	params := map[string]any{
 		"spaceId":        spaceID,
 		"pairs":          pairsToMaps(pairs),
+		"surpriseHigh":   s.surpriseHighThreshold(),
+		"surpriseMed":    s.surpriseMediumThreshold(),
 		"eta":            eta,
 		"mu":             mu,
 		"wmin":           wmin,
@@ -441,8 +443,8 @@ WITH a,b,prod,pathSim,surpriseA,surpriseB,roleA,roleB,obsTypeA,obsTypeB,sessionA
      CASE
        WHEN roleA = 'conversation_observation' OR roleB = 'conversation_observation' THEN
          CASE
-           WHEN surpriseA >= 0.7 OR surpriseB >= 0.7 THEN 2.0  // HIGH surprise
-           WHEN surpriseA >= 0.4 OR surpriseB >= 0.4 THEN 1.5  // MEDIUM surprise
+           WHEN surpriseA >= $surpriseHigh OR surpriseB >= $surpriseHigh THEN 2.0  // HIGH surprise
+           WHEN surpriseA >= $surpriseMed OR surpriseB >= $surpriseMed THEN 1.5   // MEDIUM surprise
            ELSE 1.0  // NORMAL
          END
        ELSE 1.0  // Code nodes use standard factor
@@ -729,6 +731,24 @@ func (s *Service) reinforceConversationObservations(ctx context.Context, spaceID
 // - Surprise scores (high surprise observations get stronger connections)
 // This enables session-based learning where related observations reinforce each other.
 // Returns immediately if learning is frozen for the space.
+// surpriseHighThreshold / surpriseMediumThreshold return the config-driven
+// edge-multiplier thresholds (SURPRISE-TOPK-001 — were hardcoded 0.7/0.4,
+// unreachable on the live score scale; defaults 0.5/0.3 calibrated to the
+// exact-top-K novelty scale). Non-positive config falls back to defaults.
+func (s *Service) surpriseHighThreshold() float64 {
+	if v := s.cfg.SurpriseFactorHighThreshold; v > 0 {
+		return v
+	}
+	return 0.5
+}
+
+func (s *Service) surpriseMediumThreshold() float64 {
+	if v := s.cfg.SurpriseFactorMediumThreshold; v > 0 {
+		return v
+	}
+	return 0.3
+}
+
 func (s *Service) CoactivateSession(ctx context.Context, spaceID, sessionID string) error {
 	if spaceID == "" || sessionID == "" {
 		return nil
@@ -755,9 +775,11 @@ func (s *Service) CoactivateSession(ctx context.Context, spaceID, sessionID stri
 	}
 
 	params := map[string]any{
-		"spaceId":   spaceID,
-		"sessionId": sessionID,
-		"eta":       eta,
+		"spaceId":      spaceID,
+		"sessionId":    sessionID,
+		"surpriseHigh": s.surpriseHighThreshold(),
+		"surpriseMed":  s.surpriseMediumThreshold(),
+		"eta":          eta,
 		"mu":        mu,
 		"wmin":      wmin,
 		"wmax":      wmax,
@@ -797,8 +819,8 @@ WITH a, b, temporalProximity,
      coalesce(a.surprise_score, 0.0) AS surpriseA,
      coalesce(b.surprise_score, 0.0) AS surpriseB,
      CASE
-       WHEN coalesce(a.surprise_score, 0.0) >= 0.7 OR coalesce(b.surprise_score, 0.0) >= 0.7 THEN 2.0
-       WHEN coalesce(a.surprise_score, 0.0) >= 0.4 OR coalesce(b.surprise_score, 0.0) >= 0.4 THEN 1.5
+       WHEN coalesce(a.surprise_score, 0.0) >= $surpriseHigh OR coalesce(b.surprise_score, 0.0) >= $surpriseHigh THEN 2.0
+       WHEN coalesce(a.surprise_score, 0.0) >= $surpriseMed OR coalesce(b.surprise_score, 0.0) >= $surpriseMed THEN 1.5
        ELSE 1.0
      END AS surpriseFactor
 
