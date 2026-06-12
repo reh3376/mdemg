@@ -52,7 +52,7 @@ model_under_test:
   base_sha: "a54ec18ffe24f3c909e9556471dc156ed9b3b61b872008831c7cba9d4768b4a5"
   adapter_manifest: "adapters/tier1/manifest.json"
   mlx_host: "127.0.0.1"
-  mlx_port: 8101
+  mlx_port: 8102  # Phase 13.5 cutover: llama-server (was mlx_lm.server 8101 — stale until FT-CLASSIFY-002; zero-scored any un-overridden run)
 
 # LLM judge for subjective metrics not covered by reward_functions.py.
 # Uses OWN fixed sampling — NEVER inherits task inference config

@@ -147,6 +147,73 @@ def fetch_production_user_prompts(cur, task_name: str, target: int, known: set[s
     return out
 
 
+# FT-CLASSIFY-002: production class distribution for consulting.classify,
+# measured live 2026-06-11 over 4,028 parseable rows. The 11.5d corpus had
+# none=0 and backfired; stratified sampling matches the operating
+# distribution (final corpus distribution is re-verified by TEACHER label
+# in the manifest, gate ±5pp/class).
+CLASSIFY_TARGET_DISTRIBUTION = {
+    'none': 0.819,
+    'must': 0.122,
+    'should': 0.040,
+    'must_not': 0.016,
+    'should_not': 0.002,
+}
+
+
+def fetch_stratified_classify_prompts(cur, task_name: str, target: int, known: set[str],
+                                      distribution: dict[str, float]) -> list[tuple[str, float | None]]:
+    """Class-stratified variant of fetch_production_user_prompts for
+    consulting.classify: buckets candidate prompts by their PRODUCTION
+    response class and samples each bucket to match `distribution`.
+    Shortfall in a rare class falls back to proportional backfill from
+    'none' (the dominant class) with a loud notice."""
+    cur.execute("""
+        SELECT user_prompt,
+               MAX(COALESCE(quality, 0.0)) AS best_quality,
+               (array_agg(response ORDER BY time DESC))[1] AS latest_response
+        FROM llm_interactions
+        WHERE task_name = %s AND response IS NOT NULL AND length(response) > 0
+          AND (error IS NULL OR error = '')
+        GROUP BY user_prompt
+        ORDER BY best_quality DESC, user_prompt
+        LIMIT 4000
+    """, (task_name,))
+    buckets: dict[str, list[tuple[str, float | None]]] = {k: [] for k in distribution}
+    seen: set[str] = set()
+    for user_prompt, q, latest_response in cur.fetchall():
+        if user_prompt in known or user_prompt in seen:
+            continue
+        seen.add(user_prompt)
+        try:
+            cls = json.loads(latest_response).get('type', '')
+        except (json.JSONDecodeError, TypeError, AttributeError):
+            continue
+        if cls in buckets:
+            buckets[cls].append((user_prompt, float(q) if q is not None else None))
+
+    out: list[tuple[str, float | None]] = []
+    shortfall = 0
+    for cls, frac in distribution.items():
+        want = max(1, round(target * frac)) if frac > 0 else 0
+        got = buckets[cls][:want]
+        if len(got) < want:
+            print(f'  [stratify] class {cls!r}: wanted {want}, only {len(got)} available '
+                  f'(shortfall {want - len(got)} backfills from none)')
+            shortfall += want - len(got)
+        out.extend(got)
+    if shortfall > 0:
+        used = {p for p, _ in out}
+        extra = [(p, q) for p, q in buckets['none'] if p not in used][:shortfall]
+        out.extend(extra)
+    counts = {cls: 0 for cls in distribution}
+    lookup = {p: cls for cls, items in buckets.items() for p, _ in items}
+    for p_, _ in out:
+        counts[lookup[p_]] += 1
+    print(f'  [stratify] sampled input distribution (by production label): {counts} (total {len(out)})')
+    return out
+
+
 def call_gpt_mini(system_prompt: str, user_prompt: str, sampling_kwargs: dict[str, Any], max_tokens: int) -> tuple[str, str | None, dict]:
     messages = [
         {'role': 'system', 'content': system_prompt},
@@ -182,6 +249,9 @@ def main() -> int:
     ap.add_argument('--config', default='configs/benchmark_phase10.yaml')
     ap.add_argument('--repo-root', default='/Users/reh3376/mdemg')
     ap.add_argument('--tasks', default=','.join(DISTILL_TASKS))
+    ap.add_argument('--stratify-classify', action='store_true',
+                    help='FT-CLASSIFY-002: sample consulting.classify prompts to match the '
+                         'production class distribution (incl. the dominant none class)')
     args = ap.parse_args()
 
     repo = Path(args.repo_root)
@@ -243,7 +313,9 @@ def main() -> int:
             known = known_per_task.get(task, set())
 
             print(f'\n== {task} (group={spec.sampling_group}, temp={sampling_kwargs.get("temperature","?")}, max_tokens={max_tokens}) ==')
-            candidates = fetch_production_user_prompts(cur, task, args.target_per_task, known)
+            candidates = (fetch_stratified_classify_prompts(cur, task, args.target_per_task, known, CLASSIFY_TARGET_DISTRIBUTION)
+                   if (args.stratify_classify and task == 'consulting.classify')
+                   else fetch_production_user_prompts(cur, task, args.target_per_task, known))
             print(f'  TSDB→leak-filter→dedup: {len(candidates)} unique user_prompts available')
 
             stats = {

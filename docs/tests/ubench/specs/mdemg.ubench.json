@@ -13,19 +13,28 @@
   },
   "config": {
     "path": "configs/benchmark_phase10.yaml",
-    "sha256": "76c97eb83188a4d6150aff791c2906309749530dc17aa7ae7a4d77ff9dff8522"
+    "sha256": "80df38563ad767cc66438a0d9289e91093beabcaa6c3da8108bf6dc1f6fcec31"
   },
   "judge": {
     "model": "gpt-5.4-mini",
     "temperature": 0.0,
     "max_tokens": 4000,
     "latency_budget_ms": 30000,
-    "metrics": ["coherence", "depth", "relevance", "naturalness"]
+    "metrics": [
+      "coherence",
+      "depth",
+      "relevance",
+      "naturalness"
+    ]
   },
   "ults": {
     "specs_dir": "docs/tests/ults/specs",
     "expected_specs": 17,
-    "allowed_sampling_groups": ["T", "C", "J"]
+    "allowed_sampling_groups": [
+      "T",
+      "C",
+      "J"
+    ]
   },
   "golden_holdout": {
     "path": "training_data/eval/valid_golden.jsonl",
@@ -39,7 +48,7 @@
     "max_per_task_delta": 0.01
   },
   "thresholds": {
-    "min_aggregate_weighted_score": 0.80,
+    "min_aggregate_weighted_score": 0.8,
     "max_truncated_rows": 0
   },
   "output": {

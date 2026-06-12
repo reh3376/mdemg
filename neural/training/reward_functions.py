@@ -287,7 +287,23 @@ def coverage_score(response: str, **kwargs: Any) -> float:
 
 
 def summary_quality(response: str, **kwargs: Any) -> float:
-    """Combined coherence + coverage for summary-type outputs."""
+    """Combined coherence + coverage for summary-type outputs.
+
+    FT-CLASSIFY-002: a classify response of {"type": "none", "summary": ""}
+    is CORRECT BY SPEC (the prompt mandates an empty summary when no
+    constraint is expressed) — score it 1.0 instead of penalizing the
+    empty summary. The old behavior capped every correct-none row at
+    ~0.767, which made the reward>=0.8 distill filter silently reject the
+    dominant production class (81.9% none) — the actual mechanism behind
+    the 11.5d class-skew failure.
+    """
+    try:
+        parsed = json.loads(response)
+        if isinstance(parsed, dict) and parsed.get("type") == "none" \
+                and not str(parsed.get("summary", "")).strip():
+            return 1.0
+    except (json.JSONDecodeError, TypeError):
+        pass
     return (coherence_score(response) + coverage_score(response)) / 2
 
 
