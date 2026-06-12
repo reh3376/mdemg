@@ -544,27 +544,27 @@
 {"path": "docs/development/uats-gap-001/sprint_plan_uats_gap_001.md", "tier": "T4", "phase": "001b/c", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
 {"path": "docs/development/uxts-ci-001/post.md", "tier": "T4", "phase": "001b/c", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
 {"path": "docs/development/uxts-ci-001/sprint_plan_uxts_ci_001.md", "tier": "T4", "phase": "001b/c", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
-{"path": "docs/features/_TEMPLATE.md", "tier": "T1", "phase": "001a-spotcheck", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
+{"path": "docs/features/_TEMPLATE.md", "tier": "T1", "phase": "001a-spotcheck", "status": "DONE", "audited_commit": "831eb0a", "verdict": "CURRENT", "evidence_paths": [], "notes": "wave-3 spot-check: 3-5 load-bearing claims verified, 0 discrepancies"}
 {"path": "docs/features/alert-dispatcher.md", "tier": "T1", "phase": "001a-spotcheck", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
 {"path": "docs/features/backup-restore.md", "tier": "T1", "phase": "001a-spotcheck", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
-{"path": "docs/features/bridges-edge-type.md", "tier": "T1", "phase": "001a-spotcheck", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
+{"path": "docs/features/bridges-edge-type.md", "tier": "T1", "phase": "001a-spotcheck", "status": "DONE", "audited_commit": "831eb0a", "verdict": "CURRENT", "evidence_paths": [], "notes": "wave-3 spot-check: 3-5 load-bearing claims verified, 0 discrepancies"}
 {"path": "docs/features/browser-ui.md", "tier": "T1", "phase": "001a-spotcheck", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
 {"path": "docs/features/column-voting-retrieval.md", "tier": "T1", "phase": "001a-spotcheck", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
-{"path": "docs/features/constraint-nodes.md", "tier": "T1", "phase": "001a-spotcheck", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
+{"path": "docs/features/constraint-nodes.md", "tier": "T1", "phase": "001a-spotcheck", "status": "DONE", "audited_commit": "831eb0a", "verdict": "CURRENT", "evidence_paths": [], "notes": "wave-3 spot-check: 3-5 load-bearing claims verified, 0 discrepancies"}
 {"path": "docs/features/context-fingerprinting.md", "tier": "T1", "phase": "001a-spotcheck", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
-{"path": "docs/features/database-embedding-migrations.md", "tier": "T1", "phase": "001a-spotcheck", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
-{"path": "docs/features/dev-cycle-summary-synergy.md", "tier": "T1", "phase": "001a-spotcheck", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
-{"path": "docs/features/docker-deployment.md", "tier": "T1", "phase": "001a-spotcheck", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
-{"path": "docs/features/dynamic-emergence.md", "tier": "T1", "phase": "001a-spotcheck", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
+{"path": "docs/features/database-embedding-migrations.md", "tier": "T1", "phase": "001a-spotcheck", "status": "DONE", "audited_commit": "831eb0a", "verdict": "CURRENT", "evidence_paths": [], "notes": "wave-3 spot-check: 3-5 load-bearing claims verified, 0 discrepancies"}
+{"path": "docs/features/dev-cycle-summary-synergy.md", "tier": "T1", "phase": "001a-spotcheck", "status": "DONE", "audited_commit": "831eb0a", "verdict": "CURRENT", "evidence_paths": [], "notes": "wave-3 spot-check: 3-5 load-bearing claims verified, 0 discrepancies"}
+{"path": "docs/features/docker-deployment.md", "tier": "T1", "phase": "001a-spotcheck", "status": "DONE", "audited_commit": "831eb0a", "verdict": "CURRENT", "evidence_paths": [], "notes": "wave-3 spot-check: 3-5 load-bearing claims verified, 0 discrepancies"}
+{"path": "docs/features/dynamic-emergence.md", "tier": "T1", "phase": "001a-spotcheck", "status": "DONE", "audited_commit": "831eb0a", "verdict": "CURRENT", "evidence_paths": [], "notes": "wave-3 spot-check: 3-5 load-bearing claims verified, 0 discrepancies"}
 {"path": "docs/features/embedding-retrieval-data-collection.md", "tier": "T1", "phase": "001a-spotcheck", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
 {"path": "docs/features/event-graph-federation.md", "tier": "T1", "phase": "001a-spotcheck", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
 {"path": "docs/features/fine-tuning-pipeline.md", "tier": "T1", "phase": "001a-spotcheck", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
 {"path": "docs/features/goroutine-supervisor.md", "tier": "T1", "phase": "001a-spotcheck", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
 {"path": "docs/features/hook-channel-health.md", "tier": "T1", "phase": "001a-spotcheck", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
-{"path": "docs/features/ide-repo-integration.md", "tier": "T1", "phase": "001a-spotcheck", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
-{"path": "docs/features/intent-translation.md", "tier": "T1", "phase": "001a-spotcheck", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
+{"path": "docs/features/ide-repo-integration.md", "tier": "T1", "phase": "001a-spotcheck", "status": "DONE", "audited_commit": "831eb0a", "verdict": "CURRENT", "evidence_paths": [], "notes": "wave-3 spot-check: 3-5 load-bearing claims verified, 0 discrepancies"}
+{"path": "docs/features/intent-translation.md", "tier": "T1", "phase": "001a-spotcheck", "status": "DONE", "audited_commit": "831eb0a", "verdict": "CURRENT", "evidence_paths": [], "notes": "wave-3 spot-check: 3-5 load-bearing claims verified, 0 discrepancies"}
 {"path": "docs/features/j17-ai2ai-protocol.md", "tier": "T1", "phase": "001a-spotcheck", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
-{"path": "docs/features/j17-feedback-loop-closure.md", "tier": "T1", "phase": "001a-spotcheck", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
+{"path": "docs/features/j17-feedback-loop-closure.md", "tier": "T1", "phase": "001a-spotcheck", "status": "DONE", "audited_commit": "831eb0a", "verdict": "CURRENT", "evidence_paths": [], "notes": "wave-3 spot-check: 3-5 load-bearing claims verified, 0 discrepancies"}
 {"path": "docs/features/j17-prompt-compression.md", "tier": "T1", "phase": "001a-spotcheck", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
 {"path": "docs/features/jiminy-effectiveness-tracking.md", "tier": "T1", "phase": "001a-spotcheck", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
 {"path": "docs/features/jiminy-governance.md", "tier": "T1", "phase": "001a-spotcheck", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
@@ -767,16 +767,16 @@
 {"path": "docs/tests/usts/README.md", "tier": "T3", "phase": "001b/c", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
 {"path": "docs/tests/utds/README.md", "tier": "T3", "phase": "001b/c", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
 {"path": "docs/tests/uxts_verification_tracker.md", "tier": "T3", "phase": "001b/c", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
-{"path": "docs/user/api-reference.md", "tier": "T3", "phase": "001a", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
-{"path": "docs/user/cli-reference.md", "tier": "T3", "phase": "001a", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
-{"path": "docs/user/cms-rsic-guide.md", "tier": "T3", "phase": "001a", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
-{"path": "docs/user/ingestion-guide.md", "tier": "T3", "phase": "001a", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
-{"path": "docs/user/install-guide.md", "tier": "T3", "phase": "001a", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
-{"path": "docs/user/mdemg_beta_testing.md", "tier": "T3", "phase": "001a", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
-{"path": "docs/user/module-developer-tutorial.md", "tier": "T3", "phase": "001a", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
+{"path": "docs/user/api-reference.md", "tier": "T3", "phase": "001a", "status": "DONE", "audited_commit": "831eb0a", "verdict": "CURRENT", "evidence_paths": [], "notes": ""}
+{"path": "docs/user/cli-reference.md", "tier": "T3", "phase": "001a", "status": "DONE", "audited_commit": "831eb0a", "verdict": "CURRENT", "evidence_paths": [], "notes": "correctly states llama-server :8102 Phase 13.5"}
+{"path": "docs/user/cms-rsic-guide.md", "tier": "T3", "phase": "001a", "status": "DONE", "audited_commit": "831eb0a", "verdict": "CURRENT", "evidence_paths": [], "notes": ""}
+{"path": "docs/user/ingestion-guide.md", "tier": "T3", "phase": "001a", "status": "DONE", "audited_commit": "831eb0a", "verdict": "CURRENT", "evidence_paths": [], "notes": ""}
+{"path": "docs/user/install-guide.md", "tier": "T3", "phase": "001a", "status": "DONE", "audited_commit": "831eb0a", "verdict": "CURRENT", "evidence_paths": [], "notes": "port-agnostic, dynamic allocation"}
+{"path": "docs/user/mdemg_beta_testing.md", "tier": "T3", "phase": "001a", "status": "DONE", "audited_commit": "831eb0a", "verdict": "DRIFT_MINOR", "evidence_paths": [], "notes": "template cites 'version under test: v0.3.4' vs current v0.10.1 \u2014 refresh marker in fix batch"}
+{"path": "docs/user/module-developer-tutorial.md", "tier": "T3", "phase": "001a", "status": "DONE", "audited_commit": "831eb0a", "verdict": "CURRENT", "evidence_paths": [], "notes": ""}
 {"path": "docs/user/multi-instance.md", "tier": "T0", "phase": "001a", "status": "DONE", "audited_commit": "831eb0a", "verdict": "CURRENT", "evidence_paths": ["internal/cli/init.go"], "notes": ""}
-{"path": "docs/user/quickstart-docker.md", "tier": "T3", "phase": "001a", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
-{"path": "docs/user/upgrade-guide.md", "tier": "T3", "phase": "001a", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
+{"path": "docs/user/quickstart-docker.md", "tier": "T3", "phase": "001a", "status": "DONE", "audited_commit": "831eb0a", "verdict": "CURRENT", "evidence_paths": [], "notes": ""}
+{"path": "docs/user/upgrade-guide.md", "tier": "T3", "phase": "001a", "status": "DONE", "audited_commit": "831eb0a", "verdict": "CURRENT", "evidence_paths": [], "notes": ""}
 {"path": "docs/uxts01/DECISION_REGISTER.md", "tier": "T3", "phase": "001b/c", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
 {"path": "docs/uxts01/README.md", "tier": "T3", "phase": "001b/c", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
 {"path": "docs/uxts01/SOURCE_PROVENANCE_MATRIX.md", "tier": "T3", "phase": "001b/c", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
