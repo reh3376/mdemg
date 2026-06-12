@@ -1,7 +1,7 @@
 {"path": ".github/PULL_REQUEST_TEMPLATE.md", "tier": "T3", "phase": "001b/c", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
 {"path": "AGENT_HANDOFF.md", "tier": "T3", "phase": "001b/c", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
 {"path": "CHANGELOG.md", "tier": "T0", "phase": "001a", "status": "DONE", "audited_commit": "831eb0a", "verdict": "CURRENT", "evidence_paths": [], "notes": "structure+recency only"}
-{"path": "CLAUDE.md", "tier": "T0", "phase": "001a", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
+{"path": "CLAUDE.md", "tier": "T0", "phase": "001a", "status": "DONE", "audited_commit": "831eb0a", "verdict": "CURRENT", "evidence_paths": ["internal/config/config.go", "internal/api/server.go", "internal/tsdb/migrations/"], "notes": "all spot-checked claims verified (schema 26, endpoints, defaults). Lane's DRIFT_MAJOR verdict REVERSED by orchestrator re-verification: the 8101 drift lives in compose-template CODE default + 00_README_v2, not here"}
 {"path": "CMS.md", "tier": "T3", "phase": "001b/c", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
 {"path": "CODE_OF_CONDUCT.md", "tier": "T3", "phase": "001b/c", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
 {"path": "CONTRIBUTING.md", "tier": "T0", "phase": "001a", "status": "DONE", "audited_commit": "831eb0a", "verdict": "CURRENT", "evidence_paths": ["go.mod", "cmd/mdemg/main.go"], "notes": ""}
@@ -396,7 +396,7 @@
 {"path": "docs/development/followup-c-closure.md", "tier": "T4", "phase": "001b/c", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
 {"path": "docs/development/ft-classify-002/run_record.md", "tier": "T4", "phase": "001b/c", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
 {"path": "docs/development/ft-classify-002/sprint_plan_ft_classify_002.md", "tier": "T4", "phase": "001b/c", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
-{"path": "docs/development/ft-lora/00_README_v2.md", "tier": "T0", "phase": "001a", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
+{"path": "docs/development/ft-lora/00_README_v2.md", "tier": "T0", "phase": "001a", "status": "DONE", "audited_commit": "831eb0a", "verdict": "DRIFT_MAJOR", "evidence_paths": ["docs/development/ft-lora/00_README_v2.md:40-47"], "notes": "version ledger frozen at v5.12 (2026-04-30, pre-Phase-13.5): newest entry presents mlx_lm.server :8101 as routing; 13.5 cutover + MODEL-DIST + FT-RECURSIVE/CLASSIFY history absent from a doc chartered as canonical+full-history. STATUS blockquote IS maintained."}
 {"path": "docs/development/ft-lora/01_RESEARCH_v2.md", "tier": "T4", "phase": "001b/c", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
 {"path": "docs/development/ft-lora/02_M5MAX_HARDWARE_v2.md", "tier": "T4", "phase": "001b/c", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
 {"path": "docs/development/ft-lora/03_IMPLEMENTATION_PLAN_v2.md", "tier": "T4", "phase": "001b/c", "status": "PENDING", "audited_commit": null, "verdict": null, "evidence_paths": [], "notes": ""}
