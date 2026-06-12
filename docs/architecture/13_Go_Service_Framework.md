@@ -34,14 +34,15 @@ This is the **reference service skeleton** for the MDEMG system. It is intention
 ### Retrieval
 
 - `POST /v1/memory/retrieve`
-  - Requires `query_embedding` (v1). Optionally accepts `query_text` but embedding generation is intentionally out-of-scope.
+  - Accepts `query_text` (server embeds it via the configured embedder when no `query_embedding` is supplied) or a precomputed `query_embedding`.
   - Vector recall → bounded expansion → activation → scoring → response
   - **Then** bounded learning delta writeback (Hebbian co-activation)
 
-### Maintenance (optional v1 stubs)
+### Maintenance
 
-- `POST /v1/maintenance/decay`
-- `POST /v1/maintenance/consolidate`
+- `POST /v1/memory/consolidate` (consolidation; decay+prune run via the
+  `mdemg maintenance` CLI / scheduled LaunchAgent — there are no
+  `/v1/maintenance/*` HTTP routes)
 
 ---
 

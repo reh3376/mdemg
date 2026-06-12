@@ -96,7 +96,7 @@ The skeleton service uses `REQUIRED_SCHEMA_VERSION` for simplicity.
 - `V0023__symbol_natural_key.cypher`
 - `V0024__signal_state.cypher`
 
-As of v0.7.4, production runs 24 migrations (V0001-V0024).
+Production currently runs 26 migrations (V0001–V0026; V0025/V0026 added context fingerprints + catalog). Count grows — check `migrations/` for the live set.
 
 ## Checksums (optional but recommended)
 

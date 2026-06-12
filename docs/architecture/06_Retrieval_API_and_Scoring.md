@@ -56,21 +56,26 @@
 
 ```json
 {
-  "data": {
-    "results": [
-      {
-        "node_id": "abc-123",
-        "path": "/concepts/auth",
-        "name": "Authentication System",
-        "summary": "OAuth2 implementation...",
-        "score": 0.85,
-        "vector_sim": 0.92,
-        "activation": 0.78
-      }
-    ]
-  }
+  "space_id": "myspace",
+  "results": [
+    {
+      "node_id": "abc-123",
+      "path": "/concepts/auth",
+      "name": "Authentication System",
+      "summary": "OAuth2 implementation...",
+      "score": 0.41,
+      "vector_sim": 0.92,
+      "activation": 0.78,
+      "consensus_strength": 0.75
+    }
+  ]
 }
 ```
+
+Note: the retrieve response is **unwrapped** (no `{data: …}` envelope —
+`internal/models/models.go::RetrieveResponse` is written directly), and
+`score` is on the RRF fused scale (strong matches ~0.49–0.58), not the
+legacy 0–1+ linear scale.
 
 ---
 
@@ -165,7 +170,7 @@ Bulk ingest up to 500 observations in a single request (configurable via `BATCH_
 
 **Configuration:**
 
-- `BATCH_INGEST_MAX_ITEMS=100` - Maximum observations per request
+- `BATCH_INGEST_MAX_ITEMS=500` - Maximum observations per request
 
 ---
 
@@ -523,13 +528,41 @@ Compute activation over fetched subgraph in-memory (see `04_Activation_and_Learn
 
 ---
 
-## Final Ranking (Scoring Formula)
+## Final Ranking
+
+### Default scorer: Column-Voting RRF (since Phase 13.1, 2026-05-03)
+
+The default ranking is **Reciprocal Rank Fusion over 4–5 columns**
+(`RETRIEVAL_COLUMN_VOTING_ENABLED`, default `true`; fork at
+`internal/retrieval/service.go`, scorer in `scoring_rrf.go`):
+
+| Column | Source | Default weight |
+|--------|--------|----------------|
+| Embedding | vector similarity rank | `RETRIEVAL_COLUMN_WEIGHT_EMBEDDING` 0.50 |
+| BM25 | lexical rank | `RETRIEVAL_COLUMN_WEIGHT_BM25` 0.20 |
+| Graph | activation rank | `RETRIEVAL_COLUMN_WEIGHT_GRAPH` 0.15 |
+| Structural | Cypher walk rank (`RETRIEVAL_STRUCTURAL_HOPS` 2) | `RETRIEVAL_COLUMN_WEIGHT_STRUCTURAL` 0.15 |
+| Context | fingerprint Jaccard rank (Phase 14.2.3, when enabled) | per-category weights |
+
+Fused score = Σ w_c / (`RETRIEVAL_RRF_K`=60 + rank_c). The response also
+carries `consensus_strength` (cross-column agreement). **The RRF score
+scale is NOT a stable contract** — strong matches top out ~0.49–0.58;
+downstream consumers must never hardcode absolute thresholds against
+`RetrieveResult.Score` (RRF-SCALE-001). A sparse percentile-activation
+gate (`SPARSE_RETRIEVAL_ENABLED`, default `true`, Phase 14.1.1) trims
+the rerank input post-aggregation. Fail-open: aggregator errors fall
+back to the legacy linear scorer below.
+
+### Legacy linear scorer (fallback / Jiminy-breakdown path)
 
 ```
 score = α*vector_sim + β*activation + γ_eff*recency + δ*confidence + bypass_bonus - κ*redundancy - φ*hub_penalty
 ```
 
-**ANN Optimizations (active by default):**
+Runs when column voting is disabled, on aggregator fail-open, and for
+requests needing per-component score breakdowns.
+
+**ANN Optimizations (active on the legacy path):**
 
 - **Squared Activation**: `β * max(0, activation - floor)²` replaces linear `β * activation`. Eliminates low-activation noise (floor=0.05). Config: `SCORING_ACTIVATION_SQUARED`, `SCORING_ACTIVATION_FLOOR`.
 - **Value Residual Bypass**: When `VectorSim > SCORING_BYPASS_THRESHOLD` (0.85), an additive bonus `SCORING_BYPASS_WEIGHT * excess * queryMult` bypasses the full pipeline. Query-type gated: code queries 1.3×, architecture 0.5×. Max bonus ~0.03.
@@ -540,7 +573,7 @@ Where `γ_eff` depends on temporal mode:
 - **soft** ("recent changes to auth"): `γ_eff = γ × TEMPORAL_SOFT_BOOST` (default 3.0×)
 - **hard** ("in the last 7 days"): candidates filtered by time range before scoring
 
-**Default Hyperparameters:**
+**Default Hyperparameters (legacy path):**
 
 | Symbol | Name | Default | Description |
 |--------|------|---------|-------------|

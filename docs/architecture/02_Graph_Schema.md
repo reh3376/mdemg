@@ -52,7 +52,7 @@ Properties:
 Main concept/memory node.
 Properties (minimum):
 
-- `node_id` (ULID/UUID string)
+- `node_id` (CUIDv2 string — project identifier standard)
 - `space_id`
 - `name`
 - `path`
@@ -85,12 +85,14 @@ Properties:
 
 ### `:SignalState`
 
-Singleton per space. Stores Hebbian signal learner state for persistence across restarts.
+One node **per signal code** (not per space), keyed `node_id = "signal-<code>"`.
+Stores Hebbian signal-learner state for persistence across restarts.
 
-- `space_id` (string) — space identifier
-- `signal_data` (string) — serialized signal state
-- `flushed_at` (datetime) — last flush timestamp
-- Added in V0024 migration (v0.7.0)
+- `node_id` (string) — `signal-<code>`
+- `code` (string) — signal code (e.g. `guidance:<constraint_code>`)
+- `data` (string) — serialized JSON `{emissions, responses, strength}`
+- `updated_at` (datetime) — last flush timestamp
+- Added in V0024 migration (v0.7.0); read side wired into Guide() ordering in DORMANT-CENSUS-001
 
 ### Optional debug labels
 
@@ -138,7 +140,7 @@ All relationships include:
 ### Uniqueness
 
 ```cypher
-CREATE CONSTRAINT space_taproot_unique IF NOT EXISTS
+CREATE CONSTRAINT taproot_space_unique IF NOT EXISTS
 FOR (t:TapRoot) REQUIRE t.space_id IS UNIQUE;
 
 CREATE CONSTRAINT memorynode_path_unique IF NOT EXISTS
@@ -154,10 +156,10 @@ FOR (o:Observation) REQUIRE (o.space_id, o.obs_id) IS UNIQUE;
 ### Helpful search indexes
 
 ```cypher
-CREATE INDEX memorynode_name IF NOT EXISTS
+CREATE INDEX memorynode_name_idx IF NOT EXISTS
 FOR (n:MemoryNode) ON (n.space_id, n.name);
 
-CREATE INDEX memorynode_layer_role IF NOT EXISTS
+CREATE INDEX memorynode_layer_role_idx IF NOT EXISTS
 FOR (n:MemoryNode) ON (n.space_id, n.layer, n.role_type);
 ```
 

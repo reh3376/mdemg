@@ -1,6 +1,6 @@
 # Configuration & Tuning
 
-All configuration is done via environment variables. Set these in `mdemg_build/service/.env` or export them before starting the service.
+All configuration is done via environment variables. Set these in the project `.env` or export them before starting the service.
 
 ---
 
@@ -103,17 +103,21 @@ S = α*V + β*A + γ_eff*R + δ*C - φ*log(1+deg) - κ*d
 
 Where `γ_eff` = `γ` normally, or `γ * TEMPORAL_SOFT_BOOST` when temporal soft-mode is active.
 
-Current defaults (hardcoded in `scoring.go`, configurable via future update):
+These apply to the **legacy linear scorer** (fallback/breakdown path —
+the default scorer is Column-Voting RRF, see `RETRIEVAL_COLUMN_*` vars:
+`RETRIEVAL_COLUMN_VOTING_ENABLED` default true, per-column weights
+`RETRIEVAL_COLUMN_WEIGHT_{EMBEDDING,BM25,GRAPH,STRUCTURAL}` =
+0.50/0.20/0.15/0.15, `RETRIEVAL_RRF_K`=60). All config-driven:
 
-| Symbol | Name | Default | Description |
-|--------|------|---------|-------------|
-| α | SCORING_WEIGHT_VECTOR | 0.60 | Vector similarity weight |
-| β | SCORING_WEIGHT_ACTIVATION | 0.20 | Activation score weight |
-| γ | SCORING_WEIGHT_RECENCY | 0.15 | Recency weight |
-| δ | SCORING_WEIGHT_CONFIDENCE | 0.05 | Confidence weight |
-| φ | SCORING_PENALTY_HUB | 0.08 | Hub penalty (log degree) |
-| κ | SCORING_PENALTY_REDUNDANCY | 0.12 | Path-prefix redundancy penalty |
-| ρ | SCORING_RECENCY_DECAY | 0.05 | Recency decay rate per day |
+| Symbol | Env var | Default | Description |
+|--------|---------|---------|-------------|
+| α | SCORING_ALPHA | 0.60 | Vector similarity weight |
+| β | SCORING_BETA | 0.20 | Activation score weight |
+| γ | SCORING_GAMMA | 0.15 | Recency weight |
+| δ | SCORING_DELTA | 0.05 | Confidence weight |
+| φ | SCORING_PHI | 0.08 | Hub penalty (log degree) |
+| κ | SCORING_KAPPA | 0.12 | Path-prefix redundancy penalty |
+| ρ | SCORING_RHO_L0/L1/L2 | 0.05/0.02/0.01 | Per-layer recency decay per day |
 
 ---
 
@@ -171,7 +175,7 @@ Weight clamping: `wmax * tanh(w / wmax)` (smooth saturation via tanh soft-cap)
 
 Defaults (in `learning/service.go`):
 
-- `η` (learning rate): 0.1
+- `η` (learning rate): 0.02 (`LEARNING_ETA`)
 - `μ` (regularization): 0.01
 - `w_min`: 0.0
 - `w_max`: 1.0
@@ -252,7 +256,7 @@ RECLASS_MAX_CATEGORIES=10            # Max sub-categories LLM may propose (defau
 RECLASS_MAX_ITERATIONS=5             # Max reclassification loops until convergence (default: 5, range: 1-10)
 RECLASS_MAX_DEPTH=4                  # Max dot-path taxonomy depth (default: 4, range: 1-10)
 RECLASS_PROVIDER=                    # LLM provider: openai or ollama (cascades from EMERGENCE_PROVIDER)
-RECLASS_MODEL=gpt-4.1-nano           # LLM model name (default: gpt-4.1-nano)
+RECLASS_MODEL=gpt-5.4-mini           # LLM model name (default: gpt-5.4-mini)
 RECLASS_MAX_TOKENS=2000              # Max response tokens (default: 2000, range: 500-8000)
 RECLASS_TIMEOUT_MS=30000             # LLM call timeout in ms (default: 30000, min: 5000)
 ```
@@ -317,7 +321,7 @@ Spreading activation parameters (in `activation.go`):
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| Steps (T) | 3 | Activation propagation iterations |
+| Steps (T) | 2 | Activation propagation iterations (`ACTIVATION_STEPS`) |
 | Decay (λ) | 0.15 | Per-step decay factor |
 | Min threshold | 0.20 | Ignore nodes below this for learning |
 
@@ -481,9 +485,9 @@ HEALTH_PROBE_INTERVAL_SEC=60           # Probe interval in seconds
 
 # LLM Retry (SR-001)
 LLM_RETRY_ENABLED=true                 # Enable retry with backoff
-LLM_RETRY_MAX_ATTEMPTS=3               # Maximum retry attempts
+LLM_RETRY_MAX_ATTEMPTS=5               # Maximum retry attempts
 LLM_RETRY_BASE_DELAY_MS=500            # Base delay before first retry
-LLM_RETRY_MAX_DELAY_MS=10000           # Maximum backoff delay cap
+LLM_RETRY_MAX_DELAY_MS=60000           # Maximum backoff delay cap
 
 # LLM Consecutive Failure Alert (SR-001 Gap Closure)
 LLM_CONSECUTIVE_FAILURE_THRESHOLD=3    # Alert after N consecutive LLM failures per task
@@ -492,8 +496,10 @@ LLM_CONSECUTIVE_FAILURE_THRESHOLD=3    # Alert after N consecutive LLM failures 
 ALERT_EVALUATOR_ENABLED=true           # Enable server-native TSDB rule evaluation
 ALERT_EVALUATOR_INTERVAL_SEC=30        # Base evaluation tick interval in seconds
 
-# Goroutine Supervisor (SNA-001)
-# No config — fixed: max 3 restarts, 5s base backoff (doubles per retry)
+# Goroutine Supervisor (SUPERVISOR-002)
+SUPERVISOR_MAX_RESTARTS=3              # Sliding-window restart budget
+SUPERVISOR_RESTART_WINDOW_MIN=60       # Window minutes (restarts age out)
+SUPERVISOR_BACKOFF_BASE_SEC=5          # Base backoff (doubles per retry)
 
 # Background Workers (SNA-001)
 CONTEXT_COOLER_ENABLED=false           # Enable background context cooler processing (opt-in)

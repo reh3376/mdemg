@@ -26,7 +26,7 @@ cat .mdemg/generated/install-report.json
 If needed, collect logs:
 
 ```bash
-tail -n 200 .mdemg/logs/sidecar.log
+tail -n 200 .mdemg/logs/mdemg.log
 tail -n 200 .mdemg/logs/mdemg.log
 ```
 

@@ -36,15 +36,16 @@ lang-parse-spec/
     ├── schema/
     │   └── upts.schema.json       # JSON Schema (canonical definition)
     │
-    ├── specs/
-    │   ├── typescript.upts.json   # TypeScript test spec
-    │   ├── go.upts.json           # Go test spec
-    │   └── python.upts.json       # Python test spec
+    ├── specs/                     # 28 specs — one per supported language
+    │   ├── go.upts.json
+    │   ├── python.upts.json
+    │   ├── typescript.upts.json
+    │   └── … (25 more: c, cpp, csharp, cuda, cypher, dockerfile, graphql,
+    │          ini, java, json, kotlin, lua, makefile, markdown, openapi,
+    │          php, protobuf, rust, scraper_markdown, shell, sql,
+    │          terraform, toml, xml, yaml)
     │
-    ├── fixtures/
-    │   ├── typescript_test_fixture.ts
-    │   ├── go_test_fixture.go
-    │   └── python_test_fixture.py
+    ├── fixtures/                  # 28 fixtures — one per spec
     │
     └── runners/
         └── upts_runner.py         # Python test runner
@@ -325,7 +326,7 @@ jobs:
       - uses: actions/checkout@v4
       
       - name: Build parser
-        run: go build -o parser ./cmd/ingest-codebase
+        run: go build -o parser ./bin/extract-symbols  # (built from cmd/extract-symbols; see .github/workflows/parser-tests.yml)
       
       - name: Run UPTS tests
         run: |
