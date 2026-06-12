@@ -38,6 +38,15 @@
 > work formalizes spec tracking.
 
 
+**Date:** 2026-06-12
+**Version:** 5.13 (DOC-AUDIT-001a remediation — version ledger unfrozen; entries below summarize 2026-05-03 → 2026-06-12, each verified against CHANGELOG + sprint records)
+
+> **Changes in v5.13 (catch-up ledger, 2026-06-12):**
+> - **Phase 13.5 RUNTIME CUTOVER (2026-05-03)**: production serving moved `mlx_lm.server :8101` → **`llama.cpp llama-server :8102`** (GGUF Q5_K_M) per the data-decided bake-off (`docs/development/post-ft-lora/phase_13_5_bakeoff_results.md`): 0 crashes/160 min vs ~14-min Metal-OOM crash cycle; p50 17s→3.0s; UVTS parity. All v5.12-and-earlier "Production-use: mlx_lm.server" lines below are historical.
+> - **MODEL-DIST-001/002 (2026-05-11/25)**: `mdemg model pull|list|verify|remove|where` via Ollama Library (3 fused quants + 257 MB adapter-only path). Distribution only; runtime stays llama-server.
+> - **FT-RECURSIVE-000 (2026-06-11)**: buildable spec for Phases 6/7/9 at `docs/development/ft-recursive-001/SPEC_recursive_retraining_loop.md` (as-built audit: readiness→RSIC→no-op-actuator skeleton; 6a/6b/7/9 plan; gated behind FT-CLASSIFY-002).
+> - **FT-CLASSIFY-002 (2026-06-12)**: the manual vertical slice ran end-to-end; gate verdict NO-PROMOTE (jiminy.evaluate −3.3pp) — the gate correctly rejecting a candidate IS the proving result. Durable: `summary_quality` reward fixed (spec-correct `{type:none,summary:""}` scored ~0.767 → every correct-none distill pair rejected — the REAL 11.5d failure mechanism; under the fixed reward consulting.classify baseline is **0.9228**, not 0.668); distribution-matched capture (`--stratify-classify`); candidate evals use the GGUF promotion form (MLX serving Metal-OOM'd mid-sweep). Run record: `docs/development/ft-classify-002/run_record.md`.
+
 **Date:** 2026-04-30
 **Version:** 5.12 (Sprint FT-LORA-PHASE11.6 — Production cutover. Phase 5 dense renamed `mdemg-llm-v1`; all 16 LLM call sites routed at the local model via mlx_lm.server :8101. 5 of 16 task surfaces verified routing correctly via smoke test; 3 server.go pre-existing config-wiring bugs patched.)
 
