@@ -1,1126 +1,1826 @@
 {
   "routes": {
     "/api/graph/data": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
+      "consumers": [
+        "dashboard:mdemg-graph-topology.json"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "Grafana Node Graph API datasource (deploy/docker/grafana/provisioning/datasources/nodegraph-api.yml -> http://host.docker.internal:9999; plugin convention endpoint /api/graph/data) used by mdemg-graph-topology.json (uid mdemg-nodegraph). Recon flagged as legacy - WRONG: live dashboard consumer.",
       "uats_specs": []
     },
     "/api/graph/fields": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
+      "consumers": [
+        "dashboard:mdemg-graph-topology.json"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "Node Graph API plugin convention endpoint (handlers_graph_viz.go:630); same datasource as /api/graph/data (nodegraph-api.yml).",
       "uats_specs": []
     },
     "/api/graph/health": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
+      "consumers": [
+        "dashboard:mdemg-graph-topology.json"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "Node Graph API plugin datasource health check (handlers_graph_viz.go:666); nodegraph-api.yml.",
       "uats_specs": []
     },
     "/healthz": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "hook:session-start.sh",
+        "hook:prompt-context.sh",
+        "hook:pre-compact.sh",
+        "cli:daemon(start)",
+        "cli:init",
+        "cli:data",
+        "cli:demo",
+        "cli:hooks-doctor",
+        "cli:sidecar-doctor",
+        "cli:sidecar-status",
+        "cli:ingest-claude-md",
+        "script:transfer-acceptance.sh",
+        "script:phase13_1_ablation_runner.py"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "Universal liveness probe: hook_templates/session-start.sh:50, internal/cli/daemon.go:424, internal/cli/init.go:1226, plus Docker healthcheck.",
+      "uats_specs": [
+        "health.uats.json",
+        "healthz_enhanced.uats.json"
+      ]
     },
     "/readyz": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "mcp:memory_status"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/cli/mcp.go:530 (memory_status tool readiness probe).",
+      "uats_specs": [
+        "readiness.uats.json",
+        "readyz_tsdb.uats.json"
+      ]
     },
     "/ui/": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
+      "consumers": [
+        "ui:internal/api/ui (operator dashboard)"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "Embedded operator dashboard (internal/api/ui_embed.go; CLAUDE.md documents http://localhost:9999/ui/); ui/api.js drives 30+ admin/backup/learning routes.",
       "uats_specs": []
     },
     "/v1/admin/breakers": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "DH-004 operator escape hatch: list circuit breakers (AUTH_API_KEYS-gated). No automated consumer by design; companion of breakers/reset.",
+      "uats_specs": [
+        "admin_breakers_list.uats.json"
+      ]
     },
     "/v1/admin/breakers/reset": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "DH-004 operator escape hatch; referenced as the operator action in mdemg-llm-routing.json:115 panel description.",
+      "uats_specs": [
+        "admin_breakers_reset.uats.json"
+      ]
     },
     "/v1/admin/config": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "ui:api.js",
+        "script:tsdb_data_review.py"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/api/ui/api.js:67; scripts/tsdb_data_review.py:758.",
+      "uats_specs": [
+        "admin_config_patch.uats.json"
+      ]
     },
     "/v1/admin/features": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "ui:api.js"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/api/ui/api.js:125.",
+      "uats_specs": [
+        "admin_features.uats.json"
+      ]
     },
     "/v1/admin/features/restart": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
+      "consumers": [
+        "ui:api.js"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/api/ui/api.js:128.",
       "uats_specs": []
     },
     "/v1/admin/features/start": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
+      "consumers": [
+        "ui:api.js"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/api/ui/api.js:126.",
       "uats_specs": []
     },
     "/v1/admin/features/stop": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
+      "consumers": [
+        "ui:api.js"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/api/ui/api.js:127.",
       "uats_specs": []
     },
     "/v1/admin/instances": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
+      "consumers": [
+        "ui:api.js"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/api/ui/api.js:135.",
       "uats_specs": []
     },
     "/v1/admin/logs": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
+      "consumers": [
+        "ui:api.js"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/api/ui/api.js:71.",
       "uats_specs": []
     },
     "/v1/admin/restart": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "ui:api.js"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/api/ui/api.js:131.",
+      "uats_specs": [
+        "admin_restart.uats.json"
+      ]
     },
     "/v1/admin/rsic/restart": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "ui:api.js"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/api/ui/api.js:114.",
+      "uats_specs": [
+        "admin_rsic_lifecycle.uats.json"
+      ]
     },
     "/v1/admin/rsic/start": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "ui:api.js"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/api/ui/api.js:112.",
+      "uats_specs": [
+        "admin_rsic_lifecycle.uats.json"
+      ]
     },
     "/v1/admin/rsic/stop": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "ui:api.js"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/api/ui/api.js:113.",
+      "uats_specs": [
+        "admin_rsic_lifecycle.uats.json"
+      ]
     },
     "/v1/admin/spaces": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "ui:api.js"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/api/ui/api.js:61 (spaces tab).",
+      "uats_specs": [
+        "admin_spaces_list.uats.json"
+      ]
     },
     "/v1/admin/spaces/": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "handleAdminSpaceUpdate (server.go:2590, admin-scoped): per-space update/delete; manual space administration, no automated consumer.",
+      "uats_specs": [
+        "admin_spaces_update.uats.json"
+      ]
     },
     "/v1/admin/spaces/export": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "ui:api.js",
+        "script:transfer-acceptance.sh"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/api/ui/api.js:106; scripts/transfer-acceptance.sh:133.",
+      "uats_specs": [
+        "space_export.uats.json"
+      ]
     },
     "/v1/admin/spaces/export/preview": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "script:transfer-acceptance.sh"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "scripts/transfer-acceptance.sh:117.",
+      "uats_specs": [
+        "space_export_preview.uats.json"
+      ]
     },
     "/v1/admin/spaces/import": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "ui:api.js",
+        "script:transfer-acceptance.sh"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/api/ui/api.js:109; scripts/transfer-acceptance.sh:183.",
+      "uats_specs": [
+        "space_import.uats.json"
+      ]
     },
     "/v1/admin/spaces/prune": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "Admin-scoped manual prune trigger (server.go:2589); CLI prune/maintenance go direct to Neo4j, not via this route.",
+      "uats_specs": [
+        "admin_spaces_prune.uats.json"
+      ]
     },
     "/v1/ape/status": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "APE scheduler status read (handle_ape.go:7); operator diagnostics, no automated consumer.",
+      "uats_specs": [
+        "ape_status.uats.json"
+      ]
     },
     "/v1/ape/trigger": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "\"manually triggers an APE event\" (handle_ape.go:28); explicit manual trigger surface.",
+      "uats_specs": [
+        "ape_trigger.uats.json"
+      ]
     },
     "/v1/backup/": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "ui:api.js"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/api/ui/api.js:95 (DELETE backup by id).",
+      "uats_specs": [
+        "backup_delete.uats.json"
+      ]
     },
     "/v1/backup/list": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "ui:api.js"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/api/ui/api.js:92.",
+      "uats_specs": [
+        "backup_list.uats.json"
+      ]
     },
     "/v1/backup/manifest/": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "ui:api.js"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/api/ui/api.js:94.",
+      "uats_specs": [
+        "backup_manifest.uats.json"
+      ]
     },
     "/v1/backup/restore": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "ui:api.js"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/api/ui/api.js:97 (BACKUP-RESTORE-VERIFY-001 restore trigger).",
+      "uats_specs": [
+        "backup_restore.uats.json"
+      ]
     },
     "/v1/backup/restore/status/": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "ui:api.js"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/api/ui/api.js:98.",
+      "uats_specs": [
+        "backup_restore_status.uats.json"
+      ]
     },
     "/v1/backup/status/": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "ui:api.js"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/api/ui/api.js:93.",
+      "uats_specs": [
+        "backup_status.uats.json"
+      ]
     },
     "/v1/backup/trigger": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "ui:api.js"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/api/ui/api.js:88.",
+      "uats_specs": [
+        "backup_trigger.uats.json"
+      ]
     },
     "/v1/constraints": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "script:fsd-acceptance.sh"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "scripts/fsd-acceptance.sh:211.",
+      "uats_specs": [
+        "constraints_list.uats.json"
+      ]
     },
     "/v1/constraints/conflicts": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "script:fsd-acceptance.sh"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "scripts/fsd-acceptance.sh:270.",
+      "uats_specs": [
+        "constraint_conflicts_list.uats.json"
+      ]
     },
     "/v1/constraints/conflicts/": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "PATCH /v1/constraints/conflicts/{id}/resolve (server.go:2484); manual conflict-resolution action; sibling list route is script-consumed.",
+      "uats_specs": [
+        "constraint_conflicts_resolve.uats.json"
+      ]
     },
     "/v1/constraints/detect-conflicts": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "script:fsd-acceptance.sh"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "scripts/fsd-acceptance.sh:242.",
+      "uats_specs": [
+        "constraint_conflicts_detect.uats.json"
+      ]
     },
     "/v1/constraints/effectiveness": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "script:fsd-acceptance.sh"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "scripts/fsd-acceptance.sh:184.",
+      "uats_specs": [
+        "constraint_effectiveness.uats.json"
+      ]
     },
     "/v1/constraints/scope/": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "script:fsd-acceptance.sh"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "scripts/fsd-acceptance.sh:289 (PATCH scope/$FIRST_CONSTRAINT_ID).",
+      "uats_specs": [
+        "constraint_scope_filter.uats.json"
+      ]
     },
     "/v1/constraints/stats": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "script:fsd-acceptance.sh"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "scripts/fsd-acceptance.sh:228.",
+      "uats_specs": [
+        "constraints_stats.uats.json"
+      ]
     },
     "/v1/conversation/consolidate": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "hook:pre-compact.sh",
+        "cli:ingest"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "hook_templates/pre-compact.sh:208; internal/cli/ingest.go:1769.",
+      "uats_specs": [
+        "conversation_consolidate.uats.json"
+      ]
     },
     "/v1/conversation/correct": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "INTERNAL",
+      "notes": "Explicit user-correction intake (handlers_conversation.go:125). No producer wired; corrections flow via /v1/conversation/observe obs_type=correction (CLAUDE.md observe table). Learning-loop intake surface.",
+      "uats_specs": [
+        "conversation_correct.uats.json"
+      ]
     },
     "/v1/conversation/graduate": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "hook:pre-compact.sh",
+        "hook:session-start.sh"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "hook_templates/pre-compact.sh:214; session-start.sh:517.",
+      "uats_specs": [
+        "conversation_graduate.uats.json"
+      ]
     },
     "/v1/conversation/observations/": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "handleFlagForOrgReview (server.go:2503): manually flag an observation for org review; no automated consumer.",
+      "uats_specs": [
+        "cms_org_flag.uats.json"
+      ]
     },
     "/v1/conversation/observe": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "hook:session-start.sh",
+        "hook:pre-compact.sh",
+        "hook:post-tool-observe.py",
+        "cli:demo",
+        "cli:sidecar-doctor",
+        "cli:synergy",
+        "script:live_validation.py",
+        "script:fsd-acceptance.sh",
+        "agent:CLAUDE.md (observe protocol)"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "Core observation intake: hook_templates/post-tool-observe.py:396, pre-compact.sh:146, session-start.sh:168; CLAUDE.md \"Observe Continuously\" protocol.",
+      "uats_specs": [
+        "conversation_observe.uats.json",
+        "conversation_observe_pinned.uats.json"
+      ]
     },
     "/v1/conversation/org-reviews": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "Org-review queue listing (handlers_org_review.go:67); manual review surface, no automated consumer.",
+      "uats_specs": [
+        "cms_org_reviews_list.uats.json"
+      ]
     },
     "/v1/conversation/org-reviews/": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "POST .../org-reviews/{obs_id}/decision (handlers_org_review.go:108); manual review decision.",
+      "uats_specs": [
+        "cms_org_decision.uats.json"
+      ]
     },
     "/v1/conversation/org-reviews/stats": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "Org-review stats read; manual review surface.",
+      "uats_specs": [
+        "cms_org_reviews_stats.uats.json"
+      ]
     },
     "/v1/conversation/recall": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "hook:prompt-context.sh",
+        "hook:session-start.sh",
+        "cli:synergy",
+        "cli:sidecar-generate-hooks"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "hook_templates/prompt-context.sh:90 (per-prompt CMS recall); session-start.sh:313,468; internal/cli/synergy.go:814.",
+      "uats_specs": [
+        "conversation_recall.uats.json",
+        "conversation_recall_tags.uats.json"
+      ]
     },
     "/v1/conversation/resume": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "hook:session-start.sh",
+        "cli:sidecar-doctor"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "hook_templates/session-start.sh:124 (memory resume); internal/cli/sidecar_doctor.go:321.",
+      "uats_specs": [
+        "conversation_resume.uats.json",
+        "conversation_resume_anomaly.uats.json"
+      ]
     },
     "/v1/conversation/session/anomalies": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "Session anomaly diagnostics read; UATS-covered only (session_anomalies.uats.json); no production consumer found.",
+      "uats_specs": [
+        "session_anomalies.uats.json"
+      ]
     },
     "/v1/conversation/session/health": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "hook:prompt-context.sh",
+        "hook:pre-compact.sh"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "hook_templates/prompt-context.sh:192; pre-compact.sh:82 (recon false-positive VERIFIED active).",
+      "uats_specs": [
+        "session_health.uats.json"
+      ]
     },
     "/v1/conversation/snapshot": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "Recon claim \"consumed by pre-compact.sh\" NOT verified: pre-compact.sh saves context via /v1/conversation/observe (hook_templates/pre-compact.sh:146), not snapshot. Zero consumers in hooks/cli/mcp/scripts; UATS-covered (cms_snapshot_*). Manual context-snapshot surface - orchestrator may want a follow-up (re-wire pre-compact or prune).",
+      "uats_specs": [
+        "cms_snapshot_create.uats.json",
+        "cms_snapshot_list.uats.json"
+      ]
     },
     "/v1/conversation/snapshot/": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "Snapshot get/delete by id (handlers_snapshot.go:24); same finding as /v1/conversation/snapshot - no consumer; UATS-only.",
+      "uats_specs": [
+        "cms_snapshot_delete.uats.json",
+        "cms_snapshot_get.uats.json"
+      ]
     },
     "/v1/conversation/snapshot/cleanup": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "Snapshot retention cleanup; same finding as /v1/conversation/snapshot - no consumer; UATS-only.",
+      "uats_specs": [
+        "cms_snapshot_cleanup.uats.json"
+      ]
     },
     "/v1/conversation/snapshot/latest": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "Latest-snapshot read; same finding as /v1/conversation/snapshot - no consumer; UATS-only.",
+      "uats_specs": [
+        "cms_snapshot_latest.uats.json"
+      ]
     },
     "/v1/conversation/templates": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "Conversation template CRUD (handlers_templates.go:46); operator config surface, no automated consumer.",
+      "uats_specs": [
+        "cms_templates_create.uats.json",
+        "cms_templates_list.uats.json"
+      ]
     },
     "/v1/conversation/templates/": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "Template by-id operations; operator config surface.",
+      "uats_specs": [
+        "cms_templates_delete.uats.json",
+        "cms_templates_get.uats.json",
+        "cms_templates_update.uats.json"
+      ]
     },
     "/v1/conversation/volatile/stats": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "hook:pre-compact.sh"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "hook_templates/pre-compact.sh:74.",
+      "uats_specs": [
+        "conversation_volatile_stats.uats.json"
+      ]
     },
     "/v1/embedding/health": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "ui:api.js"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/api/ui/api.js:51.",
+      "uats_specs": [
+        "embedding_health.uats.json"
+      ]
     },
     "/v1/eventgraph/guidance-outcome-neighborhood": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "cli:eventgraph",
+        "mcp:eventgraph_guidance_outcome_neighborhood"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/cli/eventgraph.go:377; internal/cli/mcp.go:1791 (EVENTGRAPH-002/MCP-REVIVE-001).",
+      "uats_specs": [
+        "guidance_outcome_neighborhood.uats.json"
+      ]
     },
     "/v1/eventgraph/reinforcement-neighborhood": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "cli:eventgraph",
+        "mcp:eventgraph_reinforcement_neighborhood"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/cli/eventgraph.go:148; internal/cli/mcp.go:1758 (EVENTGRAPH-CLI-001).",
+      "uats_specs": [
+        "eventgraph_reinforcement_neighborhood.uats.json"
+      ]
     },
     "/v1/feedback": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "PRUNE_CANDIDATE",
+      "notes": "Gap-detection retrieval-feedback intake (gaps_handlers.go:168) with zero producers; live feedback channel is /v1/jiminy/feedback (hook post-tool-observe.py:366). Superseded - prune after re-verification.",
+      "uats_specs": [
+        "capability_gaps_full.uats.json",
+        "feedback.uats.json"
+      ]
     },
     "/v1/filewatcher/start": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "Manual filewatcher control (server.go:2563); `mdemg watch` CLI uses /v1/memory/ingest/files instead, not this route.",
+      "uats_specs": [
+        "filewatcher_start.uats.json"
+      ]
     },
     "/v1/filewatcher/status": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "Manual filewatcher status read (server.go:2564).",
+      "uats_specs": [
+        "filewatcher_status.uats.json"
+      ]
     },
     "/v1/filewatcher/stop": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "Manual filewatcher control (server.go:2565).",
+      "uats_specs": [
+        "filewatcher_stop.uats.json"
+      ]
     },
     "/v1/guardrail/events": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "script:fsd-acceptance.sh"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "scripts/fsd-acceptance.sh:166.",
+      "uats_specs": [
+        "guardrail_events.uats.json"
+      ]
     },
     "/v1/hash-verification/files": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "INTERNAL",
+      "notes": "UNTS hash-verification framework surface (handlers_unts.go); test/verification infrastructure, no production consumer.",
+      "uats_specs": [
+        "hash_verification_list.uats.json"
+      ]
     },
     "/v1/hash-verification/files/": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "INTERNAL",
+      "notes": "UNTS framework surface (handlers_unts.go).",
+      "uats_specs": [
+        "hash_verification_file_get.uats.json",
+        "hash_verification_get.uats.json"
+      ]
     },
     "/v1/hash-verification/register": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "INTERNAL",
+      "notes": "UNTS framework surface (handlers_unts.go:10).",
+      "uats_specs": [
+        "hash_verification_get.uats.json",
+        "hash_verification_register.uats.json"
+      ]
     },
     "/v1/hash-verification/revert": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "INTERNAL",
+      "notes": "UNTS framework surface (handlers_unts.go).",
+      "uats_specs": [
+        "hash_verification_revert.uats.json"
+      ]
     },
     "/v1/hash-verification/scan": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "INTERNAL",
+      "notes": "UNTS framework surface (handlers_unts.go).",
+      "uats_specs": [
+        "hash_verification_scan.uats.json"
+      ]
     },
     "/v1/hash-verification/update": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "INTERNAL",
+      "notes": "UNTS framework surface (handlers_unts.go).",
+      "uats_specs": [
+        "hash_verification_update.uats.json"
+      ]
     },
     "/v1/hash-verification/verify": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "INTERNAL",
+      "notes": "UNTS framework surface (handlers_unts.go).",
+      "uats_specs": [
+        "hash_verification_verify.uats.json"
+      ]
     },
     "/v1/hash-verification/verify-all": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "INTERNAL",
+      "notes": "UNTS framework surface (handlers_unts.go).",
+      "uats_specs": [
+        "hash_verification_verify_all.uats.json"
+      ]
     },
     "/v1/jiminy/bootstrap": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "hook:session-start.sh",
+        "hook:prompt-context.sh",
+        "script:test_t1t2_comprehension.py"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "hook_templates/session-start.sh:346; prompt-context.sh:153.",
+      "uats_specs": [
+        "j17_bootstrap.uats.json"
+      ]
     },
     "/v1/jiminy/checkpoint": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "hook:pre-compact.sh"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "hook_templates/pre-compact.sh:178 (J17 ticket before compaction).",
+      "uats_specs": [
+        "j17_checkpoint.uats.json"
+      ]
     },
     "/v1/jiminy/classify": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "hook:pre-write-check.py"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "hook_templates/pre-write-check.py:108 (/strict mode Write/Edit gate; recon false-positive VERIFIED active).",
+      "uats_specs": [
+        "jiminy_classify.uats.json"
+      ]
     },
     "/v1/jiminy/evaluate": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "hook:post-tool-observe.py"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "hook_templates/post-tool-observe.py:196.",
+      "uats_specs": [
+        "jiminy_evaluate.uats.json",
+        "jiminy_evaluate_llm.uats.json"
+      ]
     },
     "/v1/jiminy/extension": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "INTERNAL",
+      "notes": "J17 protocol-extension negotiation (handlers_j17.go:96); agent-protocol internal surface, no fixed producer in repo.",
+      "uats_specs": [
+        "j17_extension_denied.uats.json",
+        "j17_extension_request.uats.json"
+      ]
     },
     "/v1/jiminy/feedback": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "hook:post-tool-observe.py",
+        "script:test_t1t2_epochs.py",
+        "script:test_t2_targeted.py",
+        "script:test_comprehension_cycle.py"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "hook_templates/post-tool-observe.py:366 (guidance outcome loop - RRF-SCALE-001/JIMINY-OUTCOME-001 sink).",
+      "uats_specs": [
+        "jiminy_feedback.uats.json",
+        "jiminy_feedback_classifier.uats.json",
+        "jiminy_feedback_persist.uats.json"
+      ]
     },
     "/v1/jiminy/guide": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "mcp:jiminy_guide",
+        "hook:prompt-context.ps1",
+        "cli:sidecar-generate-hooks",
+        "script:test_t1t2_comprehension.py",
+        "script:synergy-migrate.sh"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/cli/mcp.go:1638; hook_templates/prompt-context.ps1:97; internal/cli/sidecar_generate_hooks.go:273.",
+      "uats_specs": [
+        "j17_guide_encoded.uats.json",
+        "j17_trust_modulation.uats.json",
+        "jiminy_guide.uats.json",
+        "jiminy_guide_sanitized.uats.json",
+        "jiminy_guide_synthesis.uats.json",
+        "jiminy_guide_validation.uats.json"
+      ]
     },
     "/v1/jiminy/healthz": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "hook:session-start.sh",
+        "hook:pre-compact.sh",
+        "hook:post-tool-observe.py",
+        "cli:synergy",
+        "script:jiminy_effectiveness_report.py"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "hook_templates/session-start.sh:367; internal/cli/synergy.go:398; scripts/jiminy_effectiveness_report.py:451.",
+      "uats_specs": [
+        "jiminy_healthz.uats.json"
+      ]
     },
     "/v1/jiminy/latest": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "hook:prompt-context.sh",
+        "script:test_t1t2_comprehension.py"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "hook_templates/prompt-context.sh:127 (per-prompt guidance delivery).",
+      "uats_specs": [
+        "jiminy_latest.uats.json"
+      ]
     },
     "/v1/jiminy/protocol/feedback": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "INTERNAL",
+      "notes": "J17 protocol-learning feedback intake; UATS-covered (j17_protocol_feedback.uats.json), no production consumer - internal protocol/eval surface per census rules.",
+      "uats_specs": [
+        "j17_protocol_feedback.uats.json"
+      ]
     },
     "/v1/jiminy/protocol/learn": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "INTERNAL",
+      "notes": "J17 protocol learn intake; internal protocol/eval surface per census rules (UATS-covered; UATS-GAP-001 deep-merge pitfall was caught in the j17_protocol_learn spec).",
+      "uats_specs": [
+        "j17_protocol_learn.uats.json"
+      ]
     },
     "/v1/jiminy/protocol/metrics": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "hook:session-start.sh",
+        "script:jiminy_effectiveness_report.py",
+        "script:test_t1t2_epochs.py"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "hook_templates/session-start.sh:295; scripts/jiminy_effectiveness_report.py:452.",
+      "uats_specs": [
+        "j17_metrics.uats.json"
+      ]
     },
     "/v1/jiminy/protocol/status": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "script:jiminy_effectiveness_report.py",
+        "script:test_t1t2_epochs.py",
+        "script:test_t2_targeted.py"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "scripts/jiminy_effectiveness_report.py:454; scripts/test_t1t2_epochs.py:383.",
+      "uats_specs": [
+        "jiminy_protocol_status.uats.json",
+        "jiminy_protocol_status_400.uats.json"
+      ]
     },
     "/v1/jiminy/protocol/tier-effectiveness": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "script:jiminy_effectiveness_report.py",
+        "script:test_t1t2_epochs.py",
+        "script:test_t2_targeted.py"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "scripts/jiminy_effectiveness_report.py:453; scripts/test_t1t2_epochs.py:89.",
+      "uats_specs": [
+        "j17_tier_effectiveness.uats.json"
+      ]
     },
     "/v1/jiminy/ready": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "hook:session-start.sh",
+        "hook:pre-compact.sh"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "hook_templates/session-start.sh:287; pre-compact.sh:170.",
+      "uats_specs": [
+        "jiminy_ready.uats.json"
+      ]
     },
     "/v1/jiminy/reformulate": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "script:test_t1t2_comprehension.py"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "scripts/test_t1t2_comprehension.py:488; also the documented /strict-mode hook path (CLAUDE.md), though the current prompt-context.sh template calls /v1/jiminy/latest only - strict reformulate wiring not present in template.",
+      "uats_specs": [
+        "jiminy_reformulate.uats.json"
+      ]
     },
     "/v1/jiminy/resume-protocol": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "hook:session-start.sh"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "hook_templates/session-start.sh:324 (J17 ticket resume).",
+      "uats_specs": [
+        "j17_resume.uats.json"
+      ]
     },
     "/v1/jiminy/strict": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "mcp:jiminy_strict"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/cli/mcp.go:1845 (MCP-REVIVE-001); CLAUDE.md /strict toggle flow.",
+      "uats_specs": [
+        "jiminy_strict.uats.json"
+      ]
     },
     "/v1/jiminy/warm": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "hook:prompt-context.sh",
+        "hook:session-start.sh",
+        "hook:post-tool-observe.py",
+        "script:test_t1t2_comprehension.py"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "hook_templates/prompt-context.sh:177; session-start.sh:279; post-tool-observe.py:245 (GUIDANCE-SYNTH-001 warm channel).",
+      "uats_specs": [
+        "jiminy_warm.uats.json"
+      ]
     },
     "/v1/jobs/": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "SSE job-progress stream GET /v1/jobs/{job_id}/stream (sse.go:38); no consumer found - listed as a UI gap in docs/features/ui-gap-analysis.md:80. Manual job monitoring surface.",
+      "uats_specs": [
+        "jobs_stream.uats.json"
+      ]
     },
     "/v1/learning/freeze": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "ui:api.js"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/api/ui/api.js:78.",
+      "uats_specs": [
+        "learning_freeze.uats.json"
+      ]
     },
     "/v1/learning/freeze/status": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "ui:api.js"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/api/ui/api.js:57.",
+      "uats_specs": [
+        "learning_freeze_status.uats.json"
+      ]
     },
     "/v1/learning/negative-feedback": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "DEFERRED:GUARDRAIL-or-NEGFEED-producer",
+      "notes": "EVENTGRAPH-004 disclosed: NO automated producer (no hook/MCP/CLI/internal caller); telemetry federated ahead of the producer. Producer design (MCP memory_reject vs Jiminy contradicted-outcome bridge) is its own sprint.",
+      "uats_specs": [
+        "learning_negative_feedback.uats.json"
+      ]
     },
     "/v1/learning/prune": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "ui:api.js"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/api/ui/api.js:85.",
+      "uats_specs": [
+        "learning_prune.uats.json"
+      ]
     },
     "/v1/learning/stats": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "ui:api.js"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/api/ui/api.js:55.",
+      "uats_specs": [
+        "learning_stats.uats.json"
+      ]
     },
     "/v1/learning/unfreeze": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "ui:api.js"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/api/ui/api.js:81.",
+      "uats_specs": [
+        "learning_unfreeze.uats.json"
+      ]
     },
     "/v1/linear/comments": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "mcp:linear_add_comment"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/cli/mcp.go:1266.",
+      "uats_specs": [
+        "linear_comments.uats.json"
+      ]
     },
     "/v1/linear/issues": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "mcp:linear_create_issue",
+        "mcp:linear_list_issues",
+        "mcp:linear_search"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/cli/mcp.go:1040,1091,1312.",
+      "uats_specs": [
+        "linear_issues.uats.json"
+      ]
     },
     "/v1/linear/issues/": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "mcp:linear_read_issue",
+        "mcp:linear_update_issue"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/cli/mcp.go:1145,1226.",
+      "uats_specs": [
+        "linear_issues.uats.json"
+      ]
     },
     "/v1/linear/projects": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "Linear projects read; no MCP tool wired (linear_* tools cover issues/comments only) - manual integration read.",
+      "uats_specs": [
+        "linear_projects.uats.json"
+      ]
     },
     "/v1/linear/projects/": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "Linear project by-id read; no MCP tool wired - manual integration read.",
+      "uats_specs": [
+        "linear_projects.uats.json"
+      ]
     },
     "/v1/memory/archive/bulk": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "cli:ingest"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/cli/ingest.go:958.",
+      "uats_specs": [
+        "archive_bulk.uats.json"
+      ]
     },
     "/v1/memory/cache": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "Manual cache clear, requires confirm=true (handlers.go:2493); operator action.",
+      "uats_specs": [
+        "cache_clear.uats.json"
+      ]
     },
     "/v1/memory/cache/stats": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "Cache diagnostics read; operator surface, no automated consumer.",
+      "uats_specs": [
+        "cache_stats.uats.json"
+      ]
     },
     "/v1/memory/cleanup/graph-orphans": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "Manual orphan cleanup trigger; CLI maintenance/graph-repair go direct to Neo4j, not via HTTP.",
+      "uats_specs": [
+        "graph_orphan_cleanup.uats.json"
+      ]
     },
     "/v1/memory/cleanup/orphans": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "Manual orphan cleanup trigger; no automated consumer.",
+      "uats_specs": [
+        "orphan_cleanup.uats.json"
+      ]
     },
     "/v1/memory/cleanup/schedule": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "Cleanup schedule management; operator surface.",
+      "uats_specs": [
+        "cleanup_schedule.uats.json",
+        "orphan_cleanup.uats.json"
+      ]
     },
     "/v1/memory/cleanup/schedules": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "Cleanup schedule listing; operator surface.",
+      "uats_specs": [
+        "cleanup_schedules.uats.json"
+      ]
     },
     "/v1/memory/cleanup/stats": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "Cleanup stats read; operator surface.",
+      "uats_specs": [
+        "cleanup_stats.uats.json",
+        "orphan_cleanup.uats.json"
+      ]
     },
     "/v1/memory/consolidate": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "cli:ingest"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/cli/ingest.go:1769 (post-ingest consolidation).",
+      "uats_specs": [
+        "consolidate.uats.json"
+      ]
     },
     "/v1/memory/consult": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "Consulting/synthesis query surface; only reference is an operator-suggested curl printed by scripts/tsdb_spot_check.sh:71. No automated consumer (Jiminy consults the consulting service in-process).",
+      "uats_specs": [
+        "consult.uats.json"
+      ]
     },
     "/v1/memory/distribution": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "ui:api.js"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/api/ui/api.js:56.",
+      "uats_specs": [
+        "distribution.uats.json"
+      ]
     },
     "/v1/memory/edges/stale/refresh": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "Manual stale-edge refresh trigger; sibling stats route is UI-consumed.",
+      "uats_specs": [
+        "edges_stale_refresh.uats.json"
+      ]
     },
     "/v1/memory/edges/stale/stats": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "ui:api.js"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/api/ui/api.js:58.",
+      "uats_specs": [
+        "edges_stale_stats.uats.json"
+      ]
     },
     "/v1/memory/freshness": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "Batch space-freshness read (handlers_freshness.go:12); no consumer - listed as a UI gap in docs/features/ui-gap-analysis.md:65. Per-space freshness IS consumed via /v1/memory/spaces/ (MCP).",
+      "uats_specs": [
+        "batch_freshness.uats.json"
+      ]
     },
     "/v1/memory/frontiers": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "Frontier detection read (server.go:2386 handleFrontierDetection); gap-detection diagnostics, no automated consumer.",
+      "uats_specs": [
+        "frontier_detection.uats.json"
+      ]
     },
     "/v1/memory/graph/neighborhood": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "Graph neighborhood query; no direct HTTP consumer (the Node Graph /api/graph/data handler reuses the logic in-process, type=neighborhood). Manual graph diagnostics.",
       "uats_specs": []
     },
     "/v1/memory/graph/topology": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
+      "consumers": [
+        "internal:api/static/topology3d.html"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/api/static/topology3d.html:119 - the 3D viewer served at /viz/topology and iframed by mdemg-graph-topology.json.",
       "uats_specs": []
     },
     "/v1/memory/guardrail/validate": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "mcp:validate_changes",
+        "script:fsd-acceptance.sh"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/cli/mcp.go:1399; scripts/fsd-acceptance.sh:123.",
+      "uats_specs": [
+        "guardrail_validate.uats.json"
+      ]
     },
     "/v1/memory/ingest": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "mcp:memory_store",
+        "mcp:memory_associate",
+        "hook:post-tool-observe.py",
+        "cli:ingest-claude-md",
+        "script:transfer-acceptance.sh"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/cli/mcp.go:208,383; hook_templates/post-tool-observe.py:520 (MEMORY.md overflow); internal/cli/ingest_claude_md.go:559.",
+      "uats_specs": [
+        "ingest.uats.json"
+      ]
     },
     "/v1/memory/ingest-codebase": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "PRUNE_CANDIDATE",
+      "notes": "CHANGELOG.md:1253: \"Superseded by /v1/memory/ingest/trigger with superior job tracking; responses include Deprecation header\". The live server-triggered ingest path (INGEST-EXEC-001 resolveMdemgBin) is /v1/memory/ingest/trigger (ACTIVE via MCP). Zero consumers; UATS spec exists (ingest_codebase.uats.json) - retire spec with route.",
+      "uats_specs": [
+        "ingest_codebase.uats.json",
+        "ingest_codebase_list.uats.json",
+        "ingest_codebase_status.uats.json"
+      ]
     },
     "/v1/memory/ingest-codebase/": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "PRUNE_CANDIDATE",
+      "notes": "Job status/cancel subroutes of the deprecated ingest-codebase endpoint (CHANGELOG.md:1253); superseded by /v1/memory/ingest/status|cancel.",
+      "uats_specs": [
+        "ingest_codebase_cancel.uats.json",
+        "ingest_codebase_status.uats.json"
+      ]
     },
     "/v1/memory/ingest/batch": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "cli:ingest"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/cli/ingest.go:1727.",
+      "uats_specs": [
+        "ingest_batch.uats.json"
+      ]
     },
     "/v1/memory/ingest/cancel/": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "mcp:memory_ingest_cancel"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/cli/mcp.go:797.",
+      "uats_specs": [
+        "ingest_cancel.uats.json"
+      ]
     },
     "/v1/memory/ingest/files": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "mcp:memory_ingest_files",
+        "cli:watch"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/cli/mcp.go:899; internal/cli/watch.go:265.",
+      "uats_specs": [
+        "ingest_files.uats.json"
+      ]
     },
     "/v1/memory/ingest/jobs": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "mcp:memory_ingest_jobs"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/cli/mcp.go:818.",
+      "uats_specs": [
+        "ingest_jobs.uats.json"
+      ]
     },
     "/v1/memory/ingest/status/": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "mcp:memory_ingest_status"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/cli/mcp.go:744.",
+      "uats_specs": [
+        "ingest_status.uats.json"
+      ]
     },
     "/v1/memory/ingest/trigger": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "mcp:memory_ingest_trigger"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/cli/mcp.go:711; handler spawns the CLI via resolveMdemgBin (internal/api/handlers.go:2857, INGEST-EXEC-001) - this is the live server-triggered ingest path.",
+      "uats_specs": [
+        "ingest_trigger.uats.json"
+      ]
     },
     "/v1/memory/meta-learn": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "Manual cross-space promotion trigger: \"Promotes high-value L4/L5 concepts from a source space to the global space\" (handlers_meta.go:9); no automated consumer; UI gap (ui-gap-analysis.md:65).",
+      "uats_specs": [
+        "meta_learn_promote.uats.json"
+      ]
     },
     "/v1/memory/node/meta": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "hook:post-tool-observe.py",
+        "cli:data",
+        "cli:ingest-claude-md"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "hook_templates/post-tool-observe.py:421; internal/cli/data.go:669; internal/cli/ingest_claude_md.go:505.",
+      "uats_specs": [
+        "node_meta.uats.json"
+      ]
     },
     "/v1/memory/nodes/": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "handleNodeOperation (server.go:2372): per-node get/ops by id; manual node inspection, no automated consumer.",
+      "uats_specs": [
+        "node_archive.uats.json",
+        "node_delete.uats.json",
+        "node_unarchive.uats.json",
+        "nodes.uats.json"
+      ]
     },
     "/v1/memory/query/metrics": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "Neo4j query execution stats for performance monitoring (handlers.go:2533); operator diagnostics.",
+      "uats_specs": [
+        "query_metrics.uats.json"
+      ]
     },
     "/v1/memory/reflect": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "INTERNAL",
+      "notes": "LLM reflection-over-memory surface (handlers.go:1535). No consumer: the MCP memory_reflect tool calls /v1/memory/retrieve (mcp.go:436), NOT this route. Internal cognition/eval surface.",
+      "uats_specs": [
+        "reflect.uats.json"
+      ]
     },
     "/v1/memory/retrieve": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "hook:prompt-context.sh",
+        "mcp:memory_recall",
+        "mcp:memory_reflect",
+        "mcp:memory_associate",
+        "cli:demo",
+        "cli:eventgraph",
+        "script:live_validation.py",
+        "script:test-llm-summary.sh"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "hook_templates/prompt-context.sh:186; internal/cli/mcp.go:264,436; internal/cli/eventgraph.go:199 (seed resolution).",
+      "uats_specs": [
+        "memory_retrieve_sparse_context.uats.json",
+        "meta_learn_retrieve_global.uats.json",
+        "retrieve.uats.json"
+      ]
     },
     "/v1/memory/spaces/": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "mcp:memory_space_freshness"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/cli/mcp.go:943 (/v1/memory/spaces/{id}/freshness).",
+      "uats_specs": [
+        "space_freshness.uats.json"
+      ]
     },
     "/v1/memory/stats": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "hook:session-start.sh",
+        "ui:api.js",
+        "cli:sidecar-generate-hooks"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "hook_templates/session-start.sh:141; internal/api/ui/api.js:54.",
+      "uats_specs": [
+        "stats.uats.json"
+      ]
     },
     "/v1/memory/suggest": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "Proactive \"Active Participation\" suggestion surface (handlers.go:2325). No consumer found in hooks/cli/mcp/scripts/UI - plausibly manual/agent-invoked; flag for orchestrator: candidate for hook wiring or pruning.",
+      "uats_specs": [
+        "suggest.uats.json"
+      ]
     },
     "/v1/memory/symbols": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "mcp:memory_symbols"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/cli/mcp.go:614.",
+      "uats_specs": [
+        "symbols.uats.json"
+      ]
     },
     "/v1/metrics": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "Metrics endpoint (rate-limit-exempt, server.go:2642); no scraper provisioned (Grafana datasources are TSDB/Neo4j/NodeGraph only) - ops/diagnostic scrape surface.",
+      "uats_specs": [
+        "metrics.uats.json"
+      ]
     },
     "/v1/metrics/determinism": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "script:fsd-acceptance.sh"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "scripts/fsd-acceptance.sh:324.",
+      "uats_specs": [
+        "determinism_score.uats.json"
+      ]
     },
     "/v1/metrics/snapshot": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "cli:watchdog"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/cli/watchdog.go:318 (watchdog status reads mdemg_mlx_health_state gauge); also documented for ops scripts in mdemg-graph-topology.json:454.",
+      "uats_specs": [
+        "metrics_snapshot.uats.json",
+        "metrics_snapshot_405.uats.json"
+      ]
     },
     "/v1/metrics/trends": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "Metrics trends read; operator diagnostics, no automated consumer.",
+      "uats_specs": [
+        "metrics_trends.uats.json"
+      ]
     },
     "/v1/modules": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "Plugin/ingestion module listing (handle_modules.go:17); operator surface (UI uses /v1/plugins, not this).",
+      "uats_specs": [
+        "modules.uats.json"
+      ]
     },
     "/v1/modules/": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "POST /v1/modules/{id}/sync - manual module sync trigger (handle_modules.go:44).",
+      "uats_specs": [
+        "module_sync.uats.json"
+      ]
     },
     "/v1/neo4j/overview": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "ui:api.js"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/api/ui/api.js:59.",
+      "uats_specs": [
+        "neo4j_overview.uats.json"
+      ]
     },
     "/v1/neural/status": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "script:fsd-acceptance.sh"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "scripts/fsd-acceptance.sh:351.",
+      "uats_specs": [
+        "neural_status.uats.json"
+      ]
     },
     "/v1/plugins": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "ui:api.js"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/api/ui/api.js:117.",
+      "uats_specs": [
+        "plugins.uats.json"
+      ]
     },
     "/v1/plugins/": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "ui:api.js"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/api/ui/api.js:118-122.",
+      "uats_specs": [
+        "plugin_create.uats.json"
+      ]
     },
     "/v1/prometheus": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "Prometheus exposition endpoint; no scrape configured (Grafana provisioned against TSDB - see mdemg-graph-topology.json:454 \"no Prometheus scrape endpoint on mdemg\"). Ops surface.",
       "uats_specs": []
     },
     "/v1/scraper/jobs": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "Web scraper job control (server.go:2522); operator-driven scraping, no automated consumer.",
+      "uats_specs": [
+        "scraper_create_job.uats.json",
+        "scraper_list_jobs.uats.json"
+      ]
     },
     "/v1/scraper/jobs/": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "Scraper job by-id ops; operator surface.",
+      "uats_specs": [
+        "scraper_cancel_job.uats.json",
+        "scraper_get_status.uats.json",
+        "scraper_review.uats.json"
+      ]
     },
     "/v1/scraper/spaces": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "Scrape-space listing; operator surface.",
+      "uats_specs": [
+        "scraper_spaces.uats.json"
+      ]
     },
     "/v1/self-improve/assess": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "hook:session-start.sh",
+        "hook:pre-compact.sh",
+        "hook:session-start.ps1",
+        "cli:sidecar-generate-hooks"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "hook_templates/session-start.sh:162,243; pre-compact.sh:94 (RSIC micro assess).",
+      "uats_specs": [
+        "self_improve_assess.uats.json"
+      ]
     },
     "/v1/self-improve/calibration": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "ui:api.js"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/api/ui/api.js:64.",
+      "uats_specs": [
+        "self_improve_calibration.uats.json"
+      ]
     },
     "/v1/self-improve/cycle": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "hook:session-start.sh",
+        "ui:api.js"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "hook_templates/session-start.sh:302; internal/api/ui/api.js:75.",
+      "uats_specs": [
+        "rsic_guidance_calibration.uats.json",
+        "self_improve_cycle.uats.json",
+        "self_improve_cycle_dry_run.phase88.uats.json",
+        "self_improve_cycle_idempotency.phase87.uats.json",
+        "self_improve_cycle_trigger_metadata.phase87.uats.json"
+      ]
     },
     "/v1/self-improve/health": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "ui:api.js",
+        "ui:tabs/rsic.js"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/api/ui/api.js:62; ui/tabs/rsic.js:137.",
+      "uats_specs": [
+        "rsic_ingest_deliverables.uats.json",
+        "self_improve_health.uats.json",
+        "self_improve_health_orchestration.phase87.uats.json",
+        "self_improve_health_safety.phase88.uats.json"
+      ]
     },
     "/v1/self-improve/history": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "ui:api.js"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/api/ui/api.js:63.",
+      "uats_specs": [
+        "rsic_ingest_deliverables.uats.json",
+        "self_improve_history.uats.json",
+        "self_improve_history_trigger_source_filter.phase87.uats.json"
+      ]
     },
     "/v1/self-improve/orchestration/reset": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "Admin-scoped RSIC orchestration reset (server.go:2512); operator escape hatch for stuck admission records (RSIC-STORM-001 context).",
+      "uats_specs": [
+        "self_improve_orchestration_reset.uats.json"
+      ]
     },
     "/v1/self-improve/report": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "RSIC report read; operator diagnostics, no automated consumer.",
+      "uats_specs": [
+        "rsic_ingest_deliverables.uats.json",
+        "self_improve_report.uats.json"
+      ]
     },
     "/v1/self-improve/report/": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "RSIC report by task-id (UATS self_improve_report_by_id.uats.json); operator diagnostics.",
+      "uats_specs": [
+        "self_improve_report_by_id.uats.json"
+      ]
     },
     "/v1/self-improve/rollback": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "Admin-scoped RSIC action rollback (server.go:2515); operator escape hatch (RSIC-VALIDATE-001 context).",
+      "uats_specs": [
+        "self_improve_rollback_execute.phase88.uats.json",
+        "self_improve_rollback_list.phase88.uats.json"
+      ]
     },
     "/v1/self-improve/signals": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "RSIC signal diagnostics read; operator surface.",
+      "uats_specs": [
+        "self_improve_signals.uats.json"
+      ]
     },
     "/v1/skills": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "agent:CLAUDE.md (skill registry)"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "Skill-registry list - companion surface of the consumed recall flow (CLAUDE.md Skill Registry section; sprint-planning recall).",
+      "uats_specs": [
+        "skills_list.uats.json"
+      ]
     },
     "/v1/skills/": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "agent:.claude/skills/*.md (recall curl)"
+      ],
+      "disposition": "ACTIVE",
+      "notes": ".claude/skills/create-plugin.md:13 and mdemg-api.md:13 instruct POST /v1/skills/<name>/recall; CLAUDE.md documents POST /v1/skills/sprint-planning/recall (recon false-positive VERIFIED active).",
+      "uats_specs": [
+        "skills_recall.uats.json",
+        "skills_register.uats.json"
+      ]
     },
     "/v1/symbols/": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "GET /v1/symbols/{id}/relationships (handlers_relationships.go:36); code-graph diagnostics, no automated consumer (MCP memory_symbols uses /v1/memory/symbols).",
+      "uats_specs": [
+        "symbol_relationships.uats.json"
+      ]
     },
     "/v1/symbols/relationships": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "Relationship counts by type (handlers_relationships.go:10); diagnostics read.",
+      "uats_specs": [
+        "relationship_stats.uats.json"
+      ]
     },
     "/v1/synergy/status": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "cli:synergy"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/cli/synergy.go:71,632 (mdemg synergy status; CLAUDE.md synergy checks).",
+      "uats_specs": [
+        "synergy_status.uats.json"
+      ]
     },
     "/v1/system/capability-gaps": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "Capability-gap listing (gap-detection system); manual review surface, no automated consumer.",
+      "uats_specs": [
+        "capability_gaps.uats.json",
+        "capability_gaps_full.uats.json"
+      ]
     },
     "/v1/system/capability-gaps/": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "Capability-gap by-id ops; manual review surface.",
+      "uats_specs": [
+        "capability_gap_address.uats.json",
+        "capability_gap_analyze.uats.json",
+        "capability_gap_dismiss.uats.json",
+        "capability_gap_get.uats.json",
+        "capability_gap_metrics.uats.json"
+      ]
     },
     "/v1/system/gap-interviews": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "Gap-interview surface; generator loop is internal (WEEKLY_GAP_INTERVIEWS_ENABLED default false per CLAUDE.md \"dead startup methods\"); manual review/answer surface.",
+      "uats_specs": [
+        "gap_interviews.uats.json"
+      ]
     },
     "/v1/system/gap-interviews/": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "Gap-interview by-id ops; manual review/answer surface.",
+      "uats_specs": [
+        "gap_interview_answer.uats.json",
+        "gap_interview_run.uats.json",
+        "gap_interview_skip.uats.json",
+        "gap_interview_stats.uats.json"
+      ]
     },
     "/v1/system/pool-metrics": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "ui:api.js"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/api/ui/api.js:60.",
+      "uats_specs": [
+        "pool_metrics.uats.json"
+      ]
     },
     "/v1/training-data/download/": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
+      "consumers": [
+        "ui:api.js"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/api/ui/api.js:103.",
       "uats_specs": []
     },
     "/v1/training-data/export": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
+      "consumers": [
+        "ui:api.js"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/api/ui/api.js:101.",
       "uats_specs": []
     },
     "/v1/training-data/status/": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
+      "consumers": [
+        "ui:api.js"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "internal/api/ui/api.js:102.",
       "uats_specs": []
     },
     "/v1/webhooks/": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "OPERATOR_SURFACE",
+      "notes": "Generic webhook intake, source-config-routed (handle_webhooks_generic.go:72); operator-provisioned external integration, no source configured in-repo besides linear.",
+      "uats_specs": [
+        "webhooks_generic.uats.json"
+      ]
     },
     "/v1/webhooks/linear": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "external:linear-webhook"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "External producer: Linear webhook service; documented production wiring in docs/user/ingestion-guide.md:849 (URL + LINEAR_WEBHOOK_SECRET HMAC).",
+      "uats_specs": [
+        "webhook_linear.uats.json"
+      ]
     },
     "/viz/topology": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
+      "consumers": [
+        "dashboard:mdemg-graph-topology.json"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "deploy/docker/grafana/dashboards/mdemg-graph-topology.json:81 embeds /viz/topology in an iframe panel. Recon flagged as superseded legacy - WRONG: live dashboard consumer.",
       "uats_specs": []
     },
     "POST /v1/alerts/clear": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "hook:session-start.sh",
+        "hook:prompt-context.sh"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "hook_templates/session-start.sh:92; prompt-context.sh:83 (HOOKSYNC-001 cleared-equals-delivered contract).",
+      "uats_specs": [
+        "alerts_clear.uats.json"
+      ]
     },
     "POST /v1/alerts/grafana": {
       "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "disposition": "PRUNE_CANDIDATE",
+      "notes": "Superseded by the server-native alert evaluator (SR-001/SNA-001 - \"Grafana NOT required for alerting\"). Only reference is a commented-out backward-compat contactpoint (deploy/docker/grafana/provisioning/notifiers/contactpoints.yml:18, comment at :5 \"kept for backward compatibility\").",
+      "uats_specs": [
+        "grafana_alert_webhook.uats.json"
+      ]
     },
     "POST /v1/hooks/event": {
-      "consumers": [],
-      "disposition": "UNREVIEWED",
-      "notes": "",
-      "uats_specs": []
+      "consumers": [
+        "hook:post-tool-observe.py",
+        "hook:prompt-context.sh"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "hook_templates/post-tool-observe.py:105; prompt-context.sh:207 (HOOKSYNC-001 heartbeats -> V0024).",
+      "uats_specs": [
+        "hooks_event.uats.json"
+      ]
     }
   }
 }

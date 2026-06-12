@@ -395,6 +395,16 @@ jobs:
         # at all (allowlist requires a cited in-flight plan).
         run: python3 scripts/verify_config_consumers.py
 
+      - name: Route consumer guard (merge-blocking)
+        # DORMANT-CENSUS-001: every registered API route must have an
+        # adjudicated inventory entry (consumers + disposition) in
+        # docs/api/route_consumer_inventory.json. Fails on bidirectional
+        # drift (new route unlisted / inventory entry for removed route)
+        # and on any UNREVIEWED entry. The dormant-surface class (dead
+        # actuators, zero-write tables, 58 zero-consumer routes) stays
+        # visible permanently instead of one-off-census visible.
+        run: python3 scripts/verify_route_consumers.py
+
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
