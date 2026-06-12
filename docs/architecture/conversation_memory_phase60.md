@@ -1,5 +1,12 @@
 # MDEMG Conversation Memory - Phase 60: CMS Advanced Functionality II
 
+> ⚠️ **DESIGN HISTORY (bannered 2026-06-12, DOC-AUDIT-001b).** This document
+> is a point-in-time plan, analysis, or record of since-completed or
+> superseded work. It is preserved unmodified as design history and is NOT
+> a description of the current system — consult `docs/features/`,
+> `docs/architecture/` (living set), and `CLAUDE.md` for current behavior.
+
+
 ## Overview
 
 Phase 60 implements advanced CMS features for structured observations, intelligent resume, and context window optimization. This allows MDEMG to provide agents with precise task continuity after context compaction without flooding the context window with irrelevant information.

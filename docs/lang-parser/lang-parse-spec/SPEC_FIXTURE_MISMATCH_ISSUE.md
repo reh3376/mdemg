@@ -1,5 +1,12 @@
 # Spec-Fixture Mismatch Issue: 5 Tree-Sitter Languages
 
+> ⚠️ **DESIGN HISTORY (bannered 2026-06-12, DOC-AUDIT-001b).** This document
+> is a point-in-time plan, analysis, or record of since-completed or
+> superseded work. It is preserved unmodified as design history and is NOT
+> a description of the current system — consult `docs/features/`,
+> `docs/architecture/` (living set), and `CLAUDE.md` for current behavior.
+
+
 **Date:** 2026-01-29
 **Status:** 11/16 languages passing, 5 need spec regeneration
 **Affected Languages:** C, C++, CUDA, Java, Rust

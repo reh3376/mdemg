@@ -1,5 +1,12 @@
 # Conversation Memory System (CMS) — Engineering Spec (v2)
 
+> ⚠️ **DESIGN HISTORY (bannered 2026-06-12, DOC-AUDIT-001b).** This document
+> is a point-in-time plan, analysis, or record of since-completed or
+> superseded work. It is preserved unmodified as design history and is NOT
+> a description of the current system — consult `docs/features/`,
+> `docs/architecture/` (living set), and `CLAUDE.md` for current behavior.
+
+
 ## 1. Purpose and Non-Goals
 
 ### 1.1 Purpose

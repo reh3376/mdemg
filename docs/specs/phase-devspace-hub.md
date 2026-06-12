@@ -1,5 +1,12 @@
 # Phase 2: DevSpace Hub and Out-of-Band Distribution
 
+> ⚠️ **DESIGN HISTORY (bannered 2026-06-12, DOC-AUDIT-001b).** This document
+> is a point-in-time plan, analysis, or record of since-completed or
+> superseded work. It is preserved unmodified as design history and is NOT
+> a description of the current system — consult `docs/features/`,
+> `docs/architecture/` (living set), and `CLAUDE.md` for current behavior.
+
+
 **Parent plan:** [development-space-collaboration.md](./development-space-collaboration.md)  
 **Status:** ✅ Complete (verification 2026-01-22; ready for production use)  
 **Date:** 2026-02-06

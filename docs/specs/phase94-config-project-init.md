@@ -1,5 +1,12 @@
 # Phase 94: Config Simplification + Project Init
 
+> ⚠️ **DESIGN HISTORY (bannered 2026-06-12, DOC-AUDIT-001b).** This document
+> is a point-in-time plan, analysis, or record of since-completed or
+> superseded work. It is preserved unmodified as design history and is NOT
+> a description of the current system — consult `docs/features/`,
+> `docs/architecture/` (living set), and `CLAUDE.md` for current behavior.
+
+
 **Status**: Complete
 **Depends on**: Phase 93 (Unified CLI Foundation)
 **Effort**: M

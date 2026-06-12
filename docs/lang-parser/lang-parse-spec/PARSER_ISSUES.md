@@ -1,5 +1,12 @@
 # Parser Implementation Issues
 
+> ⚠️ **DESIGN HISTORY (bannered 2026-06-12, DOC-AUDIT-001b).** This document
+> is a point-in-time plan, analysis, or record of since-completed or
+> superseded work. It is preserved unmodified as design history and is NOT
+> a description of the current system — consult `docs/features/`,
+> `docs/architecture/` (living set), and `CLAUDE.md` for current behavior.
+
+
 **Generated:** 2026-01-29
 **Last Updated:** 2026-02-05
 **Status:** All Issues Resolved - 20/20 UPTS-validated parsers passing

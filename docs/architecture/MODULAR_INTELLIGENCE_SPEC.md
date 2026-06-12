@@ -1,5 +1,12 @@
 # MDEMG Modular Intelligence Specification
 
+> ⚠️ **DESIGN HISTORY (bannered 2026-06-12, DOC-AUDIT-001b).** This document
+> is a point-in-time plan, analysis, or record of since-completed or
+> superseded work. It is preserved unmodified as design history and is NOT
+> a description of the current system — consult `docs/features/`,
+> `docs/architecture/` (living set), and `CLAUDE.md` for current behavior.
+
+
 ## 1. Overview
 
 This document defines the **MDEMG Module System**, a plug-and-play architecture that transforms MDEMG from a passive memory store into a modular, skill-based cognitive substrate. Modules allow MDEMG to acquire domain-specific parsing skills, architectural reasoning patterns, and proactive reflection capabilities.
