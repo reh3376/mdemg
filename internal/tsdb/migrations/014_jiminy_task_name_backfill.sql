@@ -26,6 +26,17 @@
 --
 -- Sprint: FT-LORA-PHASE11.6.x (2026-05-01)
 --
+-- TIME-SCOPED (JIMINY-OUTCOME-002 hotfix, 2026-06-11): migrations re-run on
+-- every auto-migrate startup, and the original Step-4 check asserted ALL-TIME
+-- hash membership against this frozen hash set — so the first legitimate
+-- prompt evolution (the not_applicable classifier prompt, 8 rows) made V0014
+-- raise forever, aborting every migration run at 013 and pinning
+-- schema_version=13 (live RSIC schema-drift alerts, correctly firing). The
+-- backfill is a HISTORICAL repair: all statements now scope to rows from
+-- before this migration shipped (time < 2026-05-02). New rows are labeled
+-- correctly at the call site since Phase 11.6.x; future prompt hashes are
+-- none of this migration's business.
+--
 -- Rollback (manual — matches 012/013 convention):
 --   UPDATE llm_interactions SET task_name = 'jiminy.evaluate'
 --     WHERE task_name = 'jiminy.evaluate_llm'
@@ -65,12 +76,14 @@ END $$;
 UPDATE llm_interactions
    SET task_name = 'jiminy.evaluate'
  WHERE task_name = 'jiminy.evaluate_llm'
+   AND time < '2026-05-02'
    AND system_prompt_hash = 'caf70a3d392f37d4d5b2d70d10b03d07b59a2f1cf18ed8cfd75d597cafa0a773';
 
 -- ── Step 3: outcome_classifier hashes → jiminy.evaluate_llm ─────────────────
 UPDATE llm_interactions
    SET task_name = 'jiminy.evaluate_llm'
  WHERE task_name = 'jiminy.evaluate'
+   AND time < '2026-05-02'
    AND system_prompt_hash IN (
        '1f02ee469728a422bd8e83629764be1a31115a02f7fbb5a372ef64243fb76bea',
        'f897ae322c7f15b4e374eec7c40b810bb160f5284c8b015950e3e8f9aadd7da1'
@@ -88,11 +101,13 @@ BEGIN
     SELECT COUNT(*) INTO v_eval_mismatch
         FROM llm_interactions
         WHERE task_name = 'jiminy.evaluate'
+          AND time < '2026-05-02'
           AND system_prompt_hash IS NOT NULL
           AND system_prompt_hash <> 'caf70a3d392f37d4d5b2d70d10b03d07b59a2f1cf18ed8cfd75d597cafa0a773';
     SELECT COUNT(*) INTO v_eval_llm_mismatch
         FROM llm_interactions
         WHERE task_name = 'jiminy.evaluate_llm'
+          AND time < '2026-05-02'
           AND system_prompt_hash IS NOT NULL
           AND system_prompt_hash NOT IN (
               '1f02ee469728a422bd8e83629764be1a31115a02f7fbb5a372ef64243fb76bea',
