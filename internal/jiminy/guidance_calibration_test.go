@@ -12,6 +12,7 @@ import (
 type mockSignalLearner struct {
 	emissions []string
 	responses []string
+	strengths map[string]float64 // DORMANT-CENSUS-001: learned strength per code
 }
 
 func (m *mockSignalLearner) RecordEmission(code string) {
@@ -20,6 +21,13 @@ func (m *mockSignalLearner) RecordEmission(code string) {
 
 func (m *mockSignalLearner) RecordResponse(code string) {
 	m.responses = append(m.responses, code)
+}
+
+func (m *mockSignalLearner) GetStrength(code string) float64 {
+	if s, ok := m.strengths[code]; ok {
+		return s
+	}
+	return 0.5 // mirrors ape.SignalLearner's unknown-code default
 }
 
 func TestGuide_SignalLearnerEmission(t *testing.T) {

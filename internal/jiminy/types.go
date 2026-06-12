@@ -172,6 +172,11 @@ type ClassificationResult struct {
 type SignalLearnerProvider interface {
 	RecordEmission(code string)
 	RecordResponse(code string)
+	// GetStrength returns the learned Hebbian strength for a signal code
+	// (0.5 default for unknown codes). DORMANT-CENSUS-001 wired this read
+	// side into the Guide() sort — it had zero production callers despite
+	// a fully-shipped persistence layer (V0024 SignalState).
+	GetStrength(code string) float64
 }
 
 // --- J7: RetrievalProvider interface ---

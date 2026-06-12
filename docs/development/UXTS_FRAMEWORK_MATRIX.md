@@ -14,7 +14,7 @@ Last updated: 2026-06-11 (UXTS-CI-001 — counts refreshed to on-disk truth; dri
 | ------- | ---- | ------------- | ------ | ----- |
 | UNTS | Universal Hash Test Specification | Hash integrity registry, verification, revert | active | N/A (registry) |
 | UDTS | Universal DevSpace Test Specification | gRPC contract tests | active | 15 canonical, 4 drafts |
-| UATS | Universal API Test Specification | HTTP endpoint acceptance contracts | active | 220 canonical, 7 drafts |
+| UATS | Universal API Test Specification | HTTP endpoint acceptance contracts | active | 214 canonical, 7 drafts |
 | UPTS | Universal Parser Test Specification | Language parser conformance | active | 28 |
 | UBTS | Universal Benchmark Test Specification | Throughput/latency/load benchmarking | active | 3 specs, 3 profiles |
 | USTS | Universal Security Test Specification | Security behavior and hardening tests | active | 5 canonical, 2 drafts |
