@@ -22,7 +22,7 @@ UPTS provides:
 3. **Language-agnostic runner** - validates any parser implementation
 4. **Format converter** - migrate existing `*_expected.json` files
 
-> For the full UxTS methodology guide covering architecture, spec writing, CI integration, and all 11 frameworks, see [docs/guides/UXTS_DEVELOPER_GUIDE.md](../../../../docs/guides/UXTS_DEVELOPER_GUIDE.md).
+> For the full UxTS methodology guide covering architecture, spec writing, CI integration, and all 16 frameworks, see [docs/guides/UXTS_DEVELOPER_GUIDE.md](../../../../docs/guides/UXTS_DEVELOPER_GUIDE.md).
 
 ---
 
@@ -32,34 +32,34 @@ UPTS provides:
 
 | Language | Spec | Fixture | Parser |
 |----------|------|---------|--------|
-| Go | [`go.upts.json`](specs/go.upts.json) | [`go_test_fixture.go`](fixtures/go_test_fixture.go) | [`go_parser.go`](../../../../cmd/ingest-codebase/languages/go_parser.go) |
-| Rust | [`rust.upts.json`](specs/rust.upts.json) | [`rust_test_fixture.rs`](fixtures/rust_test_fixture.rs) | [`rust_parser.go`](../../../../cmd/ingest-codebase/languages/rust_parser.go) |
-| Python | [`python.upts.json`](specs/python.upts.json) | [`python_test_fixture.py`](fixtures/python_test_fixture.py) | [`python_parser.go`](../../../../cmd/ingest-codebase/languages/python_parser.go) |
-| TypeScript | [`typescript.upts.json`](specs/typescript.upts.json) | [`typescript_test_fixture.ts`](fixtures/typescript_test_fixture.ts) | [`typescript_parser.go`](../../../../cmd/ingest-codebase/languages/typescript_parser.go) |
-| Java | [`java.upts.json`](specs/java.upts.json) | [`java_test_fixture.java`](fixtures/java_test_fixture.java) | [`java_parser.go`](../../../../cmd/ingest-codebase/languages/java_parser.go) |
-| C# | [`csharp.upts.json`](specs/csharp.upts.json) | [`csharp_test_fixture.cs`](fixtures/csharp_test_fixture.cs) | [`csharp_parser.go`](../../../../cmd/ingest-codebase/languages/csharp_parser.go) |
+| Go | [`go.upts.json`](specs/go.upts.json) | [`go_test_fixture.go`](fixtures/go_test_fixture.go) | [`go_parser.go`](../../../../internal/languages/go_parser.go) |
+| Rust | [`rust.upts.json`](specs/rust.upts.json) | [`rust_test_fixture.rs`](fixtures/rust_test_fixture.rs) | [`rust_parser.go`](../../../../internal/languages/rust_parser.go) |
+| Python | [`python.upts.json`](specs/python.upts.json) | [`python_test_fixture.py`](fixtures/python_test_fixture.py) | [`python_parser.go`](../../../../internal/languages/python_parser.go) |
+| TypeScript | [`typescript.upts.json`](specs/typescript.upts.json) | [`typescript_test_fixture.ts`](fixtures/typescript_test_fixture.ts) | [`typescript_parser.go`](../../../../internal/languages/typescript_parser.go) |
+| Java | [`java.upts.json`](specs/java.upts.json) | [`java_test_fixture.java`](fixtures/java_test_fixture.java) | [`java_parser.go`](../../../../internal/languages/java_parser.go) |
+| C# | [`csharp.upts.json`](specs/csharp.upts.json) | [`csharp_test_fixture.cs`](fixtures/csharp_test_fixture.cs) | [`csharp_parser.go`](../../../../internal/languages/csharp_parser.go) |
 | PHP | [`php.upts.json`](specs/php.upts.json) | [`php_test_fixture.php`](fixtures/php_test_fixture.php) | [`php_parser.go`](../../../../internal/languages/php_parser.go) |
-| Kotlin | [`kotlin.upts.json`](specs/kotlin.upts.json) | [`kotlin_test_fixture.kt`](fixtures/kotlin_test_fixture.kt) | [`kotlin_parser.go`](../../../../cmd/ingest-codebase/languages/kotlin_parser.go) |
-| C++ | [`cpp.upts.json`](specs/cpp.upts.json) | [`cpp_test_fixture.cpp`](fixtures/cpp_test_fixture.cpp) | [`cpp_parser.go`](../../../../cmd/ingest-codebase/languages/cpp_parser.go) |
-| C | [`c.upts.json`](specs/c.upts.json) | [`c_test_fixture.c`](fixtures/c_test_fixture.c) | [`c_parser.go`](../../../../cmd/ingest-codebase/languages/c_parser.go) |
-| CUDA | [`cuda.upts.json`](specs/cuda.upts.json) | [`cuda_test_fixture.cu`](fixtures/cuda_test_fixture.cu) | [`cuda_parser.go`](../../../../cmd/ingest-codebase/languages/cuda_parser.go) |
-| SQL | [`sql.upts.json`](specs/sql.upts.json) | [`sql_test_fixture.sql`](fixtures/sql_test_fixture.sql) | [`sql_parser.go`](../../../../cmd/ingest-codebase/languages/sql_parser.go) |
-| Cypher | [`cypher.upts.json`](specs/cypher.upts.json) | [`cypher_test_fixture.cypher`](fixtures/cypher_test_fixture.cypher) | [`cypher_parser.go`](../../../../cmd/ingest-codebase/languages/cypher_parser.go) |
-| Terraform | [`terraform.upts.json`](specs/terraform.upts.json) | [`terraform_test_fixture.tf`](fixtures/terraform_test_fixture.tf) | [`terraform_parser.go`](../../../../cmd/ingest-codebase/languages/terraform_parser.go) |
-| YAML | [`yaml.upts.json`](specs/yaml.upts.json) | [`yaml_test_fixture.yaml`](fixtures/yaml_test_fixture.yaml) | [`yaml_parser.go`](../../../../cmd/ingest-codebase/languages/yaml_parser.go) |
-| TOML | [`toml.upts.json`](specs/toml.upts.json) | [`toml_test_fixture.toml`](fixtures/toml_test_fixture.toml) | [`toml_parser.go`](../../../../cmd/ingest-codebase/languages/toml_parser.go) |
-| JSON | [`json.upts.json`](specs/json.upts.json) | [`json_test_fixture.json`](fixtures/json_test_fixture.json) | [`json_parser.go`](../../../../cmd/ingest-codebase/languages/json_parser.go) |
-| INI | [`ini.upts.json`](specs/ini.upts.json) | [`ini_test_fixture.ini`](fixtures/ini_test_fixture.ini) | [`ini_parser.go`](../../../../cmd/ingest-codebase/languages/ini_parser.go) |
-| Makefile | [`makefile.upts.json`](specs/makefile.upts.json) | [`makefile_test_fixture.mk`](fixtures/makefile_test_fixture.mk) | [`makefile_parser.go`](../../../../cmd/ingest-codebase/languages/makefile_parser.go) |
-| Dockerfile | [`dockerfile.upts.json`](specs/dockerfile.upts.json) | [`dockerfile_test_fixture.Dockerfile`](fixtures/dockerfile_test_fixture.Dockerfile) | [`dockerfile_parser.go`](../../../../cmd/ingest-codebase/languages/dockerfile_parser.go) |
-| Shell | [`shell.upts.json`](specs/shell.upts.json) | [`shell_test_fixture.sh`](fixtures/shell_test_fixture.sh) | [`shell_parser.go`](../../../../cmd/ingest-codebase/languages/shell_parser.go) |
-| Protocol Buffers | [`protobuf.upts.json`](specs/protobuf.upts.json) | [`protobuf_test_fixture.proto`](fixtures/protobuf_test_fixture.proto) | [`protobuf_parser.go`](../../../../cmd/ingest-codebase/languages/protobuf_parser.go) |
-| GraphQL | [`graphql.upts.json`](specs/graphql.upts.json) | [`graphql_test_fixture.graphql`](fixtures/graphql_test_fixture.graphql) | [`graphql_parser.go`](../../../../cmd/ingest-codebase/languages/graphql_parser.go) |
-| OpenAPI | [`openapi.upts.json`](specs/openapi.upts.json) | [`openapi_test_fixture.yaml`](fixtures/openapi_test_fixture.yaml) | [`openapi_parser.go`](../../../../cmd/ingest-codebase/languages/openapi_parser.go) |
-| Markdown | [`markdown.upts.json`](specs/markdown.upts.json) | [`markdown_test_fixture.md`](fixtures/markdown_test_fixture.md) | [`markdown_parser.go`](../../../../cmd/ingest-codebase/languages/markdown_parser.go) |
-| XML | [`xml.upts.json`](specs/xml.upts.json) | [`xml_test_fixture.xml`](fixtures/xml_test_fixture.xml) | [`xml_parser.go`](../../../../cmd/ingest-codebase/languages/xml_parser.go) |
-| Lua | [`lua.upts.json`](specs/lua.upts.json) | [`lua_test_fixture.lua`](fixtures/lua_test_fixture.lua) | [`lua_parser.go`](../../../../cmd/ingest-codebase/languages/lua_parser.go) |
-| Scraper Markdown | [`scraper_markdown.upts.json`](specs/scraper_markdown.upts.json) | [`scraper_markdown_test_fixture.md`](fixtures/scraper_markdown_test_fixture.md) | [`scraper_markdown_parser.go`](../../../../cmd/ingest-codebase/languages/scraper_markdown_parser.go) |
+| Kotlin | [`kotlin.upts.json`](specs/kotlin.upts.json) | [`kotlin_test_fixture.kt`](fixtures/kotlin_test_fixture.kt) | [`kotlin_parser.go`](../../../../internal/languages/kotlin_parser.go) |
+| C++ | [`cpp.upts.json`](specs/cpp.upts.json) | [`cpp_test_fixture.cpp`](fixtures/cpp_test_fixture.cpp) | [`cpp_parser.go`](../../../../internal/languages/cpp_parser.go) |
+| C | [`c.upts.json`](specs/c.upts.json) | [`c_test_fixture.c`](fixtures/c_test_fixture.c) | [`c_parser.go`](../../../../internal/languages/c_parser.go) |
+| CUDA | [`cuda.upts.json`](specs/cuda.upts.json) | [`cuda_test_fixture.cu`](fixtures/cuda_test_fixture.cu) | [`cuda_parser.go`](../../../../internal/languages/cuda_parser.go) |
+| SQL | [`sql.upts.json`](specs/sql.upts.json) | [`sql_test_fixture.sql`](fixtures/sql_test_fixture.sql) | [`sql_parser.go`](../../../../internal/languages/sql_parser.go) |
+| Cypher | [`cypher.upts.json`](specs/cypher.upts.json) | [`cypher_test_fixture.cypher`](fixtures/cypher_test_fixture.cypher) | [`cypher_parser.go`](../../../../internal/languages/cypher_parser.go) |
+| Terraform | [`terraform.upts.json`](specs/terraform.upts.json) | [`terraform_test_fixture.tf`](fixtures/terraform_test_fixture.tf) | [`terraform_parser.go`](../../../../internal/languages/terraform_parser.go) |
+| YAML | [`yaml.upts.json`](specs/yaml.upts.json) | [`yaml_test_fixture.yaml`](fixtures/yaml_test_fixture.yaml) | [`yaml_parser.go`](../../../../internal/languages/yaml_parser.go) |
+| TOML | [`toml.upts.json`](specs/toml.upts.json) | [`toml_test_fixture.toml`](fixtures/toml_test_fixture.toml) | [`toml_parser.go`](../../../../internal/languages/toml_parser.go) |
+| JSON | [`json.upts.json`](specs/json.upts.json) | [`json_test_fixture.json`](fixtures/json_test_fixture.json) | [`json_parser.go`](../../../../internal/languages/json_parser.go) |
+| INI | [`ini.upts.json`](specs/ini.upts.json) | [`ini_test_fixture.env`](fixtures/ini_test_fixture.env) | [`ini_parser.go`](../../../../internal/languages/ini_parser.go) |
+| Makefile | [`makefile.upts.json`](specs/makefile.upts.json) | [`makefile_test_fixture.mk`](fixtures/makefile_test_fixture.mk) | [`makefile_parser.go`](../../../../internal/languages/makefile_parser.go) |
+| Dockerfile | [`dockerfile.upts.json`](specs/dockerfile.upts.json) | [`dockerfile_test_fixture.dockerfile`](fixtures/dockerfile_test_fixture.dockerfile) | [`dockerfile_parser.go`](../../../../internal/languages/dockerfile_parser.go) |
+| Shell | [`shell.upts.json`](specs/shell.upts.json) | [`shell_test_fixture.sh`](fixtures/shell_test_fixture.sh) | [`shell_parser.go`](../../../../internal/languages/shell_parser.go) |
+| Protocol Buffers | [`protobuf.upts.json`](specs/protobuf.upts.json) | [`protobuf_test_fixture.proto`](fixtures/protobuf_test_fixture.proto) | [`protobuf_parser.go`](../../../../internal/languages/protobuf_parser.go) |
+| GraphQL | [`graphql.upts.json`](specs/graphql.upts.json) | [`graphql_test_fixture.graphql`](fixtures/graphql_test_fixture.graphql) | [`graphql_parser.go`](../../../../internal/languages/graphql_parser.go) |
+| OpenAPI | [`openapi.upts.json`](specs/openapi.upts.json) | [`openapi_test_fixture.yaml`](fixtures/openapi_test_fixture.yaml) | [`openapi_parser.go`](../../../../internal/languages/openapi_parser.go) |
+| Markdown | [`markdown.upts.json`](specs/markdown.upts.json) | [`markdown_test_fixture.md`](fixtures/markdown_test_fixture.md) | [`markdown_parser.go`](../../../../internal/languages/markdown_parser.go) |
+| XML | [`xml.upts.json`](specs/xml.upts.json) | [`xml_test_fixture.xml`](fixtures/xml_test_fixture.xml) | [`xml_parser.go`](../../../../internal/languages/xml_parser.go) |
+| Lua | [`lua.upts.json`](specs/lua.upts.json) | [`lua_test_fixture.lua`](fixtures/lua_test_fixture.lua) | [`lua_parser.go`](../../../../internal/languages/lua_parser.go) |
+| Scraper Markdown | [`scraper_markdown.upts.json`](specs/scraper_markdown.upts.json) | [`scraper_markdown_test_fixture.md`](fixtures/scraper_markdown_test_fixture.md) | [`scraper_markdown_parser.go`](../../../../internal/languages/scraper_markdown_parser.go) |
 
 ---
 
@@ -120,8 +120,8 @@ upts/
 
 The primary validation method is the Go-native test harness in the parser directory:
 
-- [`upts_test.go`](../../../../cmd/ingest-codebase/languages/upts_test.go) — Test harness
-- [`upts_types.go`](../../../../cmd/ingest-codebase/languages/upts_types.go) — UPTS type definitions
+- [`upts_test.go`](../../../../internal/languages/upts_test.go) — Test harness
+- [`upts_types.go`](../../../../internal/languages/upts_types.go) — UPTS type definitions
 
 ---
 
@@ -131,10 +131,10 @@ The primary validation method is the Go-native test harness in the parser direct
 
 ```bash
 # All 28 UPTS-validated parsers
-go test ./cmd/ingest-codebase/languages/ -run TestUPTS -v
+go test ./internal/languages/ -run TestUPTS -v
 
 # Single language
-go test ./cmd/ingest-codebase/languages/ -run TestUPTS/kotlin -v
+go test ./internal/languages/ -run TestUPTS/kotlin -v
 ```
 
 ### 2. Run via Python Runner (Cross-Validation)
@@ -429,7 +429,7 @@ jobs:
 
 ### Step 1: Create the Parser
 
-Create `cmd/ingest-codebase/languages/<language>_parser.go` implementing the `LanguageParser` interface. See the [languages README](../../../../cmd/ingest-codebase/languages/README.md) for the interface and best practices.
+Create `internal/languages/<language>_parser.go` implementing the `LanguageParser` interface. See the [languages README](../../../../internal/languages/README.md) for the interface and best practices.
 
 ### Step 2: Create a Test Fixture
 
@@ -490,7 +490,7 @@ Create `specs/<language>.upts.json`:
 go build ./cmd/ingest-codebase/...
 
 # Run the UPTS test
-go test ./cmd/ingest-codebase/languages/ -run TestUPTS/<language> -v
+go test ./internal/languages/ -run TestUPTS/<language> -v
 ```
 
 Iterate until all expected symbols pass.
@@ -498,7 +498,7 @@ Iterate until all expected symbols pass.
 ### Step 5: Update Documentation
 
 - Add the language to the table in [this README](#current-status)
-- Add the language to the table in the [languages README](../../../../cmd/ingest-codebase/languages/README.md)
+- Add the language to the table in the [languages README](../../../../internal/languages/README.md)
 - Update `CHANGELOG.md`
 
 ---

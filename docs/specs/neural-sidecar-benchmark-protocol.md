@@ -1,5 +1,12 @@
 # Neural Sidecar Benchmark Protocol
 
+> ⚠️ **DESIGN HISTORY (bannered 2026-06-12, DOC-AUDIT-001b).** This document
+> is a point-in-time plan, analysis, or record of since-completed or
+> superseded work. It is preserved unmodified as design history and is NOT
+> a description of the current system — consult `docs/features/`,
+> `docs/architecture/` (living set), and `CLAUDE.md` for current behavior.
+
+
 **Epic**: 5 (Protocol Evolution via ML)
 **Step**: 5.3
 **Prerequisite**: Shadow mode operational (J17 control-loop Gap 6), training pipeline producing versioned models

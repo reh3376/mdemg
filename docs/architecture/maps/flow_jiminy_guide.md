@@ -2,7 +2,7 @@ FLOW|jiminy-guide|v1|Jiminy inner voice guidance pipeline
 TRIGGER:claude-hook .claude/hooks/prompt-context.sh,runs:every-prompt
 IN:POST /v1/jiminy/guide
 →api.handleGuide
-→jim.Guide|parallel orchestration,timeout:6s
+→jim.Guide|parallel orchestration,budget:JIMINY_TIMEOUT_MS (0=derive from 90s warm-compute budget)
   ├─cns.Suggest|active constraints from graph
   ├─neo4j.VectorSearch|corrections similar to current prompt
   ├─neo4j.Query|CONTRADICTS edges

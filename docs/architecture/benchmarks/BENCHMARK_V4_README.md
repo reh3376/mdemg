@@ -1,5 +1,12 @@
 # MDEMG Benchmark System V4
 
+> ⚠️ **DESIGN HISTORY (bannered 2026-06-12, DOC-AUDIT-001b).** This document
+> is a point-in-time plan, analysis, or record of since-completed or
+> superseded work. It is preserved unmodified as design history and is NOT
+> a description of the current system — consult `docs/features/`,
+> `docs/architecture/` (living set), and `CLAUDE.md` for current behavior.
+
+
 Robust benchmark validation system that **guarantees properly formatted answers** with file_line_refs.
 
 ## Problem Solved

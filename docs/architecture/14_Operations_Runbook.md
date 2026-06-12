@@ -246,7 +246,7 @@ Track these time series:
 
 ## 11) RSIC Observability & Operations (Phase 91)
 
-The Recursive Self-Improvement Cycle (RSIC) subsystem has TSDB-backed metrics (via `/v1/metrics/snapshot`), a Grafana dashboard, and alert rules managed via Grafana alerting with SQL queries against TimescaleDB.
+The Recursive Self-Improvement Cycle (RSIC) subsystem has TSDB-backed metrics (via `/v1/metrics/snapshot`), a Grafana dashboard, and alert rules evaluated by the server-native alert evaluator (SNA-001) with SQL queries against TimescaleDB — Grafana is optional, dashboards-only.
 
 ### 11.1 RSIC Health Indicators
 
@@ -398,7 +398,7 @@ curl -s http://localhost:9999/v1/self-improve/health | jq '{watchdog, orchestrat
 curl -s http://localhost:9999/v1/self-improve/health | jq '.active_tasks'
 
 # Check Neo4j performance
-curl -s http://localhost:9999/metrics | grep neo4j_pool
+curl -s http://localhost:9999/v1/prometheus | grep mdemg_tsdb_pool  # neo4j_pool_* gauges were deleted (no driver pool API); real pool stats are TSDB pgxpool
 ```
 
 **Root causes:** Neo4j slow queries, large blast radius estimation, consolidation taking too long, network latency.

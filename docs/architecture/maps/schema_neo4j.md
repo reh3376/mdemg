@@ -1,4 +1,4 @@
-SCHEMA|neo4j|v1|Neo4j graph schema:nodes,edges,layer hierarchy
+SCHEMA|neo4j|v2|Neo4j graph schema:nodes,edges,layer hierarchy
 NODES:
   MemoryNode|primary memory,3072-dim vector index:memNodeEmbedding
   Observation|append-only events→MemoryNode
@@ -11,10 +11,15 @@ NODES:
   ConfigPattern|configuration summaries
   ConversationObs|CMS observations(secondary label)
   ConversationTheme|CMS themes
+  SymbolNode|code symbols from ingest,natural-key MERGE,V0023 uniqueness constraint
+  SignalState|Hebbian signal-learner persistence,one node per signal code (V0024)
 
 EDGES:
   ASSOCIATED_WITH|structural:file→function,module→class
   CO_ACTIVATED_WITH|Hebbian:co-retrieval strength,tanh soft-cap,cautious decay
+  ABSTRACTS_TO|hierarchy backbone:Lk member→Lk+1 abstraction (the real grounding edge; cosine weights per HIDDEN-WEIGHT-001)
+  GENERALIZES|hierarchy:abstraction→generalization between concept layers (cosine weights)
+  DEFINES_SYMBOL|file node→SymbolNode
   GROUNDED_BY|skip-connect:L5→L0 prevents grounding loss
   IMPLEMENTS_CONCERN|file→concern node
   COMPARED_IN|module→comparison node

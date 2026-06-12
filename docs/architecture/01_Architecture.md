@@ -99,12 +99,14 @@ Recommended:
 
 MDEMG operates as a **full active participant** in the autonomous development workflow:
 
-### 1. aci-claude-go Native Integration
+### 1. Claude Code Native Integration
 
-- The primary consumer of MDEMG services.
-- Uses `internal/orchestrator` to coordinate memory ingestion and retrieval.
-- Facilitates **Internal Dialog** persistence across multi-agent sessions.
-- Triggers **Autonomous Self-Reflection** after subtask completion.
+- The primary consumer of MDEMG services is Claude Code via the enforced
+  hooks (`session-start.sh`, `prompt-context.sh`, `post-tool-observe.py`)
+  and the MCP memory channel (23 tools, `MDEMG_SPACE_ID`-scoped).
+- (Historical note: an earlier host project, `aci-claude-go`, was the
+  original primary consumer; its `internal/orchestrator` integration no
+  longer exists in this repo.)
 
 ### 2. Background Service
 
@@ -138,7 +140,9 @@ A higher-order capability where MDEMG acts as an **SME (Subject Matter Expert)**
 
 ### 6. Jiminy Inner-Voice Service
 
-Proactive guidance injected into every user prompt via Claude Code hooks (`prompt-context.sh`). Orchestrates 4 knowledge sources in parallel with a 6s timeout:
+Proactive guidance injected into every user prompt via Claude Code hooks (`prompt-context.sh`). Orchestrates 4 knowledge sources in parallel within the config-driven
+guidance budget (`JIMINY_TIMEOUT_MS`, default 0 = derived from the 90s
+`JIMINY_WARM_COMPUTE_TIMEOUT_MS` — JIMINY-BUDGET-001):
 
 | Source | What It Finds |
 |--------|---------------|
@@ -196,7 +200,7 @@ MDEMG uses a **plugin-based architecture** for extensibility. Modules communicat
 2. BM25 + RRF fusion       → hybrid search (if enabled)
 3. Graph expansion         → 1-D hop traversal
 4. Spreading activation    → compute transient scores
-5. Initial scoring         → ScoreAndRank
+5. Initial scoring         → ScoreAndRankRRF (default, Column-Voting RRF; legacy ScoreAndRank = fallback/breakdown path)
 6. REASONING MODULES       → plugin-based re-ranking
 7. Built-in LLM rerank     → optional LLM scoring
 8. Jiminy explanations     → explainable retrieval (see internal/retrieval/jiminy.go)
@@ -212,7 +216,7 @@ MDEMG uses a **plugin-based architecture** for extensibility. Modules communicat
 | `ingest` | After batch ingest |
 | `schedule` | Cron-based (e.g., hourly) |
 
-## Key Data Structures (aci-claude-go)
+## Key Data Structures (historical — aci-claude-go era)
 
 - **InternalDialog**: A chronological thread of agent thoughts stored as linked `MemoryNode` entities.
 - **SessionInsights**: Structured outcomes of agent sessions including discoveries, what worked, and what failed.
@@ -225,5 +229,5 @@ MDEMG uses a **plugin-based architecture** for extensibility. Modules communicat
 - **Runtime = activation physics** (computed in-memory, NOT persisted)
 - **DB writes = learning deltas only** (bounded, no per-request activation writes)
 - **Conceptual Continuity**: Internal Dialog must be preserved across session handoffs.
-- **Unified Surface**: All API responses must follow the aci-claude-go `{ "data": ..., "error": ... }` envelope standard.
+- **Surface convention**: newer endpoint families (j17, guardrail, eventgraph) wrap responses in a `{ "data": ... }` envelope; core endpoints (e.g. `/v1/memory/retrieve`) return unwrapped responses — check the handler, not a global rule.
 - **Space Isolation**: Memories are partitioned by `space_id` (typically the project base name).

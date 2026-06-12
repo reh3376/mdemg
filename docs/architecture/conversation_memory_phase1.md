@@ -1,5 +1,12 @@
 # MDEMG Conversation Memory - Phase 1: Observation Capture with Surprise Detection
 
+> ⚠️ **DESIGN HISTORY (bannered 2026-06-12, DOC-AUDIT-001b).** This document
+> is a point-in-time plan, analysis, or record of since-completed or
+> superseded work. It is preserved unmodified as design history and is NOT
+> a description of the current system — consult `docs/features/`,
+> `docs/architecture/` (living set), and `CLAUDE.md` for current behavior.
+
+
 ## Overview
 
 Phase 1 implements the foundation for conversation learning in MDEMG: capturing significant conversational events with automatic surprise detection. This allows MDEMG to identify and prioritize novel, project-specific information that wasn't in the LLM's training data.

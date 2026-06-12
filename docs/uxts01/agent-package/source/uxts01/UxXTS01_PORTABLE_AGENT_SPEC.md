@@ -1,5 +1,12 @@
 # UxXTS Portable Agent Specification (UxXTS01)
 
+> ⚠️ **DESIGN HISTORY (bannered 2026-06-12, DOC-AUDIT-001b).** This document
+> is a point-in-time plan, analysis, or record of since-completed or
+> superseded work. It is preserved unmodified as design history and is NOT
+> a description of the current system — consult `docs/features/`,
+> `docs/architecture/` (living set), and `CLAUDE.md` for current behavior.
+
+
 Version: 3.3.1-uxxts01
 Date: 2026-02-27
 Audience: Developers and coding agents implementing UxXTS governance in arbitrary codebases.

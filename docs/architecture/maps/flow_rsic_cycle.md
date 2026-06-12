@@ -5,7 +5,7 @@ IN:POST /v1/self-improve/cycle
   S1:ape.Assess|7-dim health(retrieval,memory,edge,task,guidance,protocol,synergy)
   S2:ape.Reflect|20 patterns+optional LLM reflector
   S3:ape.Plan|prioritized task generation from insights
-  S4:ape.Dispatch|13 action types,safety-gated
+  S4:ape.Dispatch|16+ action types (see task_dispatch.go),safety-gated
     actions:prune_decayed_edges|prune_excess_edges|trigger_consolidation|
     graduate_volatile|tombstone_stale|refresh_stale_edges|codify_constraint|
     retire_code|adjust_tier_threshold|adjust_replay_buffer|

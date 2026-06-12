@@ -133,7 +133,7 @@ The Codex adapter manages the `[mcp_servers.mdemg]` section within `.codex/confi
 ```toml
 [mcp_servers.mdemg]
 command = "mdemg"
-args = ["serve", "--mcp"]
+args = ["mcp"]
 env = { MDEMG_ENDPOINT = "http://localhost:9999" }
 ```
 
@@ -145,12 +145,8 @@ Merge behavior:
 
 Prerequisites:
 
-1. `.codex/` directory must exist. If missing, `attach-agent` fails with remediation:
-   ```
-   Error: .codex/ directory not found. Initialize Codex in this project first:
-     codex init
-   Then re-run: mdemg sidecar attach-agent codex
-   ```
+1. The `.codex/config.toml` parent directory is auto-created if missing
+   (`attach-agent` runs `os.MkdirAll` — no manual `codex init` required).
 
 Backup:
 

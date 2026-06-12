@@ -1,5 +1,12 @@
 # Tree-Sitter Grammar Integration: 5 Languages
 
+> ⚠️ **DESIGN HISTORY (bannered 2026-06-12, DOC-AUDIT-001b).** This document
+> is a point-in-time plan, analysis, or record of since-completed or
+> superseded work. It is preserved unmodified as design history and is NOT
+> a description of the current system — consult `docs/features/`,
+> `docs/architecture/` (living set), and `CLAUDE.md` for current behavior.
+
+
 **Status:** 11/16 passing → 16/16 target  
 **Languages to add:** Rust, C, C++, CUDA, Java
 

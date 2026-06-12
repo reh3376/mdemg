@@ -49,7 +49,7 @@ make build-cli
 # Binary at ./bin/mdemg
 ```
 
-Requires Go 1.24+ and CGO-compatible toolchain.
+Requires Go 1.26+ and CGO-compatible toolchain.
 
 ---
 
@@ -63,7 +63,7 @@ Requires Go 1.24+ and CGO-compatible toolchain.
 4. Ollama installed and running (`ollama serve`).
 5. Required Ollama models pulled:
    ```bash
-   ollama pull qwen3-embedding:8b        # embeddings (1536 dimensions)
+   ollama pull qwen3-embedding:8b        # embeddings (4096-dim native; MRL-truncatable via EMBEDDING_TARGET_DIMS)
    ollama pull llama3.2:3b-instruct-fp16  # text generation (cognitive features)
    ```
 

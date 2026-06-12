@@ -1,5 +1,12 @@
 # UxXTS01 Intent-to-Item Pipeline Remediation Specification
 
+> ⚠️ **DESIGN HISTORY (bannered 2026-06-12, DOC-AUDIT-001b).** This document
+> is a point-in-time plan, analysis, or record of since-completed or
+> superseded work. It is preserved unmodified as design history and is NOT
+> a description of the current system — consult `docs/features/`,
+> `docs/architecture/` (living set), and `CLAUDE.md` for current behavior.
+
+
 Version: 0.1.0-draft
 Date: 2026-02-28
 Audience: Developers and coding agents implementing or extending UxXTS frameworks.
