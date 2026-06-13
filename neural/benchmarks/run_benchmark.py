@@ -128,6 +128,7 @@ class Spec:
     reward_functions: list[str]
     quality_metrics: list[dict[str, Any]]
     system_prompt_hash: str | None
+    dynamic_prompt: bool
     output_schema: dict[str, Any] | None
     performance_max_tokens: int
     performance_latency_ms: int
@@ -144,6 +145,7 @@ class Spec:
             reward_functions=list(raw.get("reward_functions") or []),
             quality_metrics=list(raw.get("quality_metrics") or []),
             system_prompt_hash=(raw.get("prompt") or {}).get("system_prompt_hash"),
+            dynamic_prompt=bool((raw.get("prompt") or {}).get("dynamic_prompt", False)),
             output_schema=raw.get("output_schema"),
             performance_max_tokens=int(perf.get("max_tokens", 3000)),
             performance_latency_ms=int(perf.get("latency_budget_ms", 15000)),
@@ -197,7 +199,7 @@ def match_rows_for_spec(
                 matched.append(row)
             continue
         # Only for rows without meta.task_name, fall back to system-prompt hash
-        if spec.system_prompt_hash:
+        if spec.system_prompt_hash and not spec.dynamic_prompt:
             msgs = row.get("messages") or []
             sys_msgs = [m for m in msgs if m.get("role") == "system"]
             if sys_msgs and _sha256_text(

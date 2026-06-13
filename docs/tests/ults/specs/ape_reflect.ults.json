@@ -2,7 +2,7 @@
   "ults_version": "1.0.0",
   "task": {
     "name": "ape.reflect",
-    "description": "RSIC reflection engine — analyzes graph topology, detects patterns/gaps/clusters, produces actionable improvement insights",
+    "description": "RSIC reflection engine \u2014 analyzes graph topology, detects patterns/gaps/clusters, produces actionable improvement insights",
     "version": "1.0.0"
   },
   "metadata": {
@@ -14,9 +14,9 @@
   "sampling_group": "T",
   "prompt": {
     "system_prompt_hash": "39b2bc11c799a5de6eb2dcb9c6fb29dec424de5a6bf865b353047320e0e1957c",
-    "system_prompt_source": "internal/ape/llm_reflector.go:74 (rendered with AllowedLLMActions enum)",
+    "system_prompt_source": "internal/ape/llm_reflector.go:74 (rendered with AllowedLLMActions enum) [EVAL-INTEGRITY-001: dynamic \u2014 enum-templated, match by task_name not hash]",
     "think_mode": true,
-    "dynamic_prompt": false
+    "dynamic_prompt": true
   },
   "performance": {
     "latency_budget_ms": 60000,
