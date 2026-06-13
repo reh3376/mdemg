@@ -455,6 +455,7 @@ def run(opts: RunnerOptions) -> dict[str, Any]:
             1 for v in per_spec_info.values() if v.get("matched_golden_rows", 0) > 0
         ),
         "specs_with_errors": sum(1 for v in per_spec_info.values() if "error" in v),
+        "specs_with_zero_successful_calls": _count_zero_call_specs(specs, per_spec_info, aggregator),
         "per_spec": per_spec_info,
         "per_task_aggregate": per_task_aggregate,
         "per_group_summary": per_group_summary,
@@ -473,6 +474,21 @@ def run(opts: RunnerOptions) -> dict[str, Any]:
             ],
         },
     }
+
+    # EVAL-INTEGRITY-001: hard-fail determination. A run that made zero
+    # successful calls (or where no task contributed a score) previously
+    # reported aggregate 0.0 — indistinguishable from a genuine low score.
+    # Mark it as an error so the gate/CLI rejects it instead of treating a
+    # broken run as a passed/failed model judgment.
+    degenerate_reasons: list[str] = []
+    if weight_used == 0:
+        degenerate_reasons.append("no task contributed a score (weight_used==0)")
+    if report["specs_with_zero_successful_calls"] > 0:
+        degenerate_reasons.append(
+            f"{report['specs_with_zero_successful_calls']} task(s) had matched rows but zero successful calls"
+        )
+    report["status"] = "error" if degenerate_reasons else "ok"
+    report["degenerate_reasons"] = degenerate_reasons
 
     # Stagnation comparison against prior benchmark_runs, if history JSON provided
     # (for MVP, this compares against --history-dir)
@@ -575,6 +591,22 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return ap.parse_args(argv)
 
 
+def _count_zero_call_specs(specs, per_spec_info, aggregator) -> int:
+    """Count specs that matched golden rows but produced zero successful calls
+    (aggregate n==0) — the silent zero-call-scored-as-0.0 class (EVAL-INTEGRITY-001)."""
+    n = 0
+    for spec in specs:
+        info = per_spec_info.get(spec.task_name, {})
+        if info.get("matched_golden_rows", 0) == 0 or "error" in info:
+            continue
+        try:
+            if aggregator.aggregate(spec.task_name).n == 0:
+                n += 1
+        except KeyError:
+            n += 1
+    return n
+
+
 def main(argv: list[str] | None = None) -> int:
     ns = _parse_args(argv)
     if not ns.config.exists():
@@ -619,6 +651,9 @@ def main(argv: list[str] | None = None) -> int:
     print(f"aggregate_weighted_score = {report['aggregate_weighted_score']:.4f}")
     print(f"specs_with_matched_rows  = {report['specs_with_matched_rows']}/{report['specs_total']}")
     print(f"report written: {ns.out}")
+    if report.get("status") == "error":
+        print(f"BENCHMARK DEGENERATE — not a valid model judgment: {'; '.join(report['degenerate_reasons'])}", file=sys.stderr)
+        return 1
     return 0
 
 
