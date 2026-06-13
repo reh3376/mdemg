@@ -304,40 +304,59 @@ func TestCollect_Concurrent(t *testing.T) {
 }
 
 func TestCollect_EmptyCandidates(t *testing.T) {
+	// SIDECAR-LOOP-001: empty candidates are unlabelable — the guard now
+	// drops the record (previously it was written). No file should appear.
 	dir := t.TempDir()
 	dc := NewDataCollector(true, dir)
 	defer dc.Close() //nolint:errcheck
 
 	dc.Collect("empty query", nil, nil, 0.0)
-
 	time.Sleep(50 * time.Millisecond)
 	flushCollector(dc)
 
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		t.Fatalf("read dir: %v", err)
+	entries, _ := os.ReadDir(dir)
+	for _, e := range entries {
+		data, _ := os.ReadFile(filepath.Join(dir, e.Name()))
+		if len(strings.TrimSpace(string(data))) != 0 {
+			t.Fatalf("expected no record for empty candidates, got: %s", data)
+		}
 	}
-	if len(entries) == 0 {
-		t.Fatal("expected a file even with empty candidates")
-	}
+}
 
-	data, err := os.ReadFile(filepath.Join(dir, entries[0].Name()))
-	if err != nil {
-		t.Fatal(err)
-	}
+// SIDECAR-LOOP-001: length-mismatched candidate/score arrays are dropped.
+func TestCollect_DropsMisaligned(t *testing.T) {
+	dir := t.TempDir()
+	dc := NewDataCollector(true, dir)
+	defer dc.Close() //nolint:errcheck
 
-	var rec trainingRecord
-	if err := json.Unmarshal([]byte(strings.TrimSpace(string(data))), &rec); err != nil {
-		t.Fatalf("unmarshal: %v", err)
-	}
+	dc.Collect("q", testCandidates(3), testScores(2), 1.0)
+	time.Sleep(50 * time.Millisecond)
+	flushCollector(dc)
 
-	if rec.Query != "empty query" {
-		t.Errorf("query = %q, want %q", rec.Query, "empty query")
+	entries, _ := os.ReadDir(dir)
+	for _, e := range entries {
+		data, _ := os.ReadFile(filepath.Join(dir, e.Name()))
+		if len(strings.TrimSpace(string(data))) != 0 {
+			t.Fatalf("misaligned record must be dropped, got: %s", data)
+		}
 	}
-	if len(rec.Candidates) != 0 {
-		t.Errorf("expected 0 candidates, got %d", len(rec.Candidates))
-	}
-	if rec.RerankScores != nil && len(rec.RerankScores) != 0 {
-		t.Errorf("expected nil/empty rerank_scores, got %v", rec.RerankScores)
+}
+
+// SIDECAR-LOOP-001: all-zero score arrays carry no teacher signal — dropped.
+func TestCollect_DropsAllZeroScores(t *testing.T) {
+	dir := t.TempDir()
+	dc := NewDataCollector(true, dir)
+	defer dc.Close() //nolint:errcheck
+
+	dc.Collect("q", testCandidates(3), []float64{0, 0, 0}, 1.0)
+	time.Sleep(50 * time.Millisecond)
+	flushCollector(dc)
+
+	entries, _ := os.ReadDir(dir)
+	for _, e := range entries {
+		data, _ := os.ReadFile(filepath.Join(dir, e.Name()))
+		if len(strings.TrimSpace(string(data))) != 0 {
+			t.Fatalf("all-zero-score record must be dropped, got: %s", data)
+		}
 	}
 }

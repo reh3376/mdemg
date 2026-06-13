@@ -73,6 +73,28 @@ func (dc *DataCollector) Collect(query string, candidates []models.RetrieveResul
 		return
 	}
 
+	// SIDECAR-LOOP-001: keep the corpus clean by construction. A record is
+	// only trainable if every candidate has its aligned rerank score, so drop
+	// any record where candidates and scores disagree in length, or where the
+	// score array is empty / all-zero (no teacher signal). Without this guard
+	// the corpus accumulates unlabelable rows that the trainer must discard.
+	if len(candidates) == 0 || len(candidates) != len(scores) {
+		slog.Debug("DataCollector: dropping misaligned record",
+			"candidates", len(candidates), "scores", len(scores))
+		return
+	}
+	anyNonZero := false
+	for _, sc := range scores {
+		if sc != 0 {
+			anyNonZero = true
+			break
+		}
+	}
+	if !anyNonZero {
+		slog.Debug("DataCollector: dropping all-zero-score record", "candidates", len(candidates))
+		return
+	}
+
 	// Build record outside the goroutine to capture current state.
 	rec := trainingRecord{
 		Timestamp:    time.Now().UTC().Format(time.RFC3339Nano),
