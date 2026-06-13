@@ -25,6 +25,9 @@ var cacheKeyNeutralFields = map[string]string{
 	// change the result set/page — now IN the key.
 	"Cursor": "", "Limit": "", "SparseOverridePresent": "", "SparseEnabled": "",
 	"SparsePercentile": "", "Category": "", "QueryContextFingerprint": "", "StrictContextMode": "",
+	// CONTEXT-LIVE-001: the catalog version drives the cross-version
+	// Jaccard guard — changes the result set. IN the key.
+	"QueryContextFingerprintVersion": "",
 }
 
 func TestCacheKey_EveryRequestFieldClassified(t *testing.T) {

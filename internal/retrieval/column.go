@@ -57,6 +57,11 @@ type ColumnQuery struct {
 	// column contributes 0 / column suppressed (no context-aware ranking).
 	QueryContextFingerprint []uint16
 
+	// CONTEXT-LIVE-001 — catalog version QueryContextFingerprint was
+	// derived against. >0 enables the cross-version guard in
+	// ContextColumn (mismatched candidate fingerprints score 0).
+	QueryContextFingerprintVersion int
+
 	// Candidates carries the upstream-fused candidate set (already loaded
 	// once by the orchestrator). ContextColumn re-ranks this set; it does
 	// NOT do a separate Cypher walk. Other future columns may reuse this

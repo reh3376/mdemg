@@ -63,6 +63,13 @@ type RetrieveRequest struct {
 	// (graceful degradation; doesn't block other columns).
 	QueryContextFingerprint []uint16 `json:"query_context_fingerprint,omitempty"`
 
+	// CONTEXT-LIVE-001 — catalog version the query fingerprint was derived
+	// against. Bit positions reallocate per catalog build, so the
+	// ContextColumn scores a candidate 0 when its stored fingerprint
+	// version differs (cross-version Jaccard is noise). 0 = unknown
+	// (explicit-fingerprint callers): no guard, current-behavior fallback.
+	QueryContextFingerprintVersion int `json:"query_context_fingerprint_version,omitempty"`
+
 	// Phase 14.2 Epic 4 — Strict-context mode. When true AND
 	// QueryContextFingerprint is non-empty, candidates with Jaccard
 	// similarity < cfg.RetrievalContextStrictThreshold are filtered out
