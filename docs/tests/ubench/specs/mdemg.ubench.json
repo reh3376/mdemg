@@ -13,7 +13,7 @@
   },
   "config": {
     "path": "configs/benchmark_phase10.yaml",
-    "sha256": "80df38563ad767cc66438a0d9289e91093beabcaa6c3da8108bf6dc1f6fcec31"
+    "sha256": "269aebc36604163fb0d978ff60efa97e32aeed13e5daed0b3564150b345aff14"
   },
   "judge": {
     "model": "gpt-5.4-mini",
@@ -37,10 +37,10 @@
     ]
   },
   "golden_holdout": {
-    "path": "training_data/eval/valid_golden.jsonl",
-    "sha256": "b2004783607cd4934b2da6a3e7d95f066e82a936d677bcfb42d246864116fe3e",
-    "expected_rows": 108,
-    "expected_tasks": 17,
+    "path": "training_data/eval/valid_clean.jsonl",
+    "sha256": "f215a34a6ffbf7149444525a189e1c46c3259466431c66c5e41ef48024149e4e",
+    "expected_rows": 240,
+    "expected_tasks": 12,
     "min_rows_per_task": 3
   },
   "registry_parity": {
@@ -59,6 +59,6 @@
   "metadata": {
     "author": "phase-10.5-follow-up",
     "created": "2026-05-06",
-    "notes": "Promotes Phase 10 benchmark to UxTS framework. Endpoint switched to llama-server :8102 per Phase 13.5 cutover. Golden holdout SHA includes Phase 10.5a guardrail.evaluate rows (108 total, 17 tasks)."
+    "notes": "EVAL-INTEGRITY-001 (2026-06-13): holdout switched from the 99%-leaked valid_golden to the leak-free valid_clean (240 rows / 12 tasks with real current-prompt production data; 5 tasks excluded as uncoverable \u2014 no production rows, separate capture gap). Endpoint llama-server :8102 per Phase 13.5."
   }
 }

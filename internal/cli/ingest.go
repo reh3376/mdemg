@@ -23,7 +23,9 @@ import (
 	"github.com/spf13/cobra"
 	"mdemg/internal/config"
 	"mdemg/internal/languages"
+	"mdemg/internal/llmclient"
 	"mdemg/internal/summarize"
+	"mdemg/internal/tsdb"
 )
 
 // newIngestCmd creates the codebase ingestion command
@@ -640,6 +642,35 @@ func runIngest(cfg *ingestConfig) error {
 	// Initialize LLM summarize service
 	var summarizeSvc *summarize.Service
 	if cfg.llmSummary {
+		// EVAL-INTEGRITY-001 recorder-gap fix: summarize.generate runs in this
+		// `mdemg ingest` process, but SetDefaultRecorder was only wired in
+		// `mdemg serve` — so every summary LLM call was made and NEVER recorded
+		// to llm_interactions (the task's entire production corpus was lost,
+		// the EMBED-WIRE recorder-gap class via a process boundary). Wire a
+		// short-lived recorder here (BEFORE summarize.New captures defaultRecorder)
+		// and flush-on-exit since the writer is buffered and this is one-shot.
+		if appCfg, cfgErr := config.FromEnv(); cfgErr == nil && appCfg.LLMInteractionLogging {
+			recCtx, recCancel := context.WithTimeout(context.Background(), 10*time.Second)
+			if client, err := tsdb.NewClient(recCtx, tsdbConfigFromEnv()); err == nil {
+				w := tsdb.NewLLMInteractionWriter(client.Pool(),
+					time.Duration(appCfg.TSDBFlushIntervalSec)*time.Second,
+					appCfg.TSDBWriterBufferMaxSize)
+				llmclient.SetDefaultRecorder(w)
+				llmclient.SetDefaultInstanceID(appCfg.InstanceID)
+				llmclient.SetDefaultSpaceID(cfg.spaceID)
+				slog.Info("ingest: LLM recorder attached for summarize.generate capture")
+				defer func() {
+					fctx, fcancel := context.WithTimeout(context.Background(), 30*time.Second)
+					_ = w.Flush(fctx)
+					fcancel()
+					w.Close()
+					client.Close()
+				}()
+			} else {
+				slog.Warn("ingest: TSDB recorder unavailable — summarize.generate will not be captured", "error", err)
+			}
+			recCancel()
+		}
 		apiKey := os.Getenv("OPENAI_API_KEY")
 		ollamaEndpoint := os.Getenv("OLLAMA_ENDPOINT")
 		if ollamaEndpoint == "" {

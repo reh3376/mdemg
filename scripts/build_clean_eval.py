@@ -134,11 +134,14 @@ def extract_for_spec(
         'final': 0,
         'leakage_drops_per_source_unknown': True,
         'data_starved': False,
-        'mode': 'strict_hash' if hashes else 'task_name_only',
+        'mode': 'task_name_only' if (getattr(spec, 'dynamic_prompt', False) or not hashes) else 'strict_hash',
     }
 
-    if not hashes:
-        # Dynamic spec — no strict hash match. We fall back to task_name only.
+    if not hashes or getattr(spec, 'dynamic_prompt', False):
+        # Dynamic / enum-templated prompt (EVAL-INTEGRITY-001): the pinned
+        # hash drifts every time the template (e.g. ape.reflect's action enum)
+        # changes, so strict-hash matching excludes the real production rows.
+        # Match by task_name instead.
         cur.execute(
             """SELECT user_prompt, response, system_prompt, system_prompt_hash, quality, time, trace_id
                FROM llm_interactions
