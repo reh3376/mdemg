@@ -203,9 +203,15 @@ func (s *Service) Rerank(ctx context.Context, req RerankRequest) (*RerankResult,
 		TokensUsed:   tokensUsed,
 	}
 
-	// Collect training data for neural re-ranker (NR-1)
+	// Collect training data for neural re-ranker (NR-1).
+	// SIDECAR-LOOP-001: log result.Results + result.RerankScores — these are
+	// built together from the SORTED scored slice, so candidate[i] aligns 1:1
+	// (length AND position) with rerank_scores[i]. The previous call passed
+	// req.Candidates[:topN] (unsorted input) against the sorted scores, which
+	// mislabeled 100% of records (84% length-mismatched, the rest positionally
+	// wrong) — making the collected corpus untrainable.
 	if s.dataCollector != nil {
-		s.dataCollector.Collect(req.Query, req.Candidates[:topN], rerankScores, result.LatencyMs)
+		s.dataCollector.Collect(req.Query, result.Results, result.RerankScores, result.LatencyMs)
 	}
 
 	return result, nil
