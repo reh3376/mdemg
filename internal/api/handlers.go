@@ -495,7 +495,12 @@ func (s *Server) handleRetrieve(w http.ResponseWriter, r *http.Request) {
 	// (queries from UVTS / external clients don't carry fingerprints).
 	if len(req.QueryContextFingerprint) == 0 && req.QueryText != "" {
 		v := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("context")))
-		if v == "auto" || v == "true" || v == "1" {
+		optIn := v == "auto" || v == "true" || v == "1"
+		optOut := v == "off" || v == "false" || v == "0"
+		// CONTEXT-LIVE-001: derivation is DEFAULT-ON (config-gated) — the
+		// ?context=auto-only gate left the 5th column dormant on all live
+		// traffic (no hook/MCP/CLI caller passes the param).
+		if optIn || (s.cfg.ContextQueryAutoDefault && !optOut) {
 			fp, fpVer := s.deriveQueryFingerprint(r.Context(), req.SpaceID, req.QueryText)
 			if len(fp) > 0 {
 				req.QueryContextFingerprint = fp

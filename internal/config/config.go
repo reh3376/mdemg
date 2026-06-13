@@ -647,6 +647,12 @@ type Config struct {
 	// service_relationships/business_logic_constraints have no classifier
 	// equivalent and stay benchmark-only until the vocabulary grows.
 	QueryClassifyCategoryMap map[string]string // QUERY_CLASSIFY_CATEGORY_MAP (JSON; default maps data_flow/architecture/relationship)
+	// CONTEXT-LIVE-001 — derive the query context fingerprint server-side
+	// by DEFAULT (previously only on ?context=auto, which no live caller
+	// passed — the 5th RRF column was dormant on all real traffic).
+	// Per-call opt-out: ?context=off|false|0. Requires healed node
+	// fingerprints (the version guard zeroes stale ones regardless).
+	ContextQueryAutoDefault bool // CONTEXT_QUERY_AUTO_DEFAULT (default: true)
 	// CONTEXT-LIVE-001 — Phase-B refine: max current-version observations
 	// run through RefineWithCoactivations per cycle (0 disables).
 	ContextFingerprintRefineMaxPerCycle int // CONTEXT_FINGERPRINT_REFINE_MAX_PER_CYCLE (default: 200)
@@ -3057,6 +3063,7 @@ func FromEnv() (Config, error) {
 		}
 		queryClassifyCategoryMap = parsed
 	}
+	contextQueryAutoDefault := getBool("CONTEXT_QUERY_AUTO_DEFAULT", true)
 	if contextFingerprintRefreshTimeoutMs < 1000 {
 		return Config{}, fmt.Errorf("CONTEXT_FINGERPRINT_REFRESH_TIMEOUT_MS must be ≥ 1000 (got %d)", contextFingerprintRefreshTimeoutMs)
 	}
@@ -4775,6 +4782,7 @@ func FromEnv() (Config, error) {
 		ContextFingerprintRefreshTimeoutMs:     contextFingerprintRefreshTimeoutMs,
 		ContextFingerprintHealMaxPerCycle:      contextFingerprintHealMaxPerCycle,
 		QueryClassifyCategoryMap:               queryClassifyCategoryMap,
+		ContextQueryAutoDefault:                contextQueryAutoDefault,
 		ContextFingerprintRefineMaxPerCycle:    contextFingerprintRefineMaxPerCycle,
 		ContextCatalogTopNPaths:                contextCatalogTopNPaths,
 		ContextCatalogTopNTags:                 contextCatalogTopNTags,
