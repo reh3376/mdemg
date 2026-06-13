@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sort"
 	"strings"
 	"time"
 
@@ -84,8 +85,13 @@ func (s *Service) scorerVersion() string {
 	if !s.cfg.RetrievalColumnVotingEnabled {
 		return "v0-linear"
 	}
+	// v2 (CONTEXT-LIVE-001): consensus denominator counts only columns able
+	// to vote; cross-version fingerprint guard active. catmaps hashes the
+	// per-category context weights + sparse overrides — operator edits to
+	// either JSON map must flip the cache namespace (the v0.7.0 cache-key
+	// class).
 	return fmt.Sprintf(
-		"v1-rrf5|e=%.3f|b=%.3f|g=%.3f|s=%.3f|c=%.3f|hops=%d|emb=%t|bm=%t|gr=%t|st=%t|ctx=%t|strict=%.3f",
+		"v2-rrf5|e=%.3f|b=%.3f|g=%.3f|s=%.3f|c=%.3f|hops=%d|emb=%t|bm=%t|gr=%t|st=%t|ctx=%t|strict=%.3f|catmaps=%s",
 		s.cfg.RetrievalColumnWeightEmbedding,
 		s.cfg.RetrievalColumnWeightBM25,
 		s.cfg.RetrievalColumnWeightGraph,
@@ -98,7 +104,60 @@ func (s *Service) scorerVersion() string {
 		s.cfg.RetrievalColumnStructuralEnabled,
 		s.cfg.RetrievalContextColumnEnabled,
 		s.cfg.RetrievalContextStrictThreshold,
+		s.categoryMapsHash(),
 	)
+}
+
+// categoryMapsHash returns a short stable hash over the per-category
+// context-column weight map and the sparse-gate category override map, in
+// sorted-key order (map iteration is random; the hash must be stable).
+func (s *Service) categoryMapsHash() string {
+	h := sha256.New()
+	keys := make([]string, 0, len(s.cfg.RetrievalContextColumnCategoryWeights))
+	for k := range s.cfg.RetrievalContextColumnCategoryWeights {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		fmt.Fprintf(h, "cw|%s=%.4f;", k, s.cfg.RetrievalContextColumnCategoryWeights[k])
+	}
+	keys = keys[:0]
+	for k := range s.cfg.SparseGateCategoryOverrides {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		// Dereference pointer fields — %+v on pointers prints addresses,
+		// which are not stable across processes.
+		o := s.cfg.SparseGateCategoryOverrides[k]
+		ma, mx, pc := -1, -1, -1.0
+		if o.MinActive != nil {
+			ma = *o.MinActive
+		}
+		if o.MaxActive != nil {
+			mx = *o.MaxActive
+		}
+		if o.Percentile != nil {
+			pc = *o.Percentile
+		}
+		fmt.Fprintf(h, "sg|%s=%d,%d,%.4f;", k, ma, mx, pc)
+	}
+	return hex.EncodeToString(h.Sum(nil))[:12]
+}
+
+// deriveCategoryFromQueryType maps the classifier's '+'-joined query types
+// onto the UVTS category vocabulary (CONTEXT-LIVE-001). Explicit category
+// wins; first mapped type wins for multi-label; empty map disables.
+func deriveCategoryFromQueryType(existing, queryType string, m map[string]string) string {
+	if existing != "" || len(m) == 0 || queryType == "" {
+		return existing
+	}
+	for _, qt := range strings.Split(queryType, "+") {
+		if mapped, ok := m[qt]; ok && mapped != "" {
+			return mapped
+		}
+	}
+	return ""
 }
 
 // SetIntentTranslator sets the intent translator for BM25 query rewriting.
@@ -424,6 +483,19 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 		"type", hints.QueryType, "seed_n", hints.SeedN, "hop_depth", hints.HopDepth,
 		"vec_weight", hints.VectorWeight, "bm25_weight", hints.BM25Weight, "temporal", hints.TemporalIntent.Mode)
 
+	// CONTEXT-LIVE-001: classifier→category dispatch. Live traffic never
+	// passes ?category=, so the per-category protections (sparse-gate
+	// overrides, context-column weights) only ever fired on benchmark
+	// calls. Map the classifier's types onto the UVTS category vocabulary;
+	// first mapped type wins (classifier emits types in order); explicit
+	// request category always takes precedence. Runs BEFORE cacheReq/
+	// CacheKey so the derived category participates in cache identity.
+	if derived := deriveCategoryFromQueryType(req.Category, hints.QueryType, s.cfg.QueryClassifyCategoryMap); derived != req.Category {
+		req.Category = derived
+		slog.Debug("category derived from query classifier",
+			"query_type", hints.QueryType, "category", derived)
+	}
+
 	// Override hopDepth with hints if request didn't specify
 	if req.HopDepth <= 0 {
 		hopDepth = hints.HopDepth
@@ -671,6 +743,13 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 		threshold := s.cfg.RetrievalContextStrictThreshold
 		filtered := make([]Candidate, 0, len(cands))
 		for _, c := range cands {
+			// CONTEXT-LIVE-001 version guard: a candidate fingerprinted
+			// against a different catalog version carries incomparable
+			// bits — treat as below-threshold rather than Jaccard noise.
+			if req.QueryContextFingerprintVersion > 0 &&
+				c.ContextFingerprintVersion != req.QueryContextFingerprintVersion {
+				continue
+			}
 			if JaccardFingerprint(req.QueryContextFingerprint, c.ContextFingerprintActive) >= threshold {
 				filtered = append(filtered, c)
 			}
@@ -715,6 +794,7 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 			ctx, cands, act, initialTopK,
 			req.QueryEmbedding, req.QueryText, spaceIDs, filter,
 			req.QueryContextFingerprint,
+			req.QueryContextFingerprintVersion,
 			req.Category,
 		)
 		if rrfErr != nil {

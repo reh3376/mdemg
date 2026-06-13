@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 
 	"mdemg/internal/config"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"mdemg/internal/conversation"
 	"mdemg/internal/hidden"
 	"mdemg/internal/metrics"
@@ -64,6 +65,9 @@ type CycleOrchestrator struct {
 	// are constructed against the live Neo4j driver.
 	contextCatalogBuilder hidden.Builder
 	contextCatalogLoader  hidden.CatalogLoader
+	// CONTEXT-LIVE-001: driver for the stage-6 fingerprint heal + Phase-B
+	// refine passes (nil = passes skipped, catalog-rebuild-only behavior).
+	fingerprintDriver neo4j.DriverWithContext
 }
 
 // NewCycleOrchestrator wires together all RSIC components.
@@ -404,25 +408,129 @@ func (c *CycleOrchestrator) maybeRefreshContextCatalog(parentCtx context.Context
 		return
 	}
 	interval := time.Duration(c.cfg.ContextFingerprintRefreshIntervalHours) * time.Hour
-	if !cold && age < interval {
-		return
+	var cat *hidden.Catalog
+	if cold || age >= interval {
+		startedAt := time.Now()
+		built, err := c.contextCatalogBuilder.BuildForSpace(ctx, spaceID)
+		if err != nil {
+			slog.Warn("RSIC stage6 catalog build failed", "cycle_id", cycleID, "space_id", spaceID, "cold_start", cold, "error", err)
+			return
+		}
+		cat = built
+		slog.Info("RSIC stage6 catalog refreshed",
+			"cycle_id", cycleID,
+			"space_id", spaceID,
+			"version", cat.Version,
+			"total_bits", cat.TotalBits,
+			"cold_start", cold,
+			"age_before", age.String(),
+			"duration", time.Since(startedAt).String(),
+		)
 	}
 
-	startedAt := time.Now()
-	cat, err := c.contextCatalogBuilder.BuildForSpace(ctx, spaceID)
-	if err != nil {
-		slog.Warn("RSIC stage6 catalog build failed", "cycle_id", cycleID, "space_id", spaceID, "cold_start", cold, "error", err)
+	// CONTEXT-LIVE-001: stale-fingerprint heal + Phase-B refine run on EVERY
+	// stage-6 invocation (not just rebuilds) under the remaining time budget
+	// — resumable, partial work fine. Without this the catalog rebuild above
+	// structurally widens version skew (mdemg-dev reached 76,906 v1 nodes vs
+	// an active v3 catalog with zero healed).
+	if c.fingerprintDriver == nil {
 		return
 	}
-	slog.Info("RSIC stage6 catalog refreshed",
-		"cycle_id", cycleID,
-		"space_id", spaceID,
-		"version", cat.Version,
-		"total_bits", cat.TotalBits,
-		"cold_start", cold,
-		"age_before", age.String(),
-		"duration", time.Since(startedAt).String(),
-	)
+	if cat == nil {
+		loaded, err := c.contextCatalogLoader.LoadActive(ctx, spaceID)
+		if err != nil || loaded == nil {
+			return // cold space or load failure — nothing to heal against
+		}
+		cat = loaded
+	}
+	healCap := c.cfg.ContextFingerprintHealMaxPerCycle
+	if healCap <= 0 {
+		return // 0 disables the heal pass
+	}
+	healStart := time.Now()
+	scanned, updated, skipped, err := conversation.RecomputeStaleFingerprints(
+		ctx, c.fingerprintDriver, spaceID, cat, 500, healCap)
+	if err != nil && ctx.Err() == nil {
+		slog.Warn("RSIC stage6 fingerprint heal failed", "cycle_id", cycleID, "space_id", spaceID, "error", err)
+		return
+	}
+	if scanned > 0 {
+		slog.Info("RSIC stage6 fingerprint heal",
+			"cycle_id", cycleID, "space_id", spaceID, "catalog_version", cat.Version,
+			"scanned", scanned, "updated", updated, "no_bits_skipped", skipped,
+			"duration", time.Since(healStart).String())
+	}
+
+	// Phase-B refine (RefineWithCoactivations — the previously-unwired
+	// enrichment): bounded batch of current-version conversation
+	// observations not yet refined at this catalog version. No-op today on
+	// catalogs without symbol bits; wiring it makes the designed path live.
+	c.refineCurrentFingerprints(ctx, spaceID, cycleID, cat)
+}
+
+// refineCurrentFingerprints runs RefineWithCoactivations over a bounded
+// batch of conversation observations already AT cat.Version whose
+// context_fingerprint_refined_version is older, marking each so cycles
+// don't re-walk the same nodes forever.
+func (c *CycleOrchestrator) refineCurrentFingerprints(ctx context.Context, spaceID, cycleID string, cat *hidden.Catalog) {
+	refineCap := c.cfg.ContextFingerprintRefineMaxPerCycle
+	if refineCap <= 0 || c.fingerprintDriver == nil || cat == nil {
+		return
+	}
+	sess := c.fingerprintDriver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	idsRaw, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, `
+			MATCH (o:MemoryNode {space_id: $space_id, role_type: 'conversation_observation'})
+			WHERE o.obs_id IS NOT NULL
+			  AND coalesce(o.context_fingerprint_version, 0) = $version
+			  AND coalesce(o.context_fingerprint_refined_version, 0) < $version
+			  AND EXISTS((o)-[:CO_ACTIVATED_WITH]-())
+			RETURN o.obs_id AS obs_id LIMIT $cap`,
+			map[string]any{"space_id": spaceID, "version": int64(cat.Version), "cap": int64(refineCap)})
+		if err != nil {
+			return nil, err
+		}
+		var ids []string
+		for res.Next(ctx) {
+			if v, ok := res.Record().Get("obs_id"); ok && v != nil {
+				ids = append(ids, fmt.Sprint(v))
+			}
+		}
+		return ids, res.Err()
+	})
+	_ = sess.Close(ctx)
+	if err != nil {
+		if ctx.Err() == nil {
+			slog.Warn("RSIC stage6 refine scan failed", "cycle_id", cycleID, "space_id", spaceID, "error", err)
+		}
+		return
+	}
+	ids, _ := idsRaw.([]string)
+	refined, bitsAdded := 0, 0
+	for _, obsID := range ids {
+		if ctx.Err() != nil {
+			break
+		}
+		n, err := conversation.RefineWithCoactivations(ctx, c.fingerprintDriver, obsID, cat)
+		if err != nil {
+			continue // per-obs failures are non-fatal; next cycle retries
+		}
+		bitsAdded += n
+		ws := c.fingerprintDriver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+		_, _ = ws.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+			_, err := tx.Run(ctx, `
+				MATCH (o:MemoryNode {obs_id: $obs_id})
+				SET o.context_fingerprint_refined_version = $version`,
+				map[string]any{"obs_id": obsID, "version": int64(cat.Version)})
+			return nil, err
+		})
+		_ = ws.Close(ctx)
+		refined++
+	}
+	if refined > 0 {
+		slog.Info("RSIC stage6 phase-B refine",
+			"cycle_id", cycleID, "space_id", spaceID, "refined", refined, "symbol_bits_added", bitsAdded)
+	}
 }
 
 // Assess exposes just the assessment stage for the API.
@@ -480,6 +588,14 @@ func (c *CycleOrchestrator) SetConflictTracker(t *conversation.ConflictTracker) 
 func (c *CycleOrchestrator) SetContextCatalog(b hidden.Builder, l hidden.CatalogLoader) {
 	c.contextCatalogBuilder = b
 	c.contextCatalogLoader = l
+}
+
+// SetFingerprintDriver enables the stage-6 fingerprint heal + Phase-B refine
+// passes (CONTEXT-LIVE-001). Without it, stage 6 only rebuilds the catalog —
+// which WIDENS version skew (every bump strands all previously-fingerprinted
+// nodes one more version behind).
+func (c *CycleOrchestrator) SetFingerprintDriver(d neo4j.DriverWithContext) {
+	c.fingerprintDriver = d
 }
 
 // recordReflectDivergence inspects insights produced by Reflector.Reflect and

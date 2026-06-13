@@ -1077,6 +1077,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		catalogBuilder := hidden.NewNeo4jBuilder(driver, opts)
 		catalogLoader := hidden.NewNeo4jLoader(driver)
 		rsicCycle.SetContextCatalog(catalogBuilder, catalogLoader)
+		rsicCycle.SetFingerprintDriver(driver)
 		slog.Info("RSIC context catalog wired",
 			"refresh_enabled", cfg.ContextFingerprintRefreshEnabled,
 			"interval_hours", cfg.ContextFingerprintRefreshIntervalHours,

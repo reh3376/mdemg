@@ -636,6 +636,26 @@ type Config struct {
 	ContextFingerprintRefreshEnabled       bool    // CONTEXT_FINGERPRINT_REFRESH_ENABLED — CycleOrchestrator stage 6 runs Builder.BuildForSpace + post-hoc refresh (default: false initially)
 	ContextFingerprintRefreshIntervalHours int     // CONTEXT_FINGERPRINT_REFRESH_INTERVAL_HOURS — minimum hours between refresh ticks per space (default: 168 = weekly)
 	ContextFingerprintRefreshTimeoutMs     int     // CONTEXT_FINGERPRINT_REFRESH_TIMEOUT_MS — per-cycle time budget for post-hoc refresh batch (default: 60000 = 60s)
+	// CONTEXT-LIVE-001 — stage-6 version-skew heal: max stale-fingerprint
+	// nodes recomputed per cycle (0 disables; resumable across cycles).
+	ContextFingerprintHealMaxPerCycle int // CONTEXT_FINGERPRINT_HEAL_MAX_PER_CYCLE (default: 2000)
+	// CONTEXT-LIVE-001 — maps QueryClassifier output types to the UVTS
+	// category vocabulary used by SPARSE_GATE_CATEGORY_OVERRIDES and
+	// RETRIEVAL_CONTEXT_COLUMN_CATEGORY_WEIGHTS, so per-category protections
+	// fire on live traffic (previously only ?category= benchmark calls).
+	// Explicit request category always wins. Empty map disables dispatch.
+	// service_relationships/business_logic_constraints have no classifier
+	// equivalent and stay benchmark-only until the vocabulary grows.
+	QueryClassifyCategoryMap map[string]string // QUERY_CLASSIFY_CATEGORY_MAP (JSON; default maps data_flow/architecture/relationship)
+	// CONTEXT-LIVE-001 — derive the query context fingerprint server-side
+	// by DEFAULT (previously only on ?context=auto, which no live caller
+	// passed — the 5th RRF column was dormant on all real traffic).
+	// Per-call opt-out: ?context=off|false|0. Requires healed node
+	// fingerprints (the version guard zeroes stale ones regardless).
+	ContextQueryAutoDefault bool // CONTEXT_QUERY_AUTO_DEFAULT (default: true)
+	// CONTEXT-LIVE-001 — Phase-B refine: max current-version observations
+	// run through RefineWithCoactivations per cycle (0 disables).
+	ContextFingerprintRefineMaxPerCycle int // CONTEXT_FINGERPRINT_REFINE_MAX_PER_CYCLE (default: 200)
 	ContextCatalogTopNPaths                int     // CONTEXT_CATALOG_TOP_N_PATHS — cap on path bits in catalog (default: 192)
 	ContextCatalogTopNTags                 int     // CONTEXT_CATALOG_TOP_N_TAGS — cap on tag bits in catalog (default: 32)
 	ContextCatalogFloorBitsPerKind         int     // CONTEXT_CATALOG_FLOOR_BITS_PER_KIND — minimum bits allocated to any kind with ≥10 distinct values (default: 16)
@@ -3023,6 +3043,27 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	contextFingerprintHealMaxPerCycle, err := atoi("CONTEXT_FINGERPRINT_HEAL_MAX_PER_CYCLE", 2000)
+	if err != nil {
+		return Config{}, err
+	}
+	contextFingerprintRefineMaxPerCycle, err := atoi("CONTEXT_FINGERPRINT_REFINE_MAX_PER_CYCLE", 200)
+	if err != nil {
+		return Config{}, err
+	}
+	queryClassifyCategoryMap := map[string]string{
+		"data_flow":    "data_flow_integration",
+		"architecture": "architecture_structure",
+		"relationship": "relationship",
+	}
+	if raw := get("QUERY_CLASSIFY_CATEGORY_MAP", ""); raw != "" {
+		parsed := map[string]string{}
+		if err := json.Unmarshal([]byte(raw), &parsed); err != nil {
+			return Config{}, fmt.Errorf("QUERY_CLASSIFY_CATEGORY_MAP must be a JSON string map: %w", err)
+		}
+		queryClassifyCategoryMap = parsed
+	}
+	contextQueryAutoDefault := getBool("CONTEXT_QUERY_AUTO_DEFAULT", true)
 	if contextFingerprintRefreshTimeoutMs < 1000 {
 		return Config{}, fmt.Errorf("CONTEXT_FINGERPRINT_REFRESH_TIMEOUT_MS must be ≥ 1000 (got %d)", contextFingerprintRefreshTimeoutMs)
 	}
@@ -4739,6 +4780,10 @@ func FromEnv() (Config, error) {
 		ContextFingerprintRefreshEnabled:       contextFingerprintRefreshEnabled,
 		ContextFingerprintRefreshIntervalHours: contextFingerprintRefreshIntervalHours,
 		ContextFingerprintRefreshTimeoutMs:     contextFingerprintRefreshTimeoutMs,
+		ContextFingerprintHealMaxPerCycle:      contextFingerprintHealMaxPerCycle,
+		QueryClassifyCategoryMap:               queryClassifyCategoryMap,
+		ContextQueryAutoDefault:                contextQueryAutoDefault,
+		ContextFingerprintRefineMaxPerCycle:    contextFingerprintRefineMaxPerCycle,
 		ContextCatalogTopNPaths:                contextCatalogTopNPaths,
 		ContextCatalogTopNTags:                 contextCatalogTopNTags,
 		ContextCatalogFloorBitsPerKind:         contextCatalogFloorBitsPerKind,

@@ -90,6 +90,7 @@ func CacheKey(req models.RetrieveRequest, scorerVersion string) string {
 		SparsePercentile   float64        `json:"sp,omitempty"`
 		Category           string         `json:"ca,omitempty"`
 		ContextFingerprint []uint16       `json:"cf,omitempty"`
+		ContextFPVersion   int            `json:"cv,omitempty"`
 		StrictContextMode  bool           `json:"sc,omitempty"`
 		ScorerVersion      string         `json:"sv"`
 	}{
@@ -115,6 +116,7 @@ func CacheKey(req models.RetrieveRequest, scorerVersion string) string {
 		SparsePercentile:   req.SparsePercentile,
 		Category:           req.Category,
 		ContextFingerprint: req.QueryContextFingerprint,
+		ContextFPVersion:   req.QueryContextFingerprintVersion,
 		StrictContextMode:  req.StrictContextMode,
 		ScorerVersion:      scorerVersion,
 	}

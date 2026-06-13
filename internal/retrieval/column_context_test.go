@@ -136,3 +136,41 @@ func TestContextColumn_Name(t *testing.T) {
 		t.Errorf("Name = %q; want context", col.Name())
 	}
 }
+
+// CONTEXT-LIVE-001: cross-version fingerprints are incomparable — the guard
+// must zero them rather than compute Jaccard noise. mdemg-dev had 76,906
+// v1-fingerprinted nodes silently compared against v3-derived query bits.
+func TestContextColumn_VersionGuard(t *testing.T) {
+	col := NewContextColumn(true)
+	fp := []uint16{1, 2, 3}
+	cands := []Candidate{
+		{NodeID: "match-v3", ContextFingerprintActive: []uint16{1, 2, 3}, ContextFingerprintVersion: 3},
+		{NodeID: "stale-v1", ContextFingerprintActive: []uint16{1, 2, 3}, ContextFingerprintVersion: 1},
+	}
+
+	// Guard on (query version 3): identical bits at v1 must NOT outrank
+	// anything — stale candidate scores 0, current candidate scores 1.
+	res := col.Run(context.Background(), ColumnQuery{
+		QueryContextFingerprint:        fp,
+		QueryContextFingerprintVersion: 3,
+		Candidates:                     cands,
+		TopN:                           2,
+	})
+	if res.Err != nil {
+		t.Fatalf("unexpected error: %v", res.Err)
+	}
+	if len(res.Candidates) != 2 || res.Candidates[0].NodeID != "match-v3" {
+		t.Fatalf("version guard failed: got order %v", res.Candidates)
+	}
+
+	// Guard off (version 0 = unknown, explicit-fingerprint callers):
+	// legacy behavior — both score 1.0, upstream order preserved.
+	res = col.Run(context.Background(), ColumnQuery{
+		QueryContextFingerprint: fp,
+		Candidates:              cands,
+		TopN:                    2,
+	})
+	if res.Candidates[0].NodeID != "match-v3" {
+		t.Fatalf("version-0 fallback changed ordering: got %v", res.Candidates[0].NodeID)
+	}
+}

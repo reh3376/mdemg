@@ -495,10 +495,16 @@ func (s *Server) handleRetrieve(w http.ResponseWriter, r *http.Request) {
 	// (queries from UVTS / external clients don't carry fingerprints).
 	if len(req.QueryContextFingerprint) == 0 && req.QueryText != "" {
 		v := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("context")))
-		if v == "auto" || v == "true" || v == "1" {
-			fp := s.deriveQueryFingerprint(r.Context(), req.SpaceID, req.QueryText)
+		optIn := v == "auto" || v == "true" || v == "1"
+		optOut := v == "off" || v == "false" || v == "0"
+		// CONTEXT-LIVE-001: derivation is DEFAULT-ON (config-gated) — the
+		// ?context=auto-only gate left the 5th column dormant on all live
+		// traffic (no hook/MCP/CLI caller passes the param).
+		if optIn || (s.cfg.ContextQueryAutoDefault && !optOut) {
+			fp, fpVer := s.deriveQueryFingerprint(r.Context(), req.SpaceID, req.QueryText)
 			if len(fp) > 0 {
 				req.QueryContextFingerprint = fp
+				req.QueryContextFingerprintVersion = fpVer
 			}
 		}
 	}
@@ -4104,14 +4110,16 @@ func (s *Server) handleMetricsTrends(w http.ResponseWriter, r *http.Request) {
 // missing catalog (cold-start), embedder error (fail-open — the
 // ContextColumn gracefully votes 0 when fingerprint is empty rather
 // than blocking the retrieve).
-func (s *Server) deriveQueryFingerprint(ctx context.Context, spaceID, queryText string) []uint16 {
+// CONTEXT-LIVE-001: also returns the active catalog version the bits were
+// derived against, so retrieval can refuse cross-version Jaccard.
+func (s *Server) deriveQueryFingerprint(ctx context.Context, spaceID, queryText string) ([]uint16, int) {
 	if s == nil || s.driver == nil || s.contextFPCache == nil || spaceID == "" || queryText == "" {
-		return nil
+		return nil, 0
 	}
 	loader := hidden.NewNeo4jLoader(s.driver)
 	cat, err := loader.LoadActive(ctx, spaceID)
 	if err != nil || cat == nil {
-		return nil
+		return nil, 0
 	}
 	topK := s.cfg.ContextFingerprintQueryTopK
 	if topK <= 0 {
@@ -4120,7 +4128,7 @@ func (s *Server) deriveQueryFingerprint(ctx context.Context, spaceID, queryText 
 	bits, err := s.contextFPCache.derive(ctx, cat, queryText, topK)
 	if err != nil {
 		slog.Warn("context fingerprint derive failed", "space_id", spaceID, "error", err)
-		return nil
+		return nil, 0
 	}
-	return bits
+	return bits, cat.Version
 }

@@ -37,6 +37,7 @@ func (s *Service) ScoreAndRankRRF(
 	spaceIDs []string,
 	filter FileFilter,
 	queryFingerprint []uint16,
+	queryFingerprintVersion int,
 	category string,
 ) ([]models.RetrieveResult, ConsensusResult, error) {
 	if topK <= 0 {
@@ -46,10 +47,23 @@ func (s *Service) ScoreAndRankRRF(
 	// Build virtual columns over the upstream-fused candidate set. Each
 	// column produces a presorted view; aggregator consults rank position
 	// only (not score).
-	cols := []Column{
-		newVirtualColumn("embedding", sortByVectorSim(cands), s.cfg.RetrievalColumnEmbeddingEnabled),
-		newVirtualColumn("bm25", sortByBM25(cands), s.cfg.RetrievalColumnBM25Enabled),
-		newVirtualColumn("graph", sortByActivation(cands, act), s.cfg.RetrievalColumnGraphEnabled),
+	//
+	// CONTEXT-LIVE-001 consensus semantics: a column STRUCTURALLY UNABLE to
+	// vote (disabled by config, or context with no query fingerprint) is
+	// not appended at all — it must not deflate the consensus denominator.
+	// Columns that attempt and FAIL (error/timeout) still count, by design:
+	// a broken voter lowers consensus; an absent voter doesn't exist.
+	// Pre-change, every live query carried the always-empty context column
+	// in the denominator, hard-capping consensus at 0.8.
+	cols := make([]Column, 0, 5)
+	if s.cfg.RetrievalColumnEmbeddingEnabled {
+		cols = append(cols, newVirtualColumn("embedding", sortByVectorSim(cands), true))
+	}
+	if s.cfg.RetrievalColumnBM25Enabled {
+		cols = append(cols, newVirtualColumn("bm25", sortByBM25(cands), true))
+	}
+	if s.cfg.RetrievalColumnGraphEnabled {
+		cols = append(cols, newVirtualColumn("graph", sortByActivation(cands, act), true))
 	}
 
 	// Structural column runs its own Cypher walk independently. Skip if
@@ -60,11 +74,9 @@ func (s *Service) ScoreAndRankRRF(
 		cols = append(cols, structCol)
 	}
 
-	// Phase 14.2 Epic 4: ContextColumn. Always added when enabled, but
-	// gracefully degrades to zero contribution when query fingerprint is
-	// empty (cold caller). The column reads candidate fingerprints from
-	// ColumnQuery.Candidates (no separate I/O).
-	if s.cfg.RetrievalContextColumnEnabled {
+	// Phase 14.2 Epic 4 + CONTEXT-LIVE-001: ContextColumn joins only when
+	// it can actually vote — enabled AND a query fingerprint exists.
+	if s.cfg.RetrievalContextColumnEnabled && len(queryFingerprint) > 0 {
 		cols = append(cols, NewContextColumn(true))
 	}
 
@@ -75,7 +87,9 @@ func (s *Service) ScoreAndRankRRF(
 		TopN:                    topK * 4, // headroom for column disagreement before truncation
 		Filter:                  filter,
 		QueryContextFingerprint: queryFingerprint,
-		Candidates:              cands,
+
+		QueryContextFingerprintVersion: queryFingerprintVersion,
+		Candidates:                     cands,
 	}
 
 	// Phase 14.2.3: per-category override of the context-column weight.

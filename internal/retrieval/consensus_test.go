@@ -280,3 +280,25 @@ func (s *slowColumn) Run(ctx context.Context, _ ColumnQuery) ColumnResult {
 	}
 	return ColumnResult{Column: s.name, Candidates: s.cands, Latency: time.Since(start)}
 }
+
+// CONTEXT-LIVE-001: columns structurally unable to vote are NOT appended to
+// the column set, so they no longer deflate the consensus denominator (the
+// always-empty live context column used to cap every live query at 0.8).
+// This pins the assembly behavior at the ScoreAndRankRRF level indirectly:
+// the aggregator's denominator equals len(non-nil cols), so a 4-column set
+// must allow consensus 1.0 for a node every column ranks first.
+func TestConsensus_DenominatorExcludesAbsentColumns(t *testing.T) {
+	mk := func(name string, cands []Candidate) Column {
+		return newVirtualColumn(name, cands, true)
+	}
+	node := []Candidate{{NodeID: "n1"}}
+	cols := []Column{mk("embedding", node), mk("bm25", node), mk("graph", node), mk("structural", node)}
+	res, err := Aggregate(context.Background(), cols, ColumnQuery{TopN: 1}, ConsensusOpts{TopN: 1})
+	if err != nil {
+		t.Fatalf("aggregate: %v", err)
+	}
+	c := res.ConsensusByNode["n1"]
+	if c < 0.999 {
+		t.Fatalf("4/4 coverage must yield consensus ~1.0 (no phantom 5th column); got %f", c)
+	}
+}

@@ -2,11 +2,17 @@
 // Jaccard similarity between their observation context fingerprint and the
 // query's fingerprint. Implements the Column interface.
 //
-// Scoring: |A ∩ B| / |A ∪ B|, bounded [0, 1]. Either-fingerprint-empty →
-// score 0 (graceful degradation; column contributes 0 to RRF sum but
-// doesn't block other columns from voting). When the query fingerprint
-// is empty, this column emits zero candidates so the aggregator simply
-// excludes it from the RRF denominator.
+// Scoring: |A ∩ B| / |A ∪ B|, bounded [0, 1]. Candidate-fingerprint-empty
+// → score 0 (graceful degradation). When the query fingerprint is empty
+// the column is NOT APPENDED to the column set at all (CONTEXT-LIVE-001 —
+// see ScoreAndRankRRF), so it neither votes nor deflates the consensus
+// denominator.
+//
+// CONTEXT-LIVE-001 version guard: fingerprint bit positions reallocate on
+// every catalog build, so Jaccard across catalog versions is noise. When
+// ColumnQuery.QueryContextFingerprintVersion > 0, candidates whose stored
+// ContextFingerprintVersion differs score 0 (same as no fingerprint).
+// Version 0 = unknown (explicit-fingerprint callers): guard off.
 //
 // I/O: ContextColumn does NOT do its own Cypher walk — it consumes the
 // upstream-fused candidate set passed in via ColumnQuery.Candidates and
@@ -26,10 +32,9 @@ type ContextColumn struct {
 	enabled bool
 }
 
-// NewContextColumn returns a ContextColumn. enabled mirrors the
-// RETRIEVAL_CONTEXT_COLUMN_ENABLED config flag. Disabled columns return
-// success-empty so the aggregator counts them in the denominator without
-// inflating consensus (matches virtualColumn semantics).
+// NewContextColumn returns a ContextColumn. The orchestrator only
+// constructs one when the column can vote (enabled + query fingerprint
+// present); the enabled field is a belt-and-braces no-op guard.
 func NewContextColumn(enabled bool) *ContextColumn {
 	return &ContextColumn{enabled: enabled}
 }
@@ -55,7 +60,14 @@ func (c *ContextColumn) Run(_ context.Context, q ColumnQuery) ColumnResult {
 	}
 	scores := make([]scored, 0, len(q.Candidates))
 	for i, cand := range q.Candidates {
-		score := JaccardFingerprint(q.QueryContextFingerprint, cand.ContextFingerprintActive)
+		var score float64
+		if q.QueryContextFingerprintVersion > 0 &&
+			cand.ContextFingerprintVersion != q.QueryContextFingerprintVersion {
+			// Cross-version bits are incomparable — no information.
+			score = 0
+		} else {
+			score = JaccardFingerprint(q.QueryContextFingerprint, cand.ContextFingerprintActive)
+		}
 		scores = append(scores, scored{idx: i, score: score})
 	}
 	// Sort by score desc; stable so candidates with equal score keep upstream order.
