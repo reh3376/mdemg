@@ -8,7 +8,7 @@ BASE_URL ?= http://localhost:$(shell cat .mdemg.port 2>/dev/null || echo 9999)
 # via the runner's env-var fallback when --base-url is not passed directly
 export MDEMG_BASE_URL ?= $(BASE_URL)
 
-.PHONY: all build build-cli build-parser test test-parsers verify-upts-schema verify-uxts-canonical clean test-ubts-smoke test-udts test-unts-report test-sidecar test-sidecar-unit test-sidecar-integration test-sidecar-schemas test-sidecar-acceptance release-snapshot release-local man install-man test-fsd test-fsd-unit test-fsd-integration test-fsd-acceptance build-sidecar test-sidecar-python
+.PHONY: test-eval-leak all build build-cli build-parser test test-parsers verify-upts-schema verify-uxts-canonical clean test-ubts-smoke test-udts test-unts-report test-sidecar test-sidecar-unit test-sidecar-integration test-sidecar-schemas test-sidecar-acceptance release-snapshot release-local man install-man test-fsd test-fsd-unit test-fsd-integration test-fsd-acceptance build-sidecar test-sidecar-python
 
 # Build-time version info
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
@@ -280,6 +280,20 @@ UBENCH_SPEC ?= docs/tests/ubench/specs/mdemg.ubench.json
 UBENCH_REPORT ?= /tmp/ubench-report.json
 
 # Schema + SHA verification only. CI-safe; no LLM required.
+# EVAL-INTEGRITY-001: leak-audit gate. The promotion eval MUST be disjoint
+# from the training sources — run before any benchmark/promotion. Exits
+# nonzero on any overlap (the valid_golden 99%-leak class). Re-check every
+# time (build-time filtering is not a substitute; the corpus grows).
+EVAL_CLEAN ?= training_data/eval/valid_clean.jsonl
+LEAK_SOURCES ?= training_data/sft/tier1/train.jsonl,training_data/sft/tier1/valid.jsonl,training_data/sft/family_classify_notink/train.jsonl,training_data/sft/family_reasoning_think/train.jsonl,training_data/sft/family_structured_notink/train.jsonl
+test-eval-leak:
+	@echo "Auditing $(EVAL_CLEAN) for leakage against training sources..."
+	python3 scripts/audit_eval_leakage.py \
+		--eval $(EVAL_CLEAN) \
+		--against "$(LEAK_SOURCES)" \
+		--out training_data/eval/leak_audit_report.json
+	@echo "Leak audit clean."
+
 test-ubench-lint:
 	@echo "Linting UBENCH spec against schema + verifying config/holdout SHAs..."
 	python3 docs/tests/ubench/runners/ubench_runner.py \
