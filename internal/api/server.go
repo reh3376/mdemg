@@ -954,6 +954,11 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	// RSIC-SK1: Wire signal learner to Jiminy for guidance emission/response tracking
 	if jiminySvc != nil {
 		jiminySvc.SetSignalLearner(signalLearner)
+		// NEGFEED-001 Bridge A: wire the anti-Hebbian weaken path so a
+		// contradicted guidance outcome can weaken its source co-activations.
+		if lea != nil {
+			jiminySvc.SetNegativeFeedbackApplier(&negativeFeedbackAdapter{learner: lea})
+		}
 	}
 
 	// SR-001: Alert dispatcher

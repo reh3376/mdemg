@@ -168,6 +168,14 @@ type ClassificationResult struct {
 
 // --- RSIC-SK1: SignalLearnerProvider interface ---
 
+// NegativeFeedbackApplier abstracts learning.Service.ApplyNegativeFeedback for
+// Jiminy to avoid a circular import (NEGFEED-001 Bridge A). On a contradicted
+// guidance outcome, Jiminy weakens the co-activations among the guidance's own
+// source nodes — they jointly produced guidance that was contradicted.
+type NegativeFeedbackApplier interface {
+	ApplyNegativeFeedback(ctx context.Context, spaceID string, queryNodeIDs, rejectedNodeIDs []string) (weakened, contradicted int, err error)
+}
+
 // SignalLearnerProvider abstracts ape.SignalLearner for Jiminy to avoid circular imports.
 type SignalLearnerProvider interface {
 	RecordEmission(code string)

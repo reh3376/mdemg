@@ -458,3 +458,18 @@ func (a *rsicAlertAdapter) SendAlert(ctx context.Context, service, title, messag
 		Message:  message,
 	})
 }
+
+// negativeFeedbackAdapter bridges jiminy.NegativeFeedbackApplier to
+// learning.Service (NEGFEED-001 Bridge A): a contradicted guidance outcome
+// weakens co-activations among the guidance's source nodes.
+type negativeFeedbackAdapter struct {
+	learner *learning.Service
+}
+
+func (a *negativeFeedbackAdapter) ApplyNegativeFeedback(ctx context.Context, spaceID string, queryNodeIDs, rejectedNodeIDs []string) (int, int, error) {
+	if a == nil || a.learner == nil {
+		return 0, 0, nil
+	}
+	res, err := a.learner.ApplyNegativeFeedback(ctx, spaceID, queryNodeIDs, rejectedNodeIDs)
+	return res.Weakened, res.Contradicted, err
+}

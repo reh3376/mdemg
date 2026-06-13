@@ -37,6 +37,17 @@ type mcpServer struct {
 
 // resolveSpace returns the explicit space_id argument when present,
 // otherwise the server's default (MDEMG_SPACE_ID env > ide-agent).
+// firstResultNodeID extracts the node_id of the top retrieve result, or "".
+func firstResultNodeID(resp map[string]any) string {
+	results, _ := resp["results"].([]any)
+	if len(results) == 0 {
+		return ""
+	}
+	top, _ := results[0].(map[string]any)
+	id, _ := top["node_id"].(string)
+	return id
+}
+
 func (m *mcpServer) resolveSpace(args map[string]any) string {
 	if s, _ := args["space_id"].(string); s != "" {
 		return s
@@ -89,6 +100,7 @@ func runMCPServer(cmd *cobra.Command, args []string) error {
 	mcpSrv.registerMemoryStoreToool(s)
 	mcpSrv.registerMemoryRecallTool(s)
 	mcpSrv.registerMemoryAssociateTool(s)
+	mcpSrv.registerMemoryRejectTool(s)
 	mcpSrv.registerMemoryReflectTool(s)
 	mcpSrv.registerMemoryStatusTool(s)
 	mcpSrv.registerMemorySymbolsTool(s)
@@ -397,6 +409,68 @@ func (m *mcpServer) memoryAssociateHandler(ctx context.Context, request mcp.Call
 }
 
 // memory_reflect - Summarize what is known about a topic
+// memory_reject - Explicitly weaken a wrong association (NEGFEED-001 Bridge B).
+// The substrate's explicit anti-Hebbian producer: the agent rejects a memory
+// that surfaced for a context but proved wrong, weakening their co-activation.
+func (m *mcpServer) registerMemoryRejectTool(s *server.MCPServer) {
+	tool := mcp.NewTool("memory_reject",
+		mcp.WithDescription(`Weaken the association between a query context and a memory that
+should NOT have surfaced for it. Use when a recalled memory was wrong, misleading,
+or irrelevant for the given context — this teaches the graph to stop co-activating
+them (anti-Hebbian: weakens CO_ACTIVATED_WITH, or records CONTRADICTS if no edge
+exists). The opposite of memory_associate.`),
+		mcp.WithString("query",
+			mcp.Required(),
+			mcp.Description("The context/query the wrong memory surfaced for")),
+		mcp.WithString("rejected_query",
+			mcp.Required(),
+			mcp.Description("Query to find the memory that should be weakened/rejected")),
+		mcp.WithString("reason",
+			mcp.Description("Why this memory was wrong for the context")),
+		mcp.WithString("space_id",
+			mcp.Description(spaceParamDesc)),
+	)
+	s.AddTool(tool, m.memoryRejectHandler)
+}
+
+func (m *mcpServer) memoryRejectHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	args := getArgs(request)
+	query, _ := args["query"].(string)
+	rejectedQuery, _ := args["rejected_query"].(string)
+	if query == "" || rejectedQuery == "" {
+		return newToolResultError("both query and rejected_query are required"), nil
+	}
+	space := m.resolveSpace(args)
+
+	// Resolve both sides to node IDs (single space, mirrors memory_associate).
+	qResp, err := m.callMDEMG("/v1/memory/retrieve", map[string]any{
+		"space_id": space, "query_text": query, "top_k": 1,
+	})
+	if err != nil {
+		return newToolResultError(fmt.Sprintf("Failed to find query context: %v", err)), nil
+	}
+	rResp, err := m.callMDEMG("/v1/memory/retrieve", map[string]any{
+		"space_id": space, "query_text": rejectedQuery, "top_k": 1,
+	})
+	if err != nil {
+		return newToolResultError(fmt.Sprintf("Failed to find rejected memory: %v", err)), nil
+	}
+	qID := firstResultNodeID(qResp)
+	rID := firstResultNodeID(rResp)
+	if qID == "" || rID == "" {
+		return newToolResultError("could not resolve both query and rejected memory to nodes"), nil
+	}
+
+	if _, err := m.callMDEMG("/v1/learning/negative-feedback", map[string]any{
+		"space_id":          space,
+		"query_node_ids":    []string{qID},
+		"rejected_node_ids": []string{rID},
+	}); err != nil {
+		return newToolResultError(fmt.Sprintf("Failed to apply negative feedback: %v", err)), nil
+	}
+	return mcp.NewToolResultText(fmt.Sprintf("Weakened association: %q -/-> %q (space %s)", query, rejectedQuery, space)), nil
+}
+
 func (m *mcpServer) registerMemoryReflectTool(s *server.MCPServer) {
 	tool := mcp.NewTool("memory_reflect",
 		mcp.WithDescription(`Reflect on what is known about a topic, triggering a broader search

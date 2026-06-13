@@ -279,6 +279,10 @@ type Config struct {
 
 	// Jiminy Guidance settings (Phase Jiminy)
 	JiminyEnabled       bool    // JIMINY_ENABLED — enable Jiminy inner voice guidance (default: true)
+	// NEGFEED-001 — on a contradicted guidance outcome, weaken co-activations
+	// among the guidance's source nodes (anti-Hebbian). Safe (q<>r guard,
+	// weight floors at 0, single-source = no-op). Default true.
+	JiminyContradictedWeakenEnabled bool // JIMINY_CONTRADICTED_WEAKEN_ENABLED
 	JiminyTimeoutMs            int     // JIMINY_TIMEOUT_MS — direct Guide() budget; 0 = derive from JIMINY_WARM_COMPUTE_TIMEOUT_MS (default: 0; the old independent 15s starved fresh installs)
 	JiminyMaxItems      int     // JIMINY_MAX_ITEMS — max guidance items returned (default: 10)
 	JiminyMinConfidence float64 // JIMINY_MIN_CONFIDENCE — minimum confidence to include item (default: 0.3)
@@ -2308,6 +2312,7 @@ func FromEnv() (Config, error) {
 
 	// Jiminy Guidance settings (Phase Jiminy)
 	jiminyEnabled := getBool("JIMINY_ENABLED", true)
+	jiminyContradictedWeakenEnabled := getBool("JIMINY_CONTRADICTED_WEAKEN_ENABLED", true)
 	jiminyTimeoutMs, err := atoi("JIMINY_TIMEOUT_MS", 0)
 	if err != nil {
 		return Config{}, err
@@ -4514,6 +4519,7 @@ func FromEnv() (Config, error) {
 
 		// Phase Jiminy: Jiminy Guidance
 		JiminyEnabled:                    jiminyEnabled,
+		JiminyContradictedWeakenEnabled:  jiminyContradictedWeakenEnabled,
 		JiminyTimeoutMs:                  jiminyTimeoutMs,
 		JiminyMaxItems:                   jiminyMaxItems,
 		JiminyMinConfidence:              jiminyMinConfidence,

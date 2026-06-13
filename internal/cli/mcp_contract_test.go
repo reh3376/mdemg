@@ -231,6 +231,40 @@ func TestMemoryAssociate_Contract(t *testing.T) {
 	}
 }
 
+// --- memory_reject (NEGFEED-001 Bridge B: 2 lookups + negative-feedback, one space) ---
+
+func TestMemoryReject_Contract(t *testing.T) {
+	b := &mcpTestBackend{response: map[string]any{
+		"results": []any{map[string]any{"node_id": "n1", "name": "a", "content": "c"}},
+	}}
+	m := newTestMCPServer(t, b, "env-space")
+
+	_, err := m.memoryRejectHandler(context.Background(), toolRequest(map[string]any{
+		"query": "ctx", "rejected_query": "bad", "space_id": "explicit-space",
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(b.calls) < 3 {
+		t.Fatalf("expected 3 calls (2 lookups + negative-feedback), got %d", len(b.calls))
+	}
+	// All calls must stay in the one explicit space.
+	for i, c := range b.calls {
+		if c.Body["space_id"] != "explicit-space" {
+			t.Errorf("call %d space_id = %v — reject must stay in ONE space", i, c.Body["space_id"])
+		}
+	}
+	// The final call must be the negative-feedback POST with resolved node IDs.
+	last := b.calls[len(b.calls)-1]
+	if last.Path != "/v1/learning/negative-feedback" {
+		t.Errorf("final call path = %q, want /v1/learning/negative-feedback", last.Path)
+	}
+	if last.Body["query_node_ids"] == nil || last.Body["rejected_node_ids"] == nil {
+		t.Errorf("negative-feedback call missing node id arrays: q=%v r=%v",
+			last.Body["query_node_ids"], last.Body["rejected_node_ids"])
+	}
+}
+
 // --- memory_reflect ---
 
 func TestMemoryReflect_Contract(t *testing.T) {
