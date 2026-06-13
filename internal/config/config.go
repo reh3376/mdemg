@@ -639,6 +639,14 @@ type Config struct {
 	// CONTEXT-LIVE-001 — stage-6 version-skew heal: max stale-fingerprint
 	// nodes recomputed per cycle (0 disables; resumable across cycles).
 	ContextFingerprintHealMaxPerCycle int // CONTEXT_FINGERPRINT_HEAL_MAX_PER_CYCLE (default: 2000)
+	// CONTEXT-LIVE-001 — maps QueryClassifier output types to the UVTS
+	// category vocabulary used by SPARSE_GATE_CATEGORY_OVERRIDES and
+	// RETRIEVAL_CONTEXT_COLUMN_CATEGORY_WEIGHTS, so per-category protections
+	// fire on live traffic (previously only ?category= benchmark calls).
+	// Explicit request category always wins. Empty map disables dispatch.
+	// service_relationships/business_logic_constraints have no classifier
+	// equivalent and stay benchmark-only until the vocabulary grows.
+	QueryClassifyCategoryMap map[string]string // QUERY_CLASSIFY_CATEGORY_MAP (JSON; default maps data_flow/architecture/relationship)
 	// CONTEXT-LIVE-001 — Phase-B refine: max current-version observations
 	// run through RefineWithCoactivations per cycle (0 disables).
 	ContextFingerprintRefineMaxPerCycle int // CONTEXT_FINGERPRINT_REFINE_MAX_PER_CYCLE (default: 200)
@@ -3037,6 +3045,18 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	queryClassifyCategoryMap := map[string]string{
+		"data_flow":    "data_flow_integration",
+		"architecture": "architecture_structure",
+		"relationship": "relationship",
+	}
+	if raw := get("QUERY_CLASSIFY_CATEGORY_MAP", ""); raw != "" {
+		parsed := map[string]string{}
+		if err := json.Unmarshal([]byte(raw), &parsed); err != nil {
+			return Config{}, fmt.Errorf("QUERY_CLASSIFY_CATEGORY_MAP must be a JSON string map: %w", err)
+		}
+		queryClassifyCategoryMap = parsed
+	}
 	if contextFingerprintRefreshTimeoutMs < 1000 {
 		return Config{}, fmt.Errorf("CONTEXT_FINGERPRINT_REFRESH_TIMEOUT_MS must be ≥ 1000 (got %d)", contextFingerprintRefreshTimeoutMs)
 	}
@@ -4754,6 +4774,7 @@ func FromEnv() (Config, error) {
 		ContextFingerprintRefreshIntervalHours: contextFingerprintRefreshIntervalHours,
 		ContextFingerprintRefreshTimeoutMs:     contextFingerprintRefreshTimeoutMs,
 		ContextFingerprintHealMaxPerCycle:      contextFingerprintHealMaxPerCycle,
+		QueryClassifyCategoryMap:               queryClassifyCategoryMap,
 		ContextFingerprintRefineMaxPerCycle:    contextFingerprintRefineMaxPerCycle,
 		ContextCatalogTopNPaths:                contextCatalogTopNPaths,
 		ContextCatalogTopNTags:                 contextCatalogTopNTags,

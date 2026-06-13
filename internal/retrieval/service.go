@@ -145,6 +145,21 @@ func (s *Service) categoryMapsHash() string {
 	return hex.EncodeToString(h.Sum(nil))[:12]
 }
 
+// deriveCategoryFromQueryType maps the classifier's '+'-joined query types
+// onto the UVTS category vocabulary (CONTEXT-LIVE-001). Explicit category
+// wins; first mapped type wins for multi-label; empty map disables.
+func deriveCategoryFromQueryType(existing, queryType string, m map[string]string) string {
+	if existing != "" || len(m) == 0 || queryType == "" {
+		return existing
+	}
+	for _, qt := range strings.Split(queryType, "+") {
+		if mapped, ok := m[qt]; ok && mapped != "" {
+			return mapped
+		}
+	}
+	return ""
+}
+
 // SetIntentTranslator sets the intent translator for BM25 query rewriting.
 func (s *Service) SetIntentTranslator(t IntentTranslator) {
 	s.intentTranslator = t
@@ -467,6 +482,19 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 	slog.Info("query type detected",
 		"type", hints.QueryType, "seed_n", hints.SeedN, "hop_depth", hints.HopDepth,
 		"vec_weight", hints.VectorWeight, "bm25_weight", hints.BM25Weight, "temporal", hints.TemporalIntent.Mode)
+
+	// CONTEXT-LIVE-001: classifier→category dispatch. Live traffic never
+	// passes ?category=, so the per-category protections (sparse-gate
+	// overrides, context-column weights) only ever fired on benchmark
+	// calls. Map the classifier's types onto the UVTS category vocabulary;
+	// first mapped type wins (classifier emits types in order); explicit
+	// request category always takes precedence. Runs BEFORE cacheReq/
+	// CacheKey so the derived category participates in cache identity.
+	if derived := deriveCategoryFromQueryType(req.Category, hints.QueryType, s.cfg.QueryClassifyCategoryMap); derived != req.Category {
+		req.Category = derived
+		slog.Debug("category derived from query classifier",
+			"query_type", hints.QueryType, "category", derived)
+	}
 
 	// Override hopDepth with hints if request didn't specify
 	if req.HopDepth <= 0 {
