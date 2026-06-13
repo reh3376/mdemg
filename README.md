@@ -240,9 +240,9 @@ MDEMG provides long-term memory for AI agents, enabling them to:
 ## Key Features
 
 - **Multi-layer graph architecture**: Base observations (L0) → Hidden concepts (L1) → Abstract concepts (L2+)
-- **Hybrid search**: Combines vector similarity with graph traversal
+- **Hybrid search**: Combines vector similarity with graph traversal, fused by RRF column voting with sparse gating and context fingerprinting (see [`docs/features/column-voting-retrieval.md`](docs/features/column-voting-retrieval.md))
 - **Conversation Memory System (CMS)**: Persistent memory across agent sessions with surprise-weighted learning
-- **Symbol extraction (UPTS)**: Unified Parser Test Schema supporting 27 languages with file:line evidence and SHA256 fixture verification
+- **Symbol extraction (UPTS)**: Unified Parser Test Schema supporting 28 languages with file:line evidence and SHA256 fixture verification
 - **Plugin system**: Extensible via ingestion, reasoning, and APE (Autonomous Pattern Extraction) modules
 - **Evidence-based retrieval**: Returns symbol-level citations (file:line references) with results
 - **Capability gap detection**: Identifies missing knowledge areas for targeted improvement
@@ -258,9 +258,40 @@ MDEMG provides long-term memory for AI agents, enabling them to:
 - **Backup & restore**: Automated full database dumps and partial space exports with retention policies and scheduler
 - **Neo4j state monitoring**: Single endpoint for consolidated database health, per-space statistics (nodes, edges, layers, health score, staleness), and backup overview
 - **Meta-cognition enforcement**: Server-side anomaly detection (empty-resume, empty-recall), hook circuit breakers with CRITICAL warnings, multi-dimensional watchdog monitoring, Hebbian signal learning for adaptive enforcement
-- **Jiminy Inner Voice**: Proactive guidance service injected into every prompt — surfaces constraints, prior corrections, contradictions, and frontier exploration opportunities from the knowledge graph via 4-source parallel fan-out with 6s timeout
+- **Jiminy Inner Voice**: Proactive guidance service injected into every prompt — surfaces constraints, prior corrections, contradictions, and frontier exploration opportunities from the knowledge graph via 4-source parallel fan-out under a config-derived guidance budget
 - **J17 AI-to-AI Communication Protocol**: Three-tier encoding protocol (T1 coded ~15 tokens, T2 telegraphic, T3 full NL) for compact agent-to-agent communication. LLM-generated constraint codes, per-session trust scoring, signed session tickets for state persistence across context resets, RSIC-driven protocol evolution, and ML-powered tier prediction via neural sidecar
+- **Never-silent operations**: a goroutine supervisor with panic recovery over every background loop, scheduled-job health that alerts on "failed OR never ran," hook-channel self-monitoring, restore-tested backups, and a server-native alert evaluator — engineered so a dead seam self-reports instead of failing quietly
+- **Closed guidance→feedback→outcome loop**: Jiminy guidance is scored against what the agent actually did — per-constraint effectiveness rates feed RSIC calibration. The `jiminy-governance` Claude Code skill makes Jiminy a deterministic source of context and constraints over J17, with a fail-closed bash guard and graduated `/strict`-mode enforcement on edits
+- **Event-graph federation**: `mdemg eventgraph` surfaces reinforcement and guidance-outcome events in a node's graph neighborhood by federating TimescaleDB event streams with Neo4j traversal — events stay in TSDB, never reified into the graph
 - **Space Transfer & DevSpace**: Export/import space graphs as `.mdemg` files or via gRPC; optional DevSpace hub for agent registration, publish/pull exports, and inter-agent messaging (see `cmd/space-transfer/README.md` and `docs/specs/development-space-collaboration.md`)
+
+## Self-Improving Local LLM
+
+MDEMG runs its **own fine-tuned model** for its internal LLM calls — the
+classification, guidance synthesis, concept emergence, intent translation, and
+re-ranking the graph depends on, across ~16 task surfaces. The shipped model is
+`mdemg-llm-v1`: a fine-tuned dense Qwen3-14B, distributed as fused GGUF quants
+and served locally via `llama.cpp llama-server` (an adapter-only pull is also
+available — see Step 2b below for installation). Each task has a fixed JSON
+output contract; the fine-tune exists to follow those contracts more reliably
+and cheaply than a stock base. The LLM provider is operator-configurable —
+MDEMG requires a reachable LLM endpoint to start.
+
+The model improves through an operator-driven **curate → train → benchmark →
+promote** loop: every internal LLM interaction is captured (quality-filtered and
+sanitized) into TimescaleDB; `mdemg data curate` builds temporally-split
+datasets whose held-out test slice training never sees; candidates train via
+the local MLX LoRA pipeline and are benchmarked on the held-out slice
+(UBENCH); promotion is gated on measured lift and operator approval — a
+candidate that regresses is rejected, which is the gate doing its job. This is
+the offline outer loop of MDEMG's self-improvement, complementing RSIC's
+online micro-corrections; the fully-automated recursive-retraining loop is
+specced but not yet built, so today the loop runs operator-driven, not closed.
+
+Feature docs: [`fine-tuning-pipeline.md`](docs/features/fine-tuning-pipeline.md),
+[`neural-training-pipeline.md`](docs/features/neural-training-pipeline.md),
+[`ubench-framework.md`](docs/features/ubench-framework.md),
+[`local-model-distribution.md`](docs/features/local-model-distribution.md).
 
 ## Architecture
 
@@ -423,7 +454,7 @@ Requires `AUTH_API_KEYS`. Operator escape hatch when a breaker trips on a transi
 
 ## Symbol Extraction (UPTS)
 
-> For the comprehensive guide to UxTS methodology (architecture, spec writing, CI integration, governance, and all 11 frameworks), see [docs/guides/UXTS_DEVELOPER_GUIDE.md](docs/guides/UXTS_DEVELOPER_GUIDE.md).
+> For the comprehensive guide to UxTS methodology (architecture, spec writing, CI integration, governance, and the full framework family), see [docs/guides/UXTS_DEVELOPER_GUIDE.md](docs/guides/UXTS_DEVELOPER_GUIDE.md).
 
 MDEMG extracts code symbols during ingestion using the Unified Parser Test Schema (UPTS):
 
@@ -526,6 +557,10 @@ mdemg/
 ## Observability Stack
 
 MDEMG includes a complete observability stack for monitoring and debugging.
+The TimescaleDB telemetry plane that feeds it is governed end-to-end — every
+hypertable carries retention and compression policies, and the alert evaluator
+runs server-native (Grafana is dashboards-only, not required for alerting);
+see [`docs/features/tsdb-data-management.md`](docs/features/tsdb-data-management.md).
 
 ### Quick Start
 
