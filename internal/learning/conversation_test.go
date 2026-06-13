@@ -311,34 +311,44 @@ func TestEdgePropertyPreservation(t *testing.T) {
 }
 
 // TestCoactivateSessionWithMultipleObservations tests full session coactivation
-func TestCoactivateSessionWithMultipleObservations(t *testing.T) {
-	// Test the combinatorial logic for session coactivation
-	numObservations := 5
-
-	// Expected number of edges = C(n, 2) = n*(n-1)/2
-	expectedPairs := numObservations * (numObservations - 1) / 2
-
-	if expectedPairs != 10 {
-		t.Errorf("expected 10 pairs from 5 observations, got %d", expectedPairs)
-	}
-
-	// Test with different observation counts
-	testCases := []struct {
-		count    int
-		expected int
-	}{
-		{2, 1},   // C(2,2) = 1
-		{3, 3},   // C(3,2) = 3
-		{4, 6},   // C(4,2) = 6
-		{5, 10},  // C(5,2) = 10
-		{10, 45}, // C(10,2) = 45
-	}
-
-	for _, tc := range testCases {
-		pairs := tc.count * (tc.count - 1) / 2
-		if pairs != tc.expected {
-			t.Errorf("for %d observations, expected %d pairs, got %d", tc.count, tc.expected, pairs)
+// NEGFEED-001: CoactivateSession emits DELTAS, not the full C(n,2) clique.
+// Each Observe links the NEW observation to its prior session members
+// (bounded by LEARNING_SESSION_CLIQUE_WINDOW). This pins the delta-count
+// arithmetic the rewritten Cypher relies on: per-call work is the number
+// of prior members (capped by the window), not C(n,2).
+func TestCoactivateSession_DeltaPairCount(t *testing.T) {
+	deltaPairs := func(priorCount, window int) int {
+		if window > 0 && priorCount > window {
+			return window
 		}
+		return priorCount
+	}
+	cases := []struct {
+		priorCount, window, expected int
+	}{
+		{0, 50, 0},  // first observation in a session — no prior members, no edges
+		{1, 50, 1},  // 2nd obs links to the 1 prior
+		{4, 50, 4},  // 5th obs links to all 4 priors (under window)
+		{99, 50, 50}, // 100th obs in a long session — capped at the window
+		{99, 0, 99},  // window 0 = link to all priors (unbounded delta)
+	}
+	for _, tc := range cases {
+		if got := deltaPairs(tc.priorCount, tc.window); got != tc.expected {
+			t.Errorf("priorCount=%d window=%d: got %d delta pairs, want %d",
+				tc.priorCount, tc.window, got, tc.expected)
+		}
+	}
+
+	// Cumulative invariant: an UNWINDOWED session that grows to n observations
+	// still accumulates C(n,2) total edges (sum of per-call deltas
+	// 0+1+...+(n-1)), so the asymptotic graph is unchanged — only the
+	// per-Observe cost (O(n) not O(n^2)) and evidence_count semantics differ.
+	cumulative := 0
+	for i := 0; i < 5; i++ {
+		cumulative += deltaPairs(i, 0)
+	}
+	if cumulative != 5*(5-1)/2 {
+		t.Errorf("cumulative delta edges over 5 observations = %d, want C(5,2)=10", cumulative)
 	}
 }
 

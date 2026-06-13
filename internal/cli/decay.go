@@ -25,8 +25,9 @@ type edge struct {
 	TargetID      string
 	Weight        float64
 	EvidenceCount int
-	Pinned        bool
-	LastActivated time.Time
+	Pinned            bool
+	LastActivated     time.Time
+	GraduatedIncident bool // COOLER-001: an endpoint node is graduated (volatile=false)
 }
 
 // decayResult holds the result of decay calculation for a single edge
@@ -49,6 +50,7 @@ type decayConfig struct {
 
 	// Decay parameters
 	DecayRate       float64
+	GraduatedProtectionFactor float64 // COOLER-001: decay multiplier for graduated-incident edges (1.0 = off)
 	PruneThreshold  float64
 	MinEvidence     int
 	OlderThanDays   int
@@ -134,6 +136,7 @@ Protected edges (high evidence count or pinned) are never pruned.`,
 
 	// Register flags
 	cmd.Flags().Float64Var(&cfg.DecayRate, "decay-rate", 0.02, "Evidence-weighted decay rate (applied as rate/sqrt(evidence))")
+	cmd.Flags().Float64Var(&cfg.GraduatedProtectionFactor, "graduated-protection-factor", 0.5, "Decay multiplier for edges incident to a graduated node (COOLER-001; 1.0=off, 0=no decay)")
 	cmd.Flags().Float64Var(&cfg.PruneThreshold, "prune-threshold", 0.01, "Minimum weight to keep (below = prune candidate)")
 	cmd.Flags().IntVar(&cfg.MinEvidence, "min-evidence", 3, "Minimum evidence_count to protect from pruning")
 	cmd.Flags().IntVar(&cfg.OlderThanDays, "older-than", 7, "Only process edges older than N days")
@@ -291,7 +294,7 @@ func runDecayJob(ctx context.Context, driver neo4j.DriverWithContext, cfg decayC
 // processEdge calculates decay and determines pruning status for a single edge
 func processEdge(e edge, cfg decayConfig, now time.Time) decayResult {
 	// Calculate decayed weight
-	newWeight, decayPercent := calculateDecay(e, cfg.DecayRate, now)
+	newWeight, decayPercent := calculateDecay(e, cfg.DecayRate, cfg.GraduatedProtectionFactor, now)
 
 	// Clamp decay to max-decay-percent safety cap
 	if cfg.MaxDecayPercent > 0 && decayPercent > cfg.MaxDecayPercent {
@@ -320,7 +323,7 @@ const minEdgeWeight = 0.001
 // Formula: w_new = w_old * (1 - rate/sqrt(evidence))^days
 // Aligned with learning service (service.go:955). Surprise factor is omitted
 // because CLI decay operates on stored edges without session context.
-func calculateDecay(e edge, decayRate float64, now time.Time) (newWeight float64, decayPercent float64) {
+func calculateDecay(e edge, decayRate, graduatedFactor float64, now time.Time) (newWeight float64, decayPercent float64) {
 	daysSince := daysSinceActivation(e.LastActivated, now)
 
 	// Evidence-weighted decay: higher evidence = slower decay
@@ -329,6 +332,12 @@ func calculateDecay(e edge, decayRate float64, now time.Time) (newWeight float64
 		evidence = 1
 	}
 	effectiveRate := decayRate / math.Sqrt(evidence)
+	// COOLER-001: graduated-incident edges resist decay (what "graduated"
+	// means to retrieval — stable memory's associations persist). factor
+	// 1.0 = no protection (default-safe if unset), 0 = no decay.
+	if e.GraduatedIncident && graduatedFactor >= 0 && graduatedFactor < 1.0 {
+		effectiveRate *= graduatedFactor
+	}
 	decayFactor := math.Pow(1.0-effectiveRate, daysSince)
 	newWeight = e.Weight * decayFactor
 
@@ -414,6 +423,7 @@ RETURN id(r) AS edgeId,
        coalesce(r.weight, 0.0) AS weight,
        coalesce(r.evidence_count, 0) AS evidence,
        coalesce(r.pinned, false) AS pinned,
+       (coalesce(a.volatile, true) = false OR coalesce(b.volatile, true) = false) AS graduatedIncident,
        coalesce(r.last_activated_at, r.updated_at, r.created_at) AS lastActivated
 ORDER BY lastActivated ASC
 SKIP $offset
@@ -443,6 +453,7 @@ LIMIT $batchSize`
 			weight, _ := rec.Get("weight")
 			evidence, _ := rec.Get("evidence")
 			pinned, _ := rec.Get("pinned")
+			graduatedIncident, _ := rec.Get("graduatedIncident")
 			lastActivated, _ := rec.Get("lastActivated")
 
 			e := edge{
@@ -452,8 +463,9 @@ LIMIT $batchSize`
 				TargetID:      neo4jutil.AsString(targetID),
 				Weight:        neo4jutil.AsFloat64(weight),
 				EvidenceCount: neo4jutil.AsInt(evidence),
-				Pinned:        neo4jutil.AsBool(pinned),
-				LastActivated: neo4jutil.AsTime(lastActivated),
+				Pinned:            neo4jutil.AsBool(pinned),
+				GraduatedIncident: neo4jutil.AsBool(graduatedIncident),
+				LastActivated:     neo4jutil.AsTime(lastActivated),
 			}
 			edges = append(edges, e)
 		}

@@ -954,7 +954,8 @@ func TestCoactivateSession_ReinforcesStability(t *testing.T) {
 	reinforcer := &mockStabilityReinforcer{}
 	s.SetStabilityReinforcer(reinforcer)
 
-	if err := s.CoactivateSession(ctx, spaceID, sessionID); err != nil {
+	newObsNodeID := nodeIDs[len(nodeIDs)-1]
+	if err := s.CoactivateSession(ctx, spaceID, sessionID, newObsNodeID); err != nil {
 		t.Fatalf("CoactivateSession: %v", err)
 	}
 

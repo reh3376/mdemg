@@ -48,6 +48,17 @@ type SnapshotStore struct {
 	windowSec int
 	maxCap    int
 	driver    neo4j.DriverWithContext
+	// COOLER-001: graduation threshold mirrored from config so the
+	// graduate_volatile snapshot predicate matches the Context Cooler's
+	// graduation predicate exactly (RSIC-STORM-001: snapshot and executor
+	// must capture the same set or rollback drifts).
+	graduationThreshold float64
+}
+
+// SetGraduationThreshold aligns the graduate_volatile snapshot predicate
+// with the Context Cooler's config-driven threshold.
+func (ss *SnapshotStore) SetGraduationThreshold(t float64) {
+	ss.graduationThreshold = t
 }
 
 // NewSnapshotStore creates a snapshot store with the given rollback window.
@@ -224,13 +235,24 @@ func (ss *SnapshotStore) capturePreState(ctx context.Context, action, spaceID st
 				` RETURN stale.node_id AS id, stale.is_archived AS archived, stale.obs_type AS obs_type`)
 
 	case "graduate_volatile":
-		return ss.captureNodeState(ctx, spaceID,
+		// COOLER-001: match the Context Cooler's graduation predicate
+		// (volatile & NOT pinned & stability >= config threshold). The
+		// executor now delegates to ContextCooler.ProcessGraduations, so
+		// this snapshot must use the same predicate to capture exactly the
+		// set that may flip volatile=false (RSIC-STORM-001).
+		gradThresh := ss.graduationThreshold
+		if gradThresh <= 0 {
+			gradThresh = 0.8 // cooler default
+		}
+		return ss.captureNodeStateP(ctx, spaceID,
 			`MATCH (n:MemoryNode {space_id: $spaceId})
 			 WHERE n.role_type = 'conversation_observation'
-			   AND n.volatile = true
-			   AND coalesce(n.stability_score, 0.1) >= 0.7
+			   AND coalesce(n.volatile, true) = true
+			   AND NOT coalesce(n.pinned, false)
+			   AND coalesce(n.stability_score, 0.1) >= $gradThreshold
 			 RETURN n.node_id AS id, n.volatile AS volatile, n.stability_score AS stability_score
-			 LIMIT 200`)
+			 LIMIT 200`,
+			map[string]any{"gradThreshold": gradThresh})
 
 	case "refresh_stale_edges":
 		return ss.captureEdgeState(ctx, spaceID,
@@ -278,11 +300,21 @@ func (ss *SnapshotStore) captureEdgeState(ctx context.Context, spaceID, cypher s
 }
 
 func (ss *SnapshotStore) captureNodeState(ctx context.Context, spaceID, cypher string) ([]NodeEdgeState, error) {
+	return ss.captureNodeStateP(ctx, spaceID, cypher, nil)
+}
+
+// captureNodeStateP is captureNodeState with extra Cypher params (spaceId is
+// always injected; extra keys are merged in).
+func (ss *SnapshotStore) captureNodeStateP(ctx context.Context, spaceID, cypher string, extra map[string]any) ([]NodeEdgeState, error) {
 	sess := ss.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer sess.Close(ctx)
 
+	params := map[string]any{"spaceId": spaceID}
+	for k, v := range extra {
+		params[k] = v
+	}
 	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
-		res, err := tx.Run(ctx, cypher, map[string]any{"spaceId": spaceID})
+		res, err := tx.Run(ctx, cypher, params)
 		if err != nil {
 			return nil, err
 		}

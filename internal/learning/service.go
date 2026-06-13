@@ -725,8 +725,9 @@ func (s *Service) reinforceConversationObservations(ctx context.Context, spaceID
 	}
 }
 
-// CoactivateSession creates CO_ACTIVATED_WITH edges between all observations in a session.
-// Links observations together based on:
+// CoactivateSession creates CO_ACTIVATED_WITH edges between the new observation
+// (newNodeID) and the most-recent prior members of its session (NEGFEED-001
+// delta emission, bounded by LEARNING_SESSION_CLIQUE_WINDOW). Links based on:
 // - Temporal proximity (closer in time = stronger edge)
 // - Surprise scores (high surprise observations get stronger connections)
 // This enables session-based learning where related observations reinforce each other.
@@ -749,8 +750,8 @@ func (s *Service) surpriseMediumThreshold() float64 {
 	return 0.15
 }
 
-func (s *Service) CoactivateSession(ctx context.Context, spaceID, sessionID string) error {
-	if spaceID == "" || sessionID == "" {
+func (s *Service) CoactivateSession(ctx context.Context, spaceID, sessionID, newNodeID string) error {
+	if spaceID == "" || sessionID == "" || newNodeID == "" {
 		return nil
 	}
 
@@ -774,9 +775,15 @@ func (s *Service) CoactivateSession(ctx context.Context, spaceID, sessionID stri
 		wmin, wmax = 0.0, 1.0
 	}
 
+	window := s.cfg.LearningSessionCliqueWindow
+	if window < 0 {
+		window = 0
+	}
 	params := map[string]any{
 		"spaceId":      spaceID,
 		"sessionId":    sessionID,
+		"newNodeId":    newNodeID,
+		"window":       window,
 		"surpriseHigh": s.surpriseHighThreshold(),
 		"surpriseMed":  s.surpriseMediumThreshold(),
 		"eta":          eta,
@@ -795,16 +802,21 @@ func (s *Service) CoactivateSession(ctx context.Context, spaceID, sessionID stri
 		// Find all conversation_observation nodes in the session
 		// Create edges weighted by temporal proximity and surprise
 		cypher := `
-MATCH (obs:MemoryNode {space_id: $spaceId, role_type: 'conversation_observation'})
-WHERE obs.session_id = $sessionId
-WITH obs ORDER BY obs.created_at
-WITH collect(obs) AS observations
-
-// Generate pairs from observations
-UNWIND range(0, size(observations)-1) AS i
-UNWIND range(i+1, size(observations)-1) AS j
-WITH observations[i] AS a, observations[j] AS b,
-     duration.inSeconds(observations[i].created_at, observations[j].created_at).seconds AS timeDiffSec
+// NEGFEED-001: DELTA emission. Co-activate ONLY the new observation against
+// the most-recent prior session members (bounded by $window), instead of
+// regenerating the full C(n,2) session clique on every Observe. This makes
+// each call O(window) not O(n^2), and makes evidence_count count genuine
+// co-activation events for a pair rather than session length.
+MATCH (newObs:MemoryNode {space_id: $spaceId, node_id: $newNodeId})
+WHERE newObs.role_type = 'conversation_observation' AND newObs.session_id = $sessionId
+MATCH (member:MemoryNode {space_id: $spaceId, role_type: 'conversation_observation'})
+WHERE member.session_id = $sessionId AND member.node_id <> $newNodeId
+WITH newObs, member ORDER BY member.created_at DESC
+WITH newObs, collect(member) AS members
+WITH newObs, CASE WHEN $window > 0 THEN members[0..$window] ELSE members END AS members
+UNWIND members AS member
+WITH member AS a, newObs AS b,
+     abs(duration.inSeconds(member.created_at, newObs.created_at).seconds) AS timeDiffSec
 
 // Calculate temporal proximity weight (closer = higher, max 1 hour window)
 WITH a, b, timeDiffSec,

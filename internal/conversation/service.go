@@ -21,7 +21,7 @@ import (
 // LearningService defines the interface for the learning service
 // This allows dependency injection without circular imports
 type LearningService interface {
-	CoactivateSession(ctx context.Context, spaceID, sessionID string) error
+	CoactivateSession(ctx context.Context, spaceID, sessionID, newNodeID string) error
 }
 
 // ConstraintGateClassifier is a thin interface for F6a: LLM classifier gate.
@@ -484,14 +484,26 @@ func (s *Service) Observe(ctx context.Context, req ObserveRequest) (*ObserveResp
 		}
 	}
 
-	// Trigger session-based coactivation if learning service is available
-	// This creates CO_ACTIVATED_WITH edges between observations in the same session
+	// Trigger session-based coactivation if learning service is available.
+	// NEGFEED-001: run OFF the Observe request path — CoactivateSession is
+	// ~73% of Hebbian write volume and previously blocked the HTTP response
+	// with an O(n^2) session-clique write. Fire-and-forget on a detached
+	// context (request ctx is cancelled when Observe returns) with panic
+	// recovery; coactivation is a learning enhancement, never critical.
 	if s.learningService != nil && req.SessionID != "" {
-		err = s.learningService.CoactivateSession(ctx, req.SpaceID, req.SessionID)
-		if err != nil {
-			// Log but don't fail - coactivation is a learning enhancement, not critical
-			slog.Warn("failed to coactivate session", "session_id", req.SessionID, "error", err)
-		}
+		spaceID, sessionID, coNodeID := req.SpaceID, req.SessionID, nodeID
+		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					slog.Error("coactivate session panicked", "session_id", sessionID, "panic", r)
+				}
+			}()
+			bgCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+			defer cancel()
+			if cErr := s.learningService.CoactivateSession(bgCtx, spaceID, sessionID, coNodeID); cErr != nil {
+				slog.Warn("failed to coactivate session", "session_id", sessionID, "error", cErr)
+			}
+		}()
 	}
 
 	resp := &ObserveResponse{

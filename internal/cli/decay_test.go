@@ -75,7 +75,7 @@ func TestCalculateDecay(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			newWeight, _ := calculateDecay(tt.edge, tt.decayRate, time.Now())
+			newWeight, _ := calculateDecay(tt.edge, tt.decayRate, 1.0, time.Now())
 
 			if math.Abs(newWeight-tt.expectedWeight) > tt.tolerance {
 				t.Errorf("calculateDecay() = %v, want %v (tolerance %v)",
@@ -93,7 +93,7 @@ func TestCalculateDecayPercent(t *testing.T) {
 		LastActivated: time.Now().Add(-10 * 24 * time.Hour),
 	}
 
-	_, decayPercent := calculateDecay(e, 0.1, time.Now())
+	_, decayPercent := calculateDecay(e, 0.1, 1.0, time.Now())
 
 	// New formula: (1 - 0.1/sqrt(1))^10 = (0.9)^10 ≈ 0.3487
 	// Decay percent ≈ 65.13%
@@ -386,5 +386,28 @@ func TestExpDecayFormula(t *testing.T) {
 
 	if math.Abs(decayFactor-expected) > 1e-10 {
 		t.Errorf("exp(-0.1 * 10) = %v, want %v", decayFactor, expected)
+	}
+}
+
+// COOLER-001: an edge incident to a graduated node decays slower than an
+// otherwise-identical volatile-incident edge. This is what "graduated" means
+// to retrieval — stable memory's associations resist time decay.
+func TestCalculateDecay_GraduatedProtection(t *testing.T) {
+	base := edge{Weight: 1.0, EvidenceCount: 1, LastActivated: time.Now().Add(-30 * 24 * time.Hour)}
+	grad := base
+	grad.GraduatedIncident = true
+
+	now := time.Now()
+	volatileWeight, _ := calculateDecay(base, 0.05, 0.5, now) // factor irrelevant (not graduated)
+	gradWeight, _ := calculateDecay(grad, 0.05, 0.5, now)     // half decay rate
+
+	if !(gradWeight > volatileWeight) {
+		t.Errorf("graduated-incident edge should retain MORE weight: graduated=%.4f volatile=%.4f", gradWeight, volatileWeight)
+	}
+	// factor 1.0 = no protection: identical decay
+	gradNoProtect, _ := calculateDecay(grad, 0.05, 1.0, now)
+	volNoProtect, _ := calculateDecay(base, 0.05, 1.0, now)
+	if math.Abs(gradNoProtect-volNoProtect) > 1e-9 {
+		t.Errorf("factor 1.0 must disable protection: graduated=%.6f volatile=%.6f", gradNoProtect, volNoProtect)
 	}
 }

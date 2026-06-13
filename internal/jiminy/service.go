@@ -51,6 +51,7 @@ type Service struct {
 	protocolMetrics          *ProtocolMetricsCollector     // J17-4: protocol metrics for RSIC
 	extensions               *ExtensionRegistry            // J17-5: per-session protocol extensions
 	signalLearner            SignalLearnerProvider         // RSIC-SK1: Hebbian signal learner for guidance
+	negFeedback              NegativeFeedbackApplier       // NEGFEED-001: anti-Hebbian weaken on contradicted guidance
 	tierPredictor            *TierPredictor                // Gap 6: ML tier prediction
 	nliScorer                *NLIComprehensionScorer       // Gap 6: NLI comprehension scoring
 	arbitrator               *SidecarArbitrator            // NS-01: sidecar mode arbitration
@@ -334,6 +335,13 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext, consultant Co
 // SetSignalLearner sets the Hebbian signal learner for guidance emission/response tracking (RSIC-SK1).
 func (s *Service) SetSignalLearner(sl SignalLearnerProvider) {
 	s.signalLearner = sl
+}
+
+// SetNegativeFeedbackApplier wires the anti-Hebbian weaken path (NEGFEED-001
+// Bridge A). When set and JIMINY_CONTRADICTED_WEAKEN_ENABLED is true, a
+// contradicted guidance outcome weakens co-activations among its source nodes.
+func (s *Service) SetNegativeFeedbackApplier(n NegativeFeedbackApplier) {
+	s.negFeedback = n
 }
 
 // StartTrustPersistence begins the background trust flush loop.
@@ -1539,6 +1547,22 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 				if err := s.confidenceUpdater.UpdateConfidence(ctx, item.SourceNodes[0], outcome); err != nil {
 					slog.Error("jiminy: confidence update failed", "error", err)
 				}
+			}
+		}
+
+		// NEGFEED-001 Bridge A: a contradicted guidance is the substrate's
+		// only automated anti-Hebbian producer. Weaken the co-activations
+		// AMONG the contradicted guidance's source nodes (query==rejected;
+		// ApplyNegativeFeedback's q<>r guard skips self-pairs, so single-source
+		// guidance is a safe no-op and unrelated memory is never touched).
+		if outcome == OutcomeContradicted && s.negFeedback != nil &&
+			s.cfg.JiminyContradictedWeakenEnabled && len(item.SourceNodes) > 1 {
+			if weakened, contradicted, err := s.negFeedback.ApplyNegativeFeedback(
+				ctx, req.SpaceID, item.SourceNodes, item.SourceNodes); err != nil {
+				slog.Warn("jiminy: contradicted weaken failed", "guidance_id", req.GuidanceID, "error", err)
+			} else if weakened > 0 || contradicted > 0 {
+				slog.Info("jiminy: contradicted guidance weakened source co-activations",
+					"guidance_id", req.GuidanceID, "weakened", weakened, "contradicted", contradicted)
 			}
 		}
 		// Record constraint outcome to TSDB for dynamic Grafana effectiveness queries.

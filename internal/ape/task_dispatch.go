@@ -26,6 +26,11 @@ type Dispatcher struct {
 	guidanceCalibrator GuidanceCalibrationProvider // RSIC-SK1: guidance self-calibration
 	freshnessProvider  FreshnessProvider           // Phase 47.2: ingest staleness provider
 
+	// COOLER-001: unifies graduation onto the config-driven Context Cooler
+	// (executeGraduateVolatile delegates here instead of a hardcoded 0.7
+	// Cypher with no pinned-guard / no graduated_at).
+	graduationProcessor GraduationProcessor
+
 	// Phase 88: Safety enforcement
 	safetyValidator *SafetyValidator
 	snapshotStore   *SnapshotStore
@@ -84,6 +89,17 @@ func NewDispatcher(driver neo4j.DriverWithContext, learner LearningStatsProvider
 		driver:      driver,
 		sem:         make(chan struct{}, 50), // DD-P2-16: bound concurrent goroutines
 	}
+}
+
+// GraduationProcessor unifies volatile→stable graduation onto the
+// config-driven Context Cooler (COOLER-001). Returns the count graduated.
+type GraduationProcessor interface {
+	ProcessGraduations(ctx context.Context, spaceID string) (graduated int, err error)
+}
+
+// SetGraduationProcessor wires the Context Cooler graduation path.
+func (d *Dispatcher) SetGraduationProcessor(g GraduationProcessor) {
+	d.graduationProcessor = g
 }
 
 // SetSafetyValidator attaches a safety validator to the dispatcher.
@@ -440,37 +456,19 @@ func (d *Dispatcher) executeConsolidation(ctx context.Context, spaceID string) (
 }
 
 func (d *Dispatcher) executeGraduateVolatile(ctx context.Context, spaceID string) (map[string]any, error) {
-	if d.driver == nil {
-		return nil, fmt.Errorf("neo4j driver not available")
+	// COOLER-001: delegate to the config-driven Context Cooler instead of a
+	// hardcoded-0.7 Cypher. The cooler applies the COOLER_GRADUATION_THRESHOLD
+	// (default 0.8), the pinned-guard, and sets graduated_at — none of which
+	// the old inline statement did. Unifies the two divergent graduation
+	// paths onto one implementation.
+	if d.graduationProcessor == nil {
+		return nil, fmt.Errorf("graduation processor not wired")
 	}
-	// Graduate volatile observations via Neo4j directly
-	sess := d.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
-	defer sess.Close(ctx)
-
-	result, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
-		cypher := `
-			MATCH (n:MemoryNode {space_id: $spaceId})
-			WHERE n.role_type = 'conversation_observation'
-			  AND n.volatile = true
-			  AND coalesce(n.stability_score, 0.1) >= 0.7
-			SET n.volatile = false
-			RETURN count(n) AS graduated
-		`
-		res, err := tx.Run(ctx, cypher, map[string]any{"spaceId": spaceID})
-		if err != nil {
-			return nil, err
-		}
-		if res.Next(ctx) {
-			if v, ok := res.Record().Get("graduated"); ok {
-				return v, nil
-			}
-		}
-		return int64(0), res.Err()
-	})
+	graduated, err := d.graduationProcessor.ProcessGraduations(ctx, spaceID)
 	if err != nil {
 		return nil, err
 	}
-	return map[string]any{"graduated": result}, nil
+	return map[string]any{"graduated": graduated}, nil
 }
 
 // tombstoneStaleCandidates is the SINGLE source for which observations

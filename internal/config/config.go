@@ -42,6 +42,10 @@ type Config struct {
 	LearningDecayPerDay       float64 // Time-based decay per day of inactivity
 	LearningPruneThreshold    float64 // Weight threshold below which edges are pruned
 	LearningMaxEdgesPerNode   int     // Max CO_ACTIVATED_WITH edges per node
+	// NEGFEED-001 — max prior session members the NEW observation
+	// co-activates with per Observe (delta emission). 0 = all prior
+	// members. Bounds the formerly-unbounded O(n^2) full-clique regen.
+	LearningSessionCliqueWindow int // LEARNING_SESSION_CLIQUE_WINDOW (default 50)
 
 	// Top-level LLM settings (cascade to all features)
 	LLMProvider string // LLM_PROVIDER — top-level text-gen provider (default: "openai")
@@ -275,6 +279,10 @@ type Config struct {
 
 	// Jiminy Guidance settings (Phase Jiminy)
 	JiminyEnabled       bool    // JIMINY_ENABLED — enable Jiminy inner voice guidance (default: true)
+	// NEGFEED-001 — on a contradicted guidance outcome, weaken co-activations
+	// among the guidance's source nodes (anti-Hebbian). Safe (q<>r guard,
+	// weight floors at 0, single-source = no-op). Default true.
+	JiminyContradictedWeakenEnabled bool // JIMINY_CONTRADICTED_WEAKEN_ENABLED
 	JiminyTimeoutMs            int     // JIMINY_TIMEOUT_MS — direct Guide() budget; 0 = derive from JIMINY_WARM_COMPUTE_TIMEOUT_MS (default: 0; the old independent 15s starved fresh installs)
 	JiminyMaxItems      int     // JIMINY_MAX_ITEMS — max guidance items returned (default: 10)
 	JiminyMinConfidence float64 // JIMINY_MIN_CONFIDENCE — minimum confidence to include item (default: 0.3)
@@ -717,6 +725,11 @@ type Config struct {
 	ConstraintDetectionEnabled bool    // CONSTRAINT_DETECTION_ENABLED — enable constraint detection in observations (default: true)
 	ConstraintMinConfidence    float64 // CONSTRAINT_MIN_CONFIDENCE — minimum confidence to tag as constraint (default: 0.6)
 	ConstraintProtectFromDecay bool    // CONSTRAINT_PROTECT_FROM_DECAY — protect constraint-tagged obs from tombstoning (default: true)
+	// COOLER-001 — decay-rate multiplier for CO_ACTIVATED_WITH edges incident
+	// to a GRADUATED (volatile=false) node: this is what "graduated" means to
+	// retrieval — stable memory's associations resist time decay. 1.0 = no
+	// protection, 0 = no decay, 0.5 = half rate (default).
+	GraduatedDecayProtectionFactor float64 // GRADUATED_DECAY_PROTECTION_FACTOR
 
 	// Web Scraper Module (Phase 51)
 	ScraperEnabled            bool   // SCRAPER_ENABLED — enable web scraper module (default: false)
@@ -1418,6 +1431,10 @@ func FromEnv() (Config, error) {
 	learnMaxEdgesPerNode, err := strconv.Atoi(learnMaxEdgesPerNodeStr)
 	if err != nil {
 		return Config{}, fmt.Errorf("LEARNING_MAX_EDGES_PER_NODE must be int: %w", err)
+	}
+	learnSessionCliqueWindow, err := atoi("LEARNING_SESSION_CLIQUE_WINDOW", 50)
+	if err != nil {
+		return Config{}, err
 	}
 
 	allowed := get("ALLOWED_RELATIONSHIP_TYPES", "ASSOCIATED_WITH,TEMPORALLY_ADJACENT,CO_ACTIVATED_WITH,CAUSES,ENABLES,ABSTRACTS_TO,INSTANTIATES,GENERALIZES,IMPORTS,CALLS,EXTENDS,IMPLEMENTS,ANALOGOUS_TO,BRIDGES,COMPOSES_WITH,INFLUENCES,CONTRASTS_WITH,SPECIALIZES,GENERALIZES_TO,THEME_OF,DEFINES_SYMBOL,ORIGINATED_FROM,GROUNDED_BY,CONTRADICTS")
@@ -2300,6 +2317,7 @@ func FromEnv() (Config, error) {
 
 	// Jiminy Guidance settings (Phase Jiminy)
 	jiminyEnabled := getBool("JIMINY_ENABLED", true)
+	jiminyContradictedWeakenEnabled := getBool("JIMINY_CONTRADICTED_WEAKEN_ENABLED", true)
 	jiminyTimeoutMs, err := atoi("JIMINY_TIMEOUT_MS", 0)
 	if err != nil {
 		return Config{}, err
@@ -3268,6 +3286,10 @@ func FromEnv() (Config, error) {
 		return Config{}, err
 	}
 	constraintProtectFromDecay := getBool("CONSTRAINT_PROTECT_FROM_DECAY", true)
+	graduatedDecayProtectionFactor, err := atof("GRADUATED_DECAY_PROTECTION_FACTOR", 0.5)
+	if err != nil {
+		return Config{}, err
+	}
 
 	// Web Scraper Module (Phase 51)
 	scraperEnabled := getBool("SCRAPER_ENABLED", false)
@@ -4320,6 +4342,7 @@ func FromEnv() (Config, error) {
 		LearningDecayPerDay:            learnDecayPerDay,
 		LearningPruneThreshold:         learnPruneThreshold,
 		LearningMaxEdgesPerNode:        learnMaxEdgesPerNode,
+		LearningSessionCliqueWindow:    learnSessionCliqueWindow,
 		LLMProvider:                    llmProvider,
 		LLMModel:                       llmModel,
 		EmbeddingProvider:              embProvider,
@@ -4505,6 +4528,7 @@ func FromEnv() (Config, error) {
 
 		// Phase Jiminy: Jiminy Guidance
 		JiminyEnabled:                    jiminyEnabled,
+		JiminyContradictedWeakenEnabled:  jiminyContradictedWeakenEnabled,
 		JiminyTimeoutMs:                  jiminyTimeoutMs,
 		JiminyMaxItems:                   jiminyMaxItems,
 		JiminyMinConfidence:              jiminyMinConfidence,
@@ -4823,6 +4847,7 @@ func FromEnv() (Config, error) {
 		ConstraintDetectionEnabled: constraintDetectionEnabled,
 		ConstraintMinConfidence:    constraintMinConfidence,
 		ConstraintProtectFromDecay: constraintProtectFromDecay,
+		GraduatedDecayProtectionFactor: graduatedDecayProtectionFactor,
 
 		ConsolidateOnWatchdogEnabled: consolidateOnWatchdog,
 
