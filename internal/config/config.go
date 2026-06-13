@@ -529,6 +529,12 @@ type Config struct {
 	RSICLLMReflectModel     string // RSIC_LLM_REFLECT_MODEL — model for reflection (default: from EMERGENCE_MODEL)
 	RSICLLMReflectCompress  bool   // RSIC_LLM_REFLECT_COMPRESS — compress RSIC reflection prompts (default: true)
 	RSICLLMReflectTimeoutMs int    // RSIC_LLM_REFLECT_TIMEOUT_MS — timeout for reflection LLM call in ms (default: 15000, min 5000)
+	// APE-PROMPT-BUDGET-001: bound the ape.reflect prompt so output never starves
+	// the llama-server per-slot KV budget (live-measured 7489-tok prompts left only
+	// ~700 tok for output → ~87% truncated invalid JSON on the largest training target).
+	RSICLLMReflectPromptBudgetTokens int  // RSIC_LLM_REFLECT_PROMPT_BUDGET_TOKENS — max assembled user-prompt tokens; 0 disables the guard (default: 3500, range 0 or [1000,7000])
+	RSICLLMReflectHistoryCycles      int  // RSIC_LLM_REFLECT_HISTORY_CYCLES — recent cycles included in the prompt (default: 3, range [0,10])
+	RSICLLMReflectIncludeDatasets    bool // RSIC_LLM_REFLECT_INCLUDE_DATASETS — include verbose TSDB dataset fields in the prompt (default: false)
 
 	// Phase 11.6.x: per-space concurrency cap on RSIC LLM-bound stages (Reflect)
 	// to prevent unbounded fan-out from saturating the local mlx server and
@@ -2828,6 +2834,23 @@ func FromEnv() (Config, error) {
 		return Config{}, fmt.Errorf("RSIC_LLM_REFLECT_TIMEOUT_MS must be >= 5000")
 	}
 
+	// APE-PROMPT-BUDGET-001: prompt-budget + history-cap controls.
+	rsicLLMReflectPromptBudgetTokens, err := atoi("RSIC_LLM_REFLECT_PROMPT_BUDGET_TOKENS", 3500)
+	if err != nil {
+		return Config{}, err
+	}
+	if rsicLLMReflectPromptBudgetTokens != 0 && (rsicLLMReflectPromptBudgetTokens < 1000 || rsicLLMReflectPromptBudgetTokens > 7000) {
+		return Config{}, fmt.Errorf("RSIC_LLM_REFLECT_PROMPT_BUDGET_TOKENS must be 0 (disabled) or in range [1000, 7000]")
+	}
+	rsicLLMReflectHistoryCycles, err := atoi("RSIC_LLM_REFLECT_HISTORY_CYCLES", 3)
+	if err != nil {
+		return Config{}, err
+	}
+	if rsicLLMReflectHistoryCycles < 0 || rsicLLMReflectHistoryCycles > 10 {
+		return Config{}, fmt.Errorf("RSIC_LLM_REFLECT_HISTORY_CYCLES must be in range [0, 10]")
+	}
+	rsicLLMReflectIncludeDatasets := getBool("RSIC_LLM_REFLECT_INCLUDE_DATASETS", false)
+
 	rsicLLMConcurrencyLimit, err := atoi("RSIC_LLM_CONCURRENCY_LIMIT", 2)
 	if err != nil {
 		return Config{}, err
@@ -4754,6 +4777,10 @@ func FromEnv() (Config, error) {
 		RSICLLMReflectModel:     rsicLLMReflectModel,
 		RSICLLMReflectCompress:  rsicLLMReflectCompress,
 		RSICLLMReflectTimeoutMs: rsicLLMReflectTimeoutMs,
+
+		RSICLLMReflectPromptBudgetTokens: rsicLLMReflectPromptBudgetTokens,
+		RSICLLMReflectHistoryCycles:      rsicLLMReflectHistoryCycles,
+		RSICLLMReflectIncludeDatasets:    rsicLLMReflectIncludeDatasets,
 		RSICLLMConcurrencyLimit: rsicLLMConcurrencyLimit,
 		ConflictTrackerEnabled:  conflictTrackerEnabled,
 
