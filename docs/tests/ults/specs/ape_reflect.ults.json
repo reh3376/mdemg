@@ -14,7 +14,7 @@
   "sampling_group": "T",
   "prompt": {
     "system_prompt_hash": "39b2bc11c799a5de6eb2dcb9c6fb29dec424de5a6bf865b353047320e0e1957c",
-    "system_prompt_source": "internal/ape/llm_reflector.go:74 (rendered with AllowedLLMActions enum) [EVAL-INTEGRITY-001: dynamic \u2014 enum-templated, match by task_name not hash]",
+    "system_prompt_source": "internal/ape/llm_reflector.go:74 (rendered with AllowedLLMActions enum)",
     "think_mode": true,
     "dynamic_prompt": true
   },
