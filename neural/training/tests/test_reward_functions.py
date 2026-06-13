@@ -178,6 +178,8 @@ class TestEvaluationAccuracy:
 
 
 class TestCoherenceScore:
+    # REWARD-CORRECTNESS-001: length-neutral. A coherent answer scores high
+    # regardless of length; only empty or pure-repetition scores low.
     def test_good_text(self):
         text = "The module handles authentication. It validates tokens and manages sessions."
         score = coherence_score(text)
@@ -186,18 +188,40 @@ class TestCoherenceScore:
     def test_empty(self):
         assert coherence_score("") == 0.0
 
-    def test_single_word(self):
-        score = coherence_score("yes")
-        assert 0.0 < score <= 0.7
+    def test_single_word_is_coherent(self):
+        # A correct terse answer is NOT penalized for brevity (was capped ≤0.7).
+        assert coherence_score("yes") >= 0.8
+
+    def test_terse_not_below_verbose(self):
+        terse = "Validate the token before use."
+        verbose = " ".join(["The system validates each token carefully and thoroughly."] * 8)
+        assert coherence_score(terse) >= coherence_score(verbose)
+
+    def test_pure_repetition_penalized(self):
+        assert coherence_score(" ".join(["spam"] * 30)) < 0.5
 
 
 class TestCoverageScore:
-    def test_detailed(self):
-        text = " ".join(["word"] * 60)
-        assert coverage_score(text) > 0.7
+    # REWARD-CORRECTNESS-001: substantiveness, length-neutral. Verbosity is
+    # not rewarded upward; a substantive concise answer floors near the top.
+    def test_substantive_concise_scores_high(self):
+        # A correct ~10-word answer must clear the 0.8 distill gate.
+        text = "Validate the auth token, then refresh the session if expired."
+        assert coverage_score(text) >= 0.8
+
+    def test_verbosity_not_rewarded_above_concise(self):
+        concise = "Validate the auth token before refreshing the session."
+        verbose = " ".join(
+            ["The auth token must be validated before the session is refreshed."] * 10
+        )
+        assert coverage_score(verbose) <= coverage_score(concise)
 
     def test_minimal(self):
+        # Genuinely content-free (1 word) stays low.
         assert coverage_score("ok") < 0.5
+
+    def test_pure_repetition_penalized(self):
+        assert coverage_score(" ".join(["word"] * 60)) < 0.5
 
     def test_empty(self):
         assert coverage_score("") == 0.0
@@ -228,20 +252,28 @@ class TestActionabilityScore:
 
 
 class TestInsightCount:
-    def test_bulleted(self):
-        text = "- Point one\n- Point two\n- Point three\n- Point four\n- Point five"
-        assert insight_count(text) == 1.0
+    # REWARD-CORRECTNESS-001: do NOT reward insight COUNT upward — one genuine
+    # insight is a complete correct answer; more is not "better" for inclusion.
+    def test_single_insight_scores_high(self):
+        assert insight_count("The retry logic must back off exponentially.") >= 0.8
 
-    def test_few_points(self):
-        text = "- First\n- Second"
-        score = insight_count(text)
-        assert 0.3 < score < 1.0
+    def test_count_not_rewarded_upward(self):
+        one = "- Only point"
+        five = "- One\n- Two\n- Three\n- Four\n- Five"
+        assert insight_count(one) == insight_count(five)
+
+    def test_empty_low(self):
+        assert insight_count("") < 0.5
 
 
 class TestExplanationQuality:
+    # REWARD-CORRECTNESS-001: length-neutral; concise correct explanation scores high.
     def test_good_explanation(self):
         resp = '{"explanation": "The developer followed backup procedures correctly before migration."}'
         assert explanation_quality(resp) > 0.5
+
+    def test_concise_explanation_scores_high(self):
+        assert explanation_quality('{"explanation": "Backup ran before migration."}') >= 0.8
 
     def test_no_explanation(self):
         assert explanation_quality('{"verdict": "ok"}') == 0.0
