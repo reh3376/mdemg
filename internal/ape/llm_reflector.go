@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 	"unicode"
@@ -28,6 +29,11 @@ type LLMReflectorConfig struct {
 	OpenAIURL       string
 	OllamaURL       string
 	CompressPrompts bool // J17-PC: compress reflection prompts to reduce tokens
+	// APE-PROMPT-BUDGET-001: bound the assembled user prompt so output never
+	// starves the llama-server per-slot KV budget.
+	PromptBudgetTokens int  // max assembled user-prompt tokens; 0 disables the guard
+	HistoryCycles      int  // recent cycles included in the prompt (default applied if <=0)
+	IncludeDatasets    bool // include verbose TSDB dataset fields in the prompt
 }
 
 // LLMReflector sends assessment data and cycle history to an LLM for pattern detection.
@@ -196,63 +202,133 @@ func sanitizeLLMInput(s string, maxLen int) string {
 	return s
 }
 
+// estimateTokens approximates the llama-server token count of s. Calibrated to
+// the measured ape.reflect ratio (~2.3 chars/token for dense health-report JSON
+// + markdown; live rows: 17456 chars → 7489 tokens). Slightly conservative so
+// the budget guard stays under the per-slot KV ceiling rather than over it.
+func estimateTokens(s string) int {
+	return len(s) * 10 / 23
+}
+
 func (lr *LLMReflector) buildUserPrompt(report *SelfAssessmentReport) string {
-	var sb strings.Builder
 	compress := lr.cfg.CompressPrompts
 
 	// Sanitize report string fields before serialization
 	sanitized := *report
 	sanitized.SpaceID = sanitizeLLMInput(sanitized.SpaceID, 100)
 
+	// APE-PROMPT-BUDGET-001: gate the verbose TSDB dataset fields. They dominate
+	// the Current Assessment (~3895 of 7489 prompt tokens live) but are rarely
+	// referenced by real pattern-detection; excluded by default, opt-in via
+	// RSIC_LLM_REFLECT_INCLUDE_DATASETS. The scalar health/edge/orphan metrics
+	// the detectors actually use are always kept.
+	if !lr.cfg.IncludeDatasets {
+		sanitized.LLMPerformance = nil
+		sanitized.RetrievalDataset = nil
+		sanitized.EmbeddingDataset = nil
+		sanitized.TrainingReadiness = nil
+	}
+
 	// Current assessment — compact JSON saves ~40% tokens vs indented
-	sb.WriteString("## Current Assessment\n")
+	var ab strings.Builder
+	ab.WriteString("## Current Assessment\n")
 	if compress {
-		sb.WriteString(encoding.CompactJSON(&sanitized))
+		ab.WriteString(encoding.CompactJSON(&sanitized))
 	} else {
 		reportJSON, _ := json.MarshalIndent(&sanitized, "", "  ")
-		sb.Write(reportJSON)
+		ab.Write(reportJSON)
 	}
-	sb.WriteString("\n\n")
+	assessmentSection := ab.String()
 
-	// Recent cycle history (last 5)
+	// Recent cycle history (most-recent-first; count is config-bounded).
+	historyCycles := lr.cfg.HistoryCycles
+	if historyCycles <= 0 {
+		historyCycles = 5 // back-compat default for direct constructors
+	}
+	var historyBlocks []string
+	var calibrationSection string
 	if lr.calibrator != nil {
-		history := lr.calibrator.GetHistory(5)
-		if len(history) > 0 {
-			sb.WriteString("## Recent Cycle History\n")
-			for i, h := range history {
-				cycleID := sanitizeLLMInput(h.CycleID, 200)
-				fmt.Fprintf(&sb, "### Cycle %d: %s (tier=%s)\n", i+1, cycleID, h.Tier)
-				fmt.Fprintf(&sb, "- Actions: %d executed, %d success, %d failed\n", h.ActionsExecuted, h.SuccessCount, h.FailedCount)
-				fmt.Fprintf(&sb, "- Criteria met: %v\n", h.CriteriaMet)
-				if len(h.MetricsBefore) > 0 {
-					fmt.Fprintf(&sb, "- Metrics before: %v\n", h.MetricsBefore)
-				}
-				if len(h.MetricsAfter) > 0 {
-					fmt.Fprintf(&sb, "- Metrics after: %v\n", h.MetricsAfter)
-				}
-				if len(h.CriteriaDetail) > 0 {
-					detail := sanitizeLLMInput(fmt.Sprintf("%v", h.CriteriaDetail), 500)
-					if compress {
-						detail = encoding.TruncateAtWord(detail, 200)
-					}
-					fmt.Fprintf(&sb, "- Criteria detail: %s\n", detail)
-				}
-				sb.WriteString("\n")
+		history := lr.calibrator.GetHistory(historyCycles)
+		for i, h := range history {
+			var hb strings.Builder
+			cycleID := sanitizeLLMInput(h.CycleID, 200)
+			fmt.Fprintf(&hb, "### Cycle %d: %s (tier=%s)\n", i+1, cycleID, h.Tier)
+			fmt.Fprintf(&hb, "- Actions: %d executed, %d success, %d failed\n", h.ActionsExecuted, h.SuccessCount, h.FailedCount)
+			fmt.Fprintf(&hb, "- Criteria met: %v\n", h.CriteriaMet)
+			if len(h.MetricsBefore) > 0 {
+				fmt.Fprintf(&hb, "- Metrics before: %v\n", h.MetricsBefore)
 			}
+			if len(h.MetricsAfter) > 0 {
+				fmt.Fprintf(&hb, "- Metrics after: %v\n", h.MetricsAfter)
+			}
+			if len(h.CriteriaDetail) > 0 {
+				detail := sanitizeLLMInput(fmt.Sprintf("%v", h.CriteriaDetail), 500)
+				if compress {
+					detail = encoding.TruncateAtWord(detail, 200)
+				}
+				fmt.Fprintf(&hb, "- Criteria detail: %s\n", detail)
+			}
+			hb.WriteString("\n")
+			historyBlocks = append(historyBlocks, hb.String())
 		}
 
 		// Calibration confidence per action type
 		calibration := lr.calibrator.GetCalibration()
 		if len(calibration) > 0 {
-			sb.WriteString("## Calibration Confidence (action → success rate)\n")
+			var cb strings.Builder
+			cb.WriteString("## Calibration Confidence (action → success rate)\n")
 			for action, conf := range calibration {
 				action = sanitizeLLMInput(action, 100)
-				fmt.Fprintf(&sb, "- %s: %.2f\n", action, conf)
+				fmt.Fprintf(&cb, "- %s: %.2f\n", action, conf)
 			}
+			calibrationSection = cb.String()
 		}
 	}
 
-	return sb.String()
+	assemble := func(hblocks []string) string {
+		var sb strings.Builder
+		sb.WriteString(assessmentSection)
+		sb.WriteString("\n\n")
+		if len(hblocks) > 0 {
+			sb.WriteString("## Recent Cycle History\n")
+			for _, b := range hblocks {
+				sb.WriteString(b)
+			}
+		}
+		sb.WriteString(calibrationSection)
+		return sb.String()
+	}
+
+	out := assemble(historyBlocks)
+
+	// APE-PROMPT-BUDGET-001 budget guard: if the assembled prompt would starve
+	// output of the per-slot KV budget, drop history oldest-first, then truncate
+	// the assessment tail as a last resort. Never silent — log what was dropped.
+	budget := lr.cfg.PromptBudgetTokens
+	if budget > 0 && estimateTokens(out) > budget {
+		droppedCycles := 0
+		for len(historyBlocks) > 0 && estimateTokens(out) > budget {
+			historyBlocks = historyBlocks[:len(historyBlocks)-1] // drop oldest (tail)
+			droppedCycles++
+			out = assemble(historyBlocks)
+		}
+		truncatedAssessment := false
+		if estimateTokens(out) > budget {
+			const marker = "\n…[truncated to prompt budget]"
+			maxChars := budget*23/10 - len(marker) // reserve room for the marker
+			if maxChars > 0 && len(out) > maxChars {
+				out = out[:maxChars] + marker
+				truncatedAssessment = true
+			}
+		}
+		slog.Warn("ape.reflect prompt exceeded budget; trimmed to protect output headroom",
+			"budget_tokens", budget,
+			"dropped_history_cycles", droppedCycles,
+			"truncated_assessment", truncatedAssessment,
+			"final_est_tokens", estimateTokens(out))
+	}
+
+	return out
 }
 
 // ollamaReflectSchema is the JSON schema for grammar-constrained output (Ollama v0.5+).

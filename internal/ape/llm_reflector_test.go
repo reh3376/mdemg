@@ -2,9 +2,115 @@ package ape
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
+
+	"mdemg/internal/tsdb"
 )
+
+// --- APE-PROMPT-BUDGET-001 ---
+
+func bigDatasetReport() *SelfAssessmentReport {
+	r := &SelfAssessmentReport{SpaceID: "mdemg-dev", RetrievalQuality: 0.7, MemoryHealth: 1}
+	for i := 0; i < 17; i++ {
+		r.LLMPerformance = append(r.LLMPerformance, tsdb.LLMPerformanceSummary{
+			TaskName:   fmt.Sprintf("task.number.%d.with.a.reasonably.long.identifier", i),
+			TotalCalls: 1234, ErrorRate: 0.0123, LatencyP50: 17.5, LatencyP95: 88.8,
+			AvgTokensIn: 5800.5, AvgTokensOut: 540.25, DistinctModels: 2,
+		})
+	}
+	return r
+}
+
+func seedCalibrator(n int) *Calibrator {
+	cal := NewCalibrator(nil, 1000)
+	for i := 0; i < n; i++ {
+		cal.cycleHistory = append(cal.cycleHistory, CycleOutcome{
+			CycleID: fmt.Sprintf("cycle-%d-with-a-fairly-verbose-identifier-string", i),
+			Tier:    TierMicro, ActionsExecuted: 7, SuccessCount: 5, FailedCount: 2,
+			MetricsBefore: map[string]float64{"orphan_ratio": 0.067, "edge_health": 0.9, "task_perf": 0.95},
+			MetricsAfter:  map[string]float64{"orphan_ratio": 0.066, "edge_health": 0.91, "task_perf": 0.95},
+			CriteriaDetail: map[string]string{
+				"detail": strings.Repeat("some verbose criteria explanation text ", 12),
+			},
+		})
+	}
+	return cal
+}
+
+func TestEstimateTokens_Monotonic(t *testing.T) {
+	if estimateTokens("") != 0 {
+		t.Error("empty string should estimate 0 tokens")
+	}
+	if estimateTokens(strings.Repeat("a", 230)) != 100 {
+		t.Errorf("230 chars should estimate ~100 tokens, got %d", estimateTokens(strings.Repeat("a", 230)))
+	}
+	if estimateTokens("short") >= estimateTokens("a much longer string of words") {
+		t.Error("estimate should grow with length")
+	}
+}
+
+func TestBuildUserPrompt_GatesDatasets(t *testing.T) {
+	// Default (IncludeDatasets=false): verbose TSDB dataset fields omitted.
+	lr := &LLMReflector{cfg: LLMReflectorConfig{CompressPrompts: true}}
+	if got := lr.buildUserPrompt(bigDatasetReport()); strings.Contains(got, "llm_performance") {
+		t.Error("datasets should be gated OUT by default")
+	}
+	// Opt-in: present.
+	lrIn := &LLMReflector{cfg: LLMReflectorConfig{CompressPrompts: true, IncludeDatasets: true}}
+	if got := lrIn.buildUserPrompt(bigDatasetReport()); !strings.Contains(got, "llm_performance") {
+		t.Error("datasets should be INCLUDED when IncludeDatasets=true")
+	}
+}
+
+func TestBuildUserPrompt_HistoryCycleCap(t *testing.T) {
+	lr := &LLMReflector{
+		cfg:        LLMReflectorConfig{CompressPrompts: true, HistoryCycles: 2, PromptBudgetTokens: 0},
+		calibrator: seedCalibrator(8),
+	}
+	got := lr.buildUserPrompt(&SelfAssessmentReport{SpaceID: "mdemg-dev"})
+	if n := strings.Count(got, "### Cycle "); n != 2 {
+		t.Errorf("expected 2 history cycles (capped), got %d", n)
+	}
+}
+
+func TestBuildUserPrompt_BudgetGuard_DropsHistory(t *testing.T) {
+	budget := 1200
+	lr := &LLMReflector{
+		cfg:        LLMReflectorConfig{CompressPrompts: true, HistoryCycles: 10, PromptBudgetTokens: budget},
+		calibrator: seedCalibrator(10),
+	}
+	got := lr.buildUserPrompt(&SelfAssessmentReport{SpaceID: "mdemg-dev", RetrievalQuality: 0.7})
+	if est := estimateTokens(got); est > budget {
+		t.Errorf("budget guard failed: est=%d > budget=%d", est, budget)
+	}
+	// Some history must have been dropped (10 verbose cycles can't fit 1200 tok).
+	if n := strings.Count(got, "### Cycle "); n >= 10 {
+		t.Errorf("expected history dropped under budget, still have %d cycles", n)
+	}
+}
+
+func TestBuildUserPrompt_BudgetGuard_TruncatesAssessment(t *testing.T) {
+	budget := 1000
+	// Datasets ON + tiny budget + no history → only the assessment can be trimmed.
+	lr := &LLMReflector{cfg: LLMReflectorConfig{CompressPrompts: true, IncludeDatasets: true, PromptBudgetTokens: budget}}
+	got := lr.buildUserPrompt(bigDatasetReport())
+	if est := estimateTokens(got); est > budget {
+		t.Errorf("assessment not trimmed to budget: est=%d > budget=%d", est, budget)
+	}
+	if !strings.Contains(got, "truncated to prompt budget") {
+		t.Error("expected the loud truncation marker when assessment is trimmed")
+	}
+}
+
+func TestBuildUserPrompt_UnderBudget_Unchanged(t *testing.T) {
+	lr := &LLMReflector{cfg: LLMReflectorConfig{CompressPrompts: true, PromptBudgetTokens: 5000}}
+	got := lr.buildUserPrompt(&SelfAssessmentReport{SpaceID: "mdemg-dev", RetrievalQuality: 0.8})
+	if strings.Contains(got, "truncated to prompt budget") {
+		t.Error("a small under-budget prompt should not be truncated")
+	}
+}
 
 func TestLLMReflector_ParseResponse_Valid(t *testing.T) {
 	lr := &LLMReflector{}

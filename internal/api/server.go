@@ -836,6 +836,10 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 			OpenAIURL:       cfg.EffectiveLLMEndpoint(),
 			OllamaURL:       cfg.OllamaEndpoint,
 			CompressPrompts: cfg.RSICLLMReflectCompress,
+			// APE-PROMPT-BUDGET-001
+			PromptBudgetTokens: cfg.RSICLLMReflectPromptBudgetTokens,
+			HistoryCycles:      cfg.RSICLLMReflectHistoryCycles,
+			IncludeDatasets:    cfg.RSICLLMReflectIncludeDatasets,
 		}, cbRegistry, rsicCalibrator)
 		rsicReflector.SetLLMReflector(llmReflector)
 		slog.Info("RSIC LLM reflection enabled", "provider", cfg.RSICLLMReflectProvider, "model", cfg.RSICLLMReflectModel, "timeout_ms", cfg.RSICLLMReflectTimeoutMs)
