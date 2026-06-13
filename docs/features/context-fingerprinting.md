@@ -161,3 +161,41 @@ Add `--dry-run=false` to actually write. Idempotent: skips observations already 
 - `internal/tsdb/migrations/020_context_catalog_versions.sql` — TSDB historical snapshots
 - `docs/development/post-ft-lora/sprint_plan_phase_14_2_note_05_sparse_fingerprints.md` — frozen sprint plan
 - `docs/development/post-ft-lora/phase_14_2_forensic.md` — Epic 0 multi-space density audit
+
+## CONTEXT-LIVE-001 (2026-06-13) — the column goes live
+
+Context fingerprinting was benchmark-only in practice until this sprint:
+derivation required a `?context=auto` URL param no live caller passed, the
+graph held 76,906 mdemg-dev nodes fingerprinted against catalog v1 while
+the active catalog was v3 (bit positions reallocate per build —
+cross-version Jaccard is noise), and `RefineWithCoactivations` had zero
+callers. Changes:
+
+- **Default-on derivation**: `CONTEXT_QUERY_AUTO_DEFAULT` (default true)
+  derives the query fingerprint server-side for every retrieve with query
+  text; per-call opt-out `?context=off|false|0`.
+- **Version guard**: the derivation returns the catalog version it used;
+  `ContextColumn` and strict-context mode score candidates 0 when their
+  stored `context_fingerprint_version` differs. Version 0 (explicit
+  fingerprints) = guard off.
+- **Honest consensus**: columns structurally unable to vote (disabled, or
+  context with no query fingerprint) are no longer appended — previously
+  the always-empty live context column capped every live query's
+  consensus at 0.8. Errored columns still count (a broken voter lowers
+  consensus; an absent voter doesn't exist). Scorer namespace bumped to
+  v2; the per-category weight + sparse-override maps now hash into it.
+- **Skew heals itself**: RSIC stage 6 recomputes up to
+  `CONTEXT_FINGERPRINT_HEAL_MAX_PER_CYCLE` (2000) stale-version nodes
+  every cycle (`conversation.RecomputeStaleFingerprints` — recomputation,
+  NOT RefineWithCoactivations, which merges old-catalog bits) and runs the
+  Phase-B refine over up to `CONTEXT_FINGERPRINT_REFINE_MAX_PER_CYCLE`
+  (200) current-version observations. One-shot heal:
+  `mdemg migrate context-fingerprint --space-id <id> --dry-run=false`.
+- **Classifier→category dispatch**: `QUERY_CLASSIFY_CATEGORY_MAP` maps
+  classifier types onto the UVTS category vocabulary so per-category
+  sparse/weight protections fire on live traffic (explicit category wins;
+  `service_relationships`/`business_logic_constraints` have no classifier
+  equivalent and stay benchmark-only).
+
+Gate: 120q UVTS A/B at retrieval-component parity (see
+`docs/development/context-live-001/uvts_ab_analysis.md`).
