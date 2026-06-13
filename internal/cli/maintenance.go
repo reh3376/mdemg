@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"mdemg/internal/conversation"
 	"context"
 	"fmt"
 	"time"
@@ -79,8 +80,31 @@ Suitable for scheduling via launchd, systemd, or cron.`,
 			}
 			_ = decayDriver.Close(ctx)
 
-			// Step 2: Prune
-			fmt.Println("\n=== Maintenance: Step 2 — Orphan Pruning ===")
+			// Step 2: Graduation (COOLER-001) — run the config-driven Context
+			// Cooler per requested space, the same implementation RSIC
+			// delegates to. Skipped in dry-run (ProcessGraduations mutates).
+			fmt.Println("\n=== Maintenance: Step 2 — Graduation (Context Cooler) ===")
+			if dryRun {
+				fmt.Println("(dry-run: skipping graduation; rerun with --dry-run=false to graduate)")
+			} else if cfg, cfgErr := loadConfig(); cfgErr != nil {
+				fmt.Printf("(skipped: config load failed: %v)\n", cfgErr)
+			} else {
+				gradDriver, gErr := newDecayDriver(decayCfg)
+				if gErr != nil {
+					return fmt.Errorf("graduation driver: %w", gErr)
+				}
+				cooler := conversation.NewContextCooler(gradDriver, cfg)
+				summary, gErr := cooler.ProcessGraduations(ctx, spaceID)
+				_ = gradDriver.Close(ctx)
+				if gErr != nil {
+					return fmt.Errorf("graduation: %w", gErr)
+				}
+				fmt.Printf("Graduated: %d  Tombstoned: %d  Remaining volatile: %d  Decay applied: %d\n",
+					summary.Graduated, summary.Tombstoned, summary.RemainingVolatile, summary.DecayApplied)
+			}
+
+			// Step 3: Prune
+			fmt.Println("\n=== Maintenance: Step 3 — Orphan Pruning ===")
 			pruneCfg := pruneConfig{
 				Neo4jURI:         decayCfg.Neo4jURI,
 				Neo4jUser:        decayCfg.Neo4jUser,

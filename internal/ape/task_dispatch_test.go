@@ -18,9 +18,6 @@ func TestExecutors_NilDriverReturnsError(t *testing.T) {
 		name string
 		fn   func() (map[string]any, error)
 	}{
-		{"executeGraduateVolatile", func() (map[string]any, error) {
-			return d.executeGraduateVolatile(context.Background(), "test-space")
-		}},
 		{"executeTombstoneStale", func() (map[string]any, error) {
 			return d.executeTombstoneStale(context.Background(), "test-space", "test-cycle")
 		}},
@@ -71,4 +68,42 @@ func (m *mockProtoEvolver) AdjustTierThresholds(_ context.Context, _ string) (ma
 }
 func (m *mockProtoEvolver) AdjustReplayBuffer(_ context.Context, _ string) (map[string]any, error) {
 	return nil, nil
+}
+
+// COOLER-001: executeGraduateVolatile now delegates to the Context Cooler
+// graduation processor instead of an inline Cypher; it fails safe (not a
+// nil-driver panic) when the processor is unwired.
+func TestExecuteGraduateVolatile_NilProcessor(t *testing.T) {
+	d := &Dispatcher{
+		activeTasks: make(map[string]*activeTask),
+		reports:     make(map[string][]RSICProgressReport),
+		sem:         make(chan struct{}, 50),
+		// graduationProcessor intentionally nil
+	}
+	if _, err := d.executeGraduateVolatile(context.Background(), "test-space"); err == nil {
+		t.Fatal("expected error when graduation processor not wired")
+	}
+}
+
+// COOLER-001: when wired, executeGraduateVolatile returns the cooler's count.
+func TestExecuteGraduateVolatile_DelegatesToProcessor(t *testing.T) {
+	d := &Dispatcher{
+		activeTasks:         make(map[string]*activeTask),
+		reports:             make(map[string][]RSICProgressReport),
+		sem:                 make(chan struct{}, 50),
+		graduationProcessor: stubGraduationProcessor{graduated: 7},
+	}
+	out, err := d.executeGraduateVolatile(context.Background(), "test-space")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out["graduated"] != 7 {
+		t.Errorf("expected graduated=7 from processor, got %v", out["graduated"])
+	}
+}
+
+type stubGraduationProcessor struct{ graduated int }
+
+func (s stubGraduationProcessor) ProcessGraduations(_ context.Context, _ string) (int, error) {
+	return s.graduated, nil
 }

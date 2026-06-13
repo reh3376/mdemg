@@ -473,3 +473,21 @@ func (a *negativeFeedbackAdapter) ApplyNegativeFeedback(ctx context.Context, spa
 	res, err := a.learner.ApplyNegativeFeedback(ctx, spaceID, queryNodeIDs, rejectedNodeIDs)
 	return res.Weakened, res.Contradicted, err
 }
+
+// coolerGraduationAdapter bridges ape.GraduationProcessor to the Context
+// Cooler (COOLER-001) so RSIC's graduate_volatile action graduates via the
+// one config-driven implementation.
+type coolerGraduationAdapter struct {
+	cooler *conversation.ContextCooler
+}
+
+func (a *coolerGraduationAdapter) ProcessGraduations(ctx context.Context, spaceID string) (int, error) {
+	if a == nil || a.cooler == nil {
+		return 0, nil
+	}
+	sum, err := a.cooler.ProcessGraduations(ctx, spaceID)
+	if err != nil || sum == nil {
+		return 0, err
+	}
+	return sum.Graduated, nil
+}

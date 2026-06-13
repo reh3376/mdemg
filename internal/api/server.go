@@ -886,6 +886,12 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	snapshotStore := ape.NewSnapshotStore(driver, cfg.RSICRollbackWindow)
 	rsicDispatcher.SetSafetyValidator(safetyValidator)
 	rsicDispatcher.SetSnapshotStore(snapshotStore)
+	// COOLER-001: unify RSIC graduate_volatile onto the config-driven Context
+	// Cooler, and align the rollback snapshot predicate with its threshold.
+	if ctxCooler != nil {
+		rsicDispatcher.SetGraduationProcessor(&coolerGraduationAdapter{cooler: ctxCooler})
+		snapshotStore.SetGraduationThreshold(cfg.CoolerGraduationThreshold)
+	}
 	// RSIC-SK1: Wire guidance calibrator for self-calibrating guidance.
 	// CONFIG-DEADFLAG-001: gate on RSIC_GUIDANCE_CALIBRATION_ENABLED —
 	// parsed since RSIC-SK1 but the wiring ignored it (default true, so
