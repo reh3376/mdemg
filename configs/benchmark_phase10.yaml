@@ -93,7 +93,7 @@ ults:
 
 # Golden validation holdout — carved from Phase 5 valid splits.
 golden_holdout:
-  out_path: "training_data/eval/valid_golden.jsonl"
+  out_path: "training_data/eval/valid_clean.jsonl"  # EVAL-INTEGRITY-001: leak-free clean eval (was the 99%-leaked valid_golden)
   source_glob: "training_data/sft/*/valid.jsonl"
   fraction: 0.15
   seed: 0
