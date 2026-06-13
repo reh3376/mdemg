@@ -244,7 +244,14 @@ def call_gpt_mini(system_prompt: str, user_prompt: str, sampling_kwargs: dict[st
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument('--target-per-task', type=int, default=50)
-    ap.add_argument('--reward-threshold', type=float, default=0.8)
+    ap.add_argument('--reward-threshold', type=float, default=0.8,
+                    help='global inclusion gate; a kept row needs mean(reward_vector) >= this')
+    ap.add_argument('--reward-threshold-map', default='',
+                    help='REWARD-CORRECTNESS-001: JSON {"task_name": float} overriding '
+                         '--reward-threshold per task. Lets structured tasks (whose rewards '
+                         'are correctness-dominant — json_valid/schema_match) gate at the right '
+                         'bar without the global value forcing a single threshold across '
+                         'heterogeneous reward arrays. Unlisted tasks use --reward-threshold.')
     ap.add_argument('--out-dir', default='training_data/distill/phase11_5d')
     ap.add_argument('--config', default='configs/benchmark_phase10.yaml')
     ap.add_argument('--repo-root', default='/Users/reh3376/mdemg')
@@ -262,8 +269,12 @@ def main() -> int:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     tasks = [t.strip() for t in args.tasks.split(',') if t.strip()]
+    threshold_map: dict[str, float] = {}
+    if args.reward_threshold_map.strip():
+        threshold_map = {k: float(v) for k, v in json.loads(args.reward_threshold_map).items()}
     print(f'Distill capture targets: {tasks}')
-    print(f'Target per task: {args.target_per_task}, reward threshold: {args.reward_threshold}')
+    print(f'Target per task: {args.target_per_task}, reward threshold: {args.reward_threshold}'
+          + (f', per-task overrides: {threshold_map}' if threshold_map else ''))
 
     # Load production system prompts for the sampled tasks
     prod_system_prompts: dict[str, str] = {}
@@ -311,8 +322,9 @@ def main() -> int:
             sys_prompt = prod_system_prompts[task]
             max_tokens = max(int(spec.performance_max_tokens), 3000)  # MEMORY floor
             known = known_per_task.get(task, set())
+            task_threshold = threshold_map.get(task, args.reward_threshold)
 
-            print(f'\n== {task} (group={spec.sampling_group}, temp={sampling_kwargs.get("temperature","?")}, max_tokens={max_tokens}) ==')
+            print(f'\n== {task} (group={spec.sampling_group}, temp={sampling_kwargs.get("temperature","?")}, max_tokens={max_tokens}, gate={task_threshold}) ==')
             candidates = (fetch_stratified_classify_prompts(cur, task, args.target_per_task, known, CLASSIFY_TARGET_DISTRIBUTION)
                    if (args.stratify_classify and task == 'consulting.classify')
                    else fetch_production_user_prompts(cur, task, args.target_per_task, known))
@@ -362,7 +374,7 @@ def main() -> int:
                 stats['calls_succeeded'] += 1
                 stats['rewards_pre_filter'].append(reward_score)
 
-                kept = reward_score >= args.reward_threshold
+                kept = reward_score >= task_threshold
                 if kept:
                     stats['rewards_post_filter'].append(reward_score)
                     stats['kept_pairs'] += 1
@@ -377,6 +389,7 @@ def main() -> int:
                     'response_text': response,
                     'reward_vector': reward_vector,
                     'reward_score': reward_score,
+                    'reward_threshold': task_threshold,
                     'kept': kept,
                     'finish_reason': finish_reason,
                     'completion_tokens': usage.get('completion_tokens'),
@@ -390,13 +403,14 @@ def main() -> int:
                 if total_calls % 10 == 0:
                     print(f'  ... {total_calls} calls, last reward={reward_score:.3f} kept={kept}')
 
-            print(f'  → {stats["calls_succeeded"]}/{stats["calls_attempted"]} succeeded; kept {stats["kept_pairs"]} (reward ≥ {args.reward_threshold})')
+            stats['reward_threshold'] = task_threshold
+            print(f'  → {stats["calls_succeeded"]}/{stats["calls_attempted"]} succeeded; kept {stats["kept_pairs"]} (reward ≥ {task_threshold})')
             per_task_stats[task] = stats
 
     raw_path.write_text('\n'.join(raw_lines) + '\n')
 
     # Build mlx_lm.lora chat-format JSONL (kept rows only) + 90/10 split
-    kept_rows = [json.loads(l) for l in raw_lines if json.loads(l)['kept']]
+    kept_rows = [json.loads(ln) for ln in raw_lines if json.loads(ln)['kept']]
     print(f'\nKept rows total: {len(kept_rows)}')
     # Stratified split: per-task 90/10
     train_rows, valid_rows = [], []
@@ -448,6 +462,7 @@ def main() -> int:
         'elapsed_s': completed_at - started_at,
         'model': 'gpt-5.4-mini',
         'reward_threshold': args.reward_threshold,
+        'reward_threshold_map': threshold_map,
         'target_per_task': args.target_per_task,
         'tasks': tasks,
         'leak_sources': src_meta,
@@ -468,7 +483,7 @@ def main() -> int:
     manifest_path = out_dir / 'manifest.json'
     manifest_path.write_text(json.dumps(manifest, indent=2, default=str))
 
-    print(f'\n=== Summary ===')
+    print('\n=== Summary ===')
     print(f'  total OpenAI calls: {total_calls}')
     print(f'  elapsed: {(completed_at - started_at):.1f}s')
     print(f'  kept pairs: {len(kept_rows)} (train: {len(train_rows)}, valid: {len(valid_rows)})')

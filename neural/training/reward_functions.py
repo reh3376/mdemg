@@ -248,42 +248,39 @@ def coherence_score(response: str, **kwargs: Any) -> float:
     if not response or not response.strip():
         return 0.0
 
-    score = 0.5  # Base score for non-empty
+    # REWARD-CORRECTNESS-001: length-neutral. A coherent single sentence is
+    # not less coherent than two; the old >=2-sentence + 10-word gates
+    # capped terse-correct answers at 0.5-0.7. A valid non-repetitive
+    # response scores high; only pure repetition (real pathology) is penalized.
     text = response.strip()
-
-    # Reward sentence structure
-    sentences = [s.strip() for s in text.replace(".", ".\n").split("\n") if s.strip()]
-    if len(sentences) >= 2:
-        score += 0.2
-
-    # Reward reasonable length
     words = text.split()
-    if 10 <= len(words) <= 500:
-        score += 0.2
-
-    # Penalize repetition
-    if len(set(words)) / max(len(words), 1) < 0.3:
-        score -= 0.3
-
-    return max(0.0, min(1.0, score))
+    if words and len(set(words)) / len(words) < 0.3:
+        return 0.4  # degenerate repetition
+    return 0.9
 
 
 def coverage_score(response: str, **kwargs: Any) -> float:
-    """Heuristic coverage score — rewards detail and breadth."""
+    """Substantiveness score — LENGTH-NEUTRAL (REWARD-CORRECTNESS-001).
+
+    The old length ladder (<20 words→0.4, <50→0.7, then rising) dropped
+    spec-correct-but-terse answers below the 0.8 distill gate AND rewarded
+    verbosity upward — the corpus-skew mechanism behind the 3 discarded
+    retrains. A substantive, valid response now scores high regardless of
+    length; only empty/near-empty or pure-repetition content scores low.
+    Verbosity is never rewarded past the substantiveness bar.
+    """
     if not response or not response.strip():
         return 0.0
 
     words = response.strip().split()
     word_count = len(words)
 
-    if word_count < 5:
-        return 0.1
-    elif word_count < 20:
-        return 0.4
-    elif word_count < 50:
-        return 0.7
-    else:
-        return min(1.0, 0.7 + (word_count - 50) / 500)
+    # Pure repetition is genuine pathology (templated/degenerate output).
+    if word_count > 0 and len(set(words)) / word_count < 0.3:
+        return 0.3
+    if word_count < 3:
+        return 0.4  # genuinely content-free
+    return 0.9  # substantive content — length-neutral, no verbosity bonus
 
 
 def summary_quality(response: str, **kwargs: Any) -> float:
@@ -321,13 +318,13 @@ def explanation_quality(response: str, **kwargs: Any) -> float:
     if not explanation:
         return 0.0
 
+    # REWARD-CORRECTNESS-001: length-neutral. A correct concise explanation
+    # is not worth less than a verbose one; the old <20-words→0.6 cliff
+    # dropped terse-correct evaluations below the distill gate.
     words = str(explanation).split()
-    if len(words) < 5:
-        return 0.2
-    elif len(words) < 20:
-        return 0.6
-    else:
-        return 0.9
+    if len(words) < 3:
+        return 0.5  # near-empty explanation
+    return 0.9  # substantive explanation present — length-neutral
 
 
 def specificity_score(response: str, **kwargs: Any) -> float:
@@ -383,12 +380,12 @@ def insight_count(response: str, **kwargs: Any) -> float:
         # Fall back to sentence count
         points = len([s for s in response.split(".") if s.strip()])
 
-    if points >= 5:
-        return 1.0
-    elif points >= 3:
-        return 0.8
-    elif points >= 1:
-        return 0.5
+    # REWARD-CORRECTNESS-001: do NOT reward insight COUNT upward — that
+    # rewarded bullet-spam and dropped a correct single-insight reflection
+    # to 0.5 (ape.reflect, the largest target). One genuine insight is a
+    # complete correct answer; more is not "better" for inclusion.
+    if points >= 1:
+        return 0.9
     return 0.2
 
 
