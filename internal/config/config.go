@@ -636,6 +636,12 @@ type Config struct {
 	ContextFingerprintRefreshEnabled       bool    // CONTEXT_FINGERPRINT_REFRESH_ENABLED — CycleOrchestrator stage 6 runs Builder.BuildForSpace + post-hoc refresh (default: false initially)
 	ContextFingerprintRefreshIntervalHours int     // CONTEXT_FINGERPRINT_REFRESH_INTERVAL_HOURS — minimum hours between refresh ticks per space (default: 168 = weekly)
 	ContextFingerprintRefreshTimeoutMs     int     // CONTEXT_FINGERPRINT_REFRESH_TIMEOUT_MS — per-cycle time budget for post-hoc refresh batch (default: 60000 = 60s)
+	// CONTEXT-LIVE-001 — stage-6 version-skew heal: max stale-fingerprint
+	// nodes recomputed per cycle (0 disables; resumable across cycles).
+	ContextFingerprintHealMaxPerCycle int // CONTEXT_FINGERPRINT_HEAL_MAX_PER_CYCLE (default: 2000)
+	// CONTEXT-LIVE-001 — Phase-B refine: max current-version observations
+	// run through RefineWithCoactivations per cycle (0 disables).
+	ContextFingerprintRefineMaxPerCycle int // CONTEXT_FINGERPRINT_REFINE_MAX_PER_CYCLE (default: 200)
 	ContextCatalogTopNPaths                int     // CONTEXT_CATALOG_TOP_N_PATHS — cap on path bits in catalog (default: 192)
 	ContextCatalogTopNTags                 int     // CONTEXT_CATALOG_TOP_N_TAGS — cap on tag bits in catalog (default: 32)
 	ContextCatalogFloorBitsPerKind         int     // CONTEXT_CATALOG_FLOOR_BITS_PER_KIND — minimum bits allocated to any kind with ≥10 distinct values (default: 16)
@@ -3023,6 +3029,14 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	contextFingerprintHealMaxPerCycle, err := atoi("CONTEXT_FINGERPRINT_HEAL_MAX_PER_CYCLE", 2000)
+	if err != nil {
+		return Config{}, err
+	}
+	contextFingerprintRefineMaxPerCycle, err := atoi("CONTEXT_FINGERPRINT_REFINE_MAX_PER_CYCLE", 200)
+	if err != nil {
+		return Config{}, err
+	}
 	if contextFingerprintRefreshTimeoutMs < 1000 {
 		return Config{}, fmt.Errorf("CONTEXT_FINGERPRINT_REFRESH_TIMEOUT_MS must be ≥ 1000 (got %d)", contextFingerprintRefreshTimeoutMs)
 	}
@@ -4739,6 +4753,8 @@ func FromEnv() (Config, error) {
 		ContextFingerprintRefreshEnabled:       contextFingerprintRefreshEnabled,
 		ContextFingerprintRefreshIntervalHours: contextFingerprintRefreshIntervalHours,
 		ContextFingerprintRefreshTimeoutMs:     contextFingerprintRefreshTimeoutMs,
+		ContextFingerprintHealMaxPerCycle:      contextFingerprintHealMaxPerCycle,
+		ContextFingerprintRefineMaxPerCycle:    contextFingerprintRefineMaxPerCycle,
 		ContextCatalogTopNPaths:                contextCatalogTopNPaths,
 		ContextCatalogTopNTags:                 contextCatalogTopNTags,
 		ContextCatalogFloorBitsPerKind:         contextCatalogFloorBitsPerKind,

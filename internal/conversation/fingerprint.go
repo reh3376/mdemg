@@ -252,3 +252,165 @@ func asInt64Slice(in []uint16) []int64 {
 	}
 	return out
 }
+
+// RecomputeStaleFingerprints recomputes observe-time fingerprints for up to
+// maxNodes MemoryNodes whose stored context_fingerprint_version is older
+// than cat.Version, writing the new bits + version in batches.
+//
+// CONTEXT-LIVE-001: this — NOT RefineWithCoactivations — is the version-skew
+// healer. Refine MERGES existing bits and bumps the version, which would
+// relabel old-catalog bit semantics as current; recomputation derives fresh
+// bits from the node's path/role/layer/tags against the new catalog. Shared
+// by the stage-6 RSIC hook (budget-bounded, resumable across cycles) and
+// conceptually mirrors `mdemg migrate context-fingerprint`.
+//
+// Returns (scanned, updated, skipped): skipped counts nodes whose recompute
+// produced no bits (left untouched at their old version so a later catalog
+// with better coverage can still claim them).
+func RecomputeStaleFingerprints(
+	ctx context.Context,
+	driver neo4j.DriverWithContext,
+	spaceID string,
+	cat *hidden.Catalog,
+	batchSize, maxNodes int,
+) (scanned, updated, skipped int, err error) {
+	if cat == nil {
+		return 0, 0, 0, fmt.Errorf("RecomputeStaleFingerprints: nil catalog")
+	}
+	if batchSize <= 0 {
+		batchSize = 500
+	}
+	if maxNodes <= 0 {
+		maxNodes = 2000
+	}
+
+	type row struct {
+		nodeID   string
+		roleType string
+		layer    int
+		tags     []string
+		filePath string
+	}
+	readQ := `
+		MATCH (m:MemoryNode {space_id: $space_id})
+		WHERE coalesce(m.context_fingerprint_version, 0) < $target_version
+		  AND m.role_type IS NOT NULL
+		RETURN m.node_id AS node_id,
+		       coalesce(m.role_type, 'conversation_observation') AS role_type,
+		       coalesce(m.layer, 0) AS layer,
+		       coalesce(m.tags, []) AS tags,
+		       coalesce(m.path, '') AS file_path
+		LIMIT $max_nodes
+	`
+	sess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	rowsRaw, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, readQ, map[string]any{
+			"space_id":       spaceID,
+			"target_version": int64(cat.Version),
+			"max_nodes":      int64(maxNodes),
+		})
+		if err != nil {
+			return nil, err
+		}
+		var rows []row
+		for res.Next(ctx) {
+			rec := res.Record()
+			nodeID, _ := rec.Get("node_id")
+			if nodeID == nil {
+				continue
+			}
+			roleType, _ := rec.Get("role_type")
+			layerRaw, _ := rec.Get("layer")
+			tagsRaw, _ := rec.Get("tags")
+			pathRaw, _ := rec.Get("file_path")
+			r := row{nodeID: fmt.Sprint(nodeID), roleType: fmt.Sprint(roleType), filePath: fmt.Sprint(pathRaw)}
+			if li, ok := layerRaw.(int64); ok {
+				r.layer = int(li)
+			}
+			if tarr, ok := tagsRaw.([]any); ok {
+				for _, t := range tarr {
+					if s, ok := t.(string); ok {
+						r.tags = append(r.tags, s)
+					}
+				}
+			}
+			rows = append(rows, r)
+		}
+		return rows, res.Err()
+	})
+	_ = sess.Close(ctx)
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("scan stale fingerprints: %w", err)
+	}
+	rows, _ := rowsRaw.([]row)
+	scanned = len(rows)
+	if scanned == 0 {
+		return 0, 0, 0, nil
+	}
+
+	writeQ := `
+		UNWIND $rows AS row
+		MATCH (m:MemoryNode {node_id: row.node_id})
+		SET m.context_fingerprint_active = row.bits,
+		    m.context_fingerprint_version = $version
+	`
+	var pendingIDs []string
+	var pendingBits [][]int64
+	flush := func() error {
+		if len(pendingIDs) == 0 {
+			return nil
+		}
+		writeRows := make([]map[string]any, len(pendingIDs))
+		for i, id := range pendingIDs {
+			writeRows[i] = map[string]any{"node_id": id, "bits": pendingBits[i]}
+		}
+		ws := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+		_, werr := ws.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+			_, err := tx.Run(ctx, writeQ, map[string]any{
+				"rows":    writeRows,
+				"version": int64(cat.Version),
+			})
+			return nil, err
+		})
+		_ = ws.Close(ctx)
+		if werr != nil {
+			return werr
+		}
+		updated += len(pendingIDs)
+		pendingIDs, pendingBits = nil, nil
+		return nil
+	}
+
+	for _, r := range rows {
+		if ctx.Err() != nil {
+			// Budget exhausted — flush what we have; the next cycle resumes.
+			break
+		}
+		obs := &Observation{
+			Tags: r.tags,
+			Metadata: map[string]any{
+				"role_type": r.roleType,
+				"layer":     r.layer,
+			},
+		}
+		if r.filePath != "" {
+			obs.Metadata["file_path"] = r.filePath
+		}
+		fp := ComputeContextFingerprintLocal(obs, cat)
+		if fp == nil {
+			skipped++
+			continue
+		}
+		pendingIDs = append(pendingIDs, r.nodeID)
+		pendingBits = append(pendingBits, asInt64Slice(fp))
+		if len(pendingIDs) >= batchSize {
+			if err := flush(); err != nil {
+				return scanned, updated, skipped, fmt.Errorf("flush: %w", err)
+			}
+		}
+	}
+	if err := flush(); err != nil {
+		return scanned, updated, skipped, fmt.Errorf("final flush: %w", err)
+	}
+	return scanned, updated, skipped, nil
+}
