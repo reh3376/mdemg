@@ -42,6 +42,10 @@ type Config struct {
 	LearningDecayPerDay       float64 // Time-based decay per day of inactivity
 	LearningPruneThreshold    float64 // Weight threshold below which edges are pruned
 	LearningMaxEdgesPerNode   int     // Max CO_ACTIVATED_WITH edges per node
+	// NEGFEED-001 — max prior session members the NEW observation
+	// co-activates with per Observe (delta emission). 0 = all prior
+	// members. Bounds the formerly-unbounded O(n^2) full-clique regen.
+	LearningSessionCliqueWindow int // LEARNING_SESSION_CLIQUE_WINDOW (default 50)
 
 	// Top-level LLM settings (cascade to all features)
 	LLMProvider string // LLM_PROVIDER — top-level text-gen provider (default: "openai")
@@ -1418,6 +1422,10 @@ func FromEnv() (Config, error) {
 	learnMaxEdgesPerNode, err := strconv.Atoi(learnMaxEdgesPerNodeStr)
 	if err != nil {
 		return Config{}, fmt.Errorf("LEARNING_MAX_EDGES_PER_NODE must be int: %w", err)
+	}
+	learnSessionCliqueWindow, err := atoi("LEARNING_SESSION_CLIQUE_WINDOW", 50)
+	if err != nil {
+		return Config{}, err
 	}
 
 	allowed := get("ALLOWED_RELATIONSHIP_TYPES", "ASSOCIATED_WITH,TEMPORALLY_ADJACENT,CO_ACTIVATED_WITH,CAUSES,ENABLES,ABSTRACTS_TO,INSTANTIATES,GENERALIZES,IMPORTS,CALLS,EXTENDS,IMPLEMENTS,ANALOGOUS_TO,BRIDGES,COMPOSES_WITH,INFLUENCES,CONTRASTS_WITH,SPECIALIZES,GENERALIZES_TO,THEME_OF,DEFINES_SYMBOL,ORIGINATED_FROM,GROUNDED_BY,CONTRADICTS")
@@ -4320,6 +4328,7 @@ func FromEnv() (Config, error) {
 		LearningDecayPerDay:            learnDecayPerDay,
 		LearningPruneThreshold:         learnPruneThreshold,
 		LearningMaxEdgesPerNode:        learnMaxEdgesPerNode,
+		LearningSessionCliqueWindow:    learnSessionCliqueWindow,
 		LLMProvider:                    llmProvider,
 		LLMModel:                       llmModel,
 		EmbeddingProvider:              embProvider,

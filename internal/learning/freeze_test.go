@@ -122,7 +122,7 @@ func TestCoactivateSession_Frozen(t *testing.T) {
 	s.FreezeLearning(ctx, spaceID, "test", "test")
 
 	// CoactivateSession should return nil immediately when frozen
-	err := s.CoactivateSession(ctx, spaceID, "session-123")
+	err := s.CoactivateSession(ctx, spaceID, "session-123", "n-frozen")
 	if err != nil {
 		t.Errorf("CoactivateSession on frozen space returned error: %v", err)
 	}
