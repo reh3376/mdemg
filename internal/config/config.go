@@ -725,6 +725,11 @@ type Config struct {
 	ConstraintDetectionEnabled bool    // CONSTRAINT_DETECTION_ENABLED — enable constraint detection in observations (default: true)
 	ConstraintMinConfidence    float64 // CONSTRAINT_MIN_CONFIDENCE — minimum confidence to tag as constraint (default: 0.6)
 	ConstraintProtectFromDecay bool    // CONSTRAINT_PROTECT_FROM_DECAY — protect constraint-tagged obs from tombstoning (default: true)
+	// COOLER-001 — decay-rate multiplier for CO_ACTIVATED_WITH edges incident
+	// to a GRADUATED (volatile=false) node: this is what "graduated" means to
+	// retrieval — stable memory's associations resist time decay. 1.0 = no
+	// protection, 0 = no decay, 0.5 = half rate (default).
+	GraduatedDecayProtectionFactor float64 // GRADUATED_DECAY_PROTECTION_FACTOR
 
 	// Web Scraper Module (Phase 51)
 	ScraperEnabled            bool   // SCRAPER_ENABLED — enable web scraper module (default: false)
@@ -3281,6 +3286,10 @@ func FromEnv() (Config, error) {
 		return Config{}, err
 	}
 	constraintProtectFromDecay := getBool("CONSTRAINT_PROTECT_FROM_DECAY", true)
+	graduatedDecayProtectionFactor, err := atof("GRADUATED_DECAY_PROTECTION_FACTOR", 0.5)
+	if err != nil {
+		return Config{}, err
+	}
 
 	// Web Scraper Module (Phase 51)
 	scraperEnabled := getBool("SCRAPER_ENABLED", false)
@@ -4838,6 +4847,7 @@ func FromEnv() (Config, error) {
 		ConstraintDetectionEnabled: constraintDetectionEnabled,
 		ConstraintMinConfidence:    constraintMinConfidence,
 		ConstraintProtectFromDecay: constraintProtectFromDecay,
+		GraduatedDecayProtectionFactor: graduatedDecayProtectionFactor,
 
 		ConsolidateOnWatchdogEnabled: consolidateOnWatchdog,
 

@@ -50,8 +50,13 @@ Suitable for scheduling via launchd, systemd, or cron.`,
 			_ = godotenv.Load()
 
 			// Load Neo4j credentials once
+			gradFactor := 0.5
+			if c, e := loadConfig(); e == nil && c.GraduatedDecayProtectionFactor >= 0 {
+				gradFactor = c.GraduatedDecayProtectionFactor
+			}
 			decayCfg := decayConfig{
-				DecayRate:       0.02,
+				DecayRate:                 0.02,
+				GraduatedProtectionFactor: gradFactor,
 				PruneThreshold:  0.01,
 				MinEvidence:     3,
 				OlderThanDays:   7,
