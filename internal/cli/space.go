@@ -813,10 +813,14 @@ func runSpaceDelete(ctx context.Context, cfg *deleteConfig) error {
 		return fmt.Errorf("neo4j connect: %w", err)
 	}
 
-	// Count nodes first
+	// Count nodes first — count ALL labels, not just MemoryNode. The delete
+	// below is label-agnostic (MATCH (n {space_id})), so gating the pre-check
+	// on MemoryNode alone silently skipped spaces holding only SymbolNodes /
+	// Observations (e.g. codebase-symbol test spaces) — they reported "no
+	// nodes" while their nodes survived. Match the pre-check to the delete.
 	sess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	result, err := sess.Run(ctx,
-		"MATCH (n:MemoryNode {space_id: $sid}) RETURN count(n) as cnt",
+		"MATCH (n {space_id: $sid}) RETURN count(n) as cnt",
 		map[string]any{"sid": cfg.spaceID})
 	if err != nil {
 		sess.Close(ctx)
