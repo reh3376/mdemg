@@ -228,27 +228,41 @@ class TestCoverageScore:
 
 
 class TestSpecificityScore:
-    def test_specific(self):
-        text = "You must always validate input because injection is possible."
-        score = specificity_score(text)
-        assert score > 0.5
+    # REWARD-CORRECTNESS-002: substantive-floored. Valid concise guidance floors
+    # at 0.7; specific words bonus toward 1.0; hedging/empty/repetition stay low.
+    def test_specific_beats_generic(self):
+        specific = "You must always validate input because injection is possible."
+        generic = "In general, it depends on various ways of doing things."
+        assert specificity_score(specific) > specificity_score(generic)
 
-    def test_generic(self):
-        text = "In general, it depends on various ways of doing things."
-        score = specificity_score(text)
-        assert score < 0.5
+    def test_substantive_concise_floors_high(self):
+        # Valid guidance lacking the magic words is no longer dropped to 0.5.
+        assert specificity_score("Validate the auth token before refreshing the session.") >= 0.7
+
+    def test_hedging_penalized(self):
+        assert specificity_score("In general, it depends on various ways of doing things.") < 0.5
+
+    def test_empty_zero(self):
+        assert specificity_score("") == 0.0
 
 
 class TestActionabilityScore:
-    def test_actionable(self):
+    # REWARD-CORRECTNESS-002: substantive-floored (was 0.3 base).
+    def test_actionable_high(self):
         text = "You should implement retry logic and add validation."
-        score = actionability_score(text)
-        assert score > 0.5
+        assert actionability_score(text) > 0.8
 
-    def test_passive(self):
-        text = "The system is interesting."
-        score = actionability_score(text)
-        assert score <= 0.5
+    def test_substantive_floors_high(self):
+        # A valid substantive insight without action verbs is not punished.
+        assert actionability_score("The system is interesting.") >= 0.7
+
+    def test_actionable_beats_passive(self):
+        assert actionability_score("You should refactor and add validation.") >= actionability_score(
+            "The system is interesting."
+        )
+
+    def test_empty_zero(self):
+        assert actionability_score("") == 0.0
 
 
 class TestInsightCount:
@@ -277,6 +291,34 @@ class TestExplanationQuality:
 
     def test_no_explanation(self):
         assert explanation_quality('{"verdict": "ok"}') == 0.0
+
+    # REWARD-CORRECTNESS-002: schema-aware — jiminy.evaluate nests reasoning.
+    def test_nested_violation_reasoning_credited(self):
+        resp = (
+            '{"violations": [{"constraint_node_id": "n1", "description": "d", '
+            '"reasoning": "The change deletes data without a backup step.", '
+            '"remediation": "Add a backup."}], "warnings": []}'
+        )
+        assert explanation_quality(resp) >= 0.8
+
+    def test_clean_verdict_not_penalized(self):
+        # A correct "no issues" verdict has nothing to explain — must not score 0.
+        assert explanation_quality('{"violations": [], "warnings": []}') >= 0.8
+
+    def test_malformed_object_low(self):
+        assert explanation_quality('{"foo": "bar"}') == 0.0
+
+
+class TestFollowRateInheritsFloor:
+    # REWARD-CORRECTNESS-002: follow_rate = mean(specificity, actionability);
+    # inherits the substantive floor so valid guidance isn't dropped.
+    def test_substantive_guidance_floors(self):
+        from neural.training.reward_functions import follow_rate
+        assert follow_rate("Validate the auth token before refreshing the session.") >= 0.7
+
+    def test_empty_zero(self):
+        from neural.training.reward_functions import follow_rate
+        assert follow_rate("") == 0.0
 
 
 class TestNamingQualityScore:

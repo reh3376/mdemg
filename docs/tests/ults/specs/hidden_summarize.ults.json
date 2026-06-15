@@ -26,21 +26,8 @@
     }
   },
   "output_schema": {
-    "type": "object",
-    "required": [
-      "summary"
-    ],
-    "properties": {
-      "summary": {
-        "type": "string"
-      },
-      "key_concepts": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        }
-      }
-    }
+    "type": "string",
+    "description": "Bare prose cluster summary (under 50 words). Production (internal/hidden/cluster_summarizer.go::Summarize) emits plain text — 'Output ONLY the summary text, no JSON' — not an object. REWARD-CORRECTNESS-002: was wrongly declared object, which mis-flagged 72 valid summaries as invalid-JSON."
   },
   "quality_metrics": [
     {
