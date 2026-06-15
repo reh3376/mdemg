@@ -36,7 +36,7 @@ output:
 model_under_test:
   path: ".local-models/qwen3-14b-mdemg-v1-rl-sandbox"
   mlx_host: "127.0.0.1"
-  mlx_port: 8101
+  mlx_port: 8102  # BASELINE-RECOMPUTE-001: GGUF llama-server (Phase 13.5 cutover); was stale 8101 (mlx_lm.server, decommissioned) per EVAL-INTEGRITY-001
 
 # ── TSDB connection (honors TSDB_* env vars set by docker-compose) ──────────
 tsdb:
