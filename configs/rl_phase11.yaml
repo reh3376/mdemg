@@ -155,8 +155,8 @@ rollout:
 regression:
   # 5a: vs Phase 5 SFT baseline
   phase5_baseline_run_id: "q283a23bz59mrg6faxo32ydx2"
-  phase5_baseline_aggregate: 0.8338
-  aggregate_target_multiplier: 1.02    # ≥ 0.8338 × 1.02 = 0.8505 to pass
+  phase5_baseline_aggregate: 0.8655    # BASELINE-RECOMPUTE-001: recomputed via fixed harness (valid_clean + RC-001/002 rewards + GGUF :8102); was stale 0.8338
+  aggregate_target_multiplier: 1.02    # ≥ 0.8655 × 1.02 = 0.8828 to pass
   per_task_max_regression: 0.02        # no task may drop more than 2 pp
 
   # 5b: fresh dense-14B re-merge (adapter-merge corruption check)
