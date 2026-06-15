@@ -1,11 +1,11 @@
 """Phase 11 dual regression gate — Epic 5.
 
 Orchestrates two back-to-back Phase 10 benchmark runs and compares both
-against the Phase 5 SFT baseline (0.8338) + each other for adapter-merge
+against the Phase 5 SFT baseline (recomputed 0.8655 — BASELINE-RECOMPUTE-001) + each other for adapter-merge
 corruption detection.
 
-Gate 5a (vs Phase 5 SFT baseline 0.8338):
-    aggregate_sandbox ≥ 0.8338 × aggregate_target_multiplier  (default 1.02)
+Gate 5a (vs Phase 5 SFT baseline, recomputed 0.8655):
+    aggregate_sandbox ≥ baseline_report_aggregate × aggregate_target_multiplier  (default 1.02)
     AND ∀task: sandbox[task] ≥ baseline[task] − per_task_max_regression
 Gate 5b (vs fresh dense-14B re-merge):
     |aggregate_sandbox − aggregate_fresh| ≤ fresh_merge_max_delta
@@ -39,7 +39,14 @@ BenchmarkRunner = Callable[[str, str], BenchmarkReport]
 class RegressionConfig:
     """Values read from configs/rl_phase11.yaml §regression."""
 
-    phase5_baseline_aggregate: float = 0.8338
+    # BASELINE-RECOMPUTE-001 (2026-06-15): recomputed through the FIXED harness
+    # (valid_clean leak-free eval + RC-001/002 corrected rewards + GGUF llama-server
+    # :8102) = 0.8655, replacing the stale frozen 0.8338 (valid_golden-leaked eval,
+    # old length-biased rewards, decommissioned MLX serving — NOT comparable). This
+    # is now only the drift TRIPWIRE; the gate derives the live target from the
+    # baseline REPORT's aggregate_weighted_score (evaluate_gate_5a). Recompute was
+    # --rows-per-spec 10 (50 samples/task); a full-corpus recompute can refine it.
+    phase5_baseline_aggregate: float = 0.8655
     aggregate_target_multiplier: float = 1.02
     per_task_max_regression: float = 0.02
     fresh_merge_max_delta: float = 0.005
@@ -148,13 +155,26 @@ def evaluate_gate_5a(
         AND ∀task: sandbox[task] ≥ baseline[task] − per_task_max_regression
     """
     sandbox_agg = float(sandbox_report.get("aggregate_weighted_score", 0.0))
-    target = cfg.phase5_baseline_aggregate * cfg.aggregate_target_multiplier
+    # BASELINE-RECOMPUTE-001: derive the baseline aggregate from the loaded
+    # baseline REPORT (the single source of truth — recomputed through the fixed
+    # harness), not the frozen `phase5_baseline_aggregate` constant. The constant
+    # is retained as a drift tripwire: a large divergence means the report on
+    # disk no longer matches the recorded baseline and the report should be
+    # re-verified before trusting the gate.
+    baseline_agg = float(baseline_report.get("aggregate_weighted_score", cfg.phase5_baseline_aggregate))
+    target = baseline_agg * cfg.aggregate_target_multiplier
 
     failures: list[str] = []
+    if abs(baseline_agg - cfg.phase5_baseline_aggregate) > 0.05:
+        logger.warning(
+            "baseline report aggregate %.4f diverges >5pp from recorded "
+            "phase5_baseline_aggregate %.4f — re-verify the baseline report",
+            baseline_agg, cfg.phase5_baseline_aggregate,
+        )
     if sandbox_agg < target:
         failures.append(
             f"aggregate {sandbox_agg:.4f} below target "
-            f"{target:.4f} (={cfg.phase5_baseline_aggregate:.4f} × "
+            f"{target:.4f} (={baseline_agg:.4f} × "
             f"{cfg.aggregate_target_multiplier:.2f})"
         )
 
