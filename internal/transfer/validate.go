@@ -108,8 +108,12 @@ func ListSpaces(ctx context.Context, driver neo4j.DriverWithContext) ([]*pb.Spac
 	defer sess.Close(ctx)
 
 	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		// Exclude null/empty space_id: nodes without a space_id are not a
+		// "space" (orphaned/infra artifacts), and a nil spaceId crashed the
+		// sid.(string) assertion below (DATAPRUNE space-hygiene catch).
 		res, err := tx.Run(ctx, `
 MATCH (n:MemoryNode)
+WHERE n.space_id IS NOT NULL AND n.space_id <> ''
 WITH n.space_id AS spaceId, count(n) AS nodeCount, max(n.layer) AS maxLayer
 ORDER BY nodeCount DESC
 RETURN spaceId, nodeCount, maxLayer`, nil)
@@ -124,8 +128,12 @@ RETURN spaceId, nodeCount, maxLayer`, nil)
 			nc, _ := rec.Get("nodeCount")
 			ml, _ := rec.Get("maxLayer")
 
+			sidStr, ok := sid.(string)
+			if !ok || sidStr == "" {
+				continue // defensive: skip any non-string/empty space_id
+			}
 			s := &pb.SpaceSummary{
-				SpaceId:   sid.(string),
+				SpaceId:   sidStr,
 				NodeCount: nc.(int64),
 			}
 			if ml != nil {
