@@ -304,61 +304,119 @@ def summary_quality(response: str, **kwargs: Any) -> float:
     return (coherence_score(response) + coverage_score(response)) / 2
 
 
+def _score_explanation_text(text: str) -> float:
+    """Length-neutral (REWARD-CORRECTNESS-001): substantive explanation → 0.9,
+    near-empty → 0.5. A correct concise explanation is not worth less than a
+    verbose one."""
+    words = str(text).split()
+    return 0.5 if len(words) < 3 else 0.9
+
+
 def explanation_quality(response: str, **kwargs: Any) -> float:
-    """Reward for explanation quality (evaluation tasks)."""
+    """Reward for explanation quality (evaluation tasks).
+
+    REWARD-CORRECTNESS-002: schema-aware. jiminy.evaluate / jiminy.evaluate_llm
+    emit ``{"violations":[{"reasoning":...}], "warnings":[...]}`` — the
+    reasoning is NESTED per-violation, not a top-level ``explanation``/
+    ``reasoning`` field. The old flat-only lookup scored every such response
+    0.0 (even correct ones), dragging the mean below the gate. Now: prefer a
+    top-level explanation; else credit nested ``violations[]/warnings[]``
+    reasoning; a valid structured verdict with no violations is a correct
+    "no issues" answer and is not penalised for having nothing to explain.
+    """
     if not response or not response.strip():
         return 0.0
 
     try:
         parsed = json.loads(response)
-        explanation = parsed.get("explanation", parsed.get("reasoning", ""))
     except (json.JSONDecodeError, TypeError):
-        explanation = response
+        # Non-JSON: treat the whole response as the explanation text.
+        return _score_explanation_text(response)
 
-    if not explanation:
-        return 0.0
+    if isinstance(parsed, dict):
+        # 1. Top-level explanation / reasoning (flat schema).
+        flat = parsed.get("explanation", parsed.get("reasoning", "")) or ""
+        if flat:
+            return _score_explanation_text(flat)
 
-    # REWARD-CORRECTNESS-001: length-neutral. A correct concise explanation
-    # is not worth less than a verbose one; the old <20-words→0.6 cliff
-    # dropped terse-correct evaluations below the distill gate.
-    words = str(explanation).split()
-    if len(words) < 3:
-        return 0.5  # near-empty explanation
-    return 0.9  # substantive explanation present — length-neutral
+        # 2. Nested reasoning in violations[] / warnings[] (structured schema).
+        nested: list[str] = []
+        for key in ("violations", "warnings"):
+            items = parsed.get(key)
+            if isinstance(items, list):
+                for it in items:
+                    if isinstance(it, dict):
+                        r = it.get("reasoning") or it.get("description") or it.get("explanation")
+                        if r:
+                            nested.append(str(r))
+        if nested:
+            avg_words = sum(len(r.split()) for r in nested) / len(nested)
+            return 0.9 if avg_words >= 3 else 0.5
+
+        # 3. Valid structured verdict with no violations/warnings is a correct
+        #    "no issues" answer — nothing to explain, do not penalise.
+        if "violations" in parsed or "warnings" in parsed:
+            return 0.9
+
+    # Non-dict JSON (e.g. a bare string) or dict with no recognised fields.
+    if isinstance(parsed, str) and parsed.strip():
+        return _score_explanation_text(parsed)
+    return 0.0
 
 
 def specificity_score(response: str, **kwargs: Any) -> float:
-    """Reward specific, actionable guidance over generic text."""
+    """Reward specific guidance over generic text.
+
+    REWARD-CORRECTNESS-002: substantive-floored. The old base of 0.5 dropped
+    valid, concise guidance below the gate purely for lacking the ~6 hard-coded
+    specific-indicator words — a brittle keyword bag, the jiminy.synthesize
+    suppressor. Now a substantive, non-hedging response floors at 0.7;
+    specific-indicator words are a bounded BONUS toward 1.0; hedging phrases
+    and empty/repetition stay low. Specific-still-beats-generic ordering is
+    preserved (the discrimination), but correctness is no longer punished for
+    brevity / vocabulary.
+    """
     if not response or not response.strip():
         return 0.0
+
+    words = response.split()
+    if words and len(set(words)) / len(words) < 0.3:
+        return 0.3  # degenerate repetition
 
     text = response.lower()
     generic_phrases = ["in general", "it depends", "there are many", "various ways"]
     specific_indicators = ["must", "never", "always", "specifically", "because", "when"]
-
     generic_count = sum(1 for p in generic_phrases if p in text)
     specific_count = sum(1 for p in specific_indicators if p in text)
 
-    base = 0.5
-    base += specific_count * 0.1
-    base -= generic_count * 0.15
-
-    return max(0.0, min(1.0, base))
+    base = 0.7  # substantive, valid content floor (was 0.5)
+    base += min(specific_count, 3) * 0.1  # bounded bonus
+    base -= generic_count * 0.15  # hedging penalty
+    return max(0.3, min(1.0, base))
 
 
 def actionability_score(response: str, **kwargs: Any) -> float:
-    """Reward actionable insights with concrete recommendations."""
+    """Reward actionable insights with concrete recommendations.
+
+    REWARD-CORRECTNESS-002: substantive-floored. The old 0.3 base needed ~3
+    action words to clear a 0.7 bar, dropping valid concise insights. A
+    substantive response now floors at 0.7; action-indicator words are a
+    bounded BONUS toward 1.0; empty/repetition stay low.
+    """
     if not response or not response.strip():
         return 0.0
+
+    words = response.split()
+    if words and len(set(words)) / len(words) < 0.3:
+        return 0.3  # degenerate repetition
 
     text = response.lower()
     action_indicators = [
         "should", "recommend", "consider", "implement", "refactor",
         "add", "remove", "replace", "migrate", "update",
     ]
-
     hits = sum(1 for ind in action_indicators if ind in text)
-    return min(1.0, 0.3 + hits * 0.15)
+    return min(1.0, 0.7 + min(hits, 2) * 0.15)  # floor 0.7, bounded bonus
 
 
 def follow_rate(response: str, **kwargs: Any) -> float:
