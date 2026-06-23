@@ -189,6 +189,8 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext, consultant Co
 			HighThreshold:      cfg.J17TrustHighThreshold,
 			LowThreshold:       cfg.J17TrustLowThreshold,
 			TTL:                time.Duration(cfg.J17TrustTTLHours) * time.Hour,
+			Mode:               cfg.J17TrustMode,     // JIMINY-EFFECTIVENESS-001
+			EMAAlpha:           cfg.J17TrustEMAAlpha, // JIMINY-EFFECTIVENESS-001
 		})
 		slog.Info("jiminy: J17 trust scoring enabled",
 			"initial", cfg.J17TrustInitial, "high_threshold", cfg.J17TrustHighThreshold, "low_threshold", cfg.J17TrustLowThreshold,

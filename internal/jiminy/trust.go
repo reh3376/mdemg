@@ -19,7 +19,41 @@ type TrustScorer struct {
 	lowThreshold       float64
 	ttl                time.Duration
 
+	// JIMINY-EFFECTIVENESS-001: trust update rule.
+	mode     string  // "ema" (default, recoverable) | "ratchet" (legacy monotonic)
+	emaAlpha float64 // EMA smoothing factor in (0,1]
+
 	onDirty func(string) // called after score changes with sessionID
+}
+
+// JIMINY-EFFECTIVENESS-001: per-outcome effectiveness anchors for the EMA trust
+// mode. These define the metric (like reward-function anchors), not tunable
+// thresholds: trust converges toward the recent regime's anchor. A steady
+// all-Ignored regime → ~0.2 (well below the 0.75 T1 threshold); a following
+// regime → toward 1.0 (crosses 0.75). The α knob controls how fast.
+const (
+	trustTargetFollowed     = 1.0
+	trustTargetPartial      = 0.6
+	trustTargetIgnored      = 0.2
+	trustTargetContradicted = 0.0
+)
+
+// trustTargetFor maps an outcome to its EMA effectiveness anchor. ok=false for
+// outcomes that carry no effectiveness signal (Unknown / NotApplicable —
+// topically-unrelated or unclassifiable), which must not move trust.
+func trustTargetFor(outcome GuidanceOutcome) (float64, bool) {
+	switch outcome {
+	case OutcomeFollowed:
+		return trustTargetFollowed, true
+	case OutcomePartialCompliance:
+		return trustTargetPartial, true
+	case OutcomeIgnored:
+		return trustTargetIgnored, true
+	case OutcomeContradicted:
+		return trustTargetContradicted, true
+	default:
+		return 0, false
+	}
 }
 
 type trustEntry struct {
@@ -36,6 +70,9 @@ type TrustConfig struct {
 	HighThreshold      float64       // above this → agent has earned dense encoding (default: 0.75)
 	LowThreshold       float64       // below this → agent needs more explanation (default: 0.35)
 	TTL                time.Duration // trust entry expiry (default: 4h)
+	// JIMINY-EFFECTIVENESS-001
+	Mode     string  // "ema" (default) | "ratchet" (legacy monotonic boost/decay)
+	EMAAlpha float64 // EMA smoothing factor, (0,1] (default: 0.1)
 }
 
 // NewTrustScorer creates a new trust scorer with the given config.
@@ -64,6 +101,14 @@ func NewTrustScorer(cfg TrustConfig) *TrustScorer {
 		ttl = cfg.TTL
 	}
 
+	// JIMINY-EFFECTIVENESS-001 defaults.
+	if cfg.Mode != "ratchet" {
+		cfg.Mode = "ema" // recoverable trust is the default
+	}
+	if cfg.EMAAlpha <= 0 || cfg.EMAAlpha > 1 {
+		cfg.EMAAlpha = 0.1
+	}
+
 	return &TrustScorer{
 		scores:             make(map[string]*trustEntry),
 		initial:            cfg.Initial,
@@ -73,6 +118,8 @@ func NewTrustScorer(cfg TrustConfig) *TrustScorer {
 		highThreshold:      cfg.HighThreshold,
 		lowThreshold:       cfg.LowThreshold,
 		ttl:                ttl,
+		mode:               cfg.Mode,
+		emaAlpha:           cfg.EMAAlpha,
 	}
 }
 
@@ -118,15 +165,28 @@ func (ts *TrustScorer) RecordOutcome(sessionID string, outcome GuidanceOutcome) 
 		ts.scores[sessionID] = entry
 	}
 
-	switch outcome {
-	case OutcomeFollowed:
-		entry.Score += ts.boostPerFollow
-	case OutcomeIgnored:
-		entry.Score -= ts.decayPerIgnore
-	case OutcomeContradicted:
-		entry.Score -= ts.decayPerContradict
-	case OutcomePartialCompliance:
-		entry.Score += ts.boostPerFollow * 0.5
+	if ts.mode == "ema" {
+		// JIMINY-EFFECTIVENESS-001: EMA toward the outcome's effectiveness anchor.
+		// trust ← trust + α·(target − trust). Unlike the legacy ratchet, this
+		// RECOVERS: a session floored by past ignores climbs back toward 1.0 once
+		// guidance is followed, so trust tracks RECENT effectiveness (the J17 T1
+		// unblocker). A steady-ignored regime converges to ~0.2 (< 0.75), so a
+		// genuinely-ineffective session is still correctly kept out of T1.
+		if target, ok := trustTargetFor(outcome); ok {
+			entry.Score += ts.emaAlpha * (target - entry.Score)
+		}
+	} else {
+		// Legacy monotonic ratchet (JIMINY_TRUST_MODE=ratchet).
+		switch outcome {
+		case OutcomeFollowed:
+			entry.Score += ts.boostPerFollow
+		case OutcomeIgnored:
+			entry.Score -= ts.decayPerIgnore
+		case OutcomeContradicted:
+			entry.Score -= ts.decayPerContradict
+		case OutcomePartialCompliance:
+			entry.Score += ts.boostPerFollow * 0.5
+		}
 	}
 
 	// Clamp to [0.0, 1.0]

@@ -401,8 +401,13 @@ type Config struct {
 	J17TrustHighThreshold      float64 // J17_TRUST_HIGH_THRESHOLD — above this → dense encoding (default: 0.75)
 	J17TrustLowThreshold       float64 // J17_TRUST_LOW_THRESHOLD — below this → more explanation (default: 0.35)
 	J17TrustTTLHours           int     // J17_TRUST_TTL_HOURS — trust entry expiry in hours (default: 4)
-	J17BootstrapCodification   bool    // J17_BOOTSTRAP_CODIFICATION — codify all constraints on startup (default: true)
-	J17BootstrapSpaceID        string  // J17_BOOTSTRAP_SPACE_ID — space to bootstrap codes for (default: "mdemg-dev")
+	// JIMINY-EFFECTIVENESS-001: trust update rule. "ema" tracks recent
+	// effectiveness and RECOVERS (the J17-T1 unblocker); "ratchet" is the legacy
+	// monotonic boost/decay that floors permanently.
+	J17TrustMode             string  // J17_TRUST_MODE — ema|ratchet (default: ema)
+	J17TrustEMAAlpha         float64 // J17_TRUST_EMA_ALPHA — EMA smoothing factor (0,1] (default: 0.1)
+	J17BootstrapCodification bool    // J17_BOOTSTRAP_CODIFICATION — codify all constraints on startup (default: true)
+	J17BootstrapSpaceID      string  // J17_BOOTSTRAP_SPACE_ID — space to bootstrap codes for (default: "mdemg-dev")
 
 	// J17-4: Protocol Metrics + RSIC Evolution
 	J17MetricsEnabled            bool    // J17_METRICS_ENABLED — enable protocol metrics collection (default: inherits J17)
@@ -2573,6 +2578,17 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	j17TrustMode := get("J17_TRUST_MODE", "ema")
+	if j17TrustMode != "ema" && j17TrustMode != "ratchet" {
+		return Config{}, fmt.Errorf("J17_TRUST_MODE must be 'ema' or 'ratchet'")
+	}
+	j17TrustEMAAlpha, err := atof("J17_TRUST_EMA_ALPHA", 0.1)
+	if err != nil {
+		return Config{}, err
+	}
+	if j17TrustEMAAlpha <= 0 || j17TrustEMAAlpha > 1 {
+		return Config{}, fmt.Errorf("J17_TRUST_EMA_ALPHA must be in (0, 1]")
+	}
 	j17BootstrapCodification := getBool("J17_BOOTSTRAP_CODIFICATION", j17Enabled)
 	j17BootstrapSpaceID := get("J17_BOOTSTRAP_SPACE_ID", "mdemg-dev")
 
@@ -4639,6 +4655,8 @@ func FromEnv() (Config, error) {
 		J17TrustHighThreshold:          j17TrustHighThreshold,
 		J17TrustLowThreshold:           j17TrustLowThreshold,
 		J17TrustTTLHours:               j17TrustTTLHours,
+		J17TrustMode:                   j17TrustMode,
+		J17TrustEMAAlpha:               j17TrustEMAAlpha,
 		J17BootstrapCodification:       j17BootstrapCodification,
 		J17BootstrapSpaceID:            j17BootstrapSpaceID,
 		J17MetricsEnabled:              j17MetricsEnabled,

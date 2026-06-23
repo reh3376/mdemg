@@ -243,6 +243,33 @@ Per-session trust score (0.0-1.0) modulates encoding density. Trust is persisted
 | High trust threshold | -- | 0.80 |
 | Low trust threshold | -- | 0.40 |
 
+The table above describes the legacy **ratchet** mode (`JIMINY_TRUST_MODE=ratchet`), retained for rollback.
+
+#### 3.4.1 Recoverable trust — EMA mode (default, JIMINY-EFFECTIVENESS-001)
+
+The ratchet had a structural flaw: trust could only inch up/down by fixed deltas and **clamps at 0.0**, so a session accumulating many ignores got *permanently pinned at the floor* — it could never climb back to the 0.80 high threshold even if subsequent guidance became effective. In the live `mdemg-dev` session this floored trust at `0.0` over 1,445 feedbacks, which is why J17 never promoted to T1 (T1 needs trust above the high threshold).
+
+The default mode is now an **exponential moving average (EMA)** that makes trust *track recent effectiveness and recover*:
+
+```
+trust ← trust + α·(target(outcome) − trust)
+target:  Followed = 1.0,  PartialCompliance = 0.6,  Ignored = 0.2,  Contradicted = 0.0
+α = JIMINY_TRUST_EMA_ALPHA (default 0.1)
+```
+
+- A floored session climbs back past the high threshold once guidance is followed again (a sustained Followed run converges toward 1.0).
+- A genuinely all-ignored session converges toward the Ignored anchor `~0.2` — honestly low, correctly below the threshold, but **not** pinned at 0.
+- Trust always reflects the *recent regime*, not the cumulative history.
+
+It does **not** fake promotion: T1 still requires trust above the high threshold, i.e. genuinely-effective guidance. EMA only removes the irreversibility — raising the real effectiveness so trust actually crosses the threshold is a separate retrieval-quality concern (the disclosed Option B follow-up).
+
+| Config | Default | Meaning |
+|--------|---------|---------|
+| `JIMINY_TRUST_MODE` | `ema` | `ema` (recoverable) or `ratchet` (legacy fixed-delta, for rollback) |
+| `JIMINY_TRUST_EMA_ALPHA` | `0.1` | EMA learning rate ∈ (0,1]; higher = faster tracking of the recent regime |
+
+Forward-only: existing Neo4j `J17TrustState` scores self-heal toward their recent regime as new feedback arrives. **Live-verified:** the previously-floored session moved `0.0 → 0.10` on a single real `Followed` through `POST /v1/jiminy/feedback` (the EMA signature `0.1·(1.0−0)`). See `docs/development/jiminy-effectiveness-001/`.
+
 ---
 
 ## 4. Comprehension Metrics: Initial Baseline
