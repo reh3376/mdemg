@@ -162,20 +162,7 @@ func (a *Assessor) Assess(ctx context.Context, spaceID string, tier CycleTier) (
 	if a.jiminyProvider != nil {
 		js, jErr := a.jiminyProvider.GetGuidanceStats(ctx, spaceID)
 		if jErr == nil && js.TotalGuidanceIssued > 0 {
-			// JIMINY-SIGNAL-001: prefer the honest windowed follow-rate from
-			// constraint_outcomes TSDB (the dashboard panels' exact source + math)
-			// over the inflated Neo4j dedup-by-guidance_id rate (which double-credits
-			// multi-outcome guidance_ids: 0.725 vs the panels' ~0.27). Both the
-			// GuidanceHealth score and the mdemg_jiminy_follow_rate gauge consume
-			// js.FollowRate, so overriding here fixes the gauge AND RSIC's health
-			// dimension AND makes them agree with the dashboard. Falls back to the
-			// Neo4j rate when the TSDB provider is unavailable or has no window data.
-			if a.datasetProvider != nil {
-				window := time.Duration(a.cfg.RSICGuidanceEffectivenessWindowHours) * time.Hour
-				if rate, n, gErr := a.datasetProvider.GuidanceEffectiveness(ctx, spaceID, window); gErr == nil && n > 0 {
-					js.FollowRate = rate
-				}
-			}
+			a.applyHonestFollowRate(ctx, spaceID, &js)
 			report.GuidanceHealth, report.GuidanceConfidence = a.scoreGuidance(js)
 			a.publishGuidanceMetrics(spaceID, js)
 		} else if jErr != nil {
@@ -746,6 +733,24 @@ func (a *Assessor) publishProtocolMetrics(spaceID string, stats ProtocolStatsRes
 		m.J17SidecarAgreementRate(spaceID).Set(0)
 		m.J17SidecarOverrideRate(spaceID).Set(0)
 		m.J17SidecarLatency(spaceID).Set(0)
+	}
+}
+
+// applyHonestFollowRate overrides stats.FollowRate with the windowed
+// constraint_outcomes TSDB rate (the dashboard panels' source + math) when
+// available. JIMINY-SIGNAL-001: the Neo4j dedup-by-guidance_id rate is inflated
+// ~4× (double-credits multi-outcome guidance_ids: 0.73 vs the panels' ~0.27);
+// this makes the gauge, RSIC GuidanceHealth, and the panels agree. No-op when
+// the dataset provider is unavailable or the window has no data (Neo4j fallback).
+// Called by BOTH the assessment path AND the live Prometheus collector
+// (live_collectors.go) — the gauge has two publishers, so both must honest-ize.
+func (a *Assessor) applyHonestFollowRate(ctx context.Context, spaceID string, stats *JiminyStatsResult) {
+	if a == nil || a.datasetProvider == nil || stats == nil {
+		return
+	}
+	window := time.Duration(a.cfg.RSICGuidanceEffectivenessWindowHours) * time.Hour
+	if rate, n, err := a.datasetProvider.GuidanceEffectiveness(ctx, spaceID, window); err == nil && n > 0 {
+		stats.FollowRate = rate
 	}
 }
 

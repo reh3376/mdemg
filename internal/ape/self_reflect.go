@@ -334,6 +334,10 @@ func (r *Reflector) Reflect(ctx context.Context, report *SelfAssessmentReport) (
 		// guard the Go zero-value false (synergy reader unwired/skipped) fired this
 		// CRITICAL ~8×/day on a healthy, actively-delivering Jiminy.
 		if report.SynergyAssessed && !report.JiminyHealthy && (report.SynergyLinesClaude+report.SynergyLinesMemory) > 0 {
+			slog.Warn("rsic: synergy_jiminy_unhealthy CRITICAL firing",
+				"synergy_assessed", report.SynergyAssessed,
+				"jiminy_healthy", report.JiminyHealthy,
+				"synergy_lines", report.SynergyLinesClaude+report.SynergyLinesMemory)
 			insights = append(insights, ReflectionInsight{
 				PatternID:         "synergy_jiminy_unhealthy",
 				Severity:          SeverityCritical,

@@ -114,6 +114,14 @@ func (lc *LiveCollectors) CollectGuidanceMetrics() {
 		return
 	}
 
+	// JIMINY-SIGNAL-001: this live collector is the SECOND publisher of the
+	// follow-rate gauge (the assessment path is the first); both must apply the
+	// honest TSDB override or this one overwrites the gauge back to the inflated
+	// Neo4j rate. Share the assessor's logic so they can't diverge.
+	if lc.assessor != nil {
+		lc.assessor.applyHonestFollowRate(ctx, lc.spaceID, &stats)
+	}
+
 	lc.mu.Lock()
 	lc.cachedJiminyStats = &stats
 	lc.lastGuidanceRefresh = time.Now()
