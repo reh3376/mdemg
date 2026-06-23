@@ -162,6 +162,20 @@ func (a *Assessor) Assess(ctx context.Context, spaceID string, tier CycleTier) (
 	if a.jiminyProvider != nil {
 		js, jErr := a.jiminyProvider.GetGuidanceStats(ctx, spaceID)
 		if jErr == nil && js.TotalGuidanceIssued > 0 {
+			// JIMINY-SIGNAL-001: prefer the honest windowed follow-rate from
+			// constraint_outcomes TSDB (the dashboard panels' exact source + math)
+			// over the inflated Neo4j dedup-by-guidance_id rate (which double-credits
+			// multi-outcome guidance_ids: 0.725 vs the panels' ~0.27). Both the
+			// GuidanceHealth score and the mdemg_jiminy_follow_rate gauge consume
+			// js.FollowRate, so overriding here fixes the gauge AND RSIC's health
+			// dimension AND makes them agree with the dashboard. Falls back to the
+			// Neo4j rate when the TSDB provider is unavailable or has no window data.
+			if a.datasetProvider != nil {
+				window := time.Duration(a.cfg.RSICGuidanceEffectivenessWindowHours) * time.Hour
+				if rate, n, gErr := a.datasetProvider.GuidanceEffectiveness(ctx, spaceID, window); gErr == nil && n > 0 {
+					js.FollowRate = rate
+				}
+			}
 			report.GuidanceHealth, report.GuidanceConfidence = a.scoreGuidance(js)
 			a.publishGuidanceMetrics(spaceID, js)
 		} else if jErr != nil {
@@ -190,6 +204,7 @@ func (a *Assessor) Assess(ctx context.Context, spaceID string, tier CycleTier) (
 		report.SynergyOverflowRate = sm.OverflowRate
 		report.SynergyOverlapScore = sm.OverlapScore
 		report.JiminyHealthy = sm.JiminyHealthy
+		report.SynergyAssessed = true // JIMINY-SIGNAL-001: JiminyHealthy is now real, not the zero-value default
 		report.SynergyHealth, report.SynergyConfidence = a.scoreSynergy(report)
 
 		// Recovery buffer: count pending entries (CMS space + local JSONL)

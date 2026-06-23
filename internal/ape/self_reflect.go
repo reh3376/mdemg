@@ -328,12 +328,16 @@ func (r *Reflector) Reflect(ctx context.Context, report *SelfAssessmentReport) (
 
 	// 17-20. Synergy monitoring patterns
 	if r.cfg.SynergyAssessmentEnabled {
-		// 17. Jiminy down but synergy migration occurred — catastrophic forgetting risk
-		if !report.JiminyHealthy && (report.SynergyLinesClaude+report.SynergyLinesMemory) > 0 {
+		// 17. Jiminy down but synergy migration occurred — catastrophic forgetting risk.
+		// JIMINY-SIGNAL-001: guard on SynergyAssessed — JiminyHealthy is only
+		// meaningful when the synergy block actually ran and set it. Without this
+		// guard the Go zero-value false (synergy reader unwired/skipped) fired this
+		// CRITICAL ~8×/day on a healthy, actively-delivering Jiminy.
+		if report.SynergyAssessed && !report.JiminyHealthy && (report.SynergyLinesClaude+report.SynergyLinesMemory) > 0 {
 			insights = append(insights, ReflectionInsight{
 				PatternID:         "synergy_jiminy_unhealthy",
 				Severity:          SeverityCritical,
-				Description:       "Jiminy is down but .md files are pruned — catastrophic forgetting risk. Restore Jiminy immediately.",
+				Description:       "Jiminy service unavailable (disabled or not initialized) while .md files are pruned — catastrophic forgetting risk. Restore Jiminy immediately.",
 				RecommendedAction: "alert_jiminy_critical",
 				Metric:            "jiminy_healthy",
 				Value:             0,

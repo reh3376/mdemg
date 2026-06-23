@@ -158,6 +158,11 @@ type SelfAssessmentReport struct {
 	SynergyLinesClaude  int     `json:"synergy_lines_claude"`
 	SynergyLinesMemory  int     `json:"synergy_lines_memory"`
 	JiminyHealthy       bool    `json:"jiminy_healthy"`
+	// SynergyAssessed is true only when the synergy block actually ran and set
+	// JiminyHealthy (JIMINY-SIGNAL-001). Guards consumers from the Go zero-value
+	// false: when the synergy reader is unwired/disabled, JiminyHealthy defaults
+	// to false and must NOT be read as "Jiminy down" (the false-CRITICAL bug).
+	SynergyAssessed bool `json:"synergy_assessed"`
 
 	// Synergy recovery buffer
 	SynergyRecoveryBufferEntries int `json:"synergy_recovery_buffer_entries"`

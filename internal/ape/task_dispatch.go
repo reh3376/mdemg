@@ -826,14 +826,14 @@ func (d *Dispatcher) executeAlertJiminyCritical(ctx context.Context, spaceID str
 		m.RSICActionTotal("alert_jiminy_critical", "success").Inc()
 	}
 	if d.alertDispatcher != nil {
-		d.alertDispatcher.SendAlert(ctx, "jiminy", "Jiminy Pipeline Critical",
-			"Jiminy guidance pipeline is unhealthy — guidance not reaching agent", SeverityCritical)
+		d.alertDispatcher.SendAlert(ctx, "jiminy", "Jiminy Service Unavailable",
+			"Jiminy service unavailable (disabled or not initialized) — catastrophic-forgetting risk while .md files are pruned", SeverityCritical)
 	}
 	return map[string]any{
 		"alert":    "jiminy_critical",
 		"space_id": spaceID,
 		"severity": "critical",
-		"message":  "Jiminy guidance pipeline is unhealthy — guidance not reaching agent",
+		"message":  "Jiminy service unavailable (disabled or not initialized) — catastrophic-forgetting risk while .md files are pruned",
 	}, nil
 }
 

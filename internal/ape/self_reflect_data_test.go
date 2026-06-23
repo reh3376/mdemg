@@ -37,6 +37,10 @@ func (m *mockDatasetProvider) TrainingDataReadiness(_ context.Context) (*tsdb.Tr
 	return nil, nil
 }
 
+func (m *mockDatasetProvider) GuidanceEffectiveness(_ context.Context, _ string, _ time.Duration) (float64, int, error) {
+	return 0, 0, nil // JIMINY-SIGNAL-001: mock returns no data → caller uses Neo4j fallback
+}
+
 // ─── Pattern 25: LLM Latency Regression ───
 
 func TestReflect_LLMLatencyRegression_Detected(t *testing.T) {

@@ -168,6 +168,65 @@ func TestReflect_LowGuidanceFollowRate(t *testing.T) {
 	}
 }
 
+// JIMINY-SIGNAL-001: the synergy_jiminy_unhealthy CRITICAL must NOT fire on an
+// UNASSESSED (zero-value) JiminyHealthy — that false positive fired ~8×/day on a
+// healthy Jiminy when the synergy block was skipped. It fires only when the
+// synergy block actually ran (SynergyAssessed) and reported Jiminy down.
+func hasSynergyJiminyInsight(insights []ReflectionInsight) bool {
+	for _, in := range insights {
+		if in.PatternID == "synergy_jiminy_unhealthy" {
+			return true
+		}
+	}
+	return false
+}
+
+func TestReflect_JiminyUnhealthy_NotFiredWhenUnassessed(t *testing.T) {
+	r := NewReflector(config.Config{SynergyAssessmentEnabled: true}, nil)
+	// Unassessed: SynergyAssessed=false → JiminyHealthy is the zero-value false.
+	report := &SelfAssessmentReport{
+		SpaceID: "test", SynergyAssessed: false, JiminyHealthy: false,
+		SynergyLinesClaude: 500, SynergyLinesMemory: 300,
+	}
+	insights, err := r.Reflect(context.Background(), report)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if hasSynergyJiminyInsight(insights) {
+		t.Error("synergy_jiminy_unhealthy must NOT fire on an unassessed (zero-value) JiminyHealthy")
+	}
+}
+
+func TestReflect_JiminyUnhealthy_FiresWhenAssessedAndDown(t *testing.T) {
+	r := NewReflector(config.Config{SynergyAssessmentEnabled: true}, nil)
+	report := &SelfAssessmentReport{
+		SpaceID: "test", SynergyAssessed: true, JiminyHealthy: false,
+		SynergyLinesClaude: 500, SynergyLinesMemory: 300,
+	}
+	insights, err := r.Reflect(context.Background(), report)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !hasSynergyJiminyInsight(insights) {
+		t.Error("synergy_jiminy_unhealthy must fire when assessed AND Jiminy down with synergy lines present")
+	}
+}
+
+func TestReflect_JiminyUnhealthy_NotFiredWhenHealthy(t *testing.T) {
+	r := NewReflector(config.Config{SynergyAssessmentEnabled: true}, nil)
+	report := &SelfAssessmentReport{
+		SpaceID: "test", SynergyAssessed: true, JiminyHealthy: true,
+		SynergyLinesClaude: 500, SynergyLinesMemory: 300,
+	}
+	insights, err := r.Reflect(context.Background(), report)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if hasSynergyJiminyInsight(insights) {
+		t.Error("synergy_jiminy_unhealthy must NOT fire when Jiminy is healthy")
+	}
+}
+
 func TestReflect_SidecarUnhealthy_JiminyActive(t *testing.T) {
 	cfg := config.Config{}
 	r := NewReflector(cfg, nil)
