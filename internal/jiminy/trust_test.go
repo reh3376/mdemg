@@ -21,6 +21,7 @@ func TestTrustScorer_InitialScore(t *testing.T) {
 
 func TestTrustScorer_FollowedBoosts(t *testing.T) {
 	ts := NewTrustScorer(TrustConfig{
+		Mode:           "ratchet", // JIMINY-EFFECTIVENESS-001: legacy boost/decay path
 		Initial:        0.5,
 		BoostPerFollow: 0.1,
 	})
@@ -42,6 +43,7 @@ func TestTrustScorer_FollowedBoosts(t *testing.T) {
 
 func TestTrustScorer_IgnoreDecays(t *testing.T) {
 	ts := NewTrustScorer(TrustConfig{
+		Mode:           "ratchet", // JIMINY-EFFECTIVENESS-001: legacy boost/decay path
 		Initial:        0.5,
 		DecayPerIgnore: 0.1,
 	})
@@ -69,6 +71,7 @@ func TestTrustScorer_ContradictDecaysMore(t *testing.T) {
 
 func TestTrustScorer_ClampBounds(t *testing.T) {
 	ts := NewTrustScorer(TrustConfig{
+		Mode:           "ratchet", // JIMINY-EFFECTIVENESS-001: clamp test exercises the ratchet path
 		Initial:        0.9,
 		BoostPerFollow: 0.2,
 	})
@@ -82,6 +85,7 @@ func TestTrustScorer_ClampBounds(t *testing.T) {
 
 	// Should clamp to 0.0
 	ts2 := NewTrustScorer(TrustConfig{
+		Mode:           "ratchet", // JIMINY-EFFECTIVENESS-001: legacy boost/decay path
 		Initial:        0.05,
 		DecayPerIgnore: 0.1,
 	})
@@ -104,6 +108,7 @@ func TestTrustScorer_SetScore(t *testing.T) {
 
 func TestTrustScorer_SessionIsolation(t *testing.T) {
 	ts := NewTrustScorer(TrustConfig{
+		Mode:           "ratchet", // JIMINY-EFFECTIVENESS-001: legacy boost/decay path
 		Initial:        0.5,
 		BoostPerFollow: 0.1,
 	})
@@ -151,6 +156,7 @@ func TestTrustScorer_PerSessionIndependence(t *testing.T) {
 
 func TestTrustScorer_ConfigurableTTL(t *testing.T) {
 	ts := NewTrustScorer(TrustConfig{
+		Mode:           "ratchet", // JIMINY-EFFECTIVENESS-001: legacy boost/decay path
 		Initial:        0.5,
 		BoostPerFollow: 0.1,
 		TTL:            50 * time.Millisecond,
@@ -173,6 +179,7 @@ func TestTrustScorer_ConfigurableTTL(t *testing.T) {
 
 func TestTrustScorer_SixFollowsReachHighThreshold(t *testing.T) {
 	ts := NewTrustScorer(TrustConfig{
+		Mode:           "ratchet", // JIMINY-EFFECTIVENESS-001: legacy ratchet reaches the threshold in 6 follows
 		Initial:        0.5,
 		BoostPerFollow: 0.05,
 		HighThreshold:  0.8,
@@ -217,5 +224,69 @@ func TestTrustScorer_SetThresholds(t *testing.T) {
 	ts.SetThresholds(1.1, 0.2)
 	if ts.HighThreshold() != 0.7 {
 		t.Errorf("high should remain 0.7 after out-of-range set, got %f", ts.HighThreshold())
+	}
+}
+
+// ─── JIMINY-EFFECTIVENESS-001: EMA (recoverable) trust mode ───
+
+func TestTrustScorer_EMA_RecoversOffFloor(t *testing.T) {
+	// The bug: a session floored by past ignores could never recover under the
+	// ratchet. Under EMA, a run of Followed climbs trust back past the 0.75 T1
+	// threshold — the J17-T1 unblocker.
+	ts := NewTrustScorer(TrustConfig{Mode: "ema", EMAAlpha: 0.2, HighThreshold: 0.75})
+	ts.SetScore("floored", 0.04) // simulate the live 0.04-floored session
+	for i := 0; i < 25; i++ {
+		ts.RecordOutcome("floored", OutcomeFollowed)
+	}
+	score := ts.GetScore("floored")
+	if score < 0.75 {
+		t.Errorf("EMA must let a followed session recover past 0.75; got %f", score)
+	}
+}
+
+func TestTrustScorer_EMA_SteadyIgnoredConvergesLow_NotZero(t *testing.T) {
+	// A genuinely-ineffective (all-ignored) session converges toward the Ignored
+	// anchor (~0.2) — honestly low, correctly below 0.75, but NOT pinned at 0.
+	ts := NewTrustScorer(TrustConfig{Mode: "ema", EMAAlpha: 0.2})
+	ts.SetScore("ignorer", 0.65)
+	for i := 0; i < 50; i++ {
+		ts.RecordOutcome("ignorer", OutcomeIgnored)
+	}
+	score := ts.GetScore("ignorer")
+	if score > 0.30 {
+		t.Errorf("steady-ignored should converge low (~0.2); got %f", score)
+	}
+	if score < 0.10 {
+		t.Errorf("steady-ignored should converge to the ~0.2 anchor, not 0; got %f", score)
+	}
+	if score >= 0.75 {
+		t.Errorf("ineffective session must stay out of T1; got %f", score)
+	}
+}
+
+func TestTrustScorer_EMA_TracksRecentRegime(t *testing.T) {
+	// Trust tracks the RECENT regime: after ignores then a follow streak, it rises.
+	ts := NewTrustScorer(TrustConfig{Mode: "ema", EMAAlpha: 0.2})
+	ts.SetScore("sess", 0.65)
+	for i := 0; i < 10; i++ {
+		ts.RecordOutcome("sess", OutcomeIgnored)
+	}
+	low := ts.GetScore("sess")
+	for i := 0; i < 10; i++ {
+		ts.RecordOutcome("sess", OutcomeFollowed)
+	}
+	high := ts.GetScore("sess")
+	if !(high > low) {
+		t.Errorf("EMA must rise when the recent regime improves: low=%f high=%f", low, high)
+	}
+}
+
+func TestTrustScorer_EMA_DefaultMode(t *testing.T) {
+	// EMA is the default (no Mode set).
+	ts := NewTrustScorer(TrustConfig{Initial: 0.5})
+	ts.RecordOutcome("s", OutcomeFollowed)
+	// EMA toward 1.0 at default α=0.1: 0.5 + 0.1*0.5 = 0.55 (NOT the ratchet's +boost).
+	if !approxEqual(ts.GetScore("s"), 0.55) {
+		t.Errorf("default mode should be EMA; got %f, want 0.55", ts.GetScore("s"))
 	}
 }
