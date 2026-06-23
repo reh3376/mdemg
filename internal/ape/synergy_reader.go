@@ -73,8 +73,16 @@ func (r *FileSynergyReader) ReadSynergyMetrics() SynergyMetrics {
 	if r.memoryMDPath != "" {
 		sm.AutoMemoryFiles, sm.AutoMemoryLines = countAutoMemoryFiles(r.memoryMDPath)
 	}
+	// JIMINY-SIGNAL-001: default to HEALTHY. JiminyHealthy gates a CRITICAL
+	// "catastrophic-forgetting" alert; the zero-value false (= "Jiminy down")
+	// must NOT be the default when we cannot definitively check (jiminyCheck nil).
+	// Only a real check returning false marks Jiminy down — real outages are
+	// independently covered by /healthz + the Jiminy watchdog.
+	sm.JiminyHealthy = true
 	if r.jiminyCheck != nil {
 		sm.JiminyHealthy = r.jiminyCheck()
+	} else {
+		slog.Warn("synergy: jiminyCheck is nil — defaulting JiminyHealthy=true to avoid a false catastrophic-forgetting CRITICAL (wiring gap)")
 	}
 	// G1: Compute overflow rate as raw excess lines above threshold
 	if r.memoryLineThreshold > 0 && sm.MemoryMDLines > r.memoryLineThreshold {

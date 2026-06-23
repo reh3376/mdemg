@@ -17,6 +17,13 @@ type DatasetProvider interface {
 	EmbeddingCoverage(ctx context.Context, spaceID string, window time.Duration) (*EmbeddingCoverageSummary, error)
 	MetricTrend(ctx context.Context, spaceID, metricName string, window time.Duration) (*MetricTrend, error)
 	TrainingDataReadiness(ctx context.Context) (*TrainingDataReadiness, error)
+	// GuidanceEffectiveness returns the windowed guidance follow-rate computed
+	// from the constraint_outcomes TSDB sink — the SAME source + math as the
+	// mdemg-jiminy dashboard panels (followed=1.0, partial_compliance=0.5).
+	// JIMINY-SIGNAL-001: replaces the inflated Neo4j dedup-by-guidance_id gauge
+	// so the gauge, the panels, and RSIC GuidanceHealth all agree. samples=0
+	// signals no data in the window (caller falls back).
+	GuidanceEffectiveness(ctx context.Context, spaceID string, window time.Duration) (rate float64, samples int, err error)
 }
 
 // LLMPerformanceSummary holds per-task LLM performance metrics.
@@ -167,6 +174,30 @@ func (b *DatasetBuilder) LLMPerformance(ctx context.Context, spaceID string, win
 		results = append(results, s)
 	}
 	return results, rows.Err()
+}
+
+// GuidanceEffectiveness returns the windowed guidance follow-rate from
+// constraint_outcomes (JIMINY-SIGNAL-001). Mirrors the mdemg-jiminy dashboard
+// panels exactly: followed=1.0, partial_compliance=0.5, ignored/contradicted=0,
+// over (now-window, now]. Returns (rate, samples); samples=0 ⇒ no data in window.
+func (b *DatasetBuilder) GuidanceEffectiveness(ctx context.Context, spaceID string, window time.Duration) (float64, int, error) {
+	cutoff := time.Now().Add(-window)
+	const query = `
+		SELECT
+			COUNT(*)::int AS n,
+			COALESCE(
+				SUM(CASE WHEN outcome_type = 'followed' THEN 1.0
+				         WHEN outcome_type = 'partial_compliance' THEN 0.5
+				         ELSE 0.0 END) / NULLIF(COUNT(*), 0),
+				0)::float8 AS rate
+		FROM constraint_outcomes
+		WHERE space_id = $1 AND time >= $2`
+	var n int
+	var rate float64
+	if err := b.pool.QueryRow(ctx, query, spaceID, cutoff).Scan(&n, &rate); err != nil {
+		return 0, 0, fmt.Errorf("dataset_builder: guidance_effectiveness: %w", err)
+	}
+	return rate, n, nil
 }
 
 // RetrievalQuality returns retrieval pipeline quality summary for the given window.

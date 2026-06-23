@@ -278,14 +278,14 @@ type Config struct {
 	MetaLearnTimeoutMs      int    // METALEARN_TIMEOUT_MS — timeout for generalization in ms (default: 15000, min 1000)
 
 	// Jiminy Guidance settings (Phase Jiminy)
-	JiminyEnabled       bool    // JIMINY_ENABLED — enable Jiminy inner voice guidance (default: true)
+	JiminyEnabled bool // JIMINY_ENABLED — enable Jiminy inner voice guidance (default: true)
 	// NEGFEED-001 — on a contradicted guidance outcome, weaken co-activations
 	// among the guidance's source nodes (anti-Hebbian). Safe (q<>r guard,
 	// weight floors at 0, single-source = no-op). Default true.
-	JiminyContradictedWeakenEnabled bool // JIMINY_CONTRADICTED_WEAKEN_ENABLED
-	JiminyTimeoutMs            int     // JIMINY_TIMEOUT_MS — direct Guide() budget; 0 = derive from JIMINY_WARM_COMPUTE_TIMEOUT_MS (default: 0; the old independent 15s starved fresh installs)
-	JiminyMaxItems      int     // JIMINY_MAX_ITEMS — max guidance items returned (default: 10)
-	JiminyMinConfidence float64 // JIMINY_MIN_CONFIDENCE — minimum confidence to include item (default: 0.3)
+	JiminyContradictedWeakenEnabled bool    // JIMINY_CONTRADICTED_WEAKEN_ENABLED
+	JiminyTimeoutMs                 int     // JIMINY_TIMEOUT_MS — direct Guide() budget; 0 = derive from JIMINY_WARM_COMPUTE_TIMEOUT_MS (default: 0; the old independent 15s starved fresh installs)
+	JiminyMaxItems                  int     // JIMINY_MAX_ITEMS — max guidance items returned (default: 10)
+	JiminyMinConfidence             float64 // JIMINY_MIN_CONFIDENCE — minimum confidence to include item (default: 0.3)
 	// JIMINY-OUTCOME-001 — minimum vector-index cosine similarity for an embedding-based
 	// constraint-code match. Concept-abstracted guidance rarely shares 3+ literal words
 	// with raw constraint text, so keyword matching missed everything and the Neo4j
@@ -452,7 +452,7 @@ type Config struct {
 	MdemgCommit     string // MDEMG build commit hash for version comparison
 
 	// Linear integration settings (Phase 4)
-	LinearTeamID      string // Default team ID for issue creation
+	LinearTeamID string // Default team ID for issue creation
 
 	// Linear webhook settings (Phase 9.4)
 	LinearWebhookSecret  string // LINEAR_WEBHOOK_SECRET — HMAC-SHA256 signing secret
@@ -478,8 +478,8 @@ type Config struct {
 	OptimisticRetryMultiplier  float64 // OPTIMISTIC_RETRY_MULTIPLIER — exponential backoff multiplier (default: 2.0)
 
 	// Edge staleness settings (Phase 47)
-	EdgeStalenessCascadeEnabled   bool    // EDGE_STALENESS_CASCADE_ENABLED — enable edge staleness cascade (default: true)
-	EdgeStalenessRefreshBatchSize int     // EDGE_STALENESS_REFRESH_BATCH_SIZE — edges per refresh call (default: 100)
+	EdgeStalenessCascadeEnabled   bool // EDGE_STALENESS_CASCADE_ENABLED — enable edge staleness cascade (default: true)
+	EdgeStalenessRefreshBatchSize int  // EDGE_STALENESS_REFRESH_BATCH_SIZE — edges per refresh call (default: 100)
 
 	// Capability gap detection settings (Task #23)
 	GapLowScoreThreshold   float64 // Queries below this avg score are considered poor (default: 0.5)
@@ -488,29 +488,33 @@ type Config struct {
 	GapMetricsWindowSize   int     // Number of queries to keep in history (default: 1000)
 
 	// RSIC (Recursive Self-Improvement Cycle) settings (Phase 60b)
-	RSICMicroEnabled        bool     // RSIC_MICRO_ENABLED — enable per-request micro cycles (default: true)
-	RSICMesoPeriodHours     int      // RSIC_MESO_PERIOD_HOURS — hours between meso cycles (default: 6)
-	RSICMesoPeriodSessions  int      // RSIC_MESO_PERIOD_SESSIONS — sessions between meso cycles (default: 10)
-	RSICMacroCron           string   // RSIC_MACRO_CRON — cron expression for macro cycles (default: "0 3 * * *")
-	RSICMaxNodePrunePct     float64  // RSIC_MAX_NODE_PRUNE_PCT — max % of nodes a single action can prune (default: 0.05)
-	RSICMaxEdgePrunePct     float64  // RSIC_MAX_EDGE_PRUNE_PCT — max % of edges a single action can prune (default: 0.10)
-	RSICRollbackWindow      int      // RSIC_ROLLBACK_WINDOW — seconds to keep rollback snapshots (default: 3600)
-	RSICWatchdogEnabled     bool     // RSIC_WATCHDOG_ENABLED — enable decay watchdog (default: true)
-	RSICWatchdogCheckSec    int      // RSIC_WATCHDOG_CHECK_SEC — seconds between watchdog checks (default: 300)
-	RSICWatchdogDecayRate   float64  // RSIC_WATCHDOG_DECAY_RATE — decay score increase per hour without cycle (default: 0.1)
-	RSICNudgeThreshold      float64  // RSIC_NUDGE_THRESHOLD — decay score for nudge-level escalation (default: 0.3)
-	RSICWarnThreshold       float64  // RSIC_WARN_THRESHOLD — decay score for warn-level escalation (default: 0.6)
-	RSICForceThreshold      float64  // RSIC_FORCE_THRESHOLD — decay score for force-trigger escalation (default: 0.9)
-	RSICCalibrationDays     int      // RSIC_CALIBRATION_DAYS — days of history for calibration (default: 30)
-	RSICMaxHistoryEntries   int      // RSIC_MAX_HISTORY_ENTRIES — max calibration history entries per type (default: 1000)
-	RSICMinConfidence       float64  // RSIC_MIN_CONFIDENCE — minimum confidence to execute an action (default: 0.3)
-	RSICTriggerCooldownSec  int      // RSIC_TRIGGER_COOLDOWN_SEC — cooldown between triggers from same source (default: 300)
-	RSICTriggerDedupeSec    int      // RSIC_TRIGGER_DEDUPE_SEC — dedupe window for identical trigger IDs (default: 600)
-	RSICWatchdogSpaceID     string   // RSIC_WATCHDOG_SPACE_ID — space monitored by watchdog (default: "mdemg-dev")
-	RSICPersistenceEnabled  bool     // RSIC_PERSISTENCE_ENABLED — enable write-behind persistence (default: true)
-	RSICProtectedSpaces     []string // RSIC_PROTECTED_SPACES — comma-separated spaces blocked from destructive RSIC actions (default: "" = none)
-	RSICMacroCronSpace      string   // RSIC_MACRO_CRON_SPACE — space targeted by macro cron cycles (default: "mdemg-dev")
-	RSICMinActionConfidence float64  // RSIC_MIN_ACTION_CONFIDENCE — suppress planner actions below this calibration success rate (default: 0.2)
+	RSICMicroEnabled       bool    // RSIC_MICRO_ENABLED — enable per-request micro cycles (default: true)
+	RSICMesoPeriodHours    int     // RSIC_MESO_PERIOD_HOURS — hours between meso cycles (default: 6)
+	RSICMesoPeriodSessions int     // RSIC_MESO_PERIOD_SESSIONS — sessions between meso cycles (default: 10)
+	RSICMacroCron          string  // RSIC_MACRO_CRON — cron expression for macro cycles (default: "0 3 * * *")
+	RSICMaxNodePrunePct    float64 // RSIC_MAX_NODE_PRUNE_PCT — max % of nodes a single action can prune (default: 0.05)
+	RSICMaxEdgePrunePct    float64 // RSIC_MAX_EDGE_PRUNE_PCT — max % of edges a single action can prune (default: 0.10)
+	RSICRollbackWindow     int     // RSIC_ROLLBACK_WINDOW — seconds to keep rollback snapshots (default: 3600)
+	RSICWatchdogEnabled    bool    // RSIC_WATCHDOG_ENABLED — enable decay watchdog (default: true)
+	RSICWatchdogCheckSec   int     // RSIC_WATCHDOG_CHECK_SEC — seconds between watchdog checks (default: 300)
+	RSICWatchdogDecayRate  float64 // RSIC_WATCHDOG_DECAY_RATE — decay score increase per hour without cycle (default: 0.1)
+	// JIMINY-SIGNAL-001: window for the honest guidance follow-rate computed from
+	// constraint_outcomes TSDB (the dashboard panels' source), replacing the
+	// inflated Neo4j dedup gauge. 7d default is a stable window matching the panels.
+	RSICGuidanceEffectivenessWindowHours int      // RSIC_GUIDANCE_EFFECTIVENESS_WINDOW_HOURS (default: 168; range [1,720])
+	RSICNudgeThreshold                   float64  // RSIC_NUDGE_THRESHOLD — decay score for nudge-level escalation (default: 0.3)
+	RSICWarnThreshold                    float64  // RSIC_WARN_THRESHOLD — decay score for warn-level escalation (default: 0.6)
+	RSICForceThreshold                   float64  // RSIC_FORCE_THRESHOLD — decay score for force-trigger escalation (default: 0.9)
+	RSICCalibrationDays                  int      // RSIC_CALIBRATION_DAYS — days of history for calibration (default: 30)
+	RSICMaxHistoryEntries                int      // RSIC_MAX_HISTORY_ENTRIES — max calibration history entries per type (default: 1000)
+	RSICMinConfidence                    float64  // RSIC_MIN_CONFIDENCE — minimum confidence to execute an action (default: 0.3)
+	RSICTriggerCooldownSec               int      // RSIC_TRIGGER_COOLDOWN_SEC — cooldown between triggers from same source (default: 300)
+	RSICTriggerDedupeSec                 int      // RSIC_TRIGGER_DEDUPE_SEC — dedupe window for identical trigger IDs (default: 600)
+	RSICWatchdogSpaceID                  string   // RSIC_WATCHDOG_SPACE_ID — space monitored by watchdog (default: "mdemg-dev")
+	RSICPersistenceEnabled               bool     // RSIC_PERSISTENCE_ENABLED — enable write-behind persistence (default: true)
+	RSICProtectedSpaces                  []string // RSIC_PROTECTED_SPACES — comma-separated spaces blocked from destructive RSIC actions (default: "" = none)
+	RSICMacroCronSpace                   string   // RSIC_MACRO_CRON_SPACE — space targeted by macro cron cycles (default: "mdemg-dev")
+	RSICMinActionConfidence              float64  // RSIC_MIN_ACTION_CONFIDENCE — suppress planner actions below this calibration success rate (default: 0.2)
 
 	// RSIC-SK1: Guidance self-calibration
 	RSICGuidanceCalibrationEnabled bool    // RSIC_GUIDANCE_CALIBRATION_ENABLED — master switch for RSIC-SK1 actions (default: true)
@@ -645,11 +649,11 @@ type Config struct {
 	// Defaults flag-off until Epic 6 A/B verdict — operator can enable
 	// observe-time fingerprint computation alone (no retrieval-side use)
 	// to start populating data for a future A/B.
-	ContextFingerprintEnabled              bool    // CONTEXT_FINGERPRINT_ENABLED — Service.Observe computes + writes context_fingerprint_active on new MemoryNodes (default: false until Epic 6 A/B passes)
-	ContextFingerprintBitBudget            int     // CONTEXT_FINGERPRINT_BIT_BUDGET — total bits per fingerprint (default: 256 per Note 05 spec)
-	ContextFingerprintRefreshEnabled       bool    // CONTEXT_FINGERPRINT_REFRESH_ENABLED — CycleOrchestrator stage 6 runs Builder.BuildForSpace + post-hoc refresh (default: false initially)
-	ContextFingerprintRefreshIntervalHours int     // CONTEXT_FINGERPRINT_REFRESH_INTERVAL_HOURS — minimum hours between refresh ticks per space (default: 168 = weekly)
-	ContextFingerprintRefreshTimeoutMs     int     // CONTEXT_FINGERPRINT_REFRESH_TIMEOUT_MS — per-cycle time budget for post-hoc refresh batch (default: 60000 = 60s)
+	ContextFingerprintEnabled              bool // CONTEXT_FINGERPRINT_ENABLED — Service.Observe computes + writes context_fingerprint_active on new MemoryNodes (default: false until Epic 6 A/B passes)
+	ContextFingerprintBitBudget            int  // CONTEXT_FINGERPRINT_BIT_BUDGET — total bits per fingerprint (default: 256 per Note 05 spec)
+	ContextFingerprintRefreshEnabled       bool // CONTEXT_FINGERPRINT_REFRESH_ENABLED — CycleOrchestrator stage 6 runs Builder.BuildForSpace + post-hoc refresh (default: false initially)
+	ContextFingerprintRefreshIntervalHours int  // CONTEXT_FINGERPRINT_REFRESH_INTERVAL_HOURS — minimum hours between refresh ticks per space (default: 168 = weekly)
+	ContextFingerprintRefreshTimeoutMs     int  // CONTEXT_FINGERPRINT_REFRESH_TIMEOUT_MS — per-cycle time budget for post-hoc refresh batch (default: 60000 = 60s)
 	// CONTEXT-LIVE-001 — stage-6 version-skew heal: max stale-fingerprint
 	// nodes recomputed per cycle (0 disables; resumable across cycles).
 	ContextFingerprintHealMaxPerCycle int // CONTEXT_FINGERPRINT_HEAL_MAX_PER_CYCLE (default: 2000)
@@ -669,15 +673,15 @@ type Config struct {
 	ContextQueryAutoDefault bool // CONTEXT_QUERY_AUTO_DEFAULT (default: true)
 	// CONTEXT-LIVE-001 — Phase-B refine: max current-version observations
 	// run through RefineWithCoactivations per cycle (0 disables).
-	ContextFingerprintRefineMaxPerCycle int // CONTEXT_FINGERPRINT_REFINE_MAX_PER_CYCLE (default: 200)
-	ContextCatalogTopNPaths                int     // CONTEXT_CATALOG_TOP_N_PATHS — cap on path bits in catalog (default: 192)
-	ContextCatalogTopNTags                 int     // CONTEXT_CATALOG_TOP_N_TAGS — cap on tag bits in catalog (default: 32)
-	ContextCatalogFloorBitsPerKind         int     // CONTEXT_CATALOG_FLOOR_BITS_PER_KIND — minimum bits allocated to any kind with ≥10 distinct values (default: 16)
-	ContextCatalogRoleTypeLayerBits        int     // CONTEXT_CATALOG_ROLE_TYPE_LAYER_BITS — reserved bits for top-N (role_type × layer) tuples (default: 32)
-	RetrievalContextColumnEnabled          bool    // RETRIEVAL_CONTEXT_COLUMN_ENABLED — 5th RRF column gates on this (default: true since Phase 14.2.3, 2026-05-06; per-category zero-weight overrides for service_relationships / business_logic_constraints / relationship live in RetrievalContextColumnCategoryWeights)
-	RetrievalContextColumnWeight           float64 // RETRIEVAL_CONTEXT_COLUMN_WEIGHT — RRF weight on the context column (default: 0.10 per Note 05 spec)
-	RetrievalContextStrictThreshold        float64 // RETRIEVAL_CTX_STRICT_THRESHOLD — Jaccard threshold for ?strict_context=true mode (default: 0.25 per Note 05 spec)
-	ContextFingerprintQueryTopK            int     // CONTEXT_FINGERPRINT_QUERY_TOPK — Phase 14.2.1: top-K catalog refs (by cosine sim to query embedding) included in derived query fingerprint (default: 8)
+	ContextFingerprintRefineMaxPerCycle int     // CONTEXT_FINGERPRINT_REFINE_MAX_PER_CYCLE (default: 200)
+	ContextCatalogTopNPaths             int     // CONTEXT_CATALOG_TOP_N_PATHS — cap on path bits in catalog (default: 192)
+	ContextCatalogTopNTags              int     // CONTEXT_CATALOG_TOP_N_TAGS — cap on tag bits in catalog (default: 32)
+	ContextCatalogFloorBitsPerKind      int     // CONTEXT_CATALOG_FLOOR_BITS_PER_KIND — minimum bits allocated to any kind with ≥10 distinct values (default: 16)
+	ContextCatalogRoleTypeLayerBits     int     // CONTEXT_CATALOG_ROLE_TYPE_LAYER_BITS — reserved bits for top-N (role_type × layer) tuples (default: 32)
+	RetrievalContextColumnEnabled       bool    // RETRIEVAL_CONTEXT_COLUMN_ENABLED — 5th RRF column gates on this (default: true since Phase 14.2.3, 2026-05-06; per-category zero-weight overrides for service_relationships / business_logic_constraints / relationship live in RetrievalContextColumnCategoryWeights)
+	RetrievalContextColumnWeight        float64 // RETRIEVAL_CONTEXT_COLUMN_WEIGHT — RRF weight on the context column (default: 0.10 per Note 05 spec)
+	RetrievalContextStrictThreshold     float64 // RETRIEVAL_CTX_STRICT_THRESHOLD — Jaccard threshold for ?strict_context=true mode (default: 0.25 per Note 05 spec)
+	ContextFingerprintQueryTopK         int     // CONTEXT_FINGERPRINT_QUERY_TOPK — Phase 14.2.1: top-K catalog refs (by cosine sim to query embedding) included in derived query fingerprint (default: 8)
 
 	// Phase 14.2.3 — Per-category override of the context-column RRF weight.
 	// Default seed reflects the Phase 14.2.2 120q forensic: zero-weight on
@@ -748,20 +752,20 @@ type Config struct {
 	ScraperMaxContentLengthKB int    // SCRAPER_MAX_CONTENT_LENGTH_KB — max content length in KB (default: 500)
 
 	// Neo4j Backup & Restore (Phase 70)
-	BackupEnabled               bool   // BACKUP_ENABLED — enable backup module (default: true)
-	BackupStorageDir            string // BACKUP_STORAGE_DIR — directory for backup artifacts (default: ".mdemg/backups")
-	BackupFullCmd               string // BACKUP_FULL_CMD — command for full backups (default: "docker")
-	BackupNeo4jContainer        string // BACKUP_NEO4J_CONTAINER — Docker container name (default: "mdemg-neo4j")
-	BackupFullIntervalHours     int    // BACKUP_FULL_INTERVAL_HOURS — hours between full backups (default: 168)
-	BackupPartialIntervalHours  int    // BACKUP_PARTIAL_INTERVAL_HOURS — hours between partial backups (default: 24)
-	BackupRetentionFullCount    int    // BACKUP_RETENTION_FULL_COUNT — keep last N full backups (default: 4)
-	BackupRetentionPartialCount int    // BACKUP_RETENTION_PARTIAL_COUNT — keep last N partial backups (default: 14)
-	BackupRetentionMaxAgeDays   int    // BACKUP_RETENTION_MAX_AGE_DAYS — delete backups older than N days (default: 90)
-	BackupRetentionMaxStorageGB int    // BACKUP_RETENTION_MAX_STORAGE_GB — storage quota in GB (default: 50)
-	BackupRetentionRunAfter     bool   // BACKUP_RETENTION_RUN_AFTER_BACKUP — run retention after each backup (default: true)
-	BackupSnapshotWaitTimeoutSec int   // BACKUP_SNAPSHOT_WAIT_TIMEOUT_SEC — max wait for triggered backup jobs (pre-restore snapshot, scheduled-run reporting) (default: 3600)
-	BackupJobStalenessHours     int    // BACKUP_JOB_STALENESS_HOURS — neo4j-backup staleness alert window; 0 = partial interval × 2 (default: 0)
-	BackupInitialDelayMin       int    // BACKUP_INITIAL_DELAY_MIN — minutes after start before an initial partial backup; 0 disables (default: 5)
+	BackupEnabled                bool   // BACKUP_ENABLED — enable backup module (default: true)
+	BackupStorageDir             string // BACKUP_STORAGE_DIR — directory for backup artifacts (default: ".mdemg/backups")
+	BackupFullCmd                string // BACKUP_FULL_CMD — command for full backups (default: "docker")
+	BackupNeo4jContainer         string // BACKUP_NEO4J_CONTAINER — Docker container name (default: "mdemg-neo4j")
+	BackupFullIntervalHours      int    // BACKUP_FULL_INTERVAL_HOURS — hours between full backups (default: 168)
+	BackupPartialIntervalHours   int    // BACKUP_PARTIAL_INTERVAL_HOURS — hours between partial backups (default: 24)
+	BackupRetentionFullCount     int    // BACKUP_RETENTION_FULL_COUNT — keep last N full backups (default: 4)
+	BackupRetentionPartialCount  int    // BACKUP_RETENTION_PARTIAL_COUNT — keep last N partial backups (default: 14)
+	BackupRetentionMaxAgeDays    int    // BACKUP_RETENTION_MAX_AGE_DAYS — delete backups older than N days (default: 90)
+	BackupRetentionMaxStorageGB  int    // BACKUP_RETENTION_MAX_STORAGE_GB — storage quota in GB (default: 50)
+	BackupRetentionRunAfter      bool   // BACKUP_RETENTION_RUN_AFTER_BACKUP — run retention after each backup (default: true)
+	BackupSnapshotWaitTimeoutSec int    // BACKUP_SNAPSHOT_WAIT_TIMEOUT_SEC — max wait for triggered backup jobs (pre-restore snapshot, scheduled-run reporting) (default: 3600)
+	BackupJobStalenessHours      int    // BACKUP_JOB_STALENESS_HOURS — neo4j-backup staleness alert window; 0 = partial interval × 2 (default: 0)
+	BackupInitialDelayMin        int    // BACKUP_INITIAL_DELAY_MIN — minutes after start before an initial partial backup; 0 disables (default: 5)
 
 	// TimescaleDB Backup & Restore
 	TSDBBackupEnabled             bool   // TSDB_BACKUP_ENABLED — enable TSDB backup module (default: false)
@@ -965,10 +969,10 @@ type Config struct {
 	DeterminismScoringEnabled bool // DETERMINISM_SCORING_ENABLED — enable determinism score computation (default: false)
 
 	// F10: Jiminy Latency Optimization
-	JiminyCacheEnabled     bool // JIMINY_CACHE_ENABLED — enable constraint result cache (default: true)
-	JiminyCacheTTLSec      int  // JIMINY_CACHE_TTL_SEC — cache TTL in seconds (default: 300)
-	JiminyCacheSize        int  // JIMINY_CACHE_SIZE — max cache entries (default: 200)
-	JiminyCacheJ17Bypass   bool // JIMINY_CACHE_J17_BYPASS — bypass cache for J17 sessions to prevent cross-session contamination (default: true)
+	JiminyCacheEnabled   bool // JIMINY_CACHE_ENABLED — enable constraint result cache (default: true)
+	JiminyCacheTTLSec    int  // JIMINY_CACHE_TTL_SEC — cache TTL in seconds (default: 300)
+	JiminyCacheSize      int  // JIMINY_CACHE_SIZE — max cache entries (default: 200)
+	JiminyCacheJ17Bypass bool // JIMINY_CACHE_J17_BYPASS — bypass cache for J17 sessions to prevent cross-session contamination (default: true)
 
 	// F11: Configurable Activation Dimension Weights
 	ActivationDimSemanticWeight     float64 // ACTIVATION_DIM_SEMANTIC_WEIGHT — semantic dimension weight (default: 0.6)
@@ -1004,14 +1008,14 @@ type Config struct {
 
 	// ===== Synergy: Claude Code ↔ MDEMG Token Optimization =====
 
-	SynergyMemoryLineThreshold    int     // SYNERGY_MEMORY_LINE_THRESHOLD — line count before overflow triggers (default: 120)
-	SynergyClaudeMDPath           string  // SYNERGY_CLAUDE_MD_PATH — path to CLAUDE.md (default: auto-detect)
-	SynergyMemoryMDPath           string  // SYNERGY_MEMORY_MD_PATH — path to MEMORY.md (default: auto-detect)
-	SynergyAssessmentEnabled      bool    // SYNERGY_ASSESSMENT_ENABLED — master switch for synergy RSIC dimension (default: true)
-	SynergyTargetClaudeLines      int     // SYNERGY_TARGET_CLAUDE_LINES — target line count for CLAUDE.md (default: 150)
-	SynergyTargetMemoryLines      int     // SYNERGY_TARGET_MEMORY_LINES — target line count for MEMORY.md (default: 120)
-	SynergyOverlapSampleSize      int     // SYNERGY_OVERLAP_SAMPLE_SIZE — lines sampled for overlap check (default: 5)
-	SynergyOverflowAlertThreshold int     // SYNERGY_OVERFLOW_ALERT_THRESHOLD — overflow events/24h before RSIC alert (default: 5)
+	SynergyMemoryLineThreshold    int    // SYNERGY_MEMORY_LINE_THRESHOLD — line count before overflow triggers (default: 120)
+	SynergyClaudeMDPath           string // SYNERGY_CLAUDE_MD_PATH — path to CLAUDE.md (default: auto-detect)
+	SynergyMemoryMDPath           string // SYNERGY_MEMORY_MD_PATH — path to MEMORY.md (default: auto-detect)
+	SynergyAssessmentEnabled      bool   // SYNERGY_ASSESSMENT_ENABLED — master switch for synergy RSIC dimension (default: true)
+	SynergyTargetClaudeLines      int    // SYNERGY_TARGET_CLAUDE_LINES — target line count for CLAUDE.md (default: 150)
+	SynergyTargetMemoryLines      int    // SYNERGY_TARGET_MEMORY_LINES — target line count for MEMORY.md (default: 120)
+	SynergyOverlapSampleSize      int    // SYNERGY_OVERLAP_SAMPLE_SIZE — lines sampled for overlap check (default: 5)
+	SynergyOverflowAlertThreshold int    // SYNERGY_OVERFLOW_ALERT_THRESHOLD — overflow events/24h before RSIC alert (default: 5)
 
 	// ===== RSIC Overall-Health Weights (DH-005) =====
 	// Base priors for ComputeOverallHealth's 7 sub-dimensions. Values need not
@@ -1027,8 +1031,8 @@ type Config struct {
 	RSICHealthWeightSynergy   float64 // RSIC_HEALTH_WEIGHT_SYNERGY   — overall-health weight for SynergyHealth (default: 0.05)
 
 	// Synergy Recovery Buffer: store-and-forward during Jiminy outages
-	SynergyRecoveryBufferSpace      string // SYNERGY_RECOVERY_BUFFER_SPACE — CMS space for buffered observations (default: "synergy-buffer")
-	SynergyRecoveryBufferPath       string // SYNERGY_RECOVERY_BUFFER_PATH — local JSONL fallback path (default: ".mdemg/synergy-recovery-buffer.jsonl")
+	SynergyRecoveryBufferSpace string // SYNERGY_RECOVERY_BUFFER_SPACE — CMS space for buffered observations (default: "synergy-buffer")
+	SynergyRecoveryBufferPath  string // SYNERGY_RECOVERY_BUFFER_PATH — local JSONL fallback path (default: ".mdemg/synergy-recovery-buffer.jsonl")
 
 	// ===== TimescaleDB (Historical Metrics + FT Data) =====
 
@@ -2745,6 +2749,13 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	rsicGuidanceEffectivenessWindowHours, err := atoi("RSIC_GUIDANCE_EFFECTIVENESS_WINDOW_HOURS", 168)
+	if err != nil {
+		return Config{}, err
+	}
+	if rsicGuidanceEffectivenessWindowHours < 1 || rsicGuidanceEffectivenessWindowHours > 720 {
+		return Config{}, fmt.Errorf("RSIC_GUIDANCE_EFFECTIVENESS_WINDOW_HOURS must be in range [1, 720]")
+	}
 	rsicNudgeThreshold, err := atof("RSIC_NUDGE_THRESHOLD", 0.3)
 	if err != nil {
 		return Config{}, err
@@ -3270,7 +3281,6 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-
 
 	// Phase 38: UNTS Hash Verification
 	untsEnabled := getBool("UNTS_ENABLED", false)
@@ -4568,48 +4578,48 @@ func FromEnv() (Config, error) {
 		JiminyWarmMaxAgeSec:              jiminyWarmMaxAgeSec,
 
 		// Jiminy J7-J12
-		JiminyRetrievalEnabled:                     jiminyRetrievalEnabled,
-		JiminyRetrievalTopK:                        jiminyRetrievalTopK,
-		JiminyRetrievalHopDepth:                    jiminyRetrievalHopDepth,
-		JiminySynthesisEnabled:                     jiminySynthesisEnabled,
-		JiminySynthesisProvider:                    jiminySynthesisProvider,
-		JiminySynthesisModel:                       jiminySynthesisModel,
-		JiminySynthesisMaxTokens:                   jiminySynthesisMaxTokens,
-		JiminySynthesisTimeoutMs:                   jiminySynthesisTimeoutMs,
-		JiminyEvaluateEnabled:                      jiminyEvaluateEnabled,
-		JiminyEvaluateTimeoutMs:                    jiminyEvaluateTimeoutMs,
-		JiminyEvaluateMaxConstraints:               jiminyEvaluateMaxConstraints,
-		JiminyEvaluateLLMEnabled:                   jiminyEvaluateLLMEnabled,
-		JiminyEvaluateLLMProvider:                  jiminyEvaluateLLMProvider,
-		JiminyEvaluateLLMModel:                     jiminyEvaluateLLMModel,
-		JiminyEvaluateLLMTimeoutMs:                 jiminyEvaluateLLMTimeoutMs,
-		JiminyEvaluateLLMMaxTokens:                 jiminyEvaluateLLMMaxTokens,
-		JiminyOutcomeClassifierEnabled:             jiminyOutcomeClassifierEnabled,
-		JiminyOutcomeLLMEnabled:                    jiminyOutcomeLLMEnabled,
-		JiminyOutcomeSimilarityHigh:                jiminyOutcomeSimilarityHigh,
-		JiminyOutcomeSimilarityLow:                 jiminyOutcomeSimilarityLow,
-		JiminyOutcomeLLMMaxTokens:                  jiminyOutcomeLLMMaxTokens,
-		JiminyOutcomeCacheSize:                     jiminyOutcomeCacheSize,
-		JiminyClassifyCompress:                     jiminyClassifyCompress,
-		JiminyDedupSimilarityThreshold:             jiminyDedupSimilarityThreshold,
-		JiminyCorrectionDecayRate:                  jiminyCorrectionDecayRate,
-		J17TicketCacheSize:                         j17TicketCacheSize,
-		JiminySynthesisTemperature:                 jiminySynthesisTemperature,
-		JiminyGuidanceContextMaxChars:              jiminyGuidanceContextMaxChars,
-		JiminyGuidanceOutputMaxChars:               jiminyGuidanceOutputMaxChars,
-		JiminyEvaluateOutputMaxChars:               jiminyEvaluateOutputMaxChars,
-		JiminyEvaluateItemMaxChars:                 jiminyEvaluateItemMaxChars,
-		JiminyEscalationEnabled:                    jiminyEscalationEnabled,
-		JiminyEscalationWarnAfter:                  jiminyEscalationWarnAfter,
-		JiminyEscalationEscalateAfter:              jiminyEscalationEscalateAfter,
-		JiminyEscalationBlockAfter:                 jiminyEscalationBlockAfter,
-		JiminyEscalationBlockEnabled:               jiminyEscalationBlockEnabled,
-		JiminyEscalationDecayMinutes:               jiminyEscalationDecayMinutes,
-		JiminyEscalationPersistEnabled:             jiminyEscalationPersistEnabled,
-		JiminyStrictStatePath:                      jiminyStrictStatePath,
-		JiminyCodeRegenEnabled:                     jiminyCodeRegenEnabled,
-		JiminyCodeRegenThreshold:                   jiminyCodeRegenThreshold,
-		JiminyCodeRegenMinSamples:                  jiminyCodeRegenMinSamples,
+		JiminyRetrievalEnabled:         jiminyRetrievalEnabled,
+		JiminyRetrievalTopK:            jiminyRetrievalTopK,
+		JiminyRetrievalHopDepth:        jiminyRetrievalHopDepth,
+		JiminySynthesisEnabled:         jiminySynthesisEnabled,
+		JiminySynthesisProvider:        jiminySynthesisProvider,
+		JiminySynthesisModel:           jiminySynthesisModel,
+		JiminySynthesisMaxTokens:       jiminySynthesisMaxTokens,
+		JiminySynthesisTimeoutMs:       jiminySynthesisTimeoutMs,
+		JiminyEvaluateEnabled:          jiminyEvaluateEnabled,
+		JiminyEvaluateTimeoutMs:        jiminyEvaluateTimeoutMs,
+		JiminyEvaluateMaxConstraints:   jiminyEvaluateMaxConstraints,
+		JiminyEvaluateLLMEnabled:       jiminyEvaluateLLMEnabled,
+		JiminyEvaluateLLMProvider:      jiminyEvaluateLLMProvider,
+		JiminyEvaluateLLMModel:         jiminyEvaluateLLMModel,
+		JiminyEvaluateLLMTimeoutMs:     jiminyEvaluateLLMTimeoutMs,
+		JiminyEvaluateLLMMaxTokens:     jiminyEvaluateLLMMaxTokens,
+		JiminyOutcomeClassifierEnabled: jiminyOutcomeClassifierEnabled,
+		JiminyOutcomeLLMEnabled:        jiminyOutcomeLLMEnabled,
+		JiminyOutcomeSimilarityHigh:    jiminyOutcomeSimilarityHigh,
+		JiminyOutcomeSimilarityLow:     jiminyOutcomeSimilarityLow,
+		JiminyOutcomeLLMMaxTokens:      jiminyOutcomeLLMMaxTokens,
+		JiminyOutcomeCacheSize:         jiminyOutcomeCacheSize,
+		JiminyClassifyCompress:         jiminyClassifyCompress,
+		JiminyDedupSimilarityThreshold: jiminyDedupSimilarityThreshold,
+		JiminyCorrectionDecayRate:      jiminyCorrectionDecayRate,
+		J17TicketCacheSize:             j17TicketCacheSize,
+		JiminySynthesisTemperature:     jiminySynthesisTemperature,
+		JiminyGuidanceContextMaxChars:  jiminyGuidanceContextMaxChars,
+		JiminyGuidanceOutputMaxChars:   jiminyGuidanceOutputMaxChars,
+		JiminyEvaluateOutputMaxChars:   jiminyEvaluateOutputMaxChars,
+		JiminyEvaluateItemMaxChars:     jiminyEvaluateItemMaxChars,
+		JiminyEscalationEnabled:        jiminyEscalationEnabled,
+		JiminyEscalationWarnAfter:      jiminyEscalationWarnAfter,
+		JiminyEscalationEscalateAfter:  jiminyEscalationEscalateAfter,
+		JiminyEscalationBlockAfter:     jiminyEscalationBlockAfter,
+		JiminyEscalationBlockEnabled:   jiminyEscalationBlockEnabled,
+		JiminyEscalationDecayMinutes:   jiminyEscalationDecayMinutes,
+		JiminyEscalationPersistEnabled: jiminyEscalationPersistEnabled,
+		JiminyStrictStatePath:          jiminyStrictStatePath,
+		JiminyCodeRegenEnabled:         jiminyCodeRegenEnabled,
+		JiminyCodeRegenThreshold:       jiminyCodeRegenThreshold,
+		JiminyCodeRegenMinSamples:      jiminyCodeRegenMinSamples,
 
 		// J17: AI-to-AI Communication Protocol
 		J17Enabled:                     j17Enabled,
@@ -4739,37 +4749,38 @@ func FromEnv() (Config, error) {
 		MemoryPressureThresholdMB: memoryPressureThresholdMB,
 
 		// Phase 60b: RSIC
-		RSICMicroEnabled:               rsicMicroEnabled,
-		RSICMesoPeriodHours:            rsicMesoPeriodHours,
-		RSICMesoPeriodSessions:         rsicMesoPeriodSessions,
-		RSICMacroCron:                  rsicMacroCron,
-		RSICMaxNodePrunePct:            rsicMaxNodePrunePct,
-		RSICMaxEdgePrunePct:            rsicMaxEdgePrunePct,
-		RSICRollbackWindow:             rsicRollbackWindow,
-		RSICWatchdogEnabled:            rsicWatchdogEnabled,
-		RSICWatchdogCheckSec:           rsicWatchdogCheckSec,
-		RSICWatchdogDecayRate:          rsicWatchdogDecayRate,
-		RSICNudgeThreshold:             rsicNudgeThreshold,
-		RSICWarnThreshold:              rsicWarnThreshold,
-		RSICForceThreshold:             rsicForceThreshold,
-		RSICCalibrationDays:            rsicCalibrationDays,
-		RSICMaxHistoryEntries:          rsicMaxHistoryEntries,
-		RSICMinConfidence:              rsicMinConfidence,
-		RSICTriggerCooldownSec:         rsicTriggerCooldownSec,
-		RSICTriggerDedupeSec:           rsicTriggerDedupeSec,
-		RSICWatchdogSpaceID:            rsicWatchdogSpaceID,
-		RSICPersistenceEnabled:         rsicPersistenceEnabled,
-		RSICProtectedSpaces:            rsicProtectedSpaces,
-		RSICMacroCronSpace:             rsicMacroCronSpace,
-		RSICMinActionConfidence:        rsicMinActionConfidence,
-		RSICGuidanceCalibrationEnabled: rsicGuidanceCalibrationEnabled,
-		RSICGuidanceMinSurfaces:        rsicGuidanceMinSurfaces,
-		RSICGuidanceBoostThreshold:     rsicGuidanceBoostThreshold,
-		RSICGuidanceDecayThreshold:     rsicGuidanceDecayThreshold,
-		RSICGuidanceDecayMinSurfaces:   rsicGuidanceDecayMinSurfaces,
-		SpacePruneIntervalHours:        spacePruneIntervalHours,
-		ContextCoolerEnabled:           contextCoolerEnabled,
-		WeeklyGapInterviewsEnabled:     weeklyGapInterviewsEnabled,
+		RSICMicroEnabled:                     rsicMicroEnabled,
+		RSICMesoPeriodHours:                  rsicMesoPeriodHours,
+		RSICMesoPeriodSessions:               rsicMesoPeriodSessions,
+		RSICMacroCron:                        rsicMacroCron,
+		RSICMaxNodePrunePct:                  rsicMaxNodePrunePct,
+		RSICMaxEdgePrunePct:                  rsicMaxEdgePrunePct,
+		RSICRollbackWindow:                   rsicRollbackWindow,
+		RSICWatchdogEnabled:                  rsicWatchdogEnabled,
+		RSICWatchdogCheckSec:                 rsicWatchdogCheckSec,
+		RSICGuidanceEffectivenessWindowHours: rsicGuidanceEffectivenessWindowHours,
+		RSICWatchdogDecayRate:                rsicWatchdogDecayRate,
+		RSICNudgeThreshold:                   rsicNudgeThreshold,
+		RSICWarnThreshold:                    rsicWarnThreshold,
+		RSICForceThreshold:                   rsicForceThreshold,
+		RSICCalibrationDays:                  rsicCalibrationDays,
+		RSICMaxHistoryEntries:                rsicMaxHistoryEntries,
+		RSICMinConfidence:                    rsicMinConfidence,
+		RSICTriggerCooldownSec:               rsicTriggerCooldownSec,
+		RSICTriggerDedupeSec:                 rsicTriggerDedupeSec,
+		RSICWatchdogSpaceID:                  rsicWatchdogSpaceID,
+		RSICPersistenceEnabled:               rsicPersistenceEnabled,
+		RSICProtectedSpaces:                  rsicProtectedSpaces,
+		RSICMacroCronSpace:                   rsicMacroCronSpace,
+		RSICMinActionConfidence:              rsicMinActionConfidence,
+		RSICGuidanceCalibrationEnabled:       rsicGuidanceCalibrationEnabled,
+		RSICGuidanceMinSurfaces:              rsicGuidanceMinSurfaces,
+		RSICGuidanceBoostThreshold:           rsicGuidanceBoostThreshold,
+		RSICGuidanceDecayThreshold:           rsicGuidanceDecayThreshold,
+		RSICGuidanceDecayMinSurfaces:         rsicGuidanceDecayMinSurfaces,
+		SpacePruneIntervalHours:              spacePruneIntervalHours,
+		ContextCoolerEnabled:                 contextCoolerEnabled,
+		WeeklyGapInterviewsEnabled:           weeklyGapInterviewsEnabled,
 
 		// Phase AR-3: LLM-powered intelligence
 		RSICLLMReflectEnabled:   rsicLLMReflectEnabled,
@@ -4781,8 +4792,8 @@ func FromEnv() (Config, error) {
 		RSICLLMReflectPromptBudgetTokens: rsicLLMReflectPromptBudgetTokens,
 		RSICLLMReflectHistoryCycles:      rsicLLMReflectHistoryCycles,
 		RSICLLMReflectIncludeDatasets:    rsicLLMReflectIncludeDatasets,
-		RSICLLMConcurrencyLimit: rsicLLMConcurrencyLimit,
-		ConflictTrackerEnabled:  conflictTrackerEnabled,
+		RSICLLMConcurrencyLimit:          rsicLLMConcurrencyLimit,
+		ConflictTrackerEnabled:           conflictTrackerEnabled,
 
 		// Phase 11.6.3 — MLX Watchdog
 		MLXWatchdogEnabled:  mlxWatchdogEnabled,
@@ -4871,9 +4882,9 @@ func FromEnv() (Config, error) {
 		CoolerTombstoneMaxPerRun:        coolerTombstoneMaxPerRun,
 		CoolerGraduationThreshold:       coolerGradThresh,
 
-		ConstraintDetectionEnabled: constraintDetectionEnabled,
-		ConstraintMinConfidence:    constraintMinConfidence,
-		ConstraintProtectFromDecay: constraintProtectFromDecay,
+		ConstraintDetectionEnabled:     constraintDetectionEnabled,
+		ConstraintMinConfidence:        constraintMinConfidence,
+		ConstraintProtectFromDecay:     constraintProtectFromDecay,
 		GraduatedDecayProtectionFactor: graduatedDecayProtectionFactor,
 
 		ConsolidateOnWatchdogEnabled: consolidateOnWatchdog,
@@ -4889,20 +4900,20 @@ func FromEnv() (Config, error) {
 		ScraperMaxContentLengthKB: scraperMaxContentKB,
 
 		// Phase 70: Neo4j Backup & Restore
-		BackupEnabled:               backupEnabled,
-		BackupStorageDir:            backupStorageDir,
-		BackupFullCmd:               backupFullCmd,
-		BackupNeo4jContainer:        backupNeo4jContainer,
-		BackupFullIntervalHours:     backupFullIntervalHours,
-		BackupPartialIntervalHours:  backupPartialIntervalHours,
-		BackupRetentionFullCount:    backupRetentionFullCount,
-		BackupRetentionPartialCount: backupRetentionPartialCount,
-		BackupRetentionMaxAgeDays:   backupRetentionMaxAgeDays,
-		BackupRetentionMaxStorageGB: backupRetentionMaxStorageGB,
-		BackupRetentionRunAfter:     backupRetentionRunAfter,
+		BackupEnabled:                backupEnabled,
+		BackupStorageDir:             backupStorageDir,
+		BackupFullCmd:                backupFullCmd,
+		BackupNeo4jContainer:         backupNeo4jContainer,
+		BackupFullIntervalHours:      backupFullIntervalHours,
+		BackupPartialIntervalHours:   backupPartialIntervalHours,
+		BackupRetentionFullCount:     backupRetentionFullCount,
+		BackupRetentionPartialCount:  backupRetentionPartialCount,
+		BackupRetentionMaxAgeDays:    backupRetentionMaxAgeDays,
+		BackupRetentionMaxStorageGB:  backupRetentionMaxStorageGB,
+		BackupRetentionRunAfter:      backupRetentionRunAfter,
 		BackupSnapshotWaitTimeoutSec: backupSnapshotWaitTimeoutSec,
-		BackupJobStalenessHours:     backupJobStalenessHours,
-		BackupInitialDelayMin:       backupInitialDelayMin,
+		BackupJobStalenessHours:      backupJobStalenessHours,
+		BackupInitialDelayMin:        backupInitialDelayMin,
 
 		// TimescaleDB Backup & Restore
 		TSDBBackupEnabled:             tsdbBackupEnabled,
@@ -5026,16 +5037,16 @@ func FromEnv() (Config, error) {
 		NeuralRerankFallback:  neuralRerankFallback,
 
 		// Synergy
-		SynergyMemoryLineThreshold:      synergyMemoryLineThreshold,
-		SynergyClaudeMDPath:             synergyClaudeMDPath,
-		SynergyMemoryMDPath:             synergyMemoryMDPath,
-		SynergyAssessmentEnabled:        synergyAssessmentEnabled,
-		SynergyTargetClaudeLines:        synergyTargetClaudeLines,
-		SynergyTargetMemoryLines:        synergyTargetMemoryLines,
-		SynergyOverlapSampleSize:        synergyOverlapSampleSize,
-		SynergyOverflowAlertThreshold:   synergyOverflowAlertThreshold,
-		SynergyRecoveryBufferSpace:      synergyRecoveryBufferSpace,
-		SynergyRecoveryBufferPath:       synergyRecoveryBufferPath,
+		SynergyMemoryLineThreshold:    synergyMemoryLineThreshold,
+		SynergyClaudeMDPath:           synergyClaudeMDPath,
+		SynergyMemoryMDPath:           synergyMemoryMDPath,
+		SynergyAssessmentEnabled:      synergyAssessmentEnabled,
+		SynergyTargetClaudeLines:      synergyTargetClaudeLines,
+		SynergyTargetMemoryLines:      synergyTargetMemoryLines,
+		SynergyOverlapSampleSize:      synergyOverlapSampleSize,
+		SynergyOverflowAlertThreshold: synergyOverflowAlertThreshold,
+		SynergyRecoveryBufferSpace:    synergyRecoveryBufferSpace,
+		SynergyRecoveryBufferPath:     synergyRecoveryBufferPath,
 
 		// RSIC overall-health weights (DH-005)
 		RSICHealthWeightRetrieval: rsicHealthWeightRetrieval,
@@ -5114,17 +5125,17 @@ func FromEnv() (Config, error) {
 		AlertEvaluatorIntervalSec:    alertEvaluatorIntervalSec,
 
 		// TSDB-CONSUME-001 — retrieve-latency SLO rules + writer flush health
-		AlertRetrieveP95Ms:              alertRetrieveP95Ms,
-		AlertRetrieveP99Ms:              alertRetrieveP99Ms,
-		AlertRetrieveLatencyLookbackMin: alertRetrieveLatencyLookbackMin,
-		TSDBWriterAlertLookbackMin:      tsdbWriterAlertLookbackMin,
-		ScorerChangeLookbackHours:       scorerChangeLookbackHours,
-		ConsensusShiftThreshold:         consensusShiftThreshold,
-		ConsensusShiftRecentHours:       consensusShiftRecentHours,
-		ConsensusShiftBaselineDays:      consensusShiftBaselineDays,
-		ConsensusShiftMinSamples:        consensusShiftMinSamples,
-		EmergenceCycleAlertThresholdSec: emergenceCycleAlertThresholdSec,
-		EmergenceCycleAlertLookbackMin:  emergenceCycleAlertLookbackMin,
+		AlertRetrieveP95Ms:               alertRetrieveP95Ms,
+		AlertRetrieveP99Ms:               alertRetrieveP99Ms,
+		AlertRetrieveLatencyLookbackMin:  alertRetrieveLatencyLookbackMin,
+		TSDBWriterAlertLookbackMin:       tsdbWriterAlertLookbackMin,
+		ScorerChangeLookbackHours:        scorerChangeLookbackHours,
+		ConsensusShiftThreshold:          consensusShiftThreshold,
+		ConsensusShiftRecentHours:        consensusShiftRecentHours,
+		ConsensusShiftBaselineDays:       consensusShiftBaselineDays,
+		ConsensusShiftMinSamples:         consensusShiftMinSamples,
+		EmergenceCycleAlertThresholdSec:  emergenceCycleAlertThresholdSec,
+		EmergenceCycleAlertLookbackMin:   emergenceCycleAlertLookbackMin,
 		SurpriseEmbeddingNoveltyTopK:     surpriseEmbeddingNoveltyTopK,
 		SurpriseEmbeddingNoveltySimFloor: surpriseEmbeddingNoveltySimFloor,
 		SurpriseFactorHighThreshold:      surpriseFactorHighThreshold,

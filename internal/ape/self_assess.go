@@ -162,6 +162,7 @@ func (a *Assessor) Assess(ctx context.Context, spaceID string, tier CycleTier) (
 	if a.jiminyProvider != nil {
 		js, jErr := a.jiminyProvider.GetGuidanceStats(ctx, spaceID)
 		if jErr == nil && js.TotalGuidanceIssued > 0 {
+			a.applyHonestFollowRate(ctx, spaceID, &js)
 			report.GuidanceHealth, report.GuidanceConfidence = a.scoreGuidance(js)
 			a.publishGuidanceMetrics(spaceID, js)
 		} else if jErr != nil {
@@ -190,6 +191,7 @@ func (a *Assessor) Assess(ctx context.Context, spaceID string, tier CycleTier) (
 		report.SynergyOverflowRate = sm.OverflowRate
 		report.SynergyOverlapScore = sm.OverlapScore
 		report.JiminyHealthy = sm.JiminyHealthy
+		report.SynergyAssessed = true // JIMINY-SIGNAL-001: JiminyHealthy is now real, not the zero-value default
 		report.SynergyHealth, report.SynergyConfidence = a.scoreSynergy(report)
 
 		// Recovery buffer: count pending entries (CMS space + local JSONL)
@@ -731,6 +733,24 @@ func (a *Assessor) publishProtocolMetrics(spaceID string, stats ProtocolStatsRes
 		m.J17SidecarAgreementRate(spaceID).Set(0)
 		m.J17SidecarOverrideRate(spaceID).Set(0)
 		m.J17SidecarLatency(spaceID).Set(0)
+	}
+}
+
+// applyHonestFollowRate overrides stats.FollowRate with the windowed
+// constraint_outcomes TSDB rate (the dashboard panels' source + math) when
+// available. JIMINY-SIGNAL-001: the Neo4j dedup-by-guidance_id rate is inflated
+// ~4× (double-credits multi-outcome guidance_ids: 0.73 vs the panels' ~0.27);
+// this makes the gauge, RSIC GuidanceHealth, and the panels agree. No-op when
+// the dataset provider is unavailable or the window has no data (Neo4j fallback).
+// Called by BOTH the assessment path AND the live Prometheus collector
+// (live_collectors.go) — the gauge has two publishers, so both must honest-ize.
+func (a *Assessor) applyHonestFollowRate(ctx context.Context, spaceID string, stats *JiminyStatsResult) {
+	if a == nil || a.datasetProvider == nil || stats == nil {
+		return
+	}
+	window := time.Duration(a.cfg.RSICGuidanceEffectivenessWindowHours) * time.Hour
+	if rate, n, err := a.datasetProvider.GuidanceEffectiveness(ctx, spaceID, window); err == nil && n > 0 {
+		stats.FollowRate = rate
 	}
 }
 

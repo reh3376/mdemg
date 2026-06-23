@@ -29,6 +29,15 @@ func (sc *StatsCollector) GetGuidanceStats(ctx context.Context, spaceID string) 
 	sess := sc.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer sess.Close(ctx) //nolint:errcheck
 
+	// JIMINY-SIGNAL-001 note: the follow-rate from this Cypher is INFLATED —
+	// count(DISTINCT CASE WHEN outcome='followed' THEN guidance_id END) credits a
+	// guidance_id to the "followed" numerator if ANY of its edges is followed,
+	// while the denominator is the distinct-id count, so multi-outcome ids are
+	// double-credited (live: 0.725 vs the honest constraint_outcomes ~0.27). The
+	// assessor now OVERRIDES js.FollowRate with the windowed TSDB rate
+	// (DatasetProvider.GuidanceEffectiveness); this path is retained only as the
+	// fallback when TSDB is unavailable. Follow-up: de-inflate or retire this
+	// follow-rate computation once the TSDB path is proven in production.
 	cypher := `
 	MATCH (n:MemoryNode {space_id: $spaceId})-[r:GUIDANCE_OUTCOME]-()
 	RETURN
