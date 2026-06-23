@@ -111,8 +111,12 @@ func TestFileSynergyReader_NilJiminyCheck(t *testing.T) {
 	}
 
 	sm := reader.ReadSynergyMetrics()
-	if sm.JiminyHealthy {
-		t.Error("JiminyHealthy: want false with nil check")
+	// JIMINY-SIGNAL-001: a nil jiminyCheck means "cannot determine" — it must
+	// default to HEALTHY (true), not the zero-value false (= "down"), which fired
+	// a false catastrophic-forgetting CRITICAL ~8×/day. Real outages are covered
+	// by /healthz + the watchdog; only a real check returning false marks it down.
+	if !sm.JiminyHealthy {
+		t.Error("JiminyHealthy: want true (default healthy) with nil check — false would re-introduce the false CRITICAL")
 	}
 }
 
