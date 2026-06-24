@@ -43,6 +43,7 @@ import (
 	"mdemg/internal/plugins"
 	"mdemg/internal/ratelimit"
 	"mdemg/internal/retrieval"
+	"mdemg/internal/review"
 	"mdemg/internal/scraper"
 	"mdemg/internal/symbols"
 	"mdemg/internal/transfer"
@@ -173,6 +174,8 @@ type Server struct {
 	eventgraphService        *eventgraph.Service
 	constraintOutcomesWriter *tsdb.ConstraintOutcomesWriter
 	guidanceTrainingWriter   *tsdb.GuidanceTrainingRowsWriter
+	reviewWriter             *tsdb.ReviewGradesWriter
+	reviewRegistry           *review.Registry
 	llmEndpointHealthWriter  *tsdb.LLMEndpointHealthWriter
 
 	// DOCKER-P2: Browser dashboard log buffer
@@ -1422,6 +1425,26 @@ func (s *Server) SetTSDBClient(client *tsdb.Client) {
 				"buffer_size", s.cfg.GuidanceCorpusWriterBufferSize)
 		}
 
+		// HITL-REVIEW-001 Epic 1 — the review platform: registry + review_grades
+		// writer. Datasets register here (the stub for self-test; the guidance
+		// dataset + sink are wired in Epic 5). Gated by REVIEW_ENABLED.
+		if s.cfg.ReviewEnabled {
+			s.reviewWriter = tsdb.NewReviewGradesWriter(
+				client.Pool(),
+				time.Duration(s.cfg.ReviewWriterFlushIntervalSec)*time.Second,
+				s.cfg.ReviewWriterBufferSize,
+			)
+			s.reviewRegistry = review.NewRegistry()
+			if s.cfg.ReviewStubDatasetEnabled {
+				if err := s.reviewRegistry.Register(review.StubDataset{}); err != nil {
+					slog.Warn("review: stub dataset registration failed", "error", err)
+				}
+			}
+			slog.Info("review: platform attached",
+				"flush_interval_sec", s.cfg.ReviewWriterFlushIntervalSec,
+				"stub_dataset", s.cfg.ReviewStubDatasetEnabled)
+		}
+
 		// Phase 14 Epic 0 — V0017 retrieval_audit writer. Phase 13 Epic 6
 		// shipped the schema + interface but the writer was never wired,
 		// leaving V0017 empty. Wire it here so RETRIEVAL_AUDIT_ENABLED=true
@@ -1779,6 +1802,9 @@ func (s *Server) Shutdown() {
 	}
 	if s.guidanceTrainingWriter != nil {
 		s.guidanceTrainingWriter.Close()
+	}
+	if s.reviewWriter != nil {
+		s.reviewWriter.Close()
 	}
 	if s.llmEndpointHealthWriter != nil {
 		s.llmEndpointHealthWriter.Close()
