@@ -1440,9 +1440,29 @@ func (s *Server) SetTSDBClient(client *tsdb.Client) {
 					slog.Warn("review: stub dataset registration failed", "error", err)
 				}
 			}
+			// HITL-REVIEW-001 Epic 5 — the guidance corpus as the first reviewable
+			// dataset + the live-reinforcement GuidanceSink (trust EMA + node
+			// confidence, reversible). Needs jiminy (the reinforcer) + the pool
+			// (guidance_training_rows). Gated by REVIEW_GUIDANCE_SINK_ENABLED.
+			if s.cfg.ReviewGuidanceSinkEnabled && s.jiminySvc != nil && client.Pool() != nil {
+				gds := &guidanceDataset{
+					pool:          client.Pool(),
+					rubricVersion: s.cfg.ReviewRubricVersion,
+					sink: review.GuidanceSink{
+						R:               guidanceReinforcerAdapter{svc: s.jiminySvc},
+						ConfidenceNudge: s.cfg.ReviewGuidanceConfidenceNudge,
+					},
+				}
+				if err := s.reviewRegistry.Register(gds); err != nil {
+					slog.Warn("review: guidance dataset registration failed", "error", err)
+				} else {
+					slog.Info("review: guidance dataset + live-reinforcement sink registered")
+				}
+			}
 			slog.Info("review: platform attached",
 				"flush_interval_sec", s.cfg.ReviewWriterFlushIntervalSec,
-				"stub_dataset", s.cfg.ReviewStubDatasetEnabled)
+				"stub_dataset", s.cfg.ReviewStubDatasetEnabled,
+				"guidance_sink", s.cfg.ReviewGuidanceSinkEnabled)
 		}
 
 		// Phase 14 Epic 0 — V0017 retrieval_audit writer. Phase 13 Epic 6
