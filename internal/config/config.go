@@ -1068,6 +1068,15 @@ type Config struct {
 	GuidanceCorpusMaxContentBytes        int  // GUIDANCE_CORPUS_MAX_CONTENT_BYTES — truncate guidance/action snapshots to this many bytes (default: 8192, floor: 256)
 	GuidanceCorpusSourceLookupTimeoutMs  int  // GUIDANCE_CORPUS_SOURCE_LOOKUP_TIMEOUT_MS — bounded best-effort Neo4j lookup of source-node role_type/layer at emit (default: 300, 0 = disable; never blocks the hot path beyond this)
 
+	// JIMINY-RELEVANCE-001 Epic 2 — guidance label-quality auto-relabel job.
+	// Re-labels heuristic/blank-classifier_source rows in guidance_training_rows
+	// with the LLM classifier so the corpus is trustworthy (diagnostic Finding 4:
+	// ~51% of labels were heuristic noise).
+	GuidanceAuditEnabled       bool // GUIDANCE_AUDIT_ENABLED — run the periodic auto-relabel job (default: true)
+	GuidanceAuditIntervalHours int  // GUIDANCE_AUDIT_INTERVAL_HOURS — cadence of the auto-relabel job (default: 24, floor: 1)
+	GuidanceAuditSampleSize    int  // GUIDANCE_AUDIT_SAMPLE_SIZE — heuristic/blank rows re-labelled per run (default: 50, floor: 1)
+	GuidanceAuditInitialDelaySec int // GUIDANCE_AUDIT_INITIAL_DELAY_SEC — delay before the FIRST auto-relabel run after startup, so first cleanup doesn't wait a full interval (default: 60, 0 = skip the initial run)
+
 	// EVENTGRAPH-001 — TSDB reinforcement_events + federation API (Pattern Y1)
 	EventGraphEnabled                        bool // EVENTGRAPH_ENABLED — record per-pair Hebbian telemetry into reinforcement_events + expose federation API (default: true)
 	EventGraphWriterFlushIntervalSec         int  // EVENTGRAPH_WRITER_FLUSH_INTERVAL_SEC — buffered writer flush cadence in seconds (default: 30, floor: 5)
@@ -3056,6 +3065,28 @@ func FromEnv() (Config, error) {
 	if guidanceCorpusSourceLookupTimeoutMs < 0 {
 		guidanceCorpusSourceLookupTimeoutMs = 0 // 0 = disable inline lookup
 	}
+	guidanceAuditEnabled := getBool("GUIDANCE_AUDIT_ENABLED", true)
+	guidanceAuditIntervalHours, err := atoi("GUIDANCE_AUDIT_INTERVAL_HOURS", 24)
+	if err != nil {
+		return Config{}, err
+	}
+	if guidanceAuditIntervalHours < 1 {
+		guidanceAuditIntervalHours = 1 // floor
+	}
+	guidanceAuditSampleSize, err := atoi("GUIDANCE_AUDIT_SAMPLE_SIZE", 50)
+	if err != nil {
+		return Config{}, err
+	}
+	if guidanceAuditSampleSize < 1 {
+		guidanceAuditSampleSize = 1 // floor
+	}
+	guidanceAuditInitialDelaySec, err := atoi("GUIDANCE_AUDIT_INITIAL_DELAY_SEC", 60)
+	if err != nil {
+		return Config{}, err
+	}
+	if guidanceAuditInitialDelaySec < 0 {
+		guidanceAuditInitialDelaySec = 0 // 0 = skip the initial run
+	}
 
 	// EVENTGRAPH-001 — TSDB reinforcement_events + federation API (Pattern Y1).
 	eventGraphEnabled := getBool("EVENTGRAPH_ENABLED", true)
@@ -4882,6 +4913,10 @@ func FromEnv() (Config, error) {
 		GuidanceCorpusWriterBufferSize:           guidanceCorpusWriterBufferSize,
 		GuidanceCorpusMaxContentBytes:            guidanceCorpusMaxContentBytes,
 		GuidanceCorpusSourceLookupTimeoutMs:      guidanceCorpusSourceLookupTimeoutMs,
+		GuidanceAuditEnabled:                     guidanceAuditEnabled,
+		GuidanceAuditIntervalHours:               guidanceAuditIntervalHours,
+		GuidanceAuditSampleSize:                  guidanceAuditSampleSize,
+		GuidanceAuditInitialDelaySec:             guidanceAuditInitialDelaySec,
 
 		EventGraphEnabled:                        eventGraphEnabled,
 		EventGraphWriterFlushIntervalSec:         eventGraphWriterFlushIntervalSec,

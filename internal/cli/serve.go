@@ -600,6 +600,11 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 		srv.StartSpacePruneScheduler(time.Duration(cfg.SpacePruneIntervalHours) * time.Hour)
 	}
 
+	// JIMINY-RELEVANCE-001 Epic 2 — guidance label-quality auto-relabel job.
+	if cfg.GuidanceAuditEnabled {
+		srv.StartGuidanceAudit(time.Duration(cfg.GuidanceAuditIntervalHours) * time.Hour)
+	}
+
 	// Start context cooler background processing (opt-in)
 	if cfg.ContextCoolerEnabled {
 		srv.StartContextCoolerProcessing("mdemg-dev", 10*time.Minute)
