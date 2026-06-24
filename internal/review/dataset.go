@@ -19,6 +19,9 @@ type ReviewableDataset interface {
 	// items, honoring the sampling hints. The dataset decides where items come
 	// from (a TSDB table, a file, …); the platform calls this.
 	FetchCandidates(ctx context.Context, q CandidateQuery) ([]ReviewItem, error)
+	// FetchItem returns a single item by id (for the grade flow — the sink reads
+	// its Meta). ok=false when the item no longer exists.
+	FetchItem(ctx context.Context, spaceID, itemID string) (item ReviewItem, ok bool, err error)
 	// Rubric returns the versioned rubric SHAPE for this dataset (rated vs
 	// ranked, its dimensions + anchors). Per-paradigm.
 	Rubric() Rubric

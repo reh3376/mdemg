@@ -33,6 +33,16 @@ func (StubDataset) Rubric() Rubric {
 
 func (StubDataset) Sink() ReinforcementSink { return NoopSink{} }
 
+func (StubDataset) FetchItem(_ context.Context, _, itemID string) (ReviewItem, bool, error) {
+	if itemID == "" {
+		return ReviewItem{}, false, nil
+	}
+	return ReviewItem{
+		ItemID: itemID, Content: "synthetic review item " + itemID,
+		Context: "self-test context", AutoLabel: "unknown", AutoScore: 0.5, Stratum: "default",
+	}, true, nil
+}
+
 func (StubDataset) FetchCandidates(_ context.Context, q CandidateQuery) ([]ReviewItem, error) {
 	n := q.Limit
 	if n <= 0 || n > 5 {

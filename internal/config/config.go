@@ -1087,7 +1087,6 @@ type Config struct {
 	ReviewEnabled                 bool    // REVIEW_ENABLED — enable the /v1/review/* surface + UI tab (default: true)
 	ReviewWriterFlushIntervalSec  int     // REVIEW_WRITER_FLUSH_INTERVAL_SEC — review_grades writer flush cadence (default: 15, floor: 5)
 	ReviewWriterBufferSize        int     // REVIEW_WRITER_BUFFER_SIZE — max buffered grade rows before FIFO eviction (default: 500, 0 = unbounded)
-	ReviewMaxContentBytes         int     // REVIEW_MAX_CONTENT_BYTES — truncate stored item snapshots to this many bytes (default: 16384, floor: 256)
 	ReviewStubDatasetEnabled      bool    // REVIEW_STUB_DATASET_ENABLED — register a synthetic dataset for self-test/dev (default: false)
 	ReviewRubricVersion           string  // REVIEW_RUBRIC_VERSION — the current rubric version; grades not at this version aren't "certified-current" (default: gr-v1)
 	ReviewSampleSize              int     // REVIEW_SAMPLE_SIZE — max items the sampler selects per fetch (default: 200, floor: 1)
@@ -3138,13 +3137,6 @@ func FromEnv() (Config, error) {
 	if reviewWriterBufferSize < 0 {
 		reviewWriterBufferSize = 0 // 0 = unbounded
 	}
-	reviewMaxContentBytes, err := atoi("REVIEW_MAX_CONTENT_BYTES", 16384)
-	if err != nil {
-		return Config{}, err
-	}
-	if reviewMaxContentBytes < 256 {
-		reviewMaxContentBytes = 256 // floor
-	}
 	reviewStubDatasetEnabled := getBool("REVIEW_STUB_DATASET_ENABLED", false)
 	reviewRubricVersion := get("REVIEW_RUBRIC_VERSION", "gr-v1")
 	reviewSampleSize, err := atoi("REVIEW_SAMPLE_SIZE", 200)
@@ -5007,7 +4999,6 @@ func FromEnv() (Config, error) {
 		ReviewEnabled:                            reviewEnabled,
 		ReviewWriterFlushIntervalSec:             reviewWriterFlushIntervalSec,
 		ReviewWriterBufferSize:                   reviewWriterBufferSize,
-		ReviewMaxContentBytes:                    reviewMaxContentBytes,
 		ReviewStubDatasetEnabled:                 reviewStubDatasetEnabled,
 		ReviewRubricVersion:                      reviewRubricVersion,
 		ReviewSampleSize:                         reviewSampleSize,

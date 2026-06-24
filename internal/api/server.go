@@ -2712,6 +2712,11 @@ func (s *Server) Routes() http.Handler {
 	// DH-004 E4.3: circuit breaker inspection + manual reset
 	mux.HandleFunc("/v1/admin/breakers", s.handleBreakersList)
 	mux.HandleFunc("/v1/admin/breakers/reset", s.handleBreakersReset)
+	// HITL-REVIEW-001 — review platform (admin-gated; mutates the live substrate).
+	mux.Handle("/v1/review/datasets", scopedHandler(auth.ScopeAdminSpaces, s.handleReviewDatasets))
+	mux.Handle("/v1/review/next", scopedHandler(auth.ScopeAdminSpaces, s.handleReviewNext))
+	mux.Handle("/v1/review/grade", scopedHandler(auth.ScopeAdminSpaces, s.handleReviewGrade))
+	mux.Handle("/v1/review/reverse", scopedHandler(auth.ScopeAdminSpaces, s.handleReviewReverse))
 	mux.HandleFunc("/v1/eventgraph/reinforcement-neighborhood", s.handleEventgraphReinforcementNeighborhood)
 	mux.HandleFunc("/v1/eventgraph/guidance-outcome-neighborhood", s.handleEventgraphGuidanceOutcomeNeighborhood)
 	mux.Handle("/ui/", http.StripPrefix("/ui/", uiHandler()))
