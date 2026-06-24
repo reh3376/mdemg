@@ -235,6 +235,62 @@ func DefaultRules() []AlertRule {
 	}
 }
 
+// GuidanceShouldFollowRules returns the should-follow follow-rate rule
+// (JIMINY-RELEVANCE-001 Epic 4).
+//
+// "Follow rate on guidance that SHOULD have been followed" — the metric the
+// >90% operator goal actually means. The Step-1 diagnostic (TL;DR #4) showed
+// the naive follow rate is partly the wrong target because much guidance is
+// CORRECTLY ignored (advisory abstractions). This rule restricts the
+// denominator to the ACTIONABLE guidance types (constraint/correction) — the
+// items the diagnostic found are followed ~2× better and are the ones that
+// should be followed — and excludes the pattern/learning/concept advisory class.
+//
+// SQL contract (TSDB-CONSUME-001, pin-tested):
+//   - guidance_training_rows' time column is `time` (NOT recorded_at).
+//   - Aggregate (AVG) + COALESCE so the query ALWAYS returns one non-NULL row:
+//     an idle/fresh-corpus window yields 1.0 (above the floor → no false fire),
+//     never the "no rows in result set" failure that fires rule-health noise.
+//   - Unique Service label "guidance-should-follow" (dispatcher cooldown key).
+//
+// rateFloor ≤ 0 disables the rule (returns empty). Certified-gold grounding via
+// HITL-REVIEW-001's review_grades (preferring human verdicts over auto-labels)
+// is a documented follow-up — added when that table exists; this rule ships on
+// the auto-labels alone so it is not blocked on HITL-REVIEW-001.
+func GuidanceShouldFollowRules(rateFloor float64, lookbackHours int) []AlertRule {
+	if rateFloor <= 0 {
+		return nil // disabled
+	}
+	if rateFloor > 1 {
+		rateFloor = 0.5
+	}
+	if lookbackHours <= 0 {
+		lookbackHours = 168
+	}
+	return []AlertRule{
+		{
+			ID:          "guidance_should_follow_rate_low",
+			Title:       "Guidance Should-Follow Follow Rate Low",
+			Service:     "guidance-should-follow",
+			Severity:    SeverityMedium,
+			Interval:    60 * time.Second,
+			ForDuration: 0,
+			QuerySQL: fmt.Sprintf(`SELECT COALESCE(AVG(
+					CASE outcome_type
+						WHEN 'followed' THEN 1.0
+						WHEN 'partial_compliance' THEN 0.5
+						ELSE 0.0
+					END), 1.0) AS should_follow_rate
+				FROM guidance_training_rows
+				WHERE time > now() - interval '%d hours'
+				  AND guidance_type IN ('constraint', 'correction')`, lookbackHours),
+			Threshold: rateFloor,
+			Operator:  "lt",
+			Enabled:   true,
+		},
+	}
+}
+
 // RetrieveLatencyRules returns the retrieve-latency SLO rules
 // (TSDB-CONSUME-001), computed over retrieval_audit.total_latency_ms — the
 // real per-call wall time — instead of the lifetime-cumulative synthetic

@@ -254,6 +254,37 @@ type OutcomeWriter interface {
 	RecordOutcome(spaceID, constraintID, constraintCode, guidanceID, sessionID, outcomeType, guidanceType, instanceID, classifierSource string, similarity float64)
 }
 
+// GuidanceTrainingWriter persists the per-item training EVIDENCE
+// (JIMINY-RELEVANCE-001 Epic 1): the surfaced guidance text, its source-node
+// role_type/layer, the agent-action text, and the audited verdict + classifier
+// source — the data the diagnostic (Finding 1) found was being discarded.
+// Defined here (not in tsdb) to avoid an import cycle; the api layer wires a
+// *tsdb.GuidanceTrainingRowsWriter via a thin adapter.
+type GuidanceTrainingWriter interface {
+	RecordTrainingRow(row GuidanceTrainingRecord)
+}
+
+// GuidanceTrainingRecord is the jiminy-side shape of one evidence row; the
+// api-layer adapter maps it to tsdb.GuidanceTrainingRow (keeps jiminy free of
+// the tsdb import). SourceLayer is a *int so a valid layer 0 is distinct from
+// "unresolved" (nil).
+type GuidanceTrainingRecord struct {
+	SpaceID          string
+	SessionID        string
+	InstanceID       string
+	GuidanceID       string
+	GuidanceType     string
+	GuidanceContent  string
+	SourceNodeID     string
+	SourceRoleType   string
+	SourceLayer      *int
+	ActionSummary    string
+	OutcomeType      string
+	Similarity       float64
+	ClassifierSource string
+	ConstraintCode   string
+}
+
 // --- J12: Escalation types ---
 
 // EscalationLevel represents the current escalation state for a constraint.
