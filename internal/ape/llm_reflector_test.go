@@ -281,9 +281,11 @@ func TestBuildUserPrompt_BackwardCompat(t *testing.T) {
 	}
 }
 
-func TestLLMReflector_ValidActions_Has20Entries(t *testing.T) {
-	if len(validActions) != 20 {
-		t.Errorf("expected 20 valid actions, got %d", len(validActions))
+func TestLLMReflector_ValidActions_Has17Entries(t *testing.T) {
+	// RSIC-LLM-ALERT-GUARD-001: 20 → 17 after removing the 3 deterministic
+	// alert actions (alert_jiminy_critical/_memory_bloat/_synergy_overlap).
+	if len(validActions) != 17 {
+		t.Errorf("expected 17 valid actions, got %d", len(validActions))
 	}
 
 	expected := []string{
@@ -294,9 +296,12 @@ func TestLLMReflector_ValidActions_Has20Entries(t *testing.T) {
 		"review_guidance_effectiveness", "adjust_guidance_confidence",
 		"archive_ineffective_constraints", "flush_recovery_buffer",
 		"review_nli_calibration",
-		// Diagnostic actions (expanded whitelist)
-		"ingest_stale_spaces", "alert_jiminy_critical",
-		"alert_memory_bloat", "alert_synergy_overlap",
+		// Diagnostic actions
+		"ingest_stale_spaces",
+		// RSIC-LLM-ALERT-GUARD-001: alert_jiminy_critical / alert_memory_bloat /
+		// alert_synergy_overlap were REMOVED from the LLM whitelist — the
+		// rule-based reflector owns those deterministic alerts; see
+		// TestAllowedLLMActions_ExcludesDeterministicAlerts.
 	}
 	for _, a := range expected {
 		if !validActions[a] {
