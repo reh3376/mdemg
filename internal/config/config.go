@@ -286,6 +286,14 @@ type Config struct {
 	JiminyTimeoutMs                 int     // JIMINY_TIMEOUT_MS — direct Guide() budget; 0 = derive from JIMINY_WARM_COMPUTE_TIMEOUT_MS (default: 0; the old independent 15s starved fresh installs)
 	JiminyMaxItems                  int     // JIMINY_MAX_ITEMS — max guidance items returned (default: 10)
 	JiminyMinConfidence             float64 // JIMINY_MIN_CONFIDENCE — minimum confidence to include item (default: 0.3)
+	// JIMINY-ACTIONABILITY-001 — bias the surfaced guidance set toward the
+	// actionable class (constraint/correction) over abstractions. Default-preserving.
+	JiminySurfaceActionableWeight       float64 // JIMINY_SURFACE_ACTIONABLE_WEIGHT — sort-key multiplier for actionable types (default: 1.0 = no-op, floor >0)
+	JiminySurfaceMinActionable          int     // JIMINY_SURFACE_MIN_ACTIONABLE — reserve at least this many surfaced slots for actionable items (default: 0 = off)
+	JiminySurfaceMinActionableFraction  float64 // JIMINY_SURFACE_MIN_ACTIONABLE_FRACTION — reserve at least this fraction of maxItems for actionable items (default: 0.0 = off, [0,1])
+	JiminySurfaceMaxAbstractionFraction float64 // JIMINY_SURFACE_MAX_ABSTRACTION_FRACTION — cap the abstraction share of the surfaced set (default: 1.0 = no cap, (0,1])
+	JiminyDirectiveSynthesisEnabled     bool    // JIMINY_DIRECTIVE_SYNTHESIS_ENABLED — Lever B: synthesize abstraction items as imperative directives (default: false)
+	JiminyDirectiveSynthesisMaxPromptTokens int // JIMINY_DIRECTIVE_SYNTHESIS_MAX_PROMPT_TOKENS — bound on the directive synthesis prompt (default: 3500, floor 1000)
 	// JIMINY-OUTCOME-001 — minimum vector-index cosine similarity for an embedding-based
 	// constraint-code match. Concept-abstracted guidance rarely shares 3+ literal words
 	// with raw constraint text, so keyword matching missed everything and the Neo4j
@@ -2377,6 +2385,43 @@ func FromEnv() (Config, error) {
 	jiminyMaxItems, err := atoi("JIMINY_MAX_ITEMS", 10)
 	if err != nil {
 		return Config{}, err
+	}
+	// JIMINY-ACTIONABILITY-001 — surfacing levers (all default-preserving).
+	jiminySurfaceActionableWeight, err := atof("JIMINY_SURFACE_ACTIONABLE_WEIGHT", 1.0)
+	if err != nil {
+		return Config{}, err
+	}
+	if jiminySurfaceActionableWeight <= 0 {
+		jiminySurfaceActionableWeight = 1.0 // floor >0
+	}
+	jiminySurfaceMinActionable, err := atoi("JIMINY_SURFACE_MIN_ACTIONABLE", 0)
+	if err != nil {
+		return Config{}, err
+	}
+	if jiminySurfaceMinActionable < 0 {
+		jiminySurfaceMinActionable = 0
+	}
+	jiminySurfaceMinActionableFraction, err := atof("JIMINY_SURFACE_MIN_ACTIONABLE_FRACTION", 0.0)
+	if err != nil {
+		return Config{}, err
+	}
+	if jiminySurfaceMinActionableFraction < 0 || jiminySurfaceMinActionableFraction > 1 {
+		jiminySurfaceMinActionableFraction = 0.0
+	}
+	jiminySurfaceMaxAbstractionFraction, err := atof("JIMINY_SURFACE_MAX_ABSTRACTION_FRACTION", 1.0)
+	if err != nil {
+		return Config{}, err
+	}
+	if jiminySurfaceMaxAbstractionFraction <= 0 || jiminySurfaceMaxAbstractionFraction > 1 {
+		jiminySurfaceMaxAbstractionFraction = 1.0
+	}
+	jiminyDirectiveSynthesisEnabled := getBool("JIMINY_DIRECTIVE_SYNTHESIS_ENABLED", false)
+	jiminyDirectiveSynthesisMaxPromptTokens, err := atoi("JIMINY_DIRECTIVE_SYNTHESIS_MAX_PROMPT_TOKENS", 3500)
+	if err != nil {
+		return Config{}, err
+	}
+	if jiminyDirectiveSynthesisMaxPromptTokens < 1000 {
+		jiminyDirectiveSynthesisMaxPromptTokens = 1000 // floor
 	}
 	jiminyMinConfidence, err := atof("JIMINY_MIN_CONFIDENCE", 0.3)
 	if err != nil {
@@ -4728,6 +4773,12 @@ func FromEnv() (Config, error) {
 		JiminyContradictedWeakenEnabled:  jiminyContradictedWeakenEnabled,
 		JiminyTimeoutMs:                  jiminyTimeoutMs,
 		JiminyMaxItems:                   jiminyMaxItems,
+		JiminySurfaceActionableWeight:       jiminySurfaceActionableWeight,
+		JiminySurfaceMinActionable:          jiminySurfaceMinActionable,
+		JiminySurfaceMinActionableFraction:  jiminySurfaceMinActionableFraction,
+		JiminySurfaceMaxAbstractionFraction: jiminySurfaceMaxAbstractionFraction,
+		JiminyDirectiveSynthesisEnabled:     jiminyDirectiveSynthesisEnabled,
+		JiminyDirectiveSynthesisMaxPromptTokens: jiminyDirectiveSynthesisMaxPromptTokens,
 		JiminyMinConfidence:              jiminyMinConfidence,
 		JiminySignalStrengthWeight:       jiminySignalStrengthWeight,
 		JiminyConstraintCodeSimThreshold: jiminyConstraintCodeSimThreshold,

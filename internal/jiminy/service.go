@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"sort"
 	"strings"
 	"sync"
@@ -979,13 +980,16 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 		if pi != pj {
 			return pi < pj
 		}
-		return s.guidanceSortKey(filtered[i]) > s.guidanceSortKey(filtered[j])
+		// JIMINY-ACTIONABILITY-001 Lever A: actionable types out-rank equal-priority
+		// abstractions by JIMINY_SURFACE_ACTIONABLE_WEIGHT (1.0 = no-op default).
+		ki := s.guidanceSortKey(filtered[i]) * s.guidanceTypeWeight(filtered[i].Type)
+		kj := s.guidanceSortKey(filtered[j]) * s.guidanceTypeWeight(filtered[j].Type)
+		return ki > kj
 	})
 
-	// Truncate to max items
-	if len(filtered) > maxItems {
-		filtered = filtered[:maxItems]
-	}
+	// JIMINY-ACTIONABILITY-001 Lever A: min-actionable quota + abstraction cap +
+	// truncate (default-preserving — byte-identical to a plain truncate at defaults).
+	filtered = s.applyActionableComposition(filtered, maxItems)
 
 	// RSIC-SK1: Record signal emissions for each surfaced guidance item
 	if s.signalLearner != nil {
@@ -1032,6 +1036,25 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 			counts.Frontiers++
 		case GuidanceDecision, GuidanceLearning, GuidancePreference, GuidanceConcept:
 			counts.Retrievals++
+		}
+	}
+
+	// JIMINY-ACTIONABILITY-001: emit the surfaced-composition gauge — the fraction
+	// of the surfaced set that is the actionable class. This is what Lever A moves
+	// (Finding 2: the 90% abstraction wall) and what the A/B reads.
+	if std := metrics.Metrics(); std != nil && len(filtered) > 0 {
+		act := 0
+		for _, item := range filtered {
+			if isActionableType(item.Type) {
+				act++
+			}
+		}
+		frac := float64(act) / float64(len(filtered))
+		if g := std.JiminySurfacedActionableFraction; g != nil {
+			g(req.SpaceID).Set(frac)
+		}
+		if g := std.JiminySurfacedAbstractionFraction; g != nil {
+			g(req.SpaceID).Set(1 - frac)
 		}
 	}
 
@@ -2756,6 +2779,83 @@ func firstSourceNode(item GuidanceItem) string {
 // w = JIMINY_SIGNAL_STRENGTH_WEIGHT (clamped to [0,1]). Weight 0 — or a nil
 // learner — restores pure confidence, the pre-census behavior. Items whose
 // signal code resolves to nothing blend the learner's 0.5 neutral default.
+// isActionableType is the single definition of the actionable partition
+// (JIMINY-ACTIONABILITY-001): constraint/correction are followed ~2× better than
+// the abstraction class (pattern/learning/concept/suggestion/…). Used by the
+// surfaced-composition gauge, Lever A's quota/cap, and Lever B's directive
+// selection.
+func isActionableType(t GuidanceType) bool {
+	return t == GuidanceConstraint || t == GuidanceCorrection
+}
+
+// guidanceTypeWeight is Lever A's sort-key multiplier — actionable types get
+// JIMINY_SURFACE_ACTIONABLE_WEIGHT, abstractions get 1.0 (no-op at the 1.0 default).
+func (s *Service) guidanceTypeWeight(t GuidanceType) float64 {
+	if isActionableType(t) {
+		return s.cfg.JiminySurfaceActionableWeight
+	}
+	return 1.0
+}
+
+// applyActionableComposition enforces Lever A's min-actionable quota +
+// abstraction cap on an already-sorted item list, then truncates to maxItems.
+// At defaults (quota 0, cap 1.0) it is byte-identical to the prior truncation.
+// Actionable items are never dropped to satisfy the cap; abstraction-tail is.
+func (s *Service) applyActionableComposition(items []GuidanceItem, maxItems int) []GuidanceItem {
+	minActionable := s.cfg.JiminySurfaceMinActionable
+	if f := s.cfg.JiminySurfaceMinActionableFraction; f > 0 {
+		if c := int(math.Ceil(f * float64(maxItems))); c > minActionable {
+			minActionable = c
+		}
+	}
+	capFrac := s.cfg.JiminySurfaceMaxAbstractionFraction
+	noQuota := minActionable <= 0
+	noCap := capFrac >= 1.0
+	if noQuota && noCap { // default-preserving fast path
+		if len(items) > maxItems {
+			return items[:maxItems]
+		}
+		return items
+	}
+	maxAbstraction := maxItems
+	if !noCap {
+		maxAbstraction = int(math.Floor(capFrac * float64(maxItems)))
+	}
+	availActionable := 0
+	for _, it := range items {
+		if isActionableType(it.Type) {
+			availActionable++
+		}
+	}
+	reserve := minActionable
+	if reserve > availActionable {
+		reserve = availActionable
+	}
+	result := make([]GuidanceItem, 0, maxItems)
+	absUsed, actUsed := 0, 0
+	for _, it := range items {
+		if len(result) >= maxItems {
+			break
+		}
+		if isActionableType(it.Type) {
+			result = append(result, it)
+			actUsed++
+			continue
+		}
+		remaining := maxItems - len(result)
+		reserveLeft := reserve - actUsed
+		if reserveLeft < 0 {
+			reserveLeft = 0
+		}
+		if absUsed < maxAbstraction && remaining > reserveLeft {
+			result = append(result, it)
+			absUsed++
+		}
+		// else: drop this abstraction (capped, or reserving the slot for an actionable item)
+	}
+	return result
+}
+
 func (s *Service) guidanceSortKey(item GuidanceItem) float64 {
 	w := s.cfg.JiminySignalStrengthWeight
 	if w <= 0 || s.signalLearner == nil {
