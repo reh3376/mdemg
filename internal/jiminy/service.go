@@ -538,6 +538,35 @@ func (s *Service) AdjustNodeConfidenceDirect(ctx context.Context, nodeID string,
 	return s.confidenceUpdater.AdjustConfidenceDirect(ctx, nodeID, delta)
 }
 
+// GetTrustScore returns the current per-session J17 trust (HITL-REVIEW-001:
+// the guidance reinforcement sink captures this before applying so a reversal
+// can restore it exactly).
+func (s *Service) GetTrustScore(sessionID string) float64 {
+	if s.trustScorer == nil {
+		return 0
+	}
+	return s.trustScorer.GetScore(sessionID)
+}
+
+// SetTrustScore forces a session's trust to an exact value — used ONLY to
+// reverse a HITL reinforcement (restore the captured prior trust), not for
+// normal flow (which uses the EMA RecordOutcome).
+func (s *Service) SetTrustScore(sessionID string, score float64) {
+	if s.trustScorer != nil {
+		s.trustScorer.SetScore(sessionID, score)
+	}
+}
+
+// RecordTrustOutcome moves a session's trust toward the outcome's anchor (the
+// EMA from JIMINY-EFFECTIVENESS-001) and returns the new score. The HITL
+// guidance sink uses this to apply a human-certified outcome to live trust.
+func (s *Service) RecordTrustOutcome(sessionID string, outcome GuidanceOutcome) float64 {
+	if s.trustScorer == nil {
+		return 0
+	}
+	return s.trustScorer.RecordOutcome(sessionID, outcome)
+}
+
 // ConfidenceCalibrationDeltas exposes the configured boost/decay magnitudes.
 func (s *Service) ConfidenceCalibrationDeltas() (boost, decay float64) {
 	if s.confidenceUpdater == nil {

@@ -11,6 +11,7 @@ import { render as renderPlugins } from './tabs/plugins.js';
 import { render as renderFeatures } from './tabs/features.js';
 import { render as renderBackup } from './tabs/backup.js';
 import { render as renderTraining } from './tabs/training_data.js';
+import { render as renderReview } from './tabs/review.js';
 
 const TABS = {
     status:   { render: renderStatus,   label: 'Status' },
@@ -23,6 +24,7 @@ const TABS = {
     features: { render: renderFeatures, label: 'Features' },
     backup:   { render: renderBackup,   label: 'Backup' },
     training: { render: renderTraining, label: 'Training Data' },
+    review:   { render: renderReview,   label: 'Review' },
 };
 
 let activeTab = 'status';

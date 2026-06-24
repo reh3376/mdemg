@@ -43,6 +43,7 @@ import (
 	"mdemg/internal/plugins"
 	"mdemg/internal/ratelimit"
 	"mdemg/internal/retrieval"
+	"mdemg/internal/review"
 	"mdemg/internal/scraper"
 	"mdemg/internal/symbols"
 	"mdemg/internal/transfer"
@@ -173,6 +174,8 @@ type Server struct {
 	eventgraphService        *eventgraph.Service
 	constraintOutcomesWriter *tsdb.ConstraintOutcomesWriter
 	guidanceTrainingWriter   *tsdb.GuidanceTrainingRowsWriter
+	reviewWriter             *tsdb.ReviewGradesWriter
+	reviewRegistry           *review.Registry
 	llmEndpointHealthWriter  *tsdb.LLMEndpointHealthWriter
 
 	// DOCKER-P2: Browser dashboard log buffer
@@ -1422,6 +1425,56 @@ func (s *Server) SetTSDBClient(client *tsdb.Client) {
 				"buffer_size", s.cfg.GuidanceCorpusWriterBufferSize)
 		}
 
+		// HITL-REVIEW-001 Epic 1 — the review platform: registry + review_grades
+		// writer. Datasets register here (the stub for self-test; the guidance
+		// dataset + sink are wired in Epic 5). Gated by REVIEW_ENABLED.
+		if s.cfg.ReviewEnabled {
+			s.reviewWriter = tsdb.NewReviewGradesWriter(
+				client.Pool(),
+				time.Duration(s.cfg.ReviewWriterFlushIntervalSec)*time.Second,
+				s.cfg.ReviewWriterBufferSize,
+			)
+			s.reviewRegistry = review.NewRegistry()
+			// HITL-REVIEW-001 Epic 5 — the guidance corpus as the first reviewable
+			// dataset + the live-reinforcement GuidanceSink (trust EMA + node
+			// confidence, reversible). Needs jiminy (the reinforcer) + the pool
+			// (guidance_training_rows). Gated by REVIEW_GUIDANCE_SINK_ENABLED.
+			if s.cfg.ReviewGuidanceSinkEnabled && s.jiminySvc != nil && client.Pool() != nil {
+				gds := &guidanceDataset{
+					pool:          client.Pool(),
+					rubricVersion: s.cfg.ReviewRubricVersion,
+					sink: review.GuidanceSink{
+						R:               guidanceReinforcerAdapter{svc: s.jiminySvc},
+						ConfidenceNudge: s.cfg.ReviewGuidanceConfidenceNudge,
+					},
+				}
+				if err := s.reviewRegistry.Register(gds); err != nil {
+					slog.Warn("review: guidance dataset registration failed", "error", err)
+				} else {
+					slog.Info("review: guidance dataset + live-reinforcement sink registered")
+				}
+			}
+			// HITL-REVIEW-001 — the 16 MDEMG LLM call sites as reviewable
+			// datasets (gold-only review of llm_interactions outputs → SFT/quality
+			// training data). Gated by REVIEW_LLM_DATASETS_ENABLED.
+			if s.cfg.ReviewLLMDatasetsEnabled && client.Pool() != nil {
+				n := 0
+				for _, site := range llmCallSiteCatalog {
+					if err := s.reviewRegistry.Register(llmCallSiteDataset{
+						site: site, pool: client.Pool(), rubricVersion: s.cfg.ReviewRubricVersion,
+					}); err != nil {
+						slog.Warn("review: llm dataset registration failed", "task", site.task, "error", err)
+					} else {
+						n++
+					}
+				}
+				slog.Info("review: LLM call-site datasets registered", "count", n)
+			}
+			slog.Info("review: platform attached",
+				"flush_interval_sec", s.cfg.ReviewWriterFlushIntervalSec,
+				"guidance_sink", s.cfg.ReviewGuidanceSinkEnabled)
+		}
+
 		// Phase 14 Epic 0 — V0017 retrieval_audit writer. Phase 13 Epic 6
 		// shipped the schema + interface but the writer was never wired,
 		// leaving V0017 empty. Wire it here so RETRIEVAL_AUDIT_ENABLED=true
@@ -1779,6 +1832,9 @@ func (s *Server) Shutdown() {
 	}
 	if s.guidanceTrainingWriter != nil {
 		s.guidanceTrainingWriter.Close()
+	}
+	if s.reviewWriter != nil {
+		s.reviewWriter.Close()
 	}
 	if s.llmEndpointHealthWriter != nil {
 		s.llmEndpointHealthWriter.Close()
@@ -2686,6 +2742,11 @@ func (s *Server) Routes() http.Handler {
 	// DH-004 E4.3: circuit breaker inspection + manual reset
 	mux.HandleFunc("/v1/admin/breakers", s.handleBreakersList)
 	mux.HandleFunc("/v1/admin/breakers/reset", s.handleBreakersReset)
+	// HITL-REVIEW-001 — review platform (admin-gated; mutates the live substrate).
+	mux.Handle("/v1/review/datasets", scopedHandler(auth.ScopeAdminSpaces, s.handleReviewDatasets))
+	mux.Handle("/v1/review/next", scopedHandler(auth.ScopeAdminSpaces, s.handleReviewNext))
+	mux.Handle("/v1/review/grade", scopedHandler(auth.ScopeAdminSpaces, s.handleReviewGrade))
+	mux.Handle("/v1/review/reverse", scopedHandler(auth.ScopeAdminSpaces, s.handleReviewReverse))
 	mux.HandleFunc("/v1/eventgraph/reinforcement-neighborhood", s.handleEventgraphReinforcementNeighborhood)
 	mux.HandleFunc("/v1/eventgraph/guidance-outcome-neighborhood", s.handleEventgraphGuidanceOutcomeNeighborhood)
 	mux.Handle("/ui/", http.StripPrefix("/ui/", uiHandler()))

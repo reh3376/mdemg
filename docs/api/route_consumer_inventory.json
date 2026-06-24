@@ -1505,6 +1505,38 @@
       "notes": "Prometheus exposition endpoint; no scrape configured (Grafana provisioned against TSDB - see mdemg-graph-topology.json:454 \"no Prometheus scrape endpoint on mdemg\"). Ops surface.",
       "uats_specs": []
     },
+    "/v1/review/datasets": {
+      "consumers": [
+        "ui:api.js"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "HITL-REVIEW-001: internal/api/ui/api.js (review* helpers) \u2192 tabs/review.js \u2014 list reviewable datasets (+descriptions); Playwright tests/e2e/browser-ui.",
+      "uats_specs": []
+    },
+    "/v1/review/grade": {
+      "consumers": [
+        "ui:api.js"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "HITL-REVIEW-001: internal/api/ui/api.js (review* helpers) \u2192 tabs/review.js \u2014 submit a grade (+optional live reinforcement / dry-run); Playwright tests/e2e/browser-ui.",
+      "uats_specs": []
+    },
+    "/v1/review/next": {
+      "consumers": [
+        "ui:api.js"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "HITL-REVIEW-001: internal/api/ui/api.js (review* helpers) \u2192 tabs/review.js \u2014 fetch the next sampled item to review; Playwright tests/e2e/browser-ui.",
+      "uats_specs": []
+    },
+    "/v1/review/reverse": {
+      "consumers": [
+        "ui:api.js"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "HITL-REVIEW-001: internal/api/ui/api.js (review* helpers) \u2192 tabs/review.js \u2014 reverse a grade's live reinforcement; Playwright tests/e2e/browser-ui.",
+      "uats_specs": []
+    },
     "/v1/scraper/jobs": {
       "consumers": [],
       "disposition": "OPERATOR_SURFACE",
