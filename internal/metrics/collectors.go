@@ -264,6 +264,11 @@ type StandardMetrics struct {
 	EventgraphRowsEnqueued *Counter // mdemg_eventgraph_writer_rows_enqueued_total — successful CopyFrom rows
 	EventgraphRowsDropped  *Counter // mdemg_eventgraph_writer_rows_dropped_total — FIFO-evicted rows (buffer-full)
 	EventgraphFlushFailure *Counter // mdemg_eventgraph_writer_flush_failure_total — CopyFrom errors
+
+	// JIMINY-RELEVANCE-001 — guidance_training_rows writer counters.
+	GuidanceCorpusRowsEnqueued *Counter // mdemg_guidance_corpus_rows_enqueued_total — training-evidence rows written to TSDB
+	GuidanceCorpusRowsDropped  *Counter // mdemg_guidance_corpus_rows_dropped_total — rows FIFO-evicted (buffer-full)
+	GuidanceCorpusFlushFailure *Counter // mdemg_guidance_corpus_flush_failure_total — writer CopyFrom failures
 }
 
 // Registry returns the underlying metric registry.
@@ -814,6 +819,17 @@ func NewStandardMetrics(r *Registry) *StandardMetrics {
 	m.EventgraphFlushFailure = r.NewCounter(
 		"eventgraph_writer_flush_failure_total",
 		"Reinforcement-event writer CopyFrom failures", nil)
+
+	// JIMINY-RELEVANCE-001 — guidance_training_rows writer counters.
+	m.GuidanceCorpusRowsEnqueued = r.NewCounter(
+		"guidance_corpus_rows_enqueued_total",
+		"Guidance training-evidence rows successfully written to TSDB", nil)
+	m.GuidanceCorpusRowsDropped = r.NewCounter(
+		"guidance_corpus_rows_dropped_total",
+		"Guidance training-evidence rows FIFO-evicted (buffer-full)", nil)
+	m.GuidanceCorpusFlushFailure = r.NewCounter(
+		"guidance_corpus_flush_failure_total",
+		"Guidance training-evidence writer CopyFrom failures", nil)
 
 	return m
 }

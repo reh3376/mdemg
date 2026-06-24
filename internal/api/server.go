@@ -172,6 +172,7 @@ type Server struct {
 	reinforcementWriter      *tsdb.ReinforcementEventsWriter
 	eventgraphService        *eventgraph.Service
 	constraintOutcomesWriter *tsdb.ConstraintOutcomesWriter
+	guidanceTrainingWriter   *tsdb.GuidanceTrainingRowsWriter
 	llmEndpointHealthWriter  *tsdb.LLMEndpointHealthWriter
 
 	// DOCKER-P2: Browser dashboard log buffer
@@ -1397,6 +1398,30 @@ func (s *Server) SetTSDBClient(client *tsdb.Client) {
 		}
 		slog.Info("tsdb: constraint outcomes logger attached")
 
+		// JIMINY-RELEVANCE-001 Epic 1 — V0027 guidance_training_rows writer.
+		// Persists the training EVIDENCE (guidance text + action text + source
+		// role/layer + verdict) discarded until now. Gated by
+		// GUIDANCE_CORPUS_ENABLED (default true); buffered + async so the
+		// /v1/jiminy/feedback hot path is never blocked.
+		if s.cfg.GuidanceCorpusEnabled && s.jiminySvc != nil {
+			s.guidanceTrainingWriter = tsdb.NewGuidanceTrainingRowsWriter(
+				client.Pool(),
+				time.Duration(s.cfg.GuidanceCorpusWriterFlushIntervalSec)*time.Second,
+				s.cfg.GuidanceCorpusWriterBufferSize,
+			)
+			s.jiminySvc.SetGuidanceTrainingWriter(&guidanceTrainingAdapter{w: s.guidanceTrainingWriter})
+			if std := metrics.Metrics(); std != nil {
+				s.guidanceTrainingWriter.SetPrometheusCounters(
+					std.GuidanceCorpusRowsEnqueued,
+					std.GuidanceCorpusRowsDropped,
+					std.GuidanceCorpusFlushFailure,
+				)
+			}
+			slog.Info("tsdb: guidance_training_rows writer attached",
+				"flush_interval_sec", s.cfg.GuidanceCorpusWriterFlushIntervalSec,
+				"buffer_size", s.cfg.GuidanceCorpusWriterBufferSize)
+		}
+
 		// Phase 14 Epic 0 — V0017 retrieval_audit writer. Phase 13 Epic 6
 		// shipped the schema + interface but the writer was never wired,
 		// leaving V0017 empty. Wire it here so RETRIEVAL_AUDIT_ENABLED=true
@@ -1552,6 +1577,33 @@ type retrievalAuditAdapter struct {
 // from production traffic.
 type sparseGateRecorderAdapter struct {
 	writer *tsdb.SparseGateMetricsWriter
+}
+
+// guidanceTrainingAdapter adapts *tsdb.GuidanceTrainingRowsWriter (in tsdb, to
+// avoid the import cycle) to jiminy.GuidanceTrainingWriter (the contract jiminy
+// consumes). Maps the jiminy-side evidence record to the tsdb row shape.
+// JIMINY-RELEVANCE-001 Epic 1.
+type guidanceTrainingAdapter struct {
+	w *tsdb.GuidanceTrainingRowsWriter
+}
+
+func (a *guidanceTrainingAdapter) RecordTrainingRow(row jiminy.GuidanceTrainingRecord) {
+	a.w.Record(tsdb.GuidanceTrainingRow{
+		SpaceID:          row.SpaceID,
+		SessionID:        row.SessionID,
+		InstanceID:       row.InstanceID,
+		GuidanceID:       row.GuidanceID,
+		GuidanceType:     row.GuidanceType,
+		GuidanceContent:  row.GuidanceContent,
+		SourceNodeID:     row.SourceNodeID,
+		SourceRoleType:   row.SourceRoleType,
+		SourceLayer:      row.SourceLayer,
+		ActionSummary:    row.ActionSummary,
+		OutcomeType:      row.OutcomeType,
+		Similarity:       row.Similarity,
+		ClassifierSource: row.ClassifierSource,
+		ConstraintCode:   row.ConstraintCode,
+	})
 }
 
 // RecordGate satisfies retrieval.SparseGateRecorder. Translates the retrieval-
@@ -1724,6 +1776,9 @@ func (s *Server) Shutdown() {
 	}
 	if s.constraintOutcomesWriter != nil {
 		s.constraintOutcomesWriter.Close()
+	}
+	if s.guidanceTrainingWriter != nil {
+		s.guidanceTrainingWriter.Close()
 	}
 	if s.llmEndpointHealthWriter != nil {
 		s.llmEndpointHealthWriter.Close()

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"github.com/nrednav/cuid2"
@@ -67,6 +68,7 @@ type Service struct {
 	conflictTracker          *conversation.ConflictTracker // Phase 12 Epic 6: optional divergence-recorder hook
 	codeComprehensionTracker *CodeComprehensionTracker     // P1-15: code comprehension feedback loop
 	outcomeWriter            OutcomeWriter                 // TSDB writer for constraint outcomes
+	guidanceTrainingWriter   GuidanceTrainingWriter        // JIMINY-RELEVANCE-001: TSDB writer for the guidance training-evidence corpus
 
 	// B4: Per-session feedback tracking for protocol status endpoint
 	feedbackMu     sync.RWMutex
@@ -1585,6 +1587,37 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 			)
 		}
 
+		// JIMINY-RELEVANCE-001 Epic 1: persist the training EVIDENCE that was
+		// previously discarded — the guidance text, source-node role/layer, the
+		// agent-action text, and the audited verdict. Captures every non-Unknown
+		// outcome (including not_applicable — an off-topic verdict is a valid
+		// relevance label). The source role/layer lookup is bounded + best-effort;
+		// the writer is async, so the feedback hot path is never blocked.
+		if s.cfg.GuidanceCorpusEnabled && s.guidanceTrainingWriter != nil && outcome != OutcomeUnknown {
+			sourceNodeID := ""
+			if len(item.SourceNodes) > 0 {
+				sourceNodeID = item.SourceNodes[0]
+			}
+			roleType, layer, _ := s.resolveSourceMeta(ctx, sourceNodeID)
+			maxBytes := s.cfg.GuidanceCorpusMaxContentBytes
+			s.guidanceTrainingWriter.RecordTrainingRow(GuidanceTrainingRecord{
+				SpaceID:          req.SpaceID,
+				SessionID:        feedbackSessionID,
+				InstanceID:       s.cfg.InstanceID,
+				GuidanceID:       req.GuidanceID,
+				GuidanceType:     string(item.Type),
+				GuidanceContent:  truncateBytes(item.Content, maxBytes),
+				SourceNodeID:     sourceNodeID,
+				SourceRoleType:   roleType,
+				SourceLayer:      layer,
+				ActionSummary:    truncateBytes(req.ActionSummary, maxBytes),
+				OutcomeType:      string(outcome),
+				Similarity:       cr.Confidence,
+				ClassifierSource: cr.Source,
+				ConstraintCode:   item.ConstraintCode,
+			})
+		}
+
 		// RSIC-SK1: Record signal response for positive outcomes (independent of persistence)
 		if s.signalLearner != nil && (outcome == OutcomeFollowed || outcome == OutcomePartialCompliance) {
 			if code := guidanceSignalCode(item); code != "" {
@@ -2034,6 +2067,78 @@ func (s *Service) SetCodeGenerator(gen *ConstraintCodeGenerator) {
 // SetOutcomeWriter sets the TSDB writer for constraint outcome events.
 func (s *Service) SetOutcomeWriter(w OutcomeWriter) {
 	s.outcomeWriter = w
+}
+
+// SetGuidanceTrainingWriter sets the TSDB writer for the guidance training-
+// evidence corpus (JIMINY-RELEVANCE-001 Epic 1).
+func (s *Service) SetGuidanceTrainingWriter(w GuidanceTrainingWriter) {
+	s.guidanceTrainingWriter = w
+}
+
+// resolveSourceMeta does a bounded, best-effort Neo4j lookup of a source node's
+// role_type + layer for the guidance training corpus (Finding 5's actionability
+// signal — 172:1 abstraction:constraint ratio). Returns ("", nil, false) on
+// disable / timeout / miss; NEVER blocks the feedback hot path beyond
+// GUIDANCE_CORPUS_SOURCE_LOOKUP_TIMEOUT_MS. layer is a *int so a valid layer 0
+// is distinct from "unresolved".
+func (s *Service) resolveSourceMeta(ctx context.Context, nodeID string) (string, *int, bool) {
+	if nodeID == "" || s.driver == nil || s.cfg.GuidanceCorpusSourceLookupTimeoutMs <= 0 {
+		return "", nil, false
+	}
+	lookupCtx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.GuidanceCorpusSourceLookupTimeoutMs)*time.Millisecond)
+	defer cancel()
+
+	sess := s.driver.NewSession(lookupCtx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(lookupCtx)
+
+	result, err := sess.ExecuteRead(lookupCtx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(lookupCtx, `
+			MATCH (n:MemoryNode {node_id: $id})
+			RETURN n.role_type AS role_type, n.layer AS layer
+			LIMIT 1
+		`, map[string]any{"id": nodeID})
+		if err != nil {
+			return nil, err
+		}
+		return res.Single(lookupCtx)
+	})
+	if err != nil {
+		return "", nil, false
+	}
+	rec, ok := result.(*neo4j.Record)
+	if !ok || rec == nil {
+		return "", nil, false
+	}
+	roleType := ""
+	if rt, found := rec.Get("role_type"); found {
+		if v, isStr := rt.(string); isStr {
+			roleType = v
+		}
+	}
+	var layer *int
+	if lv, found := rec.Get("layer"); found {
+		if v, isInt := lv.(int64); isInt {
+			l := int(v)
+			layer = &l
+		}
+	}
+	return roleType, layer, true
+}
+
+// truncateBytes returns s truncated to at most max bytes (UTF-8-safe at the byte
+// boundary), appending a marker when truncation occurs. max ≤ 0 returns s
+// unchanged. Used to bound the guidance/action snapshots stored in the corpus.
+func truncateBytes(s string, max int) string {
+	if max <= 0 || len(s) <= max {
+		return s
+	}
+	const marker = "…[truncated]"
+	cut := max
+	// Back off to a valid UTF-8 boundary so we never split a multibyte rune.
+	for cut > 0 && !utf8.RuneStart(s[cut]) {
+		cut--
+	}
+	return s[:cut] + marker
 }
 
 // SetWarmStore sets the warm store reference for trust-based invalidation (B7).

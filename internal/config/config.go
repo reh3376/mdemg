@@ -1052,12 +1052,21 @@ type Config struct {
 	TSDBFlushIntervalSec      int    // TSDB_FLUSH_INTERVAL_SEC — metric writer flush interval in seconds (default: 60)
 	TSDBRawRetentionDays      int    // TSDB_RAW_RETENTION_DAYS — raw sample retention in days (default: 90)
 	TSDBHourlyRetentionDays   int    // TSDB_HOURLY_RETENTION_DAYS — hourly aggregate retention in days (default: 365)
-	TSDBRequiredSchemaVersion int    // TSDB_REQUIRED_SCHEMA_VERSION — minimum required TSDB schema version (default: 26 post-JIMINY-OUTCOME-002 V0026 classifier_source)
+	TSDBRequiredSchemaVersion int    // TSDB_REQUIRED_SCHEMA_VERSION — minimum required TSDB schema version (default: 27 post-JIMINY-RELEVANCE-001 V0027 guidance_training_rows)
 	TSDBOptional              bool   // TSDB_OPTIONAL — if true, TSDB failure is non-fatal on startup (default: true)
 	InstanceID                string // MDEMG_INSTANCE_ID — identifies this node for multi-instance coordination (default: "{hostname}-{space_id}")
 	LLMInteractionLogging     bool   // LLM_INTERACTION_LOGGING — log all LLM calls to llm_interactions table (default: true)
 	EmbeddingEventLogging     bool   // EMBEDDING_EVENT_LOGGING — log all Embed() calls for contrastive training data (default: true)
 	RetrievalEventLogging     bool   // RETRIEVAL_EVENT_LOGGING — log all Retrieve() pipelines for contrastive training data (default: true)
+
+	// JIMINY-RELEVANCE-001 Epic 1 — guidance_training_rows (V0027): persist the
+	// training EVIDENCE (guidance text + action text + source role/layer + verdict)
+	// per guidance-feedback item that was previously discarded.
+	GuidanceCorpusEnabled               bool // GUIDANCE_CORPUS_ENABLED — persist guidance training evidence to guidance_training_rows (default: true)
+	GuidanceCorpusWriterFlushIntervalSec int  // GUIDANCE_CORPUS_WRITER_FLUSH_INTERVAL_SEC — buffered writer flush cadence in seconds (default: 30, floor: 5)
+	GuidanceCorpusWriterBufferSize       int  // GUIDANCE_CORPUS_WRITER_BUFFER_SIZE — max rows held before FIFO eviction (default: 1000, 0 = unlimited)
+	GuidanceCorpusMaxContentBytes        int  // GUIDANCE_CORPUS_MAX_CONTENT_BYTES — truncate guidance/action snapshots to this many bytes (default: 8192, floor: 256)
+	GuidanceCorpusSourceLookupTimeoutMs  int  // GUIDANCE_CORPUS_SOURCE_LOOKUP_TIMEOUT_MS — bounded best-effort Neo4j lookup of source-node role_type/layer at emit (default: 300, 0 = disable; never blocks the hot path beyond this)
 
 	// EVENTGRAPH-001 — TSDB reinforcement_events + federation API (Pattern Y1)
 	EventGraphEnabled                        bool // EVENTGRAPH_ENABLED — record per-pair Hebbian telemetry into reinforcement_events + expose federation API (default: true)
@@ -3017,6 +3026,37 @@ func FromEnv() (Config, error) {
 	// Phase 13 Epic 6 — retrieval_audit (V0017) write toggle
 	retrievalAuditEnabled := getBool("RETRIEVAL_AUDIT_ENABLED", true)
 
+	// JIMINY-RELEVANCE-001 Epic 1 — guidance_training_rows (V0027).
+	guidanceCorpusEnabled := getBool("GUIDANCE_CORPUS_ENABLED", true)
+	guidanceCorpusWriterFlushIntervalSec, err := atoi("GUIDANCE_CORPUS_WRITER_FLUSH_INTERVAL_SEC", 30)
+	if err != nil {
+		return Config{}, err
+	}
+	if guidanceCorpusWriterFlushIntervalSec < 5 {
+		guidanceCorpusWriterFlushIntervalSec = 5 // floor — never thrash the DB
+	}
+	guidanceCorpusWriterBufferSize, err := atoi("GUIDANCE_CORPUS_WRITER_BUFFER_SIZE", 1000)
+	if err != nil {
+		return Config{}, err
+	}
+	if guidanceCorpusWriterBufferSize < 0 {
+		guidanceCorpusWriterBufferSize = 0 // 0 = unlimited (disabled cap)
+	}
+	guidanceCorpusMaxContentBytes, err := atoi("GUIDANCE_CORPUS_MAX_CONTENT_BYTES", 8192)
+	if err != nil {
+		return Config{}, err
+	}
+	if guidanceCorpusMaxContentBytes < 256 {
+		guidanceCorpusMaxContentBytes = 256 // floor — keep enough to be useful evidence
+	}
+	guidanceCorpusSourceLookupTimeoutMs, err := atoi("GUIDANCE_CORPUS_SOURCE_LOOKUP_TIMEOUT_MS", 300)
+	if err != nil {
+		return Config{}, err
+	}
+	if guidanceCorpusSourceLookupTimeoutMs < 0 {
+		guidanceCorpusSourceLookupTimeoutMs = 0 // 0 = disable inline lookup
+	}
+
 	// EVENTGRAPH-001 — TSDB reinforcement_events + federation API (Pattern Y1).
 	eventGraphEnabled := getBool("EVENTGRAPH_ENABLED", true)
 	eventGraphWriterFlushIntervalSec, err := atoi("EVENTGRAPH_WRITER_FLUSH_INTERVAL_SEC", 30)
@@ -4163,7 +4203,7 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	tsdbRequiredSchemaVersion, err := atoi("TSDB_REQUIRED_SCHEMA_VERSION", 26)
+	tsdbRequiredSchemaVersion, err := atoi("TSDB_REQUIRED_SCHEMA_VERSION", 27)
 	if err != nil {
 		return Config{}, err
 	}
@@ -4837,6 +4877,12 @@ func FromEnv() (Config, error) {
 		RetrievalAuditEnabled:           retrievalAuditEnabled,
 
 		// EVENTGRAPH-001 — TSDB reinforcement_events + federation API
+		GuidanceCorpusEnabled:                    guidanceCorpusEnabled,
+		GuidanceCorpusWriterFlushIntervalSec:     guidanceCorpusWriterFlushIntervalSec,
+		GuidanceCorpusWriterBufferSize:           guidanceCorpusWriterBufferSize,
+		GuidanceCorpusMaxContentBytes:            guidanceCorpusMaxContentBytes,
+		GuidanceCorpusSourceLookupTimeoutMs:      guidanceCorpusSourceLookupTimeoutMs,
+
 		EventGraphEnabled:                        eventGraphEnabled,
 		EventGraphWriterFlushIntervalSec:         eventGraphWriterFlushIntervalSec,
 		EventGraphWriterBufferSize:               eventGraphWriterBufferSize,
