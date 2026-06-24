@@ -84,6 +84,42 @@ func (r Rubric) Score(g GradeSubmission) (gold float64, dims map[string]any, err
 	}
 }
 
+// LLMOutputRubric is the rated rubric for reviewing an LLM call site's output —
+// shared across all 16 MDEMG call sites. Reviewing produces gold SFT/quality
+// data for the recursive-retraining loop.
+func LLMOutputRubric(version string) Rubric {
+	if version == "" {
+		version = "gr-v1"
+	}
+	return Rubric{
+		Version: version,
+		Kind:    RubricRated,
+		Dimensions: []RubricDimension{
+			{Key: "correctness", Anchors: [5]string{
+				"wrong — the output is incorrect / hallucinated",
+				"mostly wrong",
+				"mixed — partly right",
+				"mostly correct",
+				"correct — fully right for this input",
+			}},
+			{Key: "format_validity", Anchors: [5]string{
+				"malformed — wrong shape / unparseable",
+				"major format issues",
+				"parseable with issues",
+				"valid with minor nits",
+				"perfectly-formed for the call site's contract",
+			}},
+			{Key: "helpfulness", Anchors: [5]string{
+				"useless — adds nothing / misleading",
+				"weak",
+				"adequate",
+				"good",
+				"excellent — exactly what the call site needs",
+			}},
+		},
+	}
+}
+
 // GuidanceRubric is the rated rubric for the guidance corpus dataset. The
 // outcome_label_correctness dimension is what the guidance reinforcement sink
 // (Epic 5) reads to derive the corrected outcome. Anchors are the reproducible

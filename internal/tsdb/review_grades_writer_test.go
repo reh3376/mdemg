@@ -92,8 +92,8 @@ func TestReviewGradesWriter_RecordThenFlush(t *testing.T) {
 	if last.tableName[0] != "review_grades" {
 		t.Errorf("table = %q, want review_grades", last.tableName[0])
 	}
-	if len(last.columns) != 15 {
-		t.Errorf("got %d columns, want 15", len(last.columns))
+	if len(last.columns) != 16 {
+		t.Errorf("got %d columns, want 16", len(last.columns))
 	}
 	if len(last.rows) != 3 {
 		t.Fatalf("got %d rows, want 3", len(last.rows))

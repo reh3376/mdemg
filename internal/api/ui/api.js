@@ -127,6 +127,12 @@ export const featureStart = (name) => post('/v1/admin/features/start', { name })
 export const featureStop = (name) => post('/v1/admin/features/stop', { name });
 export const featureRestart = (name) => post('/v1/admin/features/restart', { name });
 
+// --- Review (HITL-REVIEW-001) ---
+export const reviewDatasets = (spaceId) => get(`/v1/review/datasets?space_id=${encodeURIComponent(spaceId)}`);
+export const reviewNext = (datasetId, spaceId) => get(`/v1/review/next?dataset_id=${encodeURIComponent(datasetId)}&space_id=${encodeURIComponent(spaceId)}`);
+export const reviewGrade = (body) => post('/v1/review/grade', body);
+export const reviewReverse = (gradeId) => post('/v1/review/reverse', { grade_id: gradeId });
+
 // --- Server ---
 export const serverRestart = () => post('/v1/admin/restart', null);
 

@@ -81,12 +81,12 @@ class TestPageLoad:
 # ---------------------------------------------------------------------------
 
 class TestTabNavigation:
-    """Verify all 10 tabs are present and can be clicked."""
+    """Verify all tabs are present and can be clicked."""
 
-    TAB_NAMES = ["status", "memory", "learning", "config", "logs", "rsic", "plugins", "features", "backup", "training"]
+    TAB_NAMES = ["status", "memory", "learning", "config", "logs", "rsic", "plugins", "features", "backup", "training", "review"]
 
     def test_all_tab_buttons_present(self, ui_page: Page):
-        """All 10 tab buttons should be visible."""
+        """All tab buttons should be visible."""
         for tab_name in self.TAB_NAMES:
             btn = ui_page.locator(f'.tab-btn[data-tab="{tab_name}"]')
             expect(btn).to_be_visible(timeout=5000), f"Tab button '{tab_name}' not visible"
@@ -121,6 +121,58 @@ class TestTabNavigation:
         content = ui_page.locator("#content")
         inner = content.inner_text()
         assert len(inner) > 0, f"Tab '{tab_name}' rendered empty content"
+
+
+class TestReviewTab:
+    """HITL-REVIEW-001: the Review tab loads, lists datasets, renders an item +
+    rubric form, and a dry-run preview returns without mutating (non-destructive
+    browser e2e; the full grade->reinforce->reverse cycle is API-level verified)."""
+
+    def _open_review(self, ui_page: Page):
+        ui_page.locator('.tab-btn[data-tab="review"]').click()
+        ui_page.wait_for_timeout(2500)
+
+    def test_review_tab_loads_dataset_picker(self, ui_page: Page):
+        self._open_review(ui_page)
+        picker = ui_page.locator("#review-dataset")
+        err = ui_page.locator("#review-error")
+        # On the dev stack (auth passes through) the picker renders; if the
+        # platform is disabled/gated, a clear error renders instead.
+        assert picker.count() > 0 or err.count() > 0, "Review tab rendered neither a dataset picker nor an error"
+
+    def test_review_guidance_renders_item_or_empty(self, ui_page: Page):
+        self._open_review(ui_page)
+        picker = ui_page.locator("#review-dataset")
+        if picker.count() == 0:
+            pytest.skip("review platform not available on this stack")
+        picker.select_option("guidance")
+        ui_page.wait_for_timeout(2500)
+        item = ui_page.locator("#review-item")
+        empty = ui_page.locator("#review-empty")
+        assert item.count() > 0 or empty.count() > 0, "guidance dataset rendered neither an item nor an empty state"
+        if item.count() > 0:
+            # The rubric form must offer 0..4 radio inputs to grade.
+            assert ui_page.locator("#review-form input[type=radio]").count() > 0, "rubric form has no grading inputs"
+
+    def test_review_dry_run_preview_no_mutation(self, ui_page: Page):
+        self._open_review(ui_page)
+        picker = ui_page.locator("#review-dataset")
+        if picker.count() == 0:
+            pytest.skip("review platform not available")
+        picker.select_option("guidance")
+        ui_page.wait_for_timeout(2500)
+        if ui_page.locator("#review-item").count() == 0:
+            pytest.skip("no guidance items to review")
+        # Fill one radio per dimension, then dry-run preview (no write).
+        form = ui_page.locator("#review-form")
+        names = form.locator("input[type=radio]").evaluate_all(
+            "els => [...new Set(els.map(e => e.name))]")
+        for name in names:
+            form.locator(f'input[type=radio][name="{name}"][value="3"]').first.check()
+        ui_page.get_by_text("Preview (dry-run)").click()
+        ui_page.wait_for_timeout(3000)
+        status = ui_page.locator("#review-status").inner_text()
+        assert "PREVIEW" in status or "gold" in status, f"dry-run preview produced no result: {status!r}"
 
 
 # ---------------------------------------------------------------------------

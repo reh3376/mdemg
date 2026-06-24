@@ -35,6 +35,35 @@ type noRow struct{}
 
 func (noRow) Scan(_ ...any) error { return pgx.ErrNoRows }
 
+// fakeReviewDataset is a test-only ReviewableDataset (the prod stub was removed).
+type fakeReviewDataset struct{}
+
+func (fakeReviewDataset) ID() string          { return "stub" }
+func (fakeReviewDataset) DisplayName() string { return "Stub (test)" }
+func (fakeReviewDataset) Rubric() review.Rubric {
+	return review.Rubric{Version: "gr-v1", Kind: review.RubricRated, Dimensions: []review.RubricDimension{
+		{Key: "quality", Anchors: [5]string{"0", "1", "2", "3", "4"}},
+	}}
+}
+func (fakeReviewDataset) Sink() review.ReinforcementSink { return review.NoopSink{} }
+func (fakeReviewDataset) FetchCandidates(_ context.Context, q review.CandidateQuery) ([]review.ReviewItem, error) {
+	n := q.Limit
+	if n <= 0 || n > 3 {
+		n = 3
+	}
+	out := make([]review.ReviewItem, 0, n)
+	for i := 0; i < n; i++ {
+		out = append(out, review.ReviewItem{ItemID: "stub-1", Content: "c", Context: "x", AutoLabel: "unknown", AutoScore: 0.5, Stratum: "s"})
+	}
+	return out, nil
+}
+func (fakeReviewDataset) FetchItem(_ context.Context, _, itemID string) (review.ReviewItem, bool, error) {
+	if itemID == "" {
+		return review.ReviewItem{}, false, nil
+	}
+	return review.ReviewItem{ItemID: itemID, Content: "c", Context: "x", AutoLabel: "unknown", AutoScore: 0.5}, true, nil
+}
+
 func reviewTestServer(t *testing.T, enabled bool) (*Server, *fakeReviewPool) {
 	t.Helper()
 	pool := &fakeReviewPool{}
@@ -45,7 +74,7 @@ func reviewTestServer(t *testing.T, enabled bool) (*Server, *fakeReviewPool) {
 	}}
 	if enabled {
 		s.reviewRegistry = review.NewRegistry()
-		_ = s.reviewRegistry.Register(review.StubDataset{})
+		_ = s.reviewRegistry.Register(fakeReviewDataset{})
 		s.reviewWriter = tsdb.NewReviewGradesWriter(pool, 0, 0)
 	}
 	return s, pool

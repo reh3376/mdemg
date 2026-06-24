@@ -1435,11 +1435,6 @@ func (s *Server) SetTSDBClient(client *tsdb.Client) {
 				s.cfg.ReviewWriterBufferSize,
 			)
 			s.reviewRegistry = review.NewRegistry()
-			if s.cfg.ReviewStubDatasetEnabled {
-				if err := s.reviewRegistry.Register(review.StubDataset{}); err != nil {
-					slog.Warn("review: stub dataset registration failed", "error", err)
-				}
-			}
 			// HITL-REVIEW-001 Epic 5 — the guidance corpus as the first reviewable
 			// dataset + the live-reinforcement GuidanceSink (trust EMA + node
 			// confidence, reversible). Needs jiminy (the reinforcer) + the pool
@@ -1459,9 +1454,24 @@ func (s *Server) SetTSDBClient(client *tsdb.Client) {
 					slog.Info("review: guidance dataset + live-reinforcement sink registered")
 				}
 			}
+			// HITL-REVIEW-001 — the 16 MDEMG LLM call sites as reviewable
+			// datasets (gold-only review of llm_interactions outputs → SFT/quality
+			// training data). Gated by REVIEW_LLM_DATASETS_ENABLED.
+			if s.cfg.ReviewLLMDatasetsEnabled && client.Pool() != nil {
+				n := 0
+				for _, site := range llmCallSiteCatalog {
+					if err := s.reviewRegistry.Register(llmCallSiteDataset{
+						site: site, pool: client.Pool(), rubricVersion: s.cfg.ReviewRubricVersion,
+					}); err != nil {
+						slog.Warn("review: llm dataset registration failed", "task", site.task, "error", err)
+					} else {
+						n++
+					}
+				}
+				slog.Info("review: LLM call-site datasets registered", "count", n)
+			}
 			slog.Info("review: platform attached",
 				"flush_interval_sec", s.cfg.ReviewWriterFlushIntervalSec,
-				"stub_dataset", s.cfg.ReviewStubDatasetEnabled,
 				"guidance_sink", s.cfg.ReviewGuidanceSinkEnabled)
 		}
 

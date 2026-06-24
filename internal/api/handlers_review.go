@@ -12,7 +12,7 @@ import (
 // reviewGradeRow maps a review.Grade (+ marshalled jsonb + audit fields) to the
 // tsdb row shape (keeps internal/tsdb free of internal/review). reversesGradeID
 // non-empty marks a reversal row; the original is flagged via MarkReversed.
-func reviewGradeRow(g review.Grade, dimsJSON string, applied bool, detailJSON, reversesGradeID, instanceID string) tsdb.ReviewGradeRow {
+func reviewGradeRow(g review.Grade, dimsJSON string, applied bool, detailJSON, reversesGradeID, instanceID, suggested string) tsdb.ReviewGradeRow {
 	return tsdb.ReviewGradeRow{
 		GradeID:                 g.GradeID,
 		DatasetID:               g.DatasetID,
@@ -27,6 +27,7 @@ func reviewGradeRow(g review.Grade, dimsJSON string, applied bool, detailJSON, r
 		Reversed:                false,
 		ReversesGradeID:         reversesGradeID,
 		InstanceID:              instanceID,
+		SuggestedGuidance:       suggested,
 	}
 }
 
@@ -70,11 +71,16 @@ func (s *Server) handleReviewDatasets(w http.ResponseWriter, r *http.Request) {
 		cands, _ := d.FetchCandidates(r.Context(), review.CandidateQuery{
 			SpaceID: spaceID, Limit: s.cfg.ReviewSampleSize, ExcludeGraded: true,
 		})
+		desc := ""
+		if dd, ok := d.(interface{ Description() string }); ok {
+			desc = dd.Description()
+		}
 		out = append(out, map[string]any{
-			"id":             d.ID(),
-			"display_name":   d.DisplayName(),
-			"rubric_version": rb.Version,
-			"rubric_kind":    rb.Kind.String(),
+			"id":              d.ID(),
+			"display_name":    d.DisplayName(),
+			"description":     desc,
+			"rubric_version":  rb.Version,
+			"rubric_kind":     rb.Kind.String(),
 			"candidate_count": len(cands),
 		})
 	}
@@ -145,9 +151,10 @@ type reviewGradeRequest struct {
 		Rejected   string `json:"rejected"`
 		Confidence int    `json:"confidence"`
 	} `json:"ranking,omitempty"`
-	Reinforce *bool `json:"reinforce,omitempty"`
-	DryRun    *bool `json:"dry_run,omitempty"`
-	Force     bool  `json:"force,omitempty"`
+	Reinforce         *bool  `json:"reinforce,omitempty"`
+	DryRun            *bool  `json:"dry_run,omitempty"`
+	Force             bool   `json:"force,omitempty"`
+	SuggestedGuidance string `json:"suggested_guidance,omitempty"` // SME corrective example
 }
 
 // POST /v1/review/grade
@@ -249,7 +256,7 @@ func (s *Server) handleReviewGrade(w http.ResponseWriter, r *http.Request) {
 	}
 
 	dimsJSON, _ := json.Marshal(dims)
-	s.reviewWriter.Record(reviewGradeRow(grade, string(dimsJSON), applied, detailJSON, "", s.cfg.InstanceID))
+	s.reviewWriter.Record(reviewGradeRow(grade, string(dimsJSON), applied, detailJSON, "", s.cfg.InstanceID, req.SuggestedGuidance))
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"data": map[string]any{
@@ -310,7 +317,7 @@ func (s *Server) handleReviewReverse(w http.ResponseWriter, r *http.Request) {
 		SpaceID: row.SpaceID, GraderID: "reversal", RubricVersion: row.RubricVersion,
 		GoldScore: row.GoldScore,
 	}
-	s.reviewWriter.Record(reviewGradeRow(rev, "{}", false, "", req.GradeID, s.cfg.InstanceID))
+	s.reviewWriter.Record(reviewGradeRow(rev, "{}", false, "", req.GradeID, s.cfg.InstanceID, ""))
 	if err := s.reviewWriter.MarkReversed(r.Context(), req.GradeID); err != nil {
 		writeInternalError(w, err, "review mark reversed")
 		return

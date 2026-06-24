@@ -1052,7 +1052,7 @@ type Config struct {
 	TSDBFlushIntervalSec      int    // TSDB_FLUSH_INTERVAL_SEC — metric writer flush interval in seconds (default: 60)
 	TSDBRawRetentionDays      int    // TSDB_RAW_RETENTION_DAYS — raw sample retention in days (default: 90)
 	TSDBHourlyRetentionDays   int    // TSDB_HOURLY_RETENTION_DAYS — hourly aggregate retention in days (default: 365)
-	TSDBRequiredSchemaVersion int    // TSDB_REQUIRED_SCHEMA_VERSION — minimum required TSDB schema version (default: 28 post-HITL-REVIEW-001 V0028 review_grades)
+	TSDBRequiredSchemaVersion int    // TSDB_REQUIRED_SCHEMA_VERSION — minimum required TSDB schema version (default: 29 post-HITL-REVIEW-001 V0029 review_grades.suggested_guidance)
 	TSDBOptional              bool   // TSDB_OPTIONAL — if true, TSDB failure is non-fatal on startup (default: true)
 	InstanceID                string // MDEMG_INSTANCE_ID — identifies this node for multi-instance coordination (default: "{hostname}-{space_id}")
 	LLMInteractionLogging     bool   // LLM_INTERACTION_LOGGING — log all LLM calls to llm_interactions table (default: true)
@@ -1087,7 +1087,6 @@ type Config struct {
 	ReviewEnabled                 bool    // REVIEW_ENABLED — enable the /v1/review/* surface + UI tab (default: true)
 	ReviewWriterFlushIntervalSec  int     // REVIEW_WRITER_FLUSH_INTERVAL_SEC — review_grades writer flush cadence (default: 15, floor: 5)
 	ReviewWriterBufferSize        int     // REVIEW_WRITER_BUFFER_SIZE — max buffered grade rows before FIFO eviction (default: 500, 0 = unbounded)
-	ReviewStubDatasetEnabled      bool    // REVIEW_STUB_DATASET_ENABLED — register a synthetic dataset for self-test/dev (default: false)
 	ReviewRubricVersion           string  // REVIEW_RUBRIC_VERSION — the current rubric version; grades not at this version aren't "certified-current" (default: gr-v1)
 	ReviewSampleSize              int     // REVIEW_SAMPLE_SIZE — max items the sampler selects per fetch (default: 200, floor: 1)
 	ReviewActiveUncertaintyBand   float64 // REVIEW_ACTIVE_UNCERTAINTY_BAND — prefer items whose AutoScore is within this band of 0.5 (default: 0.4)
@@ -1095,6 +1094,7 @@ type Config struct {
 	ReviewReinforceDefault        bool    // REVIEW_REINFORCE_DEFAULT — default for the per-grade reinforce flag; false = grades are gold-only unless reinforce:true is sent (default: false)
 	ReviewGuidanceSinkEnabled     bool    // REVIEW_GUIDANCE_SINK_ENABLED — enable the guidance live-reinforcement sink (default: true)
 	ReviewGuidanceConfidenceNudge float64 // REVIEW_GUIDANCE_CONFIDENCE_NUDGE — node-confidence delta the guidance sink applies (default: 0.05)
+	ReviewLLMDatasetsEnabled      bool    // REVIEW_LLM_DATASETS_ENABLED — register the 16 MDEMG LLM call sites as reviewable datasets (gold-only review of llm_interactions) (default: true)
 
 	// EVENTGRAPH-001 — TSDB reinforcement_events + federation API (Pattern Y1)
 	EventGraphEnabled                        bool // EVENTGRAPH_ENABLED — record per-pair Hebbian telemetry into reinforcement_events + expose federation API (default: true)
@@ -3137,7 +3137,6 @@ func FromEnv() (Config, error) {
 	if reviewWriterBufferSize < 0 {
 		reviewWriterBufferSize = 0 // 0 = unbounded
 	}
-	reviewStubDatasetEnabled := getBool("REVIEW_STUB_DATASET_ENABLED", false)
 	reviewRubricVersion := get("REVIEW_RUBRIC_VERSION", "gr-v1")
 	reviewSampleSize, err := atoi("REVIEW_SAMPLE_SIZE", 200)
 	if err != nil {
@@ -3160,6 +3159,7 @@ func FromEnv() (Config, error) {
 	reviewSampleSeed := int64(reviewSampleSeedInt)
 	reviewReinforceDefault := getBool("REVIEW_REINFORCE_DEFAULT", false)
 	reviewGuidanceSinkEnabled := getBool("REVIEW_GUIDANCE_SINK_ENABLED", true)
+	reviewLLMDatasetsEnabled := getBool("REVIEW_LLM_DATASETS_ENABLED", true)
 	reviewGuidanceConfidenceNudge, err := atof("REVIEW_GUIDANCE_CONFIDENCE_NUDGE", 0.05)
 	if err != nil {
 		return Config{}, err
@@ -4311,7 +4311,7 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	tsdbRequiredSchemaVersion, err := atoi("TSDB_REQUIRED_SCHEMA_VERSION", 28)
+	tsdbRequiredSchemaVersion, err := atoi("TSDB_REQUIRED_SCHEMA_VERSION", 29)
 	if err != nil {
 		return Config{}, err
 	}
@@ -4999,13 +4999,13 @@ func FromEnv() (Config, error) {
 		ReviewEnabled:                            reviewEnabled,
 		ReviewWriterFlushIntervalSec:             reviewWriterFlushIntervalSec,
 		ReviewWriterBufferSize:                   reviewWriterBufferSize,
-		ReviewStubDatasetEnabled:                 reviewStubDatasetEnabled,
 		ReviewRubricVersion:                      reviewRubricVersion,
 		ReviewSampleSize:                         reviewSampleSize,
 		ReviewActiveUncertaintyBand:              reviewActiveUncertaintyBand,
 		ReviewSampleSeed:                         reviewSampleSeed,
 		ReviewReinforceDefault:                   reviewReinforceDefault,
 		ReviewGuidanceSinkEnabled:                reviewGuidanceSinkEnabled,
+		ReviewLLMDatasetsEnabled:                 reviewLLMDatasetsEnabled,
 		ReviewGuidanceConfidenceNudge:            reviewGuidanceConfidenceNudge,
 
 		EventGraphEnabled:                        eventGraphEnabled,
