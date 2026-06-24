@@ -492,6 +492,11 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 			rules = append(rules, alert.RetrieveLatencyRules(
 				float64(cfg.AlertRetrieveP95Ms), float64(cfg.AlertRetrieveP99Ms),
 				cfg.AlertRetrieveLatencyLookbackMin)...)
+				// JIMINY-RELEVANCE-001 Epic 4: should-follow follow-rate over
+				// guidance_training_rows (actionable constraint/correction only —
+				// excludes correctly-ignored advisory). Floor=0 disables.
+				rules = append(rules, alert.GuidanceShouldFollowRules(
+					cfg.GuidanceShouldFollowRateFloor, cfg.GuidanceShouldFollowLookbackHours)...)
 			// TSDB-CONSUME-001: buffered-writer flush failures (a wedged
 			// writer used to drop rows in silence).
 			rules = append(rules, alert.TSDBWriterRules(

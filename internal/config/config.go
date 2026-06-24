@@ -1077,6 +1077,12 @@ type Config struct {
 	GuidanceAuditSampleSize    int  // GUIDANCE_AUDIT_SAMPLE_SIZE — heuristic/blank rows re-labelled per run (default: 50, floor: 1)
 	GuidanceAuditInitialDelaySec int // GUIDANCE_AUDIT_INITIAL_DELAY_SEC — delay before the FIRST auto-relabel run after startup, so first cleanup doesn't wait a full interval (default: 60, 0 = skip the initial run)
 
+	// JIMINY-RELEVANCE-001 Epic 4 — should-follow follow-rate alert.
+	// "Follow rate on guidance that SHOULD have been followed" (actionable
+	// constraint/correction types) — excludes correctly-ignored advisory items.
+	GuidanceShouldFollowRateFloor    float64 // GUIDANCE_SHOULD_FOLLOW_RATE_FLOOR — alert when should-follow follow rate drops below this (default: 0.5; 0 disables the rule)
+	GuidanceShouldFollowLookbackHours int    // GUIDANCE_SHOULD_FOLLOW_LOOKBACK_HOURS — window for the should-follow rate (default: 168 = 7d, floor: 1)
+
 	// EVENTGRAPH-001 — TSDB reinforcement_events + federation API (Pattern Y1)
 	EventGraphEnabled                        bool // EVENTGRAPH_ENABLED — record per-pair Hebbian telemetry into reinforcement_events + expose federation API (default: true)
 	EventGraphWriterFlushIntervalSec         int  // EVENTGRAPH_WRITER_FLUSH_INTERVAL_SEC — buffered writer flush cadence in seconds (default: 30, floor: 5)
@@ -3087,6 +3093,20 @@ func FromEnv() (Config, error) {
 	if guidanceAuditInitialDelaySec < 0 {
 		guidanceAuditInitialDelaySec = 0 // 0 = skip the initial run
 	}
+	guidanceShouldFollowRateFloor, err := atof("GUIDANCE_SHOULD_FOLLOW_RATE_FLOOR", 0.5)
+	if err != nil {
+		return Config{}, err
+	}
+	if guidanceShouldFollowRateFloor < 0 || guidanceShouldFollowRateFloor > 1 {
+		guidanceShouldFollowRateFloor = 0.5 // out-of-range → default
+	}
+	guidanceShouldFollowLookbackHours, err := atoi("GUIDANCE_SHOULD_FOLLOW_LOOKBACK_HOURS", 168)
+	if err != nil {
+		return Config{}, err
+	}
+	if guidanceShouldFollowLookbackHours < 1 {
+		guidanceShouldFollowLookbackHours = 1 // floor
+	}
 
 	// EVENTGRAPH-001 — TSDB reinforcement_events + federation API (Pattern Y1).
 	eventGraphEnabled := getBool("EVENTGRAPH_ENABLED", true)
@@ -4917,6 +4937,8 @@ func FromEnv() (Config, error) {
 		GuidanceAuditIntervalHours:               guidanceAuditIntervalHours,
 		GuidanceAuditSampleSize:                  guidanceAuditSampleSize,
 		GuidanceAuditInitialDelaySec:             guidanceAuditInitialDelaySec,
+		GuidanceShouldFollowRateFloor:            guidanceShouldFollowRateFloor,
+		GuidanceShouldFollowLookbackHours:        guidanceShouldFollowLookbackHours,
 
 		EventGraphEnabled:                        eventGraphEnabled,
 		EventGraphWriterFlushIntervalSec:         eventGraphWriterFlushIntervalSec,
