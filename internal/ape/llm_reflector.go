@@ -395,9 +395,15 @@ var AllowedLLMActions = []string{
 	"review_nli_calibration",
 	// Diagnostic actions (alert-only, not calibrated)
 	"ingest_stale_spaces",
-	"alert_jiminy_critical",
-	"alert_memory_bloat",
-	"alert_synergy_overlap",
+	// NOTE (RSIC-LLM-ALERT-GUARD-001): the deterministic threshold-gated alerts
+	// `alert_jiminy_critical` / `alert_memory_bloat` / `alert_synergy_overlap`
+	// were REMOVED from this whitelist. They are produced correctly by the
+	// rule-based reflector (self_reflect.go) from real metrics; letting the LLM
+	// also recommend them only let it HALLUCINATE an ungrounded CRITICAL (e.g. a
+	// false "Jiminy Service Unavailable" while jiminy_healthy=true). The LLM
+	// reflector's job is to surface NOVEL patterns, not duplicate the
+	// deterministic alert set. deduplicateInsights enforces this as a structural
+	// guard too (deterministicAlertActions) so re-adding them here stays safe.
 }
 
 // validActions is derived from AllowedLLMActions at init time.

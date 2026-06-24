@@ -593,12 +593,34 @@ func (r *Reflector) Reflect(ctx context.Context, report *SelfAssessmentReport) (
 
 // deduplicateInsights merges llmInsights into base, skipping any with a
 // recommended_action already present in base.
+//
+// deterministicAlertActions are threshold-gated alerts produced ONLY by the
+// rule-based reflector from real metrics. The LLM reflector must never introduce
+// them (RSIC-LLM-ALERT-GUARD-001): when an LLM insight recommends one and the
+// rule-based path did NOT (because the real condition is false), the merge would
+// otherwise admit a hallucinated, ungrounded alert — e.g. a false
+// `alert_jiminy_critical` "Jiminy Service Unavailable" while jiminy_healthy=true.
+// This is a structural guard independent of the AllowedLLMActions whitelist, so
+// it holds even if those actions are re-added there.
+var deterministicAlertActions = map[string]bool{
+	"alert_jiminy_critical": true,
+	"alert_memory_bloat":    true,
+	"alert_synergy_overlap": true,
+}
+
 func deduplicateInsights(base, llmInsights []ReflectionInsight) []ReflectionInsight {
 	seen := make(map[string]bool, len(base))
 	for _, i := range base {
 		seen[i.RecommendedAction] = true
 	}
 	for _, li := range llmInsights {
+		if deterministicAlertActions[li.RecommendedAction] {
+			// LLM may not introduce a deterministic alert the rule-based path
+			// didn't already raise — prevents ungrounded hallucinated CRITICALs.
+			slog.Warn("rsic: dropping LLM-recommended deterministic alert (rule-based path owns it)",
+				"action", li.RecommendedAction, "pattern", li.PatternID)
+			continue
+		}
 		if !seen[li.RecommendedAction] {
 			seen[li.RecommendedAction] = true
 			base = append(base, li)
