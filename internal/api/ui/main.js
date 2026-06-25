@@ -54,6 +54,11 @@ function switchTab(name) {
     // Re-register persistent (non-tab) subscriptions
     setupInstanceSelector();
     setupSpaceSelector();
+
+    // DASHBOARD-FIXES-001: RSIC polls on a 10s interval gated to the active tab,
+    // so switching in showed "unknown" badges for up to 10s. Kick an immediate
+    // poll on mount.
+    if (name === 'rsic') pollRsicTab();
 }
 
 // Health polling: 10s

@@ -84,10 +84,17 @@ function pluginCard(p) {
             btn('Stop', () => lifecycle(p.id, 'stop')),
             btn('Restart', () => lifecycle(p.id, 'restart')),
             btn('Validate', () => validate(p.id)),
-            btn(detailDiv.classList.contains('hidden') ? 'Details' : 'Hide', () => {
-                detailDiv.classList.toggle('hidden');
-                loadDetail(p.id, detailDiv);
-            }),
+            (() => {
+                // DASHBOARD-FIXES-001: update the label inside the handler (the
+                // render-time ternary left it stuck at "Details"); fetch on SHOW
+                // only (was re-fetching on hide too).
+                const detailBtn = btn('Details', () => {
+                    const nowHidden = detailDiv.classList.toggle('hidden');
+                    detailBtn.textContent = nowHidden ? 'Details' : 'Hide';
+                    if (!nowHidden) loadDetail(p.id, detailDiv);
+                });
+                return detailBtn;
+            })(),
         ),
         detailDiv,
     );
