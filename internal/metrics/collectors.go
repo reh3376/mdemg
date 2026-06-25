@@ -218,6 +218,11 @@ type StandardMetrics struct {
 	// Jiminy guidance metrics (published after each assessment)
 	JiminyFollowRate              func(spaceID string) *Gauge
 	JiminyConstraintEffectiveness func(spaceID string) *Gauge
+	// JIMINY-ACTIONABILITY-001 — surfaced-composition observability (the fraction
+	// of the surfaced guidance set that is the actionable vs abstraction class —
+	// what Lever A directly moves).
+	JiminySurfacedActionableFraction  func(spaceID string) *Gauge
+	JiminySurfacedAbstractionFraction func(spaceID string) *Gauge
 	JiminySourceDiversity         func(spaceID string) *Gauge
 	JiminyTotalIssued             func(spaceID string) *Gauge
 	JiminyTotalFollowed           func(spaceID string) *Gauge
@@ -690,6 +695,14 @@ func NewStandardMetrics(r *Registry) *StandardMetrics {
 	// Jiminy guidance metrics
 	m.JiminyFollowRate = func(spaceID string) *Gauge {
 		return r.NewGauge("jiminy_follow_rate", "Guidance follow rate (0-1)",
+			map[string]string{"space_id": spaceID})
+	}
+	m.JiminySurfacedActionableFraction = func(spaceID string) *Gauge {
+		return r.NewGauge("jiminy_surfaced_actionable_fraction", "Fraction of the surfaced guidance set that is the actionable class (constraint/correction) — JIMINY-ACTIONABILITY-001",
+			map[string]string{"space_id": spaceID})
+	}
+	m.JiminySurfacedAbstractionFraction = func(spaceID string) *Gauge {
+		return r.NewGauge("jiminy_surfaced_abstraction_fraction", "Fraction of the surfaced guidance set that is the abstraction class (pattern/learning/concept/…) — JIMINY-ACTIONABILITY-001",
 			map[string]string{"space_id": spaceID})
 	}
 	m.JiminyConstraintEffectiveness = func(spaceID string) *Gauge {

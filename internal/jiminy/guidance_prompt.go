@@ -35,6 +35,21 @@ Output rules:
 - Order by urgency: CONSTRAINTS > CORRECTIONS > CONFLICTS > DECISIONS > PATTERNS > CONCEPTS > FRONTIERS
 - Output a short, directive narrative — not a bulleted list`
 
+// directiveSynthesisInstruction is appended to the system prompt in directive
+// mode (JIMINY-ACTIONABILITY-001 Lever B). It biases the synthesizer to render
+// abstraction-type evidence (patterns, decisions, concepts, learnings) as
+// imperative, task-specific directives the agent can execute NOW — closing the
+// gap that abstractions are ignored ~54-66% vs ~27-35% for already-imperative
+// constraints/corrections. Fixed-length addition: it does not grow with state.
+const directiveSynthesisInstruction = `DIRECTIVE MODE (override the narrative style above):
+- Render EVERY item — including PATTERNS, DECISIONS, CONCEPTS, and learnings — as an
+  imperative, specific directive the agent must act on for the CURRENT task:
+  "Do X", "Before Y, do Z", "Use A, not B". Never leave a principle as advisory description.
+- Convert each abstraction into the one concrete action it implies here. If a principle
+  implies no concrete action for this task, omit it rather than restating it as prose.
+- Constraints and corrections are already imperative — keep them verbatim in force.
+- Still cite every claim as (Node: <node_id>) and invent nothing beyond the evidence.`
+
 // ollamaSynthesisSchema is the JSON schema for Ollama structured synthesis output.
 var ollamaSynthesisSchema = []byte(`{
 	"type": "object",
