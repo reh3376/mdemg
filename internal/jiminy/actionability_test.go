@@ -149,3 +149,20 @@ func TestSynthesize_DirectiveMode_OffIsDefault(t *testing.T) {
 		t.Error("DirectiveMode must default to false (zero value)")
 	}
 }
+
+// --- Lever C: constraint-inclusion (guards; DB path live-tested in Epic 5d) ---
+
+func TestFetchActionableCandidates_Guards(t *testing.T) {
+	s := &Service{cfg: config.Config{}} // nil driver
+	if got := s.fetchActionableCandidates(nil, "sp", []float32{0.1, 0.2}, 5, 0.3); got != nil {
+		t.Errorf("nil driver must return nil, got %v", got)
+	}
+	// topK<=0 → nil even with a (would-be) driver
+	if got := s.fetchActionableCandidates(nil, "sp", []float32{0.1}, 0, 0.3); got != nil {
+		t.Errorf("topK<=0 must return nil")
+	}
+	// empty embedding → nil
+	if got := s.fetchActionableCandidates(nil, "sp", nil, 5, 0.3); got != nil {
+		t.Errorf("empty embedding must return nil")
+	}
+}

@@ -918,6 +918,34 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 
 	wg.Wait()
 
+	// JIMINY-ACTIONABILITY-001 Lever C: guarantee actionable candidates are in
+	// the pool. Epic-4's A/B showed retrieval surfaces no constraint/correction
+	// candidates for most contexts, so Lever A's quota had nothing to promote.
+	// Fetch the top-K actionable nodes by embedding similarity and merge them
+	// (dedup by node_id) — they are already correctly typed (the fetch filters
+	// role_type), and Lever A's surfacing composition then promotes them.
+	if s.cfg.JiminyGuidanceConstraintBiasEnabled && queryEmbedding != nil {
+		actionable := s.fetchActionableCandidates(ctx, req.SpaceID, queryEmbedding,
+			s.cfg.JiminyGuidanceConstraintIncludeTopK, s.cfg.JiminyGuidanceConstraintSimFloor)
+		if len(actionable) > 0 {
+			seen := make(map[string]bool, len(items))
+			for _, it := range items {
+				for _, n := range it.SourceNodes {
+					seen[n] = true
+				}
+			}
+			added := 0
+			for _, a := range actionable {
+				if len(a.SourceNodes) > 0 && seen[a.SourceNodes[0]] {
+					continue
+				}
+				items = append(items, a)
+				added++
+			}
+			debug["leverc_actionable_merged"] = added
+		}
+	}
+
 	// Normalize structured metadata to natural language for embedding similarity.
 	// Ingested summaries use a keyword-list format ("Module: X. Related to: a, b")
 	// that embeds into a different semantic region than action descriptions, producing
@@ -2670,6 +2698,101 @@ const defaultConstraintCodeSimThreshold = config.DefaultJiminyConstraintCodeSimT
 // similarity, and return the code of the closest above the threshold. Returns ""
 // on any miss/error so the caller can fall back to the keyword matcher.
 //
+// actionableScanWindow is the vector-index scan depth for Lever C's actionable
+// fetch (mirrors matchConstraintCodeByEmbedding's window — an internal impl
+// constant, not an operator-facing value).
+const actionableScanWindow = 50
+
+// fetchActionableCandidates is JIMINY-ACTIONABILITY-001 Lever C (Epic 5): a
+// targeted vector query returning the top-K constraint/correction nodes by
+// embedding similarity to the query, so actionable guidance enters the pool even
+// when the general retrieval surfaces none (the Epic-4 finding: retrieval rarely
+// ranks actionable nodes into the pool, so Lever A's quota has nothing to
+// promote). The returned nodes are ALREADY KNOWN actionable (the query filters
+// role_type), so they are typed correctly — sidestepping the retrieval-path
+// role-classification gap. RRF-SCALE-001-safe: the relevance floor gates the
+// vector-index cosine `sim` ([0,1], stable), NEVER the RRF RetrieveResult.Score.
+func (s *Service) fetchActionableCandidates(ctx context.Context, spaceID string, embedding []float32, topK int, simFloor float64) []GuidanceItem {
+	if s.driver == nil || len(embedding) == 0 || topK <= 0 {
+		return nil
+	}
+	indexName := s.cfg.VectorIndexName
+	if indexName == "" {
+		indexName = "memNodeEmbedding"
+	}
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx) //nolint:errcheck
+
+	cypher := `
+	CALL db.index.vector.queryNodes($indexName, $scanK, $embedding)
+	YIELD node AS c, score AS sim
+	WHERE c.space_id = $spaceId
+	  AND c.role_type IN ['constraint', 'correction']
+	  AND NOT coalesce(c.is_archived, false)
+	  AND sim >= $simFloor
+	RETURN c.node_id AS nodeId, coalesce(c.name, '') AS name,
+	       coalesce(c.summary, '') AS summary, c.role_type AS roleType, sim
+	ORDER BY sim DESC LIMIT $topK`
+
+	out, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, txErr := tx.Run(ctx, cypher, map[string]any{
+			"indexName": indexName,
+			"scanK":     actionableScanWindow,
+			"embedding": embedding,
+			"spaceId":   spaceID,
+			"simFloor":  simFloor,
+			"topK":      topK,
+		})
+		if txErr != nil {
+			return nil, txErr
+		}
+		var items []GuidanceItem
+		for res.Next(ctx) {
+			rec := res.Record()
+			getStr := func(k string) string { v, _ := rec.Get(k); return asStringVal(v) }
+			nodeID := getStr("nodeId")
+			name := getStr("name")
+			summary := getStr("summary")
+			role := getStr("roleType")
+			simVal, _ := rec.Get("sim")
+			sim, _ := simVal.(float64)
+			content := name
+			if summary != "" {
+				if content != "" {
+					content += ": " + summary
+				} else {
+					content = summary
+				}
+			}
+			if content == "" || nodeID == "" {
+				continue
+			}
+			gType := GuidanceConstraint
+			if role == "correction" {
+				gType = GuidanceCorrection
+			}
+			conf := sim // vector-index cosine, already [0,1]
+			if conf > maxConfidence {
+				conf = maxConfidence
+			}
+			items = append(items, GuidanceItem{
+				Type:        gType,
+				Priority:    "high",
+				Content:     content,
+				Confidence:  conf,
+				SourceNodes: []string{nodeID},
+			})
+		}
+		return items, res.Err()
+	})
+	if err != nil {
+		slog.Debug("jiminy: Lever C actionable fetch failed", "error", err)
+		return nil
+	}
+	items, _ := out.([]GuidanceItem)
+	return items
+}
+
 // Mirrors the proven Evaluator.findMatchingConstraints vector-index pattern.
 func (s *Service) matchConstraintCodeByEmbedding(ctx context.Context, spaceID string, embedding []float32, threshold float64) string {
 	if s.driver == nil || len(embedding) == 0 {
