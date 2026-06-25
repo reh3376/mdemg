@@ -1,6 +1,27 @@
-# Lever C — SIM_FLOOR Sweep + >90%-Actionable Config
+# Lever C — Tuning: relevance-balanced (ENABLED) + the >90%-actionable sweep
 
-Operator goal: surfaced guidance **>90% actionable**. Achieved and **enabled live** on mdemg-dev.
+Two operator goals were explored. **The relevance-balanced config below is what is enabled live** (the >90% config is retained for reference — it hit the target but padded with moderately-relevant constraints and suppressed all context).
+
+## ✅ ENABLED LIVE — relevance-balanced config
+
+```
+JIMINY_GUIDANCE_CONSTRAINT_BIAS_ENABLED=true
+JIMINY_GUIDANCE_CONSTRAINT_INCLUDE_TOPK=5
+JIMINY_GUIDANCE_CONSTRAINT_SIM_FLOOR=0.70        # only HIGHLY-relevant constraints
+JIMINY_SURFACE_MIN_ACTIONABLE_FRACTION=0.3       # guarantee the relevant constraints surface (~3 slots)
+JIMINY_SURFACE_ACTIONABLE_WEIGHT=1.5             # rank actionables a touch higher
+# NO abstraction cap → relevant patterns/learnings stay as context
+```
+
+**Live-measured (6 contexts): 25% actionable** (9 constraint / 36), 75% relevant context (13 pattern + 14 learning). Per-query 0–40%, varying with context (no padding to a target). **Relevance: every surfaced item was on-topic** — e.g. the "TSDB migration / bump schema version" context surfaced 2 TimescaleDB/schema constraints + patterns/learnings about `003_metric_types.sql`, `tsdb_schema_meta`, and schema-version tracking. This is the intended balance: the highly-relevant constraints (floor 0.70) surface via the modest quota, alongside relevant context.
+
+**Tune knobs:** raise `MIN_ACTIONABLE_FRACTION` for more actionable weight; lower `SIM_FLOOR` (toward 0.6) to admit more constraints; add a `MAX_ABSTRACTION_FRACTION` cap to bound context.
+
+---
+
+## Reference — the >90%-actionable config (NOT enabled)
+
+Operator goal: surfaced guidance **>90% actionable**. Achieved but with the tradeoffs below; superseded by the balanced config above.
 
 ## Config that hits the target
 
