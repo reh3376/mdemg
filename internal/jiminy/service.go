@@ -2698,11 +2698,6 @@ const defaultConstraintCodeSimThreshold = config.DefaultJiminyConstraintCodeSimT
 // similarity, and return the code of the closest above the threshold. Returns ""
 // on any miss/error so the caller can fall back to the keyword matcher.
 //
-// actionableScanWindow is the vector-index scan depth for Lever C's actionable
-// fetch (mirrors matchConstraintCodeByEmbedding's window — an internal impl
-// constant, not an operator-facing value).
-const actionableScanWindow = 50
-
 // fetchActionableCandidates is JIMINY-ACTIONABILITY-001 Lever C (Epic 5): a
 // targeted vector query returning the top-K constraint/correction nodes by
 // embedding similarity to the query, so actionable guidance enters the pool even
@@ -2716,28 +2711,28 @@ func (s *Service) fetchActionableCandidates(ctx context.Context, spaceID string,
 	if s.driver == nil || len(embedding) == 0 || topK <= 0 {
 		return nil
 	}
-	indexName := s.cfg.VectorIndexName
-	if indexName == "" {
-		indexName = "memNodeEmbedding"
-	}
 	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer sess.Close(ctx) //nolint:errcheck
 
+	// Compute cosine over the ROLE-FILTERED set directly (constraint/correction
+	// nodes are rare — ~hundreds among ~80k MemoryNodes — so a top-N vector-index
+	// scan then role-filter returns ~nothing: the actionable nodes almost never
+	// rank into the global top-N. vector.similarity.cosine over only the
+	// actionable partition is cheap and GUARANTEES the top-K actionables are
+	// found. Same cosine [0,1] stable scale (RRF-SCALE-001-safe).
 	cypher := `
-	CALL db.index.vector.queryNodes($indexName, $scanK, $embedding)
-	YIELD node AS c, score AS sim
-	WHERE c.space_id = $spaceId
-	  AND c.role_type IN ['constraint', 'correction']
+	MATCH (c:MemoryNode {space_id: $spaceId})
+	WHERE c.role_type IN ['constraint', 'correction']
 	  AND NOT coalesce(c.is_archived, false)
-	  AND sim >= $simFloor
+	  AND c.embedding IS NOT NULL
+	WITH c, vector.similarity.cosine(c.embedding, $embedding) AS sim
+	WHERE sim >= $simFloor
 	RETURN c.node_id AS nodeId, coalesce(c.name, '') AS name,
 	       coalesce(c.summary, '') AS summary, c.role_type AS roleType, sim
 	ORDER BY sim DESC LIMIT $topK`
 
 	out, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 		res, txErr := tx.Run(ctx, cypher, map[string]any{
-			"indexName": indexName,
-			"scanK":     actionableScanWindow,
 			"embedding": embedding,
 			"spaceId":   spaceID,
 			"simFloor":  simFloor,
