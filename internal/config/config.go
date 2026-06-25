@@ -232,19 +232,20 @@ type Config struct {
 	QueryClassifyTimeoutMs int    // QUERY_CLASSIFY_TIMEOUT_MS — timeout for classification in ms (default: 5000)
 
 	// Dynamic Emergence settings (Phase 103)
-	EmergenceEnabled                bool    // EMERGENCE_ENABLED — enable LLM-driven concept naming (default: false)
-	HiddenThemeIdentitySimThreshold float64 // HIDDEN_THEME_IDENTITY_SIM_THRESHOLD — centroid cosine floor for matching a cluster to an EXISTING theme (in-place update, stable node identity) instead of recreating (default: 0.90; HIDDEN-CHURN-001)
-	HiddenThemeTargetRatio          float64 // HIDDEN_THEME_TARGET_RATIO — themes-per-observation ratio for KMeans k (default: 0.1 = ceil(n/10); was an inline equation; HIDDEN-CHURN-001 PR-B)
-	HiddenThemeAssignSimThreshold   float64 // HIDDEN_THEME_ASSIGN_SIM_THRESHOLD — cosine floor for density-assigning NOISE observations to their nearest theme (edges only, no new themes; 0 disables; default: 0.70; PR-B coverage retune)
-	ConversationCoverageAlertFloor  float64 // CONVERSATION_COVERAGE_ALERT_FLOOR — alert when themed/total conversation-observation coverage stays below this (default: 0.2; PR-B)
-	ConversationCoverageMinObs      int     // CONVERSATION_COVERAGE_MIN_OBS — spaces with fewer live conversation observations don't emit the coverage gauge (statistically meaningless; default: 50, DH-005 confidence-threshold pattern)
-	EmergenceProvider               string  // EMERGENCE_PROVIDER — LLM provider for naming (openai/ollama, default: openai)
-	EmergenceModel                  string  // EMERGENCE_MODEL — model for naming (default: gpt-4o-mini)
-	EmergenceMaxTokens              int     // EMERGENCE_MAX_TOKENS — max tokens for naming response (default: 500, range 100-4000)
-	EmergenceTimeoutMs              int     // EMERGENCE_TIMEOUT_MS — timeout for naming call in ms (default: 10000, min 1000)
-	EmergenceMinWeight              float64 // EMERGENCE_MIN_WEIGHT — min CO_ACTIVATED_WITH weight for clustering (default: 0.3, range 0.0-1.0)
-	EmergenceMinClusterSize         int     // EMERGENCE_MIN_CLUSTER_SIZE — min nodes per cluster (default: 3, min 2)
-	EmergenceMaxClusters            int     // EMERGENCE_MAX_CLUSTERS — max clusters per run (default: 10, min 1)
+	EmergenceEnabled                  bool    // EMERGENCE_ENABLED — enable LLM-driven concept naming (default: false)
+	HiddenThemeIdentitySimThreshold   float64 // HIDDEN_THEME_IDENTITY_SIM_THRESHOLD — centroid cosine floor for matching a cluster to an EXISTING theme (in-place update, stable node identity) instead of recreating (default: 0.90; HIDDEN-CHURN-001)
+	HiddenPatternIdentitySimThreshold float64 // HIDDEN_PATTERN_IDENTITY_SIM_THRESHOLD — centroid cosine floor for matching a cluster to an EXISTING L1 hidden pattern (in-place update, stable node identity) instead of recreating (default: 0.90; HIDDEN-CHURN-002)
+	HiddenThemeTargetRatio            float64 // HIDDEN_THEME_TARGET_RATIO — themes-per-observation ratio for KMeans k (default: 0.1 = ceil(n/10); was an inline equation; HIDDEN-CHURN-001 PR-B)
+	HiddenThemeAssignSimThreshold     float64 // HIDDEN_THEME_ASSIGN_SIM_THRESHOLD — cosine floor for density-assigning NOISE observations to their nearest theme (edges only, no new themes; 0 disables; default: 0.70; PR-B coverage retune)
+	ConversationCoverageAlertFloor    float64 // CONVERSATION_COVERAGE_ALERT_FLOOR — alert when themed/total conversation-observation coverage stays below this (default: 0.2; PR-B)
+	ConversationCoverageMinObs        int     // CONVERSATION_COVERAGE_MIN_OBS — spaces with fewer live conversation observations don't emit the coverage gauge (statistically meaningless; default: 50, DH-005 confidence-threshold pattern)
+	EmergenceProvider                 string  // EMERGENCE_PROVIDER — LLM provider for naming (openai/ollama, default: openai)
+	EmergenceModel                    string  // EMERGENCE_MODEL — model for naming (default: gpt-4o-mini)
+	EmergenceMaxTokens                int     // EMERGENCE_MAX_TOKENS — max tokens for naming response (default: 500, range 100-4000)
+	EmergenceTimeoutMs                int     // EMERGENCE_TIMEOUT_MS — timeout for naming call in ms (default: 10000, min 1000)
+	EmergenceMinWeight                float64 // EMERGENCE_MIN_WEIGHT — min CO_ACTIVATED_WITH weight for clustering (default: 0.3, range 0.0-1.0)
+	EmergenceMinClusterSize           int     // EMERGENCE_MIN_CLUSTER_SIZE — min nodes per cluster (default: 3, min 2)
+	EmergenceMaxClusters              int     // EMERGENCE_MAX_CLUSTERS — max clusters per run (default: 10, min 1)
 
 	// Active MCP Guardrails settings (Phase 104)
 	GuardrailEnabled        bool   // GUARDRAIL_ENABLED — enable guardrail validation (default: false)
@@ -288,12 +289,12 @@ type Config struct {
 	JiminyMinConfidence             float64 // JIMINY_MIN_CONFIDENCE — minimum confidence to include item (default: 0.3)
 	// JIMINY-ACTIONABILITY-001 — bias the surfaced guidance set toward the
 	// actionable class (constraint/correction) over abstractions. Default-preserving.
-	JiminySurfaceActionableWeight       float64 // JIMINY_SURFACE_ACTIONABLE_WEIGHT — sort-key multiplier for actionable types (default: 1.0 = no-op, floor >0)
-	JiminySurfaceMinActionable          int     // JIMINY_SURFACE_MIN_ACTIONABLE — reserve at least this many surfaced slots for actionable items (default: 0 = off)
-	JiminySurfaceMinActionableFraction  float64 // JIMINY_SURFACE_MIN_ACTIONABLE_FRACTION — reserve at least this fraction of maxItems for actionable items (default: 0.0 = off, [0,1])
-	JiminySurfaceMaxAbstractionFraction float64 // JIMINY_SURFACE_MAX_ABSTRACTION_FRACTION — cap the abstraction share of the surfaced set (default: 1.0 = no cap, (0,1])
-	JiminyDirectiveSynthesisEnabled     bool    // JIMINY_DIRECTIVE_SYNTHESIS_ENABLED — Lever B: synthesize abstraction items as imperative directives (default: false)
-	JiminyDirectiveSynthesisMaxPromptTokens int // JIMINY_DIRECTIVE_SYNTHESIS_MAX_PROMPT_TOKENS — bound on the directive synthesis prompt (default: 3500, floor 1000)
+	JiminySurfaceActionableWeight           float64 // JIMINY_SURFACE_ACTIONABLE_WEIGHT — sort-key multiplier for actionable types (default: 1.0 = no-op, floor >0)
+	JiminySurfaceMinActionable              int     // JIMINY_SURFACE_MIN_ACTIONABLE — reserve at least this many surfaced slots for actionable items (default: 0 = off)
+	JiminySurfaceMinActionableFraction      float64 // JIMINY_SURFACE_MIN_ACTIONABLE_FRACTION — reserve at least this fraction of maxItems for actionable items (default: 0.0 = off, [0,1])
+	JiminySurfaceMaxAbstractionFraction     float64 // JIMINY_SURFACE_MAX_ABSTRACTION_FRACTION — cap the abstraction share of the surfaced set (default: 1.0 = no cap, (0,1])
+	JiminyDirectiveSynthesisEnabled         bool    // JIMINY_DIRECTIVE_SYNTHESIS_ENABLED — Lever B: synthesize abstraction items as imperative directives (default: false)
+	JiminyDirectiveSynthesisMaxPromptTokens int     // JIMINY_DIRECTIVE_SYNTHESIS_MAX_PROMPT_TOKENS — bound on the directive synthesis prompt (default: 3500, floor 1000)
 	// JIMINY-OUTCOME-001 — minimum vector-index cosine similarity for an embedding-based
 	// constraint-code match. Concept-abstracted guidance rarely shares 3+ literal words
 	// with raw constraint text, so keyword matching missed everything and the Neo4j
@@ -1070,7 +1071,7 @@ type Config struct {
 	// JIMINY-RELEVANCE-001 Epic 1 — guidance_training_rows (V0027): persist the
 	// training EVIDENCE (guidance text + action text + source role/layer + verdict)
 	// per guidance-feedback item that was previously discarded.
-	GuidanceCorpusEnabled               bool // GUIDANCE_CORPUS_ENABLED — persist guidance training evidence to guidance_training_rows (default: true)
+	GuidanceCorpusEnabled                bool // GUIDANCE_CORPUS_ENABLED — persist guidance training evidence to guidance_training_rows (default: true)
 	GuidanceCorpusWriterFlushIntervalSec int  // GUIDANCE_CORPUS_WRITER_FLUSH_INTERVAL_SEC — buffered writer flush cadence in seconds (default: 30, floor: 5)
 	GuidanceCorpusWriterBufferSize       int  // GUIDANCE_CORPUS_WRITER_BUFFER_SIZE — max rows held before FIFO eviction (default: 1000, 0 = unlimited)
 	GuidanceCorpusMaxContentBytes        int  // GUIDANCE_CORPUS_MAX_CONTENT_BYTES — truncate guidance/action snapshots to this many bytes (default: 8192, floor: 256)
@@ -1080,16 +1081,16 @@ type Config struct {
 	// Re-labels heuristic/blank-classifier_source rows in guidance_training_rows
 	// with the LLM classifier so the corpus is trustworthy (diagnostic Finding 4:
 	// ~51% of labels were heuristic noise).
-	GuidanceAuditEnabled       bool // GUIDANCE_AUDIT_ENABLED — run the periodic auto-relabel job (default: true)
-	GuidanceAuditIntervalHours int  // GUIDANCE_AUDIT_INTERVAL_HOURS — cadence of the auto-relabel job (default: 24, floor: 1)
-	GuidanceAuditSampleSize    int  // GUIDANCE_AUDIT_SAMPLE_SIZE — heuristic/blank rows re-labelled per run (default: 50, floor: 1)
-	GuidanceAuditInitialDelaySec int // GUIDANCE_AUDIT_INITIAL_DELAY_SEC — delay before the FIRST auto-relabel run after startup, so first cleanup doesn't wait a full interval (default: 60, 0 = skip the initial run)
+	GuidanceAuditEnabled         bool // GUIDANCE_AUDIT_ENABLED — run the periodic auto-relabel job (default: true)
+	GuidanceAuditIntervalHours   int  // GUIDANCE_AUDIT_INTERVAL_HOURS — cadence of the auto-relabel job (default: 24, floor: 1)
+	GuidanceAuditSampleSize      int  // GUIDANCE_AUDIT_SAMPLE_SIZE — heuristic/blank rows re-labelled per run (default: 50, floor: 1)
+	GuidanceAuditInitialDelaySec int  // GUIDANCE_AUDIT_INITIAL_DELAY_SEC — delay before the FIRST auto-relabel run after startup, so first cleanup doesn't wait a full interval (default: 60, 0 = skip the initial run)
 
 	// JIMINY-RELEVANCE-001 Epic 4 — should-follow follow-rate alert.
 	// "Follow rate on guidance that SHOULD have been followed" (actionable
 	// constraint/correction types) — excludes correctly-ignored advisory items.
-	GuidanceShouldFollowRateFloor    float64 // GUIDANCE_SHOULD_FOLLOW_RATE_FLOOR — alert when should-follow follow rate drops below this (default: 0.5; 0 disables the rule)
-	GuidanceShouldFollowLookbackHours int    // GUIDANCE_SHOULD_FOLLOW_LOOKBACK_HOURS — window for the should-follow rate (default: 168 = 7d, floor: 1)
+	GuidanceShouldFollowRateFloor     float64 // GUIDANCE_SHOULD_FOLLOW_RATE_FLOOR — alert when should-follow follow rate drops below this (default: 0.5; 0 disables the rule)
+	GuidanceShouldFollowLookbackHours int     // GUIDANCE_SHOULD_FOLLOW_LOOKBACK_HOURS — window for the should-follow rate (default: 168 = 7d, floor: 1)
 
 	// HITL-REVIEW-001 — general-purpose human-in-the-loop review + live-reinforcement platform.
 	ReviewEnabled                 bool    // REVIEW_ENABLED — enable the /v1/review/* surface + UI tab (default: true)
@@ -2203,6 +2204,10 @@ func FromEnv() (Config, error) {
 	// Dynamic Emergence settings (Phase 103)
 	emergenceEnabled := getBool("EMERGENCE_ENABLED", false)
 	hiddenThemeIdentitySimThreshold, err := atof("HIDDEN_THEME_IDENTITY_SIM_THRESHOLD", 0.90)
+	if err != nil {
+		return Config{}, err
+	}
+	hiddenPatternIdentitySimThreshold, err := atof("HIDDEN_PATTERN_IDENTITY_SIM_THRESHOLD", 0.90)
 	if err != nil {
 		return Config{}, err
 	}
@@ -4745,19 +4750,20 @@ func FromEnv() (Config, error) {
 		QueryClassifyTimeoutMs: queryClassifyTimeoutMs,
 
 		// Phase 103: Dynamic Emergence
-		EmergenceEnabled:                emergenceEnabled,
-		HiddenThemeIdentitySimThreshold: hiddenThemeIdentitySimThreshold,
-		HiddenThemeTargetRatio:          hiddenThemeTargetRatio,
-		HiddenThemeAssignSimThreshold:   hiddenThemeAssignSimThreshold,
-		ConversationCoverageAlertFloor:  conversationCoverageAlertFloor,
-		ConversationCoverageMinObs:      conversationCoverageMinObs,
-		EmergenceProvider:               emergenceProvider,
-		EmergenceModel:                  emergenceModel,
-		EmergenceMaxTokens:              emergenceMaxTokens,
-		EmergenceTimeoutMs:              emergenceTimeoutMs,
-		EmergenceMinWeight:              emergenceMinWeight,
-		EmergenceMinClusterSize:         emergenceMinClusterSize,
-		EmergenceMaxClusters:            emergenceMaxClusters,
+		EmergenceEnabled:                  emergenceEnabled,
+		HiddenThemeIdentitySimThreshold:   hiddenThemeIdentitySimThreshold,
+		HiddenPatternIdentitySimThreshold: hiddenPatternIdentitySimThreshold,
+		HiddenThemeTargetRatio:            hiddenThemeTargetRatio,
+		HiddenThemeAssignSimThreshold:     hiddenThemeAssignSimThreshold,
+		ConversationCoverageAlertFloor:    conversationCoverageAlertFloor,
+		ConversationCoverageMinObs:        conversationCoverageMinObs,
+		EmergenceProvider:                 emergenceProvider,
+		EmergenceModel:                    emergenceModel,
+		EmergenceMaxTokens:                emergenceMaxTokens,
+		EmergenceTimeoutMs:                emergenceTimeoutMs,
+		EmergenceMinWeight:                emergenceMinWeight,
+		EmergenceMinClusterSize:           emergenceMinClusterSize,
+		EmergenceMaxClusters:              emergenceMaxClusters,
 
 		// Phase 104: Active MCP Guardrails
 		GuardrailEnabled:        guardrailEnabled,
@@ -4769,28 +4775,28 @@ func FromEnv() (Config, error) {
 		GuardrailCompress:       guardrailCompress,
 
 		// Phase Jiminy: Jiminy Guidance
-		JiminyEnabled:                    jiminyEnabled,
-		JiminyContradictedWeakenEnabled:  jiminyContradictedWeakenEnabled,
-		JiminyTimeoutMs:                  jiminyTimeoutMs,
-		JiminyMaxItems:                   jiminyMaxItems,
-		JiminySurfaceActionableWeight:       jiminySurfaceActionableWeight,
-		JiminySurfaceMinActionable:          jiminySurfaceMinActionable,
-		JiminySurfaceMinActionableFraction:  jiminySurfaceMinActionableFraction,
-		JiminySurfaceMaxAbstractionFraction: jiminySurfaceMaxAbstractionFraction,
-		JiminyDirectiveSynthesisEnabled:     jiminyDirectiveSynthesisEnabled,
+		JiminyEnabled:                           jiminyEnabled,
+		JiminyContradictedWeakenEnabled:         jiminyContradictedWeakenEnabled,
+		JiminyTimeoutMs:                         jiminyTimeoutMs,
+		JiminyMaxItems:                          jiminyMaxItems,
+		JiminySurfaceActionableWeight:           jiminySurfaceActionableWeight,
+		JiminySurfaceMinActionable:              jiminySurfaceMinActionable,
+		JiminySurfaceMinActionableFraction:      jiminySurfaceMinActionableFraction,
+		JiminySurfaceMaxAbstractionFraction:     jiminySurfaceMaxAbstractionFraction,
+		JiminyDirectiveSynthesisEnabled:         jiminyDirectiveSynthesisEnabled,
 		JiminyDirectiveSynthesisMaxPromptTokens: jiminyDirectiveSynthesisMaxPromptTokens,
-		JiminyMinConfidence:              jiminyMinConfidence,
-		JiminySignalStrengthWeight:       jiminySignalStrengthWeight,
-		JiminyConstraintCodeSimThreshold: jiminyConstraintCodeSimThreshold,
-		JiminyIncludeFrontiers:           jiminyIncludeFrontiers,
-		JiminyFrontierMinSim:             jiminyFrontierMinSim,
-		JiminyEffectivenessTTLSec:        jiminyEffectivenessTTLSec,
-		JiminyWarmEnabled:                jiminyWarmEnabled,
-		JiminyWarmDebounceSec:            jiminyWarmDebounceSec,
-		JiminyWarmComputeTimeoutMs:       jiminyWarmComputeTimeoutMs,
-		JiminyReformulateTimeoutMs:       jiminyReformulateTimeoutMs,
-		JiminyFeedbackTimeoutMs:          jiminyFeedbackTimeoutMs,
-		JiminyWarmMaxAgeSec:              jiminyWarmMaxAgeSec,
+		JiminyMinConfidence:                     jiminyMinConfidence,
+		JiminySignalStrengthWeight:              jiminySignalStrengthWeight,
+		JiminyConstraintCodeSimThreshold:        jiminyConstraintCodeSimThreshold,
+		JiminyIncludeFrontiers:                  jiminyIncludeFrontiers,
+		JiminyFrontierMinSim:                    jiminyFrontierMinSim,
+		JiminyEffectivenessTTLSec:               jiminyEffectivenessTTLSec,
+		JiminyWarmEnabled:                       jiminyWarmEnabled,
+		JiminyWarmDebounceSec:                   jiminyWarmDebounceSec,
+		JiminyWarmComputeTimeoutMs:              jiminyWarmComputeTimeoutMs,
+		JiminyReformulateTimeoutMs:              jiminyReformulateTimeoutMs,
+		JiminyFeedbackTimeoutMs:                 jiminyFeedbackTimeoutMs,
+		JiminyWarmMaxAgeSec:                     jiminyWarmMaxAgeSec,
 
 		// Jiminy J7-J12
 		JiminyRetrievalEnabled:         jiminyRetrievalEnabled,
@@ -5036,28 +5042,28 @@ func FromEnv() (Config, error) {
 		RetrievalAuditEnabled:           retrievalAuditEnabled,
 
 		// EVENTGRAPH-001 — TSDB reinforcement_events + federation API
-		GuidanceCorpusEnabled:                    guidanceCorpusEnabled,
-		GuidanceCorpusWriterFlushIntervalSec:     guidanceCorpusWriterFlushIntervalSec,
-		GuidanceCorpusWriterBufferSize:           guidanceCorpusWriterBufferSize,
-		GuidanceCorpusMaxContentBytes:            guidanceCorpusMaxContentBytes,
-		GuidanceCorpusSourceLookupTimeoutMs:      guidanceCorpusSourceLookupTimeoutMs,
-		GuidanceAuditEnabled:                     guidanceAuditEnabled,
-		GuidanceAuditIntervalHours:               guidanceAuditIntervalHours,
-		GuidanceAuditSampleSize:                  guidanceAuditSampleSize,
-		GuidanceAuditInitialDelaySec:             guidanceAuditInitialDelaySec,
-		GuidanceShouldFollowRateFloor:            guidanceShouldFollowRateFloor,
-		GuidanceShouldFollowLookbackHours:        guidanceShouldFollowLookbackHours,
-		ReviewEnabled:                            reviewEnabled,
-		ReviewWriterFlushIntervalSec:             reviewWriterFlushIntervalSec,
-		ReviewWriterBufferSize:                   reviewWriterBufferSize,
-		ReviewRubricVersion:                      reviewRubricVersion,
-		ReviewSampleSize:                         reviewSampleSize,
-		ReviewActiveUncertaintyBand:              reviewActiveUncertaintyBand,
-		ReviewSampleSeed:                         reviewSampleSeed,
-		ReviewReinforceDefault:                   reviewReinforceDefault,
-		ReviewGuidanceSinkEnabled:                reviewGuidanceSinkEnabled,
-		ReviewLLMDatasetsEnabled:                 reviewLLMDatasetsEnabled,
-		ReviewGuidanceConfidenceNudge:            reviewGuidanceConfidenceNudge,
+		GuidanceCorpusEnabled:                guidanceCorpusEnabled,
+		GuidanceCorpusWriterFlushIntervalSec: guidanceCorpusWriterFlushIntervalSec,
+		GuidanceCorpusWriterBufferSize:       guidanceCorpusWriterBufferSize,
+		GuidanceCorpusMaxContentBytes:        guidanceCorpusMaxContentBytes,
+		GuidanceCorpusSourceLookupTimeoutMs:  guidanceCorpusSourceLookupTimeoutMs,
+		GuidanceAuditEnabled:                 guidanceAuditEnabled,
+		GuidanceAuditIntervalHours:           guidanceAuditIntervalHours,
+		GuidanceAuditSampleSize:              guidanceAuditSampleSize,
+		GuidanceAuditInitialDelaySec:         guidanceAuditInitialDelaySec,
+		GuidanceShouldFollowRateFloor:        guidanceShouldFollowRateFloor,
+		GuidanceShouldFollowLookbackHours:    guidanceShouldFollowLookbackHours,
+		ReviewEnabled:                        reviewEnabled,
+		ReviewWriterFlushIntervalSec:         reviewWriterFlushIntervalSec,
+		ReviewWriterBufferSize:               reviewWriterBufferSize,
+		ReviewRubricVersion:                  reviewRubricVersion,
+		ReviewSampleSize:                     reviewSampleSize,
+		ReviewActiveUncertaintyBand:          reviewActiveUncertaintyBand,
+		ReviewSampleSeed:                     reviewSampleSeed,
+		ReviewReinforceDefault:               reviewReinforceDefault,
+		ReviewGuidanceSinkEnabled:            reviewGuidanceSinkEnabled,
+		ReviewLLMDatasetsEnabled:             reviewLLMDatasetsEnabled,
+		ReviewGuidanceConfidenceNudge:        reviewGuidanceConfidenceNudge,
 
 		EventGraphEnabled:                        eventGraphEnabled,
 		EventGraphWriterFlushIntervalSec:         eventGraphWriterFlushIntervalSec,
