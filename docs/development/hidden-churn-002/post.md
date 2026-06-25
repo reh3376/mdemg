@@ -31,9 +31,13 @@ The first-ever completing cycle logged `created=1614 updated=2747` + `removed st
 4. With completion fixed, churn dropped to ~28% (centroid-only). Operator approved adding member-overlap matching.
 5. Member-overlap + determinism only reached ~75% survival — the residual is structural.
 
-## Residual + follow-up (HIDDEN-CHURN-003)
+## Residual — UNRESOLVED DEFECT, must be fully remedied (HIDDEN-CHURN-003)
 
-~25% per-cycle churn remains, driven by (a) non-deterministic **LLM category reclassification** (`RECLASS_ENABLED`) re-splitting oversized categories differently each cycle, and (b) full re-clustering of a growing L0 set. Closing to ~95% requires **incremental clustering** (assign only new/changed L0 nodes; leave stable patterns untouched) and/or deterministic/cached reclassification — tracked as HIDDEN-CHURN-003.
+⚠️ **HIDDEN-CHURN-002 is a PARTIAL fix, not a closed defect.** It reduced hidden-pattern identity churn from 100% → ~25% per cycle, but **~25% residual churn remains and is an open defect that MUST be fully remedied — it is not an optional enhancement and not indefinitely deferrable.** Every cycle it still orphans ~25% of reinforcement / abstraction edges (the `CO_ACTIVATED_WITH` / `reinforcement_events` / HIDDEN-WEIGHT-001 weight references that pointed at the churned patterns) and re-runs the backward-pass weight computation from scratch. The cognitive substrate is not stable until this is closed.
+
+The residual is **structural**: (a) non-deterministic **LLM category reclassification** (`RECLASS_ENABLED`) re-splits oversized categories differently each cycle, and (b) full re-clustering of a growing L0 set reshuffles membership — no centroid/Jaccard match threshold can recover it. **The remedy (HIDDEN-CHURN-003, committed) is incremental clustering** — assign only new/changed L0 nodes to existing patterns, leave stable patterns untouched — and/or deterministic/cached reclassification, targeting ~95%+ identity stability.
+
+**This is logged so the sprint line is NOT mistaken for "done." Operator decided (2026-06-24) to ship the partial fix now and remedy the residual in HIDDEN-CHURN-003; that decision does not downgrade the residual from must-fix to nice-to-have.**
 
 ## Testing
 
