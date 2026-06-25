@@ -1,6 +1,7 @@
 package jiminy
 
 import (
+	"strings"
 	"testing"
 
 	"mdemg/internal/config"
@@ -99,4 +100,52 @@ func typesOf(its []GuidanceItem) []GuidanceType {
 		out[i] = it.Type
 	}
 	return out
+}
+
+// --- Lever B: directive-mode synthesis ---
+
+func TestBoundDirectivePrompt(t *testing.T) {
+	long := strings.Repeat("x", 100)
+	// 0/negative budget = no bound.
+	if got := boundDirectivePrompt(long, 0); got != long {
+		t.Errorf("budget 0 must not bound; len=%d", len(got))
+	}
+	if got := boundDirectivePrompt(long, -5); got != long {
+		t.Errorf("negative budget must not bound; len=%d", len(got))
+	}
+	// budget 10 tokens → 40 chars max; 100-char prompt is trimmed + marked.
+	got := boundDirectivePrompt(long, 10)
+	if !strings.HasPrefix(got, strings.Repeat("x", 40)) {
+		t.Errorf("bounded prompt must keep the first 40 chars")
+	}
+	if !strings.HasSuffix(got, "[bounded]") {
+		t.Errorf("bounded prompt must carry the [bounded] marker, got %q", got)
+	}
+	// Under budget = untouched.
+	short := strings.Repeat("y", 20)
+	if got := boundDirectivePrompt(short, 10); got != short {
+		t.Errorf("under-budget prompt must be untouched, got %q", got)
+	}
+}
+
+func TestDirectiveSynthesisInstruction_Imperative(t *testing.T) {
+	// The directive block must actually instruct imperative rendering of
+	// abstractions — a sanity guard so a future edit can't silently neuter it.
+	if !strings.Contains(directiveSynthesisInstruction, "DIRECTIVE MODE") {
+		t.Error("directive instruction must announce DIRECTIVE MODE")
+	}
+	for _, kw := range []string{"PATTERNS", "imperative", "(Node:"} {
+		if !strings.Contains(directiveSynthesisInstruction, kw) {
+			t.Errorf("directive instruction must reference %q (imperative-abstraction + citation contract)", kw)
+		}
+	}
+}
+
+func TestSynthesize_DirectiveMode_OffIsDefault(t *testing.T) {
+	// Default-off: a zero-value SynthesisConfig leaves DirectiveMode false, so
+	// the system prompt is the unmodified guidanceSystemPrompt.
+	var cfg SynthesisConfig
+	if cfg.DirectiveMode {
+		t.Error("DirectiveMode must default to false (zero value)")
+	}
 }

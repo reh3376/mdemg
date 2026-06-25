@@ -2792,7 +2792,10 @@ func isActionableType(t GuidanceType) bool {
 // JIMINY_SURFACE_ACTIONABLE_WEIGHT, abstractions get 1.0 (no-op at the 1.0 default).
 func (s *Service) guidanceTypeWeight(t GuidanceType) float64 {
 	if isActionableType(t) {
-		return s.cfg.JiminySurfaceActionableWeight
+		// ≤0 means unset (zero-value config) → no-op weight of 1.0.
+		if w := s.cfg.JiminySurfaceActionableWeight; w > 0 {
+			return w
+		}
 	}
 	return 1.0
 }
@@ -2810,7 +2813,8 @@ func (s *Service) applyActionableComposition(items []GuidanceItem, maxItems int)
 	}
 	capFrac := s.cfg.JiminySurfaceMaxAbstractionFraction
 	noQuota := minActionable <= 0
-	noCap := capFrac >= 1.0
+	// ≤0 means unset (zero-value config) → no cap, same as the 1.0 default.
+	noCap := capFrac >= 1.0 || capFrac <= 0
 	if noQuota && noCap { // default-preserving fast path
 		if len(items) > maxItems {
 			return items[:maxItems]

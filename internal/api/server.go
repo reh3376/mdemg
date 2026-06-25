@@ -81,7 +81,7 @@ type Server struct {
 	stopInterviewer         chan struct{}
 	stopScheduledSync       chan struct{}
 	stopSpacePrune          chan struct{}
-	bgWg                    sync.WaitGroup // tracks background goroutine completion
+	bgWg                    sync.WaitGroup                                        // tracks background goroutine completion
 	superviseFn             func(name string, fn func(ctx context.Context) error) // SUPERVISOR-002: injected supervisor launcher
 
 	// Phase 3: Production readiness components
@@ -590,6 +590,9 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 				Temperature:     cfg.JiminySynthesisTemperature,
 				ContextMaxChars: cfg.JiminyGuidanceContextMaxChars,
 				OutputMaxChars:  cfg.JiminyGuidanceOutputMaxChars,
+				// JIMINY-ACTIONABILITY-001 Lever B: directive-mode synthesis.
+				DirectiveMode:            cfg.JiminyDirectiveSynthesisEnabled,
+				DirectiveMaxPromptTokens: cfg.JiminyDirectiveSynthesisMaxPromptTokens,
 			}
 			jiminySvc.SetSynthesizer(jiminy.NewGuidanceSynthesizer(synCfg, cbRegistry))
 			slog.Info("Jiminy J8/J15: LLM synthesis enabled", "provider", cfg.JiminySynthesisProvider, "model", cfg.JiminySynthesisModel, "max_tokens", cfg.JiminySynthesisMaxTokens, "timeout_ms", cfg.JiminySynthesisTimeoutMs)
@@ -714,17 +717,17 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	var backupSched *backup.Scheduler
 	if cfg.BackupEnabled {
 		backupCfg := backup.Config{
-			Enabled:               cfg.BackupEnabled,
-			StorageDir:            cfg.BackupStorageDir,
-			FullCmd:               cfg.BackupFullCmd,
-			Neo4jContainer:        cfg.BackupNeo4jContainer,
-			FullIntervalHours:     cfg.BackupFullIntervalHours,
-			PartialIntervalHours:  cfg.BackupPartialIntervalHours,
-			RetentionFullCount:    cfg.BackupRetentionFullCount,
-			RetentionPartialCount: cfg.BackupRetentionPartialCount,
-			RetentionMaxAgeDays:   cfg.BackupRetentionMaxAgeDays,
-			RetentionMaxStorageGB: cfg.BackupRetentionMaxStorageGB,
-			RetentionRunAfter:     cfg.BackupRetentionRunAfter,
+			Enabled:                cfg.BackupEnabled,
+			StorageDir:             cfg.BackupStorageDir,
+			FullCmd:                cfg.BackupFullCmd,
+			Neo4jContainer:         cfg.BackupNeo4jContainer,
+			FullIntervalHours:      cfg.BackupFullIntervalHours,
+			PartialIntervalHours:   cfg.BackupPartialIntervalHours,
+			RetentionFullCount:     cfg.BackupRetentionFullCount,
+			RetentionPartialCount:  cfg.BackupRetentionPartialCount,
+			RetentionMaxAgeDays:    cfg.BackupRetentionMaxAgeDays,
+			RetentionMaxStorageGB:  cfg.BackupRetentionMaxStorageGB,
+			RetentionRunAfter:      cfg.BackupRetentionRunAfter,
 			SnapshotWaitTimeoutSec: cfg.BackupSnapshotWaitTimeoutSec,
 			InitialBackupDelayMin:  cfg.BackupInitialDelayMin,
 		}

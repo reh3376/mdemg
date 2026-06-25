@@ -24,6 +24,10 @@ type SynthesisConfig struct {
 	Temperature     *float64 // J15: optional temperature (nil = API default)
 	ContextMaxChars int      // J16: max chars for agent context (default: 200000, 0 = unlimited)
 	OutputMaxChars  int      // J16: max chars for agent output (default: 200000, 0 = unlimited)
+	// JIMINY-ACTIONABILITY-001 Lever B: render abstraction-type guidance as
+	// imperative directives. Default-off; bounded prompt; reuses this same call.
+	DirectiveMode            bool
+	DirectiveMaxPromptTokens int
 }
 
 // GuidanceSynthesizer synthesizes guidance items into coherent LLM-generated narratives.
@@ -31,6 +35,20 @@ type GuidanceSynthesizer struct {
 	cfg        SynthesisConfig
 	cbRegistry *circuitbreaker.Registry
 	llm        *llmclient.Client
+}
+
+// boundDirectivePrompt trims prompt to ~maxPromptTokens (×4 chars/token) in
+// directive mode so the augmented system prompt + user prompt stay inside the
+// llama-server KV slot. maxPromptTokens ≤ 0 = no bound.
+func boundDirectivePrompt(prompt string, maxPromptTokens int) string {
+	if maxPromptTokens <= 0 {
+		return prompt
+	}
+	maxChars := maxPromptTokens * 4
+	if len(prompt) > maxChars {
+		return prompt[:maxChars] + "\n…[bounded]"
+	}
+	return prompt
 }
 
 // NewGuidanceSynthesizer creates a new GuidanceSynthesizer.
@@ -66,6 +84,15 @@ func (gs *GuidanceSynthesizer) Synthesize(ctx context.Context, items []GuidanceI
 
 	prompt := buildGuidancePrompt(items, agentContext, agentOutput, gs.cfg.ContextMaxChars, gs.cfg.OutputMaxChars)
 
+	// JIMINY-ACTIONABILITY-001 Lever B: in directive mode, augment the system
+	// prompt to render abstraction principles as imperative directives, and bound
+	// the user prompt to the token budget (fixed addition, no growth-with-state).
+	systemPrompt := guidanceSystemPrompt
+	if gs.cfg.DirectiveMode {
+		systemPrompt = guidanceSystemPrompt + "\n\n" + directiveSynthesisInstruction
+		prompt = boundDirectivePrompt(prompt, gs.cfg.DirectiveMaxPromptTokens)
+	}
+
 	timeoutMs := gs.cfg.TimeoutMs
 	if timeoutMs <= 0 {
 		timeoutMs = 5000
@@ -83,7 +110,7 @@ func (gs *GuidanceSynthesizer) Synthesize(ctx context.Context, items []GuidanceI
 	}
 
 	msgs := []llmclient.Message{
-		{Role: "system", Content: guidanceSystemPrompt},
+		{Role: "system", Content: systemPrompt},
 		{Role: "user", Content: prompt},
 	}
 	opts := llmclient.CompleteOpts{
