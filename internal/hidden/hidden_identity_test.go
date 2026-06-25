@@ -113,3 +113,43 @@ func TestHiddenPatternNodeID_IsCUIDv2NotUUID(t *testing.T) {
 		}
 	}
 }
+
+// --- HIDDEN-CHURN-003: incremental clustering ---
+
+func TestHiddenIncrementalAssignThreshold(t *testing.T) {
+	if got := (&Service{cfg: config.Config{}}).hiddenIncrementalAssignThreshold(); got != 0.80 {
+		t.Errorf("default = %v, want 0.80", got)
+	}
+	if got := (&Service{cfg: config.Config{HiddenIncrementalAssignSimThreshold: 0.6}}).hiddenIncrementalAssignThreshold(); got != 0.6 {
+		t.Errorf("override = %v, want 0.6", got)
+	}
+}
+
+func TestNearestPatternByCentroid(t *testing.T) {
+	refs := []hiddenPatternRef{
+		{NodeID: "p1", Centroid: []float64{1, 0, 0}},
+		{NodeID: "p2", Centroid: []float64{0, 1, 0}},
+	}
+	if got := nearestPatternByCentroid([]float64{0.99, 0.01, 0}, refs, 0.80); got != "p1" {
+		t.Errorf("want p1, got %q", got)
+	}
+	if got := nearestPatternByCentroid([]float64{0, 0, 1}, refs, 0.80); got != "" {
+		t.Errorf("orthogonal must not match, got %q", got)
+	}
+	if got := nearestPatternByCentroid([]float64{1, 0, 0}, nil, 0.80); got != "" {
+		t.Errorf("empty refs must not match, got %q", got)
+	}
+}
+
+func TestIncrementalMean(t *testing.T) {
+	// mean of n=3 vectors = [2,2]; fold k=1 new summing to [6,6]:
+	// ([2,2]*3 + [6,6]) / 4 = [3,3].
+	got := incrementalMean([]float64{2, 2}, []float64{6, 6}, 3, 1)
+	if len(got) != 2 || got[0] != 3 || got[1] != 3 {
+		t.Errorf("want [3 3], got %v", got)
+	}
+	// Length mismatch → old returned unchanged.
+	if got := incrementalMean([]float64{1, 2, 3}, []float64{1, 1}, 1, 1); len(got) != 3 || got[0] != 1 {
+		t.Errorf("length mismatch must return old, got %v", got)
+	}
+}

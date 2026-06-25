@@ -51,6 +51,36 @@ func (s *Service) hiddenIncrementalAssignThreshold() float64 {
 	return 0.80
 }
 
+// nearestPatternByCentroid returns the node_id of the pattern whose centroid is
+// closest (cosine) to emb and clears threshold, or "" if none does.
+func nearestPatternByCentroid(emb []float64, refs []hiddenPatternRef, threshold float64) string {
+	best, bestSim := "", threshold
+	for _, r := range refs {
+		if len(r.Centroid) == 0 {
+			continue
+		}
+		if sim := cosineSimilarity(emb, r.Centroid); sim >= bestSim {
+			best, bestSim = r.NodeID, sim
+		}
+	}
+	return best
+}
+
+// incrementalMean folds k new vectors (summed into sum) into an existing mean of
+// n vectors: (old·n + sum) / (n + k). Returns old unchanged on a length/empty
+// mismatch.
+func incrementalMean(old, sum []float64, n, k int) []float64 {
+	if len(old) != len(sum) || (n+k) == 0 {
+		return old
+	}
+	out := make([]float64, len(old))
+	denom := float64(n + k)
+	for i := range old {
+		out[i] = (old[i]*float64(n) + sum[i]) / denom
+	}
+	return out
+}
+
 // assignOrphansToPatterns is HIDDEN-CHURN-003's incremental core: each orphan L0
 // node is attached to its nearest existing pattern (cosine ≥ threshold) via a
 // GENERALIZES edge, and that pattern's centroid is updated by incremental mean.
@@ -77,15 +107,7 @@ func (s *Service) assignOrphansToPatterns(ctx context.Context, spaceID string, o
 		if len(o.Embedding) == 0 {
 			continue
 		}
-		best, bestSim := "", threshold
-		for _, r := range refs {
-			if len(r.Centroid) == 0 {
-				continue
-			}
-			if sim := cosineSimilarity(o.Embedding, r.Centroid); sim >= bestSim {
-				best, bestSim = r.NodeID, sim
-			}
-		}
+		best := nearestPatternByCentroid(o.Embedding, refs, threshold)
 		if best == "" {
 			unassigned = append(unassigned, o)
 			continue
@@ -150,13 +172,10 @@ RETURN count(b) AS assigned`, map[string]any{"spaceId": spaceID, "rows": rows})
 		if ref == nil || len(ref.Centroid) != len(sum) {
 			continue
 		}
-		n := float64(len(ref.Members))
-		k := float64(counts[pid])
-		newC := make([]float64, len(sum))
-		for i := range sum {
-			newC[i] = (ref.Centroid[i]*n + sum[i]) / (n + k)
-		}
-		centroidRows = append(centroidRows, map[string]any{"patternId": pid, "centroid": toFloat32Slice(newC), "count": int(n + k)})
+		n := len(ref.Members)
+		k := counts[pid]
+		newC := incrementalMean(ref.Centroid, sum, n, k)
+		centroidRows = append(centroidRows, map[string]any{"patternId": pid, "centroid": toFloat32Slice(newC), "count": n + k})
 	}
 	if len(centroidRows) > 0 {
 		_, cErr := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
