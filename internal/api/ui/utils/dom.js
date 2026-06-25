@@ -29,7 +29,10 @@ export function sectionHeader(title) {
 
 export function statusBadge(status) {
     const s = String(status).toLowerCase();
-    const cls = (s === 'ok' || s === 'healthy' || s === 'ready' || s === 'active')
+    // DASHBOARD-FIXES-001: 'running' and 'completed' are healthy states (RSIC
+    // watchdog running; backup completed) — without them a healthy RSIC State
+    // badge rendered red.
+    const cls = (s === 'ok' || s === 'healthy' || s === 'ready' || s === 'active' || s === 'running' || s === 'completed')
         ? 'badge-ok' : (s === 'degraded' || s === 'warn')
         ? 'badge-warn' : 'badge-err';
     return h('span', { className: `badge ${cls}` }, status);

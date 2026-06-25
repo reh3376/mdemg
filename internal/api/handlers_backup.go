@@ -110,10 +110,27 @@ func (s *Server) handleBackupList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// DASHBOARD-FIXES-001: a listed manifest only exists for a COMPLETED backup
+	// (written on success), but the manifest carries no status field — so the UI
+	// Restore dropdown (which filters status==='completed') was always empty.
+	// Surface a response-time status so the contract is explicit to the client.
+	out := make([]backupListItem, len(manifests))
+	for i, m := range manifests {
+		out[i] = backupListItem{BackupManifest: m, Status: "completed"}
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{
-		"backups": manifests,
-		"count":   len(manifests),
+		"backups": out,
+		"count":   len(out),
 	})
+}
+
+// backupListItem is a manifest plus a response-time status (a listed manifest is
+// always a completed backup artifact). Embedding promotes the manifest's JSON
+// fields to the top level alongside status.
+type backupListItem struct {
+	backup.BackupManifest
+	Status string `json:"status"`
 }
 
 // handleBackupManifest routes GET /v1/backup/manifest/{id}.

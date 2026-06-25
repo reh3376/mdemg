@@ -24,9 +24,28 @@ function update() {
     sections.push(sectionHeader('Memory Overview'));
     sections.push(h('div', { className: 'info-group' },
         infoRow('Total Memories', formatNumber(ms.memory_count)),
+        // DASHBOARD-FIXES-001: observation_count is in /v1/memory/stats but was never shown.
+        infoRow('Observations', formatNumber(ms.observation_count)),
         infoRow('Embedding Coverage', ms.embedding_coverage != null ? `${(ms.embedding_coverage * 100).toFixed(1)}%` : '\u2014'),
         infoRow('Health Score', ms.health_score != null ? `${(ms.health_score * 100).toFixed(1)}%` : '\u2014'),
     ));
+
+    // DASHBOARD-FIXES-001: the memoryDistribution subscription was fetched every
+    // 30s and never rendered. Surface the graph phase + edge count + phase alerts.
+    const ds = dist?.stats;
+    if (ds) {
+        sections.push(sectionHeader('Graph Phase'));
+        const phaseGroup = h('div', { className: 'info-group' },
+            infoRow('Phase', ds.phase || '\u2014'),
+            infoRow('Edge Count', formatNumber(ds.edge_count)),
+        );
+        if (Array.isArray(ds.alerts)) {
+            for (const a of ds.alerts) {
+                phaseGroup.append(infoRow('Alert', a.description || a.type || ''));
+            }
+        }
+        sections.push(phaseGroup);
+    }
 
     // Layer breakdown
     if (ms.memories_by_layer) {

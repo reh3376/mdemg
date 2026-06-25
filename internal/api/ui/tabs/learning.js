@@ -41,17 +41,23 @@ function update() {
     ));
 
     // Freeze state
+    // DASHBOARD-FIXES-001: source the frozen flag from /v1/learning/stats'
+    // freeze_state (authoritative per-space) \u2014 the freezeStatus endpoint
+    // (/v1/learning/freeze/status) returns {count, frozen_spaces} with no
+    // top-level .frozen, so a frozen space rendered "active" after the poll.
     sections.push(sectionHeader('Freeze State'));
-    const isFrozen = fs?.frozen || false;
+    const fz = ls.freeze_state || {};
+    const isFrozen = fz.frozen || false;
+    const frozenAt = fz.frozen_at && !String(fz.frozen_at).startsWith('0001') ? fz.frozen_at : (fs?.frozen_at || '\u2014');
     const freezeBadge = statusBadge(isFrozen ? 'frozen' : 'active');
     const freezeRow = infoRow('State', '');
     freezeRow.querySelector('.info-value').replaceChildren(freezeBadge);
     sections.push(h('div', { className: 'info-group' },
         freezeRow,
         ...(isFrozen ? [
-            infoRow('Frozen At', fs.frozen_at || '\u2014'),
-            infoRow('Frozen By', fs.frozen_by || '\u2014'),
-            infoRow('Reason', fs.reason || '\u2014'),
+            infoRow('Frozen At', frozenAt),
+            infoRow('Frozen By', fs?.frozen_by || '\u2014'),
+            infoRow('Reason', fs?.reason || '\u2014'),
         ] : []),
     ));
 

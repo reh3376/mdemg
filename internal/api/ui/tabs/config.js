@@ -128,10 +128,8 @@ function createInput(entry) {
             checked: val === 'true',
             className: 'config-checkbox',
         });
-        cb.onchange = () => {
-            const newVal = cb.checked ? 'true' : 'false';
-            markDirty(key, newVal, val, cb.parentElement);
-        };
+        // DASHBOARD-FIXES-001: single handler (the first assignment was dead —
+        // immediately overwritten by this one, which also updates the label).
         const label = h('label', { className: 'config-cb-label' }, cb, val === 'true' ? ' true' : ' false');
         cb.onchange = () => {
             const newVal = cb.checked ? 'true' : 'false';

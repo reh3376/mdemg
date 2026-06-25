@@ -152,7 +152,15 @@ function startStatusPolling(exportId) {
 
             if (data.status === 'completed' && data.result) {
                 items.push(infoRow('Total Rows', data.result.total_rows));
-                items.push(infoRow('Tables', data.result.tables));
+                // DASHBOARD-FIXES-001: render tables explicitly (was raw array/
+                // object coercion → "a,b,c" or "[object Object]").
+                const tbls = data.result.tables;
+                const tablesStr = Array.isArray(tbls)
+                    ? tbls.join(', ')
+                    : (tbls && typeof tbls === 'object'
+                        ? Object.entries(tbls).map(([k, v]) => `${k}: ${v}`).join(', ')
+                        : (tbls ?? '—'));
+                items.push(infoRow('Tables', tablesStr));
                 items.push(infoRow('Privacy', `${data.result.privacy || 0} violations`));
 
                 const dlBtn = btn('Download', () => {

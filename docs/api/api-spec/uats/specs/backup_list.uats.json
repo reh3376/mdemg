@@ -14,13 +14,13 @@
   "metadata": {
     "author": "reh3376",
     "created": "2026-02-07",
-    "description": "Validates GET /v1/backup/list returns backup list when enabled",
+    "description": "Validates GET /v1/backup/list returns backup list when enabled; item-field assertions (created_at/size_bytes/spaces/status \u2014 DASHBOARD-FIXES-001) are optional so they assert when a backup exists but pass on an empty list (CI has no backups).",
     "test_type": "contract",
     "priority": "medium"
   },
   "config": {
     "timeout_ms": 10000,
-    "sha256": "359eca1ae64660834bf2e3da19b30a431ceab7ebfcb507306905eda3766db375",
+    "sha256": "9bcb7e57680b36fa18b6c077d9a1120a6cc703188bda4330e99c20203ea623e9",
     "tags": [
       "backup_required"
     ]
@@ -40,6 +40,30 @@
         "path": "$.count",
         "op": "type_is",
         "expected": "number"
+      },
+      {
+        "path": "$.backups[0].created_at",
+        "op": "type_is",
+        "expected": "string",
+        "optional": true
+      },
+      {
+        "path": "$.backups[0].size_bytes",
+        "op": "type_is",
+        "expected": "number",
+        "optional": true
+      },
+      {
+        "path": "$.backups[0].spaces",
+        "op": "type_is",
+        "expected": "array",
+        "optional": true
+      },
+      {
+        "path": "$.backups[0].status",
+        "op": "equals",
+        "expected": "completed",
+        "optional": true
       }
     ]
   }

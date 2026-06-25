@@ -25,12 +25,23 @@ function update() {
         const statusRow = infoRow('Status', '');
         statusRow.querySelector('.info-value').replaceChildren(statusBadge(hz.status || 'unknown'));
         const stateRow = infoRow('State', '');
-        stateRow.querySelector('.info-value').replaceChildren(statusBadge('running'));
-        sections.push(h('div', { className: 'info-group' },
+        // DASHBOARD-FIXES-001: reflect degraded instead of a hardcoded 'running'.
+        stateRow.querySelector('.info-value').replaceChildren(statusBadge(hz.status === 'degraded' ? 'degraded' : 'running'));
+        const group = h('div', { className: 'info-group' },
             statusRow,
             stateRow,
             infoRow('Version', hz.version || '\u2014'),
-        ));
+        );
+        // DASHBOARD-FIXES-001: surface the per-subsystem healthz.checks map
+        // (hidden before) so a degraded status shows WHICH subsystem is down.
+        if (hz.checks && typeof hz.checks === 'object') {
+            for (const [name, st] of Object.entries(hz.checks)) {
+                const row = infoRow(`check: ${name}`, '');
+                row.querySelector('.info-value').replaceChildren(statusBadge(String(st)));
+                group.append(row);
+            }
+        }
+        sections.push(group);
     } else {
         const statusRow = infoRow('Status', '');
         statusRow.querySelector('.info-value').replaceChildren(statusBadge('unreachable'));
