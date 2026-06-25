@@ -114,6 +114,16 @@ MDEMG's server-side substrate is mature and recently hardened — all four Hebbi
 
 ---
 
+## 5. Post-Roadmap Follow-Ups (added 2026-06-25)
+
+New sprints surfaced by work completed after this roadmap's 2026-06-10 revision (what *shipped* is tracked in `CHANGELOG.md`; this section records only the forward-looking follow-ups they spawned):
+
+- **HIDDEN-CHURN-003 — incremental hidden-layer clustering (~4–6d) — COMMITTED remedy, not optional.** HIDDEN-CHURN-002 (shipped 2026-06-24) stopped the L1 destroy-recreate churn (100%→~25%/cycle) and fixed the consolidation-never-completes silent failure, but **~25% per-cycle identity churn remains as an OPEN DEFECT** — HIDDEN-CHURN-002 is explicitly a *partial* fix and the line is **not "done" until this is closed**. The residual is **structural**: non-deterministic LLM category reclassification (`RECLASS_ENABLED`) + full re-clustering of a growing L0 set reshuffle cluster membership every cycle, which no centroid/Jaccard match threshold can recover. The remedy is **incremental clustering** — assign only new/changed L0 nodes to existing patterns, leave stable patterns untouched — and/or deterministic/cached reclassification, targeting ~95%+ identity stability. *Why it matters:* every cycle still orphans ~25% of reinforcement/abstraction edges and re-runs HIDDEN-WEIGHT-001's backward pass from scratch — the substrate is not stable until remedied. *Status:* must-fix; operator approved shipping the partial fix first (2026-06-24), which does **not** downgrade this to a nice-to-have. Sprint dir: `docs/development/hidden-churn-002/` (residual documented in `post.md` + feature doc).
+
+- **jiminy-actionability-002 — actionable-biased retrieval (~3d).** JIMINY-ACTIONABILITY-001 (shipped 2026-06-24) added surface-composition levers + directive synthesis. Live A/B showed Lever B (directive phrasing) works, but Lever A (surface reweighting) is modest (surfaced actionable 6.7%→10.5%) because the **binding constraint is upstream**: retrieval surfaces no `constraint`/`correction` candidates for most contexts, so the min-actionable quota has nothing to promote. The higher-leverage fix is a **role-scoped retrieval boost** for actionable nodes, so the surfacing levers have actionables to work with. *Why it matters:* the direct route to raising guidance follow-rate toward the actionable class. *Trigger:* operator decision; pairs with the JIMINY-RELEVANCE-001 corpus. Sprint dir: `docs/development/jiminy-actionability-001/` (finding in `epic4_live_ab.md`).
+
+---
+
 ## Annex — Orchestrator Spot-Verification (2026-06-10, live system)
 
 The workflow's final agent verified 5 claims itself (supervisor registers only 3 loops at `serve.go:424/435/455`;

@@ -46,9 +46,9 @@ Operator-transparent — the fix is in the consolidation write path. Tunables (a
 - Identity churn per cycle: **100% (pre-fix) → ~25%** (75% of patterns survive in place across consecutive cycles — live-measured 3093/4144).
 - Total-node gauge oscillation: **±2,676 → ±780**, converging.
 
-## Known limitation — residual ~25% churn (→ HIDDEN-CHURN-003)
+## Open defect — residual ~25% churn MUST be remedied (HIDDEN-CHURN-003)
 
-Identity is stable for ~75% of patterns per cycle, not ~95%. The residual is **structural**, not a matching-threshold issue (raising the Jaccard/cosine floors does not help — the clusters genuinely differ between cycles):
+⚠️ **This sprint is a PARTIAL fix.** Identity is stable for ~75% of patterns per cycle, not ~95% — the remaining ~25% per-cycle churn is an **open defect that must be fully remedied (HIDDEN-CHURN-003), not an accepted limitation.** Every cycle it still orphans ~25% of the reinforcement/abstraction edges referencing the churned patterns. The residual is **structural**, not a matching-threshold issue (raising the Jaccard/cosine floors does not help — the clusters genuinely differ between cycles):
 
 1. **Non-deterministic LLM reclassification.** `ReclassifyOversizedCategories` (`RECLASS_ENABLED=true`) calls the LLM to re-split oversized categories every cycle; its output varies, so the category→cluster structure of large categories changes run-to-run and members reshuffle.
 2. **Full re-clustering of a growing L0 set.** Every cycle re-clusters all ~52k+ L0 nodes from scratch; KMeans assignments near cluster boundaries flip as new observations are ingested.
