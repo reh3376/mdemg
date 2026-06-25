@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	cuid2 "github.com/nrednav/cuid2"
 	"mdemg/internal/circuitbreaker"
 	"mdemg/internal/config"
 	"mdemg/internal/metrics"
@@ -348,14 +349,15 @@ func (s *Service) CreateHiddenNodes(ctx context.Context, spaceID string) (int, e
 
 	slog.Info("CreateHiddenNodes: L0 base nodes fetched for re-clustering", "count", len(baseNodes))
 
-	// Step 1b: Detach old GENERALIZES edges from L0→L1 and remove childless L1 nodes
-	detached, err := s.detachBaseNodeHiddenEdges(ctx, spaceID)
+	// Step 1b: HIDDEN-CHURN-002 — the global detach-everything-then-recreate is
+	// GONE. List existing L1 patterns so each cluster can match an existing node
+	// by centroid and update it IN PLACE (stable node_id); only patterns matched
+	// by no cluster this run are deleted at the end.
+	existingPatterns, err := s.listHiddenPatterns(ctx, spaceID)
 	if err != nil {
-		return 0, fmt.Errorf("detach old hidden edges: %w", err)
+		return 0, fmt.Errorf("list existing hidden patterns: %w", err)
 	}
-	if detached > 0 {
-		slog.Info("CreateHiddenNodes: detached old L0→L1 GENERALIZES edges", "count", detached)
-	}
+	claimedPatterns := make(map[string]bool, len(existingPatterns))
 
 	// Step 2: Filter to nodes with valid embeddings
 	validNodes := make([]BaseNode, 0, len(baseNodes))
@@ -397,6 +399,7 @@ func (s *Service) CreateHiddenNodes(ctx context.Context, spaceID string) (int, e
 
 	// Step 5: KMeans within each classification category
 	created := 0
+	updated := 0
 	clusterID := 0
 
 	for category, classNodes := range classes {
@@ -438,8 +441,25 @@ func (s *Service) CreateHiddenNodes(ctx context.Context, spaceID string) (int, e
 				clusterName := inferClusterName(subMembers, s.cfg.HiddenLayerPathGroupDepth)
 				name := fmt.Sprintf("Hidden-%s-%s-%d", category, clusterName, uniqueID)
 				catDesc := categoryDescriptions[category] // may be "" for non-reclassified categories
-				err := s.createHiddenNodeWithEdges(ctx, spaceID, name, centroid, subMembers, category, catDesc)
-				if err != nil {
+
+				// HIDDEN-CHURN-002: match-or-create. A cluster whose centroid is
+				// within the identity threshold of an existing pattern UPDATES it
+				// in place — node_id and inbound references survive the cycle
+				// instead of being destroyed and recreated every ~5 minutes.
+				if matched := matchTheme(centroid, existingPatterns, claimedPatterns, s.hiddenPatternIdentityThreshold()); matched != "" {
+					claimedPatterns[matched] = true
+					if _, err := s.updateHiddenNodeWithEdges(ctx, spaceID, matched, name, centroid, subMembers, category, catDesc); err != nil {
+						return created, fmt.Errorf("update hidden node %s: %w", matched, err)
+					}
+					updated++
+					clusterID++
+					continue
+				}
+
+				// Unmatched cluster → new pattern with a CUIDv2 id (Cypher
+				// cannot mint CUIDv2; HIDDEN-CHURN-002 replaces randomUUID()).
+				newID := cuid2.Generate()
+				if err := s.createHiddenNodeWithEdges(ctx, spaceID, newID, name, centroid, subMembers, category, catDesc); err != nil {
 					return created, fmt.Errorf("create hidden node %s: %w", name, err)
 				}
 				created++
@@ -452,7 +472,15 @@ func (s *Service) CreateHiddenNodes(ctx context.Context, spaceID string) (int, e
 		}
 	}
 
-	slog.Info("hidden node creation complete", "created", created)
+	// HIDDEN-CHURN-002: only patterns matched by NO cluster this run die —
+	// the scoped replacement for the old wipe-all orphan sweep.
+	if removed, err := s.deleteUnmatchedHiddenPatterns(ctx, spaceID, claimedPatterns, existingPatterns); err != nil {
+		slog.Warn("CreateHiddenNodes: stale-pattern cleanup failed", "error", err)
+	} else if removed > 0 {
+		slog.Info("CreateHiddenNodes: removed stale hidden patterns", "count", removed)
+	}
+
+	slog.Info("hidden node creation complete", "created", created, "updated", updated)
 	return created, nil
 }
 
@@ -591,89 +619,8 @@ RETURN b.node_id AS nodeId, b.path AS path, b.embedding AS embedding,
 	return result.([]BaseNode), nil
 }
 
-// detachBaseNodeHiddenEdges removes GENERALIZES edges from L0 base nodes to L1 hidden
-// nodes, and deletes any L1 HiddenPattern nodes left with zero members.
-// This enables full re-clustering on every consolidation run.
-func (s *Service) detachBaseNodeHiddenEdges(ctx context.Context, spaceID string) (int, error) {
-	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
-	defer sess.Close(ctx)
-
-	// Delete GENERALIZES edges from L0→L1 HiddenPattern.
-	// Batched to prevent OOM on large graphs (48K+ nodes exceed
-	// Neo4j transaction memory limit in a single DELETE).
-	const edgeBatchSize = 500
-	detached := 0
-	for {
-		result, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
-			res, err := tx.Run(ctx, `
-MATCH (b:MemoryNode {space_id: $spaceId, layer: 0})
-      -[r:GENERALIZES]->(h:HiddenPattern {space_id: $spaceId, layer: 1})
-WITH r LIMIT $limit
-DELETE r
-RETURN count(r) AS deleted`, map[string]any{"spaceId": spaceID, "limit": edgeBatchSize})
-			if err != nil {
-				return 0, err
-			}
-			if res.Next(ctx) {
-				rec := res.Record()
-				cnt, _ := rec.Get("deleted")
-				return asInt(cnt), res.Err()
-			}
-			return 0, res.Err()
-		})
-		if err != nil {
-			return 0, fmt.Errorf("detach GENERALIZES edges: %w", err)
-		}
-		batch := result.(int)
-		detached += batch
-		if batch == 0 {
-			break
-		}
-	}
-
-	// Remove orphaned HiddenPattern nodes (no remaining members).
-	// Batched to prevent OOM on large graphs — each iteration deletes
-	// up to orphanBatchSize nodes in its own transaction.
-	if detached > 0 {
-		const orphanBatchSize = 500
-		totalRemoved := 0
-		for {
-			removed, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
-				res, err := tx.Run(ctx, `
-MATCH (h:HiddenPattern {space_id: $spaceId, layer: 1})
-WHERE NOT ()-[:GENERALIZES]->(h)
-WITH h LIMIT $limit
-DETACH DELETE h
-RETURN count(h) AS removed`, map[string]any{"spaceId": spaceID, "limit": orphanBatchSize})
-				if err != nil {
-					return 0, err
-				}
-				if res.Next(ctx) {
-					rec := res.Record()
-					cnt, _ := rec.Get("removed")
-					return asInt(cnt), res.Err()
-				}
-				return 0, res.Err()
-			})
-			if err != nil {
-				return detached, fmt.Errorf("cleanup orphaned hidden nodes: %w", err)
-			}
-			batch := removed.(int)
-			totalRemoved += batch
-			if batch == 0 {
-				break
-			}
-		}
-		if totalRemoved > 0 {
-			slog.Info("CreateHiddenNodes: removed orphaned HiddenPattern nodes", "count", totalRemoved)
-		}
-	}
-
-	return detached, nil
-}
-
 // createHiddenNodeWithEdges creates a hidden node and GENERALIZES edges from members
-func (s *Service) createHiddenNodeWithEdges(ctx context.Context, spaceID, name string, centroid []float64, members []BaseNode, category, categorySummary string) error {
+func (s *Service) createHiddenNodeWithEdges(ctx context.Context, spaceID, nodeID, name string, centroid []float64, members []BaseNode, category, categorySummary string) error {
 	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer sess.Close(ctx)
 
@@ -685,7 +632,7 @@ func (s *Service) createHiddenNodeWithEdges(ctx context.Context, spaceID, name s
 	cypher := `
 CREATE (h:MemoryNode:HiddenPattern {
   space_id: $spaceId,
-  node_id: randomUUID(),
+  node_id: $nodeId,
   name: $name,
   layer: 1,
   role_type: 'hidden',
@@ -722,6 +669,7 @@ RETURN h.node_id AS hiddenId, count(b) AS edgeCount`
 	_, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 		res, err := tx.Run(ctx, cypher, map[string]any{
 			"spaceId":         spaceID,
+			"nodeId":          nodeID,
 			"name":            name,
 			"centroid":        toFloat32Slice(centroid),
 			"memberCount":     len(members),
