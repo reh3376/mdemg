@@ -24,11 +24,16 @@ Plan: `docs/development/dashboard-fixes-001/sprint_plan_dashboard_fixes_001.md` 
 - Server response-field additions: `status` on `/v1/backup/list`, `config_key` on `/v1/admin/features`.
 - Tier 3: Playwright assertion per fix (`tests/e2e/browser-ui/test_browser_ui.py`).
 
-## C. GRAFANA-AUDIT-002 — re-audit + improve `:3000` dashboards (~2d)
+## C. GRAFANA-AUDIT-002 — re-audit + improve `:3000` dashboards — ✅ SHIPPED 2026-06-25
+
+Re-audit: 0 FAIL (dashboards report correctly); fixed the dead `_p50` panel target; added 3 new-gauge panels (jiminy surfaced-actionable, null-weight-edges, conversation-coverage). Disclosed follow-up: `llm_interactions.quality` has no writer (Entropy Health panel — metric-instrumentation task). See `docs/development/grafana-audit-002/`.
+
+<details><summary>original scope</summary>
 
 GRAFANA-AUDIT-001 (shipped 2026-05-21) built the harness `scripts/grafana_panel_audit.py` and left **17 EMPTY / 18 SKIP / 0 FAIL** across ~146 panels / 8 dashboards. That result is **~5 weeks + ~10 metric-changing sprints stale** (TSDB-CONSUME-001 deleted/windowed gauges + removed ft_* panels; HIDDEN-WEIGHT/CHURN, EVENTGRAPH, jiminy-actionability added new gauges with **no panels**).
 - **Phase 1 (correctness):** re-run `grafana_panel_audit.py` against the current live TSDB; produce the current PASS/EMPTY/FAIL/SKIP verdict per panel.
 - **Phase 2 (improve):** wire-or-delete the EMPTY/FAIL panels; add panels for the new unpanelled metrics (`mdemg_jiminy_surfaced_actionable_fraction`/`_abstraction_fraction`, incremental-clustering signals, eventgraph counters, HIDDEN-CHURN gauges, etc.). UOBS/UOTS dashboard specs gate it.
+</details>
 
 ---
 
