@@ -232,20 +232,22 @@ type Config struct {
 	QueryClassifyTimeoutMs int    // QUERY_CLASSIFY_TIMEOUT_MS — timeout for classification in ms (default: 5000)
 
 	// Dynamic Emergence settings (Phase 103)
-	EmergenceEnabled                  bool    // EMERGENCE_ENABLED — enable LLM-driven concept naming (default: false)
-	HiddenThemeIdentitySimThreshold   float64 // HIDDEN_THEME_IDENTITY_SIM_THRESHOLD — centroid cosine floor for matching a cluster to an EXISTING theme (in-place update, stable node identity) instead of recreating (default: 0.90; HIDDEN-CHURN-001)
-	HiddenPatternIdentitySimThreshold float64 // HIDDEN_PATTERN_IDENTITY_SIM_THRESHOLD — centroid cosine floor for matching a cluster to an EXISTING L1 hidden pattern (in-place update, stable node identity) instead of recreating (default: 0.90; HIDDEN-CHURN-002)
-	HiddenThemeTargetRatio            float64 // HIDDEN_THEME_TARGET_RATIO — themes-per-observation ratio for KMeans k (default: 0.1 = ceil(n/10); was an inline equation; HIDDEN-CHURN-001 PR-B)
-	HiddenThemeAssignSimThreshold     float64 // HIDDEN_THEME_ASSIGN_SIM_THRESHOLD — cosine floor for density-assigning NOISE observations to their nearest theme (edges only, no new themes; 0 disables; default: 0.70; PR-B coverage retune)
-	ConversationCoverageAlertFloor    float64 // CONVERSATION_COVERAGE_ALERT_FLOOR — alert when themed/total conversation-observation coverage stays below this (default: 0.2; PR-B)
-	ConversationCoverageMinObs        int     // CONVERSATION_COVERAGE_MIN_OBS — spaces with fewer live conversation observations don't emit the coverage gauge (statistically meaningless; default: 50, DH-005 confidence-threshold pattern)
-	EmergenceProvider                 string  // EMERGENCE_PROVIDER — LLM provider for naming (openai/ollama, default: openai)
-	EmergenceModel                    string  // EMERGENCE_MODEL — model for naming (default: gpt-4o-mini)
-	EmergenceMaxTokens                int     // EMERGENCE_MAX_TOKENS — max tokens for naming response (default: 500, range 100-4000)
-	EmergenceTimeoutMs                int     // EMERGENCE_TIMEOUT_MS — timeout for naming call in ms (default: 10000, min 1000)
-	EmergenceMinWeight                float64 // EMERGENCE_MIN_WEIGHT — min CO_ACTIVATED_WITH weight for clustering (default: 0.3, range 0.0-1.0)
-	EmergenceMinClusterSize           int     // EMERGENCE_MIN_CLUSTER_SIZE — min nodes per cluster (default: 3, min 2)
-	EmergenceMaxClusters              int     // EMERGENCE_MAX_CLUSTERS — max clusters per run (default: 10, min 1)
+	EmergenceEnabled                    bool    // EMERGENCE_ENABLED — enable LLM-driven concept naming (default: false)
+	HiddenThemeIdentitySimThreshold     float64 // HIDDEN_THEME_IDENTITY_SIM_THRESHOLD — centroid cosine floor for matching a cluster to an EXISTING theme (in-place update, stable node identity) instead of recreating (default: 0.90; HIDDEN-CHURN-001)
+	HiddenPatternIdentitySimThreshold   float64 // HIDDEN_PATTERN_IDENTITY_SIM_THRESHOLD — centroid cosine floor for the FALLBACK match of a cluster to an EXISTING L1 hidden pattern when member-overlap finds none (in-place update, stable node identity) instead of recreating (default: 0.90; HIDDEN-CHURN-002)
+	HiddenPatternMemberJaccardThreshold float64 // HIDDEN_PATTERN_MEMBER_JACCARD_THRESHOLD — PRIMARY identity match: Jaccard overlap of a cluster's L0 member set with an existing pattern's members. Stable under KMeans repartition jitter (centroid-cosine alone left ~28% churn/cycle). 0 disables member matching (centroid-only). (default: 0.5; HIDDEN-CHURN-002)
+	ConsolidateTimeoutMs                int     // CONSOLIDATE_TIMEOUT_MS — server-side deadline for a full /v1/memory/consolidate cycle, DETACHED from caller cancellation so a client timeout can't abort it mid-cycle (re-clustering 50k+ L0 nodes takes ~10 min; default: 1800000 = 30 min, floor 60000; HIDDEN-CHURN-002)
+	HiddenThemeTargetRatio              float64 // HIDDEN_THEME_TARGET_RATIO — themes-per-observation ratio for KMeans k (default: 0.1 = ceil(n/10); was an inline equation; HIDDEN-CHURN-001 PR-B)
+	HiddenThemeAssignSimThreshold       float64 // HIDDEN_THEME_ASSIGN_SIM_THRESHOLD — cosine floor for density-assigning NOISE observations to their nearest theme (edges only, no new themes; 0 disables; default: 0.70; PR-B coverage retune)
+	ConversationCoverageAlertFloor      float64 // CONVERSATION_COVERAGE_ALERT_FLOOR — alert when themed/total conversation-observation coverage stays below this (default: 0.2; PR-B)
+	ConversationCoverageMinObs          int     // CONVERSATION_COVERAGE_MIN_OBS — spaces with fewer live conversation observations don't emit the coverage gauge (statistically meaningless; default: 50, DH-005 confidence-threshold pattern)
+	EmergenceProvider                   string  // EMERGENCE_PROVIDER — LLM provider for naming (openai/ollama, default: openai)
+	EmergenceModel                      string  // EMERGENCE_MODEL — model for naming (default: gpt-4o-mini)
+	EmergenceMaxTokens                  int     // EMERGENCE_MAX_TOKENS — max tokens for naming response (default: 500, range 100-4000)
+	EmergenceTimeoutMs                  int     // EMERGENCE_TIMEOUT_MS — timeout for naming call in ms (default: 10000, min 1000)
+	EmergenceMinWeight                  float64 // EMERGENCE_MIN_WEIGHT — min CO_ACTIVATED_WITH weight for clustering (default: 0.3, range 0.0-1.0)
+	EmergenceMinClusterSize             int     // EMERGENCE_MIN_CLUSTER_SIZE — min nodes per cluster (default: 3, min 2)
+	EmergenceMaxClusters                int     // EMERGENCE_MAX_CLUSTERS — max clusters per run (default: 10, min 1)
 
 	// Active MCP Guardrails settings (Phase 104)
 	GuardrailEnabled        bool   // GUARDRAIL_ENABLED — enable guardrail validation (default: false)
@@ -2210,6 +2212,17 @@ func FromEnv() (Config, error) {
 	hiddenPatternIdentitySimThreshold, err := atof("HIDDEN_PATTERN_IDENTITY_SIM_THRESHOLD", 0.90)
 	if err != nil {
 		return Config{}, err
+	}
+	hiddenPatternMemberJaccardThreshold, err := atof("HIDDEN_PATTERN_MEMBER_JACCARD_THRESHOLD", 0.5)
+	if err != nil {
+		return Config{}, err
+	}
+	consolidateTimeoutMs, err := atoi("CONSOLIDATE_TIMEOUT_MS", 1800000)
+	if err != nil {
+		return Config{}, err
+	}
+	if consolidateTimeoutMs < 60000 {
+		consolidateTimeoutMs = 60000
 	}
 	hiddenThemeTargetRatio, err := atof("HIDDEN_THEME_TARGET_RATIO", 0.1)
 	if err != nil {
@@ -4750,20 +4763,22 @@ func FromEnv() (Config, error) {
 		QueryClassifyTimeoutMs: queryClassifyTimeoutMs,
 
 		// Phase 103: Dynamic Emergence
-		EmergenceEnabled:                  emergenceEnabled,
-		HiddenThemeIdentitySimThreshold:   hiddenThemeIdentitySimThreshold,
-		HiddenPatternIdentitySimThreshold: hiddenPatternIdentitySimThreshold,
-		HiddenThemeTargetRatio:            hiddenThemeTargetRatio,
-		HiddenThemeAssignSimThreshold:     hiddenThemeAssignSimThreshold,
-		ConversationCoverageAlertFloor:    conversationCoverageAlertFloor,
-		ConversationCoverageMinObs:        conversationCoverageMinObs,
-		EmergenceProvider:                 emergenceProvider,
-		EmergenceModel:                    emergenceModel,
-		EmergenceMaxTokens:                emergenceMaxTokens,
-		EmergenceTimeoutMs:                emergenceTimeoutMs,
-		EmergenceMinWeight:                emergenceMinWeight,
-		EmergenceMinClusterSize:           emergenceMinClusterSize,
-		EmergenceMaxClusters:              emergenceMaxClusters,
+		EmergenceEnabled:                    emergenceEnabled,
+		HiddenThemeIdentitySimThreshold:     hiddenThemeIdentitySimThreshold,
+		HiddenPatternIdentitySimThreshold:   hiddenPatternIdentitySimThreshold,
+		HiddenPatternMemberJaccardThreshold: hiddenPatternMemberJaccardThreshold,
+		ConsolidateTimeoutMs:                consolidateTimeoutMs,
+		HiddenThemeTargetRatio:              hiddenThemeTargetRatio,
+		HiddenThemeAssignSimThreshold:       hiddenThemeAssignSimThreshold,
+		ConversationCoverageAlertFloor:      conversationCoverageAlertFloor,
+		ConversationCoverageMinObs:          conversationCoverageMinObs,
+		EmergenceProvider:                   emergenceProvider,
+		EmergenceModel:                      emergenceModel,
+		EmergenceMaxTokens:                  emergenceMaxTokens,
+		EmergenceTimeoutMs:                  emergenceTimeoutMs,
+		EmergenceMinWeight:                  emergenceMinWeight,
+		EmergenceMinClusterSize:             emergenceMinClusterSize,
+		EmergenceMaxClusters:                emergenceMaxClusters,
 
 		// Phase 104: Active MCP Guardrails
 		GuardrailEnabled:        guardrailEnabled,

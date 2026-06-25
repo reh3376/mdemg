@@ -353,10 +353,13 @@ func (s *Service) CreateHiddenNodes(ctx context.Context, spaceID string) (int, e
 	// GONE. List existing L1 patterns so each cluster can match an existing node
 	// by centroid and update it IN PLACE (stable node_id); only patterns matched
 	// by no cluster this run are deleted at the end.
-	existingPatterns, err := s.listHiddenPatterns(ctx, spaceID)
+	existingPatterns, err := s.listHiddenPatternRefs(ctx, spaceID)
 	if err != nil {
 		return 0, fmt.Errorf("list existing hidden patterns: %w", err)
 	}
+	patternMemberIndex := buildMemberIndex(existingPatterns)
+	jaccardMin := s.hiddenPatternMemberJaccardThreshold()
+	cosineMin := s.hiddenPatternIdentityThreshold()
 	claimedPatterns := make(map[string]bool, len(existingPatterns))
 
 	// Step 2: Filter to nodes with valid embeddings
@@ -442,11 +445,18 @@ func (s *Service) CreateHiddenNodes(ctx context.Context, spaceID string) (int, e
 				name := fmt.Sprintf("Hidden-%s-%s-%d", category, clusterName, uniqueID)
 				catDesc := categoryDescriptions[category] // may be "" for non-reclassified categories
 
-				// HIDDEN-CHURN-002: match-or-create. A cluster whose centroid is
-				// within the identity threshold of an existing pattern UPDATES it
-				// in place — node_id and inbound references survive the cycle
-				// instead of being destroyed and recreated every ~5 minutes.
-				if matched := matchTheme(centroid, existingPatterns, claimedPatterns, s.hiddenPatternIdentityThreshold()); matched != "" {
+				// HIDDEN-CHURN-002: match-or-create. A cluster that overlaps an
+				// existing pattern's L0 members (Jaccard) — or, failing that, is
+				// centroid-close — UPDATES that pattern in place, so node_id and
+				// inbound references survive the cycle instead of being destroyed
+				// and recreated. Member overlap is the primary signal because it
+				// is stable under KMeans repartition jitter (centroid-only left
+				// ~28% churn/cycle in live Tier-3).
+				clusterMemberIDs := make([]string, len(subMembers))
+				for mi, m := range subMembers {
+					clusterMemberIDs[mi] = m.NodeID
+				}
+				if matched := matchHiddenPattern(clusterMemberIDs, centroid, existingPatterns, patternMemberIndex, claimedPatterns, jaccardMin, cosineMin); matched != "" {
 					claimedPatterns[matched] = true
 					if _, err := s.updateHiddenNodeWithEdges(ctx, spaceID, matched, name, centroid, subMembers, category, catDesc); err != nil {
 						return created, fmt.Errorf("update hidden node %s: %w", matched, err)
@@ -581,12 +591,19 @@ func (s *Service) fetchAllBaseNodes(ctx context.Context, spaceID string) ([]Base
 	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer sess.Close(ctx)
 
+	// HIDDEN-CHURN-002: ORDER BY node_id makes the L0 fetch order DETERMINISTIC.
+	// KMeans init here is order-dependent (first centroid = point 0, then
+	// farthest-first), so a stable input order yields reproducible partitions
+	// across cycles — which is what lets member-overlap / centroid matching find
+	// the same patterns next cycle. Without it, Neo4j's arbitrary scan order
+	// reshuffled members every run and defeated identity matching (~28% churn).
 	cypher := `
 MATCH (b:MemoryNode {space_id: $spaceId, layer: 0})
 WHERE b.embedding IS NOT NULL
   AND (b.role_type IS NULL OR b.role_type <> 'conversation_observation')
 RETURN b.node_id AS nodeId, b.path AS path, b.embedding AS embedding,
-       coalesce(b.summary, '') AS summary`
+       coalesce(b.summary, '') AS summary
+ORDER BY b.node_id`
 
 	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 		res, err := tx.Run(ctx, cypher, map[string]any{"spaceId": spaceID})
