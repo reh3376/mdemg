@@ -43,8 +43,8 @@ type RetrieveRequest struct {
 	// SPARSE_RETRIEVAL_ENABLED config default for this call. SparsePercentile
 	// > 0 overrides SPARSE_ACTIVATION_PERCENTILE for this call. Use these to
 	// disable the gate per-call (`?sparse=false`) without restarting mdemg.
-	SparseOverridePresent bool    `json:"-"`                            // not serialized; set by handler when ?sparse= present
-	SparseEnabled         bool    `json:"sparse,omitempty"`             // request-level override for SPARSE_RETRIEVAL_ENABLED
+	SparseOverridePresent bool    `json:"-"`                                                                  // not serialized; set by handler when ?sparse= present
+	SparseEnabled         bool    `json:"sparse,omitempty"`                                                   // request-level override for SPARSE_RETRIEVAL_ENABLED
 	SparsePercentile      float64 `json:"sparse_percentile,omitempty" validate:"omitempty,min=0.5,max=0.999"` // request-level override for SPARSE_ACTIVATION_PERCENTILE
 
 	// Phase 14.1 Epic 2 — Per-category gate dispatch hint. When the gate
@@ -90,10 +90,10 @@ type RetrieveResult struct {
 	NormalizedConfidence float64 `json:"normalized_confidence,omitempty"` // Percentile rank 0-100
 	ConfidenceLevel      string  `json:"confidence_level,omitempty"`      // HIGH/MEDIUM/LOW based on percentile
 
-	VectorSim  float64             `json:"vector_sim,omitempty"`
-	Activation float64             `json:"activation,omitempty"`
-	Jiminy     *JiminyExplanation  `json:"jiminy,omitempty"`  // Explainable retrieval (when enabled)
-	Evidence   []SymbolEvidence    `json:"evidence,omitempty"` // Symbol evidence grounding the result
+	VectorSim  float64            `json:"vector_sim,omitempty"`
+	Activation float64            `json:"activation,omitempty"`
+	Jiminy     *JiminyExplanation `json:"jiminy,omitempty"`   // Explainable retrieval (when enabled)
+	Evidence   []SymbolEvidence   `json:"evidence,omitempty"` // Symbol evidence grounding the result
 }
 
 // SymbolEvidence provides verifiable evidence linking a retrieval result to specific code.
@@ -122,10 +122,10 @@ type JiminyExplanation struct {
 }
 
 type RetrieveResponse struct {
-	SpaceID          string            `json:"space_id"`
-	Results          []RetrieveResult  `json:"results"`
-	EvidenceMetrics  *EvidenceMetrics  `json:"evidence_metrics,omitempty"` // Evidence compliance tracking
-	Debug            map[string]any    `json:"debug,omitempty"`
+	SpaceID         string           `json:"space_id"`
+	Results         []RetrieveResult `json:"results"`
+	EvidenceMetrics *EvidenceMetrics `json:"evidence_metrics,omitempty"` // Evidence compliance tracking
+	Debug           map[string]any   `json:"debug,omitempty"`
 
 	// Pagination fields (Phase 48.3)
 	NextCursor string `json:"next_cursor,omitempty"` // Cursor for next page (empty if no more results)
@@ -138,31 +138,31 @@ type RetrieveResponse struct {
 
 // EvidenceMetrics tracks evidence compliance for retrieval quality measurement.
 type EvidenceMetrics struct {
-	TotalResults       int     `json:"total_results"`        // Total number of results returned
-	ResultsWithEvidence int    `json:"results_with_evidence"` // Results that have at least one symbol evidence
-	TotalSymbols       int     `json:"total_symbols"`        // Total symbols across all results
-	ComplianceRate     float64 `json:"compliance_rate"`      // % of results with evidence (ECR)
+	TotalResults        int     `json:"total_results"`          // Total number of results returned
+	ResultsWithEvidence int     `json:"results_with_evidence"`  // Results that have at least one symbol evidence
+	TotalSymbols        int     `json:"total_symbols"`          // Total symbols across all results
+	ComplianceRate      float64 `json:"compliance_rate"`        // % of results with evidence (ECR)
 	AvgSymbolsPerResult float64 `json:"avg_symbols_per_result"` // Average symbols per result
 }
 
 type IngestRequest struct {
-	SpaceID     string    `json:"space_id" validate:"required,min=1,max=256"`
-	Timestamp   string    `json:"timestamp" validate:"required,min=1"`
-	Source      string    `json:"source" validate:"required,min=1,max=64"`
-	Content     any       `json:"content" validate:"required"`
-	Tags        []string  `json:"tags,omitempty" validate:"omitempty,dive,min=1"`
-	NodeID      string    `json:"node_id,omitempty"`
-	Path        string    `json:"path,omitempty" validate:"omitempty,max=512"`
-	Name        string    `json:"name,omitempty"`
-	Summary     string    `json:"summary,omitempty" validate:"omitempty,max=1000"` // Brief summary for reranking (max 1000 chars)
-	Sensitivity string    `json:"sensitivity,omitempty" validate:"omitempty,oneof=public internal confidential"`
-	Confidence  *float64  `json:"confidence,omitempty" validate:"omitempty,min=0,max=1"`
-	Embedding       []float32 `json:"embedding,omitempty" validate:"omitempty,embedding_dims"` // Optional: pre-computed embedding
-	CanonicalTime   string    `json:"canonical_time,omitempty"`                                // ISO8601: content-relevant time (Phase 2 Temporal)
+	SpaceID         string    `json:"space_id" validate:"required,min=1,max=256"`
+	Timestamp       string    `json:"timestamp" validate:"required,min=1"`
+	Source          string    `json:"source" validate:"required,min=1,max=64"`
+	Content         any       `json:"content" validate:"required"`
+	Tags            []string  `json:"tags,omitempty" validate:"omitempty,dive,min=1"`
+	NodeID          string    `json:"node_id,omitempty"`
+	Path            string    `json:"path,omitempty" validate:"omitempty,max=512"`
+	Name            string    `json:"name,omitempty"`
+	Summary         string    `json:"summary,omitempty" validate:"omitempty,max=1000"` // Brief summary for reranking (max 1000 chars)
+	Sensitivity     string    `json:"sensitivity,omitempty" validate:"omitempty,oneof=public internal confidential"`
+	Confidence      *float64  `json:"confidence,omitempty" validate:"omitempty,min=0,max=1"`
+	Embedding       []float32 `json:"embedding,omitempty" validate:"omitempty,embedding_dims"`                              // Optional: pre-computed embedding
+	CanonicalTime   string    `json:"canonical_time,omitempty"`                                                             // ISO8601: content-relevant time (Phase 2 Temporal)
 	TimestampFormat string    `json:"timestamp_format,omitempty" validate:"omitempty,oneof=rfc3339 unix unix_ms date_only"` // Timestamp format enum (default: rfc3339)
-	ContentHash     string    `json:"content_hash,omitempty" validate:"omitempty,max=128"`     // SHA256 hash for change detection (skip re-ingest if unchanged)
-	FileSize        int64     `json:"file_size,omitempty"`                                     // File size in bytes
-	LineCount       int       `json:"line_count,omitempty"`                                    // Number of lines in the file
+	ContentHash     string    `json:"content_hash,omitempty" validate:"omitempty,max=128"`                                  // SHA256 hash for change detection (skip re-ingest if unchanged)
+	FileSize        int64     `json:"file_size,omitempty"`                                                                  // File size in bytes
+	LineCount       int       `json:"line_count,omitempty"`                                                                 // Number of lines in the file
 }
 
 type IngestResponse struct {
@@ -187,7 +187,7 @@ const (
 // Anomaly represents a detected anomaly during ingest
 type Anomaly struct {
 	Type        AnomalyType `json:"type"`
-	Severity    string      `json:"severity"`               // "info", "warning", "critical"
+	Severity    string      `json:"severity"` // "info", "warning", "critical"
 	Message     string      `json:"message"`
 	RelatedNode string      `json:"related_node,omitempty"` // Node ID of related node
 	Confidence  float64     `json:"confidence"`             // 0.0 - 1.0
@@ -199,7 +199,7 @@ type AnomalySignal struct {
 	Code     string `json:"code"`     // "empty-resume", "no-themes", "empty-recall"
 	Severity string `json:"severity"` // "critical", "high", "medium", "low"
 	Message  string `json:"message"`
-	Action   string `json:"action"`   // Recommended action (e.g., curl command)
+	Action   string `json:"action"` // Recommended action (e.g., curl command)
 }
 
 // MetricsResponse - main response structure for GET /v1/metrics
@@ -231,10 +231,10 @@ type ActivityStats struct {
 // ReflectRequest - request for deep context exploration via /v1/memory/reflect
 type ReflectRequest struct {
 	SpaceID        string    `json:"space_id" validate:"required,min=1"`
-	Topic          string    `json:"topic" validate:"required_without=TopicEmbedding,omitempty,min=1,max=500"`                     // natural language topic (required)
+	Topic          string    `json:"topic" validate:"required_without=TopicEmbedding,omitempty,min=1,max=500"`             // natural language topic (required)
 	TopicEmbedding []float32 `json:"topic_embedding,omitempty" validate:"required_without=Topic,omitempty,embedding_dims"` // pre-computed embedding for topic
-	MaxDepth       int       `json:"max_depth,omitempty" validate:"omitempty,min=1,max=10"`       // hop depth (default: 3)
-	MaxNodes       int       `json:"max_nodes,omitempty" validate:"omitempty,min=1,max=500"`       // cap results (default: 50)
+	MaxDepth       int       `json:"max_depth,omitempty" validate:"omitempty,min=1,max=10"`                                // hop depth (default: 3)
+	MaxNodes       int       `json:"max_nodes,omitempty" validate:"omitempty,min=1,max=500"`                               // cap results (default: 50)
 }
 
 // ReflectResponse - response from deep context exploration
@@ -260,7 +260,7 @@ type ScoredNode struct {
 
 // Insight - a detected pattern or observation from reflection
 type Insight struct {
-	Type        string   `json:"type"`        // "cluster", "pattern", "gap"
+	Type        string   `json:"type"` // "cluster", "pattern", "gap"
 	Description string   `json:"description"`
 	NodeIDs     []string `json:"node_ids"`
 }
@@ -280,34 +280,34 @@ type BatchIngestRequest struct {
 
 // BatchIngestItem - single observation in a batch ingest request
 type BatchIngestItem struct {
-	Timestamp   string         `json:"timestamp" validate:"required,min=1"`
-	Source      string         `json:"source" validate:"required,min=1,max=64"`
-	Content     any            `json:"content" validate:"required"`
-	Tags        []string       `json:"tags,omitempty" validate:"omitempty,dive,min=1"`
-	NodeID      string         `json:"node_id,omitempty"`
-	Path        string         `json:"path,omitempty" validate:"omitempty,max=512"`
-	Name        string         `json:"name,omitempty"`
-	Summary     string         `json:"summary,omitempty" validate:"omitempty,max=1000"` // Brief summary for reranking
-	Symbols     []IngestSymbol `json:"symbols,omitempty"`                               // Extracted code symbols (Phase 8)
-	Sensitivity string         `json:"sensitivity,omitempty" validate:"omitempty,oneof=public internal confidential"`
-	Confidence  *float64       `json:"confidence,omitempty" validate:"omitempty,min=0,max=1"`
+	Timestamp       string         `json:"timestamp" validate:"required,min=1"`
+	Source          string         `json:"source" validate:"required,min=1,max=64"`
+	Content         any            `json:"content" validate:"required"`
+	Tags            []string       `json:"tags,omitempty" validate:"omitempty,dive,min=1"`
+	NodeID          string         `json:"node_id,omitempty"`
+	Path            string         `json:"path,omitempty" validate:"omitempty,max=512"`
+	Name            string         `json:"name,omitempty"`
+	Summary         string         `json:"summary,omitempty" validate:"omitempty,max=1000"` // Brief summary for reranking
+	Symbols         []IngestSymbol `json:"symbols,omitempty"`                               // Extracted code symbols (Phase 8)
+	Sensitivity     string         `json:"sensitivity,omitempty" validate:"omitempty,oneof=public internal confidential"`
+	Confidence      *float64       `json:"confidence,omitempty" validate:"omitempty,min=0,max=1"`
 	Embedding       []float32      `json:"embedding,omitempty" validate:"omitempty,embedding_dims"`
-	CanonicalTime   string         `json:"canonical_time,omitempty"`                                // ISO8601: content-relevant time (Phase 2 Temporal)
+	CanonicalTime   string         `json:"canonical_time,omitempty"`                                                             // ISO8601: content-relevant time (Phase 2 Temporal)
 	TimestampFormat string         `json:"timestamp_format,omitempty" validate:"omitempty,oneof=rfc3339 unix unix_ms date_only"` // Timestamp format enum (default: rfc3339)
-	ContentHash     string         `json:"content_hash,omitempty" validate:"omitempty,max=128"`     // SHA256 hash for change detection
-	FileSize        int64          `json:"file_size,omitempty"`                                     // File size in bytes
-	LineCount       int            `json:"line_count,omitempty"`                                    // Number of lines
+	ContentHash     string         `json:"content_hash,omitempty" validate:"omitempty,max=128"`                                  // SHA256 hash for change detection
+	FileSize        int64          `json:"file_size,omitempty"`                                                                  // File size in bytes
+	LineCount       int            `json:"line_count,omitempty"`                                                                 // Number of lines
 }
 
 // IngestSymbol represents an extracted code symbol (constant, function, class, etc.)
 // Used for evidence-locked retrieval in Phase 8 symbol-level indexing.
 type IngestSymbol struct {
 	Name           string `json:"name"`
-	Type           string `json:"type"`                      // const, function, class, enum, enum_value, etc.
-	Value          string `json:"value,omitempty"`           // Resolved value (e.g., "60000" from "60 * 1000")
-	RawValue       string `json:"raw_value,omitempty"`       // Original value as written in code
-	Line           int    `json:"line"`                      // 1-indexed start line (UPTS standard)
-	LineEnd        int    `json:"line_end,omitempty"`        // End line for multi-line symbols
+	Type           string `json:"type"`                // const, function, class, enum, enum_value, etc.
+	Value          string `json:"value,omitempty"`     // Resolved value (e.g., "60000" from "60 * 1000")
+	RawValue       string `json:"raw_value,omitempty"` // Original value as written in code
+	Line           int    `json:"line"`                // 1-indexed start line (UPTS standard)
+	LineEnd        int    `json:"line_end,omitempty"`  // End line for multi-line symbols
 	Exported       bool   `json:"exported"`
 	DocComment     string `json:"doc_comment,omitempty"`
 	Signature      string `json:"signature,omitempty"`       // Function signature
@@ -339,17 +339,17 @@ type BatchIngestResponse struct {
 // Provides comprehensive per-space memory statistics including counts,
 // embedding coverage, learning metrics, and health indicators.
 type StatsResponse struct {
-	SpaceID               string               `json:"space_id"`
-	MemoryCount           int64                `json:"memory_count"`
-	ObservationCount      int64                `json:"observation_count"`
-	MemoriesByLayer       map[int]int64        `json:"memories_by_layer"`
-	EmbeddingCoverage     float64              `json:"embedding_coverage"`      // 0.0 - 1.0
-	AvgEmbeddingDimensions int                 `json:"avg_embedding_dimensions"`
-	LearningActivity      *LearningActivity    `json:"learning_activity"`
-	TemporalDistribution  *TemporalDistribution `json:"temporal_distribution"`
-	Connectivity          *Connectivity        `json:"connectivity"`
-	HealthScore           float64              `json:"health_score"` // 0.0 - 1.0
-	ComputedAt            string               `json:"computed_at"`  // ISO8601 timestamp
+	SpaceID                string                `json:"space_id"`
+	MemoryCount            int64                 `json:"memory_count"`
+	ObservationCount       int64                 `json:"observation_count"`
+	MemoriesByLayer        map[int]int64         `json:"memories_by_layer"`
+	EmbeddingCoverage      float64               `json:"embedding_coverage"` // 0.0 - 1.0
+	AvgEmbeddingDimensions int                   `json:"avg_embedding_dimensions"`
+	LearningActivity       *LearningActivity     `json:"learning_activity"`
+	TemporalDistribution   *TemporalDistribution `json:"temporal_distribution"`
+	Connectivity           *Connectivity         `json:"connectivity"`
+	HealthScore            float64               `json:"health_score"` // 0.0 - 1.0
+	ComputedAt             string                `json:"computed_at"`  // ISO8601 timestamp
 }
 
 // LearningActivity - Hebbian learning metrics from CO_ACTIVATED_WITH edges
@@ -427,55 +427,55 @@ type BulkArchiveResponse struct {
 // ConsultRequest - request for POST /v1/memory/consult
 // The Agent Consulting Service acts as an SME for coding agents.
 type ConsultRequest struct {
-	SpaceID  string         `json:"space_id" validate:"required,min=1,max=256"`
-	Context  string         `json:"context" validate:"required,min=1,max=10000"`   // Current context (code, error, task description)
-	Question string         `json:"question" validate:"required,min=1,max=2000"`   // What the agent is asking about
-	Tags     []string       `json:"tags,omitempty" validate:"omitempty,dive,min=1"` // Optional filtering tags
-	MaxSuggestions int      `json:"max_suggestions,omitempty" validate:"omitempty,min=1,max=20"` // Max suggestions to return (default 5)
-	IncludeEvidence bool    `json:"include_evidence,omitempty"` // Include symbol evidence for suggestions
-	LlmSynthesis    bool    `json:"llm_synthesis,omitempty"`    // Enable LLM synthesis for narrative response (Phase 101)
-	TranslateIntent bool    `json:"translate_intent,omitempty"` // Enable LLM query rewriting before embedding (Phase 102)
-	SessionID       string  `json:"session_id,omitempty"`       // Propagated to TSDB for session-level analysis
+	SpaceID         string   `json:"space_id" validate:"required,min=1,max=256"`
+	Context         string   `json:"context" validate:"required,min=1,max=10000"`                 // Current context (code, error, task description)
+	Question        string   `json:"question" validate:"required,min=1,max=2000"`                 // What the agent is asking about
+	Tags            []string `json:"tags,omitempty" validate:"omitempty,dive,min=1"`              // Optional filtering tags
+	MaxSuggestions  int      `json:"max_suggestions,omitempty" validate:"omitempty,min=1,max=20"` // Max suggestions to return (default 5)
+	IncludeEvidence bool     `json:"include_evidence,omitempty"`                                  // Include symbol evidence for suggestions
+	LlmSynthesis    bool     `json:"llm_synthesis,omitempty"`                                     // Enable LLM synthesis for narrative response (Phase 101)
+	TranslateIntent bool     `json:"translate_intent,omitempty"`                                  // Enable LLM query rewriting before embedding (Phase 102)
+	SessionID       string   `json:"session_id,omitempty"`                                        // Propagated to TSDB for session-level analysis
 }
 
 // ConsultResponse - response from the Agent Consulting Service
 type ConsultResponse struct {
-	SpaceID         string            `json:"space_id"`
-	Suggestions     []Suggestion      `json:"suggestions"`
-	RelatedConcepts []RelatedConcept  `json:"related_concepts,omitempty"` // Higher-level concepts
-	Confidence      float64           `json:"confidence"`                 // Overall confidence 0.0-1.0
-	Rationale       string            `json:"rationale,omitempty"`        // Why these suggestions
-	Synthesis       string            `json:"synthesis,omitempty"`        // LLM-generated narrative (Phase 101)
+	SpaceID          string           `json:"space_id"`
+	Suggestions      []Suggestion     `json:"suggestions"`
+	RelatedConcepts  []RelatedConcept `json:"related_concepts,omitempty"`  // Higher-level concepts
+	Confidence       float64          `json:"confidence"`                  // Overall confidence 0.0-1.0
+	Rationale        string           `json:"rationale,omitempty"`         // Why these suggestions
+	Synthesis        string           `json:"synthesis,omitempty"`         // LLM-generated narrative (Phase 101)
 	TranslatedIntent string           `json:"translated_intent,omitempty"` // Rewritten query from intent translation (Phase 102)
-	Debug           map[string]any    `json:"debug,omitempty"`
+	Debug            map[string]any   `json:"debug,omitempty"`
 }
 
 // Suggestion represents a single piece of SME advice
 type Suggestion struct {
-	Type        SuggestionType     `json:"type"`         // context, process, concept, risk
-	Content     string             `json:"content"`      // The suggestion text
-	Confidence  float64            `json:"confidence"`   // Confidence 0.0-1.0
-	SourceNodes []string           `json:"source_nodes"` // Node IDs backing this suggestion
-	Evidence    []SymbolEvidence   `json:"evidence,omitempty"` // Symbol evidence (when requested)
+	Type        SuggestionType   `json:"type"`               // context, process, concept, risk
+	Content     string           `json:"content"`            // The suggestion text
+	Confidence  float64          `json:"confidence"`         // Confidence 0.0-1.0
+	SourceNodes []string         `json:"source_nodes"`       // Node IDs backing this suggestion
+	Evidence    []SymbolEvidence `json:"evidence,omitempty"` // Symbol evidence (when requested)
 }
 
 // SuggestionType categorizes what kind of advice this is
 type SuggestionType string
 
 const (
-	SuggestionContext SuggestionType = "context"  // "Based on this codebase's patterns..."
-	SuggestionProcess SuggestionType = "process"  // "The typical workflow for this type of change is..."
-	SuggestionConcept SuggestionType = "concept"  // "This relates to the higher-level principle of..."
-	SuggestionRisk    SuggestionType = "risk"     // "Previous attempts at this approach encountered..."
+	SuggestionContext SuggestionType = "context" // "Based on this codebase's patterns..."
+	SuggestionProcess SuggestionType = "process" // "The typical workflow for this type of change is..."
+	SuggestionConcept SuggestionType = "concept" // "This relates to the higher-level principle of..."
+	SuggestionRisk    SuggestionType = "risk"    // "Previous attempts at this approach encountered..."
 )
 
 // RelatedConcept represents a higher-level concept from the hidden layer
 type RelatedConcept struct {
-	NodeID     string  `json:"node_id"`
-	Name       string  `json:"name"`
-	Summary    string  `json:"summary,omitempty"`
-	Layer      int     `json:"layer"`
-	Relevance  float64 `json:"relevance"` // How relevant to the query 0.0-1.0
+	NodeID    string  `json:"node_id"`
+	Name      string  `json:"name"`
+	Summary   string  `json:"summary,omitempty"`
+	Layer     int     `json:"layer"`
+	Relevance float64 `json:"relevance"` // How relevant to the query 0.0-1.0
 }
 
 // SuggestRequest - request for POST /v1/memory/suggest
@@ -496,15 +496,15 @@ type SuggestRequest struct {
 
 // SuggestResponse - response from context-triggered suggestion endpoint
 type SuggestResponse struct {
-	SpaceID         string             `json:"space_id"`
-	Triggers        []ContextTrigger   `json:"triggers,omitempty"`         // What triggered these suggestions
-	Suggestions     []Suggestion       `json:"suggestions"`                // Proactive suggestions
-	Conflicts       []ConflictWarning  `json:"conflicts,omitempty"`        // Potential conflicts with existing knowledge
-	Constraints     []Constraint       `json:"constraints,omitempty"`      // Relevant architectural constraints
-	RelatedConcepts []RelatedConcept   `json:"related_concepts,omitempty"` // Higher-level concepts
-	Confidence       float64            `json:"confidence"`                  // Overall confidence
-	TranslatedIntent string             `json:"translated_intent,omitempty"` // Rewritten query from intent translation (Phase 102)
-	Debug            map[string]any     `json:"debug,omitempty"`
+	SpaceID          string            `json:"space_id"`
+	Triggers         []ContextTrigger  `json:"triggers,omitempty"`          // What triggered these suggestions
+	Suggestions      []Suggestion      `json:"suggestions"`                 // Proactive suggestions
+	Conflicts        []ConflictWarning `json:"conflicts,omitempty"`         // Potential conflicts with existing knowledge
+	Constraints      []Constraint      `json:"constraints,omitempty"`       // Relevant architectural constraints
+	RelatedConcepts  []RelatedConcept  `json:"related_concepts,omitempty"`  // Higher-level concepts
+	Confidence       float64           `json:"confidence"`                  // Overall confidence
+	TranslatedIntent string            `json:"translated_intent,omitempty"` // Rewritten query from intent translation (Phase 102)
+	Debug            map[string]any    `json:"debug,omitempty"`
 }
 
 // ContextTrigger explains what in the context triggered suggestions
@@ -516,21 +516,21 @@ type ContextTrigger struct {
 
 // ConflictWarning indicates a potential conflict with existing knowledge
 type ConflictWarning struct {
-	Severity    string   `json:"severity"`     // low, medium, high
-	Description string   `json:"description"`  // What the conflict is
-	ConflictsWith string `json:"conflicts_with"` // Node ID or pattern that conflicts
-	Evidence    string   `json:"evidence,omitempty"` // Supporting evidence
-	SourceNodes []string `json:"source_nodes"`
+	Severity      string   `json:"severity"`           // low, medium, high
+	Description   string   `json:"description"`        // What the conflict is
+	ConflictsWith string   `json:"conflicts_with"`     // Node ID or pattern that conflicts
+	Evidence      string   `json:"evidence,omitempty"` // Supporting evidence
+	SourceNodes   []string `json:"source_nodes"`
 }
 
 // Constraint represents an architectural constraint that applies to the context
 type Constraint struct {
-	Name        string   `json:"name"`
-	Description string   `json:"description"`
-	ConstraintType string `json:"constraint_type"` // must, must_not, should, should_not
-	Scope       string   `json:"scope,omitempty"` // Where this constraint applies
-	SourceNodes []string `json:"source_nodes"`
-	Confidence  float64  `json:"confidence"`
+	Name           string   `json:"name"`
+	Description    string   `json:"description"`
+	ConstraintType string   `json:"constraint_type"` // must, must_not, should, should_not
+	Scope          string   `json:"scope,omitempty"` // Where this constraint applies
+	SourceNodes    []string `json:"source_nodes"`
+	Confidence     float64  `json:"confidence"`
 }
 
 // Additional suggestion types for context-triggered suggestions
@@ -544,14 +544,19 @@ const (
 // ConsolidateRequest - request for POST /v1/memory/consolidate
 // Triggers hidden layer creation and message passing operations.
 type ConsolidateRequest struct {
-	SpaceID       string `json:"space_id" validate:"required,min=1,max=256"`
+	SpaceID        string `json:"space_id" validate:"required,min=1,max=256"`
 	SkipClustering bool   `json:"skip_clustering,omitempty"` // Skip DBSCAN clustering, only run message passing
-	SkipForward   bool   `json:"skip_forward,omitempty"`    // Skip forward pass
-	SkipBackward  bool   `json:"skip_backward,omitempty"`   // Skip backward pass
+	SkipForward    bool   `json:"skip_forward,omitempty"`    // Skip forward pass
+	SkipBackward   bool   `json:"skip_backward,omitempty"`   // Skip backward pass
 
 	// Dynamic Emergence (Phase 103)
 	EnableDynamicEmergence bool    `json:"enable_dynamic_emergence,omitempty"` // Enable LLM-driven concept naming
 	MinClusterDensity      float64 `json:"min_cluster_density,omitempty"`      // Override min CO_ACTIVATED_WITH weight
+
+	// HIDDEN-CHURN-003: force a full hidden-layer re-cluster even when
+	// HIDDEN_INCREMENTAL_ENABLED is true (the explicit periodic-maintenance path,
+	// `mdemg concepts recluster`). The default consolidation cycle is incremental.
+	FullRecluster bool `json:"full_recluster,omitempty"`
 }
 
 // StepResultAPI is the API-layer mirror of hidden.StepResult.
@@ -565,9 +570,9 @@ type StepResultAPI struct {
 
 // ConsolidateResponse - response from consolidate endpoint
 type ConsolidateResponse struct {
-	SpaceID             string                     `json:"space_id"`
-	Enabled             bool                       `json:"enabled"` // Whether hidden layer is enabled
-	Steps               map[string]*StepResultAPI  `json:"steps,omitempty"` // Dynamic pipeline step results (Phase 46)
+	SpaceID string                    `json:"space_id"`
+	Enabled bool                      `json:"enabled"`         // Whether hidden layer is enabled
+	Steps   map[string]*StepResultAPI `json:"steps,omitempty"` // Dynamic pipeline step results (Phase 46)
 
 	// Core consolidation fields (forward/backward pass, concepts)
 	HiddenNodesCreated  int     `json:"hidden_nodes_created"`
@@ -639,7 +644,7 @@ type ObserveResponse struct {
 	SurpriseScore       float64                  `json:"surprise_score"`
 	SurpriseFactors     map[string]float64       `json:"surprise_factors"`
 	Summary             string                   `json:"summary,omitempty"`
-	DetectedConstraints []DetectedConstraintInfo  `json:"detected_constraints,omitempty"`
+	DetectedConstraints []DetectedConstraintInfo `json:"detected_constraints,omitempty"`
 }
 
 // CorrectRequest - request for POST /v1/conversation/correct
@@ -667,21 +672,21 @@ type CorrectRequest struct {
 type IngestTriggerRequest struct {
 	SpaceID         string   `json:"space_id" validate:"required,min=1,max=256"`
 	Path            string   `json:"path" validate:"required,min=1"`
-	BatchSize       int      `json:"batch_size,omitempty"`       // Items per batch (default: 100)
-	Workers         int      `json:"workers,omitempty"`          // Parallel workers (default: 4)
-	TimeoutSeconds  int      `json:"timeout_seconds,omitempty"`  // HTTP timeout (default: 300)
-	ExtractSymbols  *bool    `json:"extract_symbols,omitempty"`  // Extract code symbols (default: true)
-	Consolidate     *bool    `json:"consolidate,omitempty"`      // Run consolidation after (default: true)
-	IncludeTests    bool     `json:"include_tests,omitempty"`    // Include test files
-	IncludeMarkdown *bool    `json:"include_md,omitempty"`       // Include markdown (default: true)
-	IncludeTS       *bool    `json:"include_ts,omitempty"`       // Include TypeScript/JS (default: true)
-	IncludePython   *bool    `json:"include_py,omitempty"`       // Include Python (default: true)
-	Incremental     bool     `json:"incremental,omitempty"`      // Only changed files
-	SinceCommit     string   `json:"since_commit,omitempty"`     // Git commit for incremental (default: HEAD~1)
-	ArchiveDeleted  *bool    `json:"archive_deleted,omitempty"`  // Archive deleted file nodes (default: true)
-	ExcludeDirs     []string `json:"exclude_dirs,omitempty"`     // Directories to skip
-	Limit           int      `json:"limit,omitempty"`            // Max elements to ingest (0 = no limit)
-	DryRun          bool     `json:"dry_run,omitempty"`          // Preview without ingesting
+	BatchSize       int      `json:"batch_size,omitempty"`      // Items per batch (default: 100)
+	Workers         int      `json:"workers,omitempty"`         // Parallel workers (default: 4)
+	TimeoutSeconds  int      `json:"timeout_seconds,omitempty"` // HTTP timeout (default: 300)
+	ExtractSymbols  *bool    `json:"extract_symbols,omitempty"` // Extract code symbols (default: true)
+	Consolidate     *bool    `json:"consolidate,omitempty"`     // Run consolidation after (default: true)
+	IncludeTests    bool     `json:"include_tests,omitempty"`   // Include test files
+	IncludeMarkdown *bool    `json:"include_md,omitempty"`      // Include markdown (default: true)
+	IncludeTS       *bool    `json:"include_ts,omitempty"`      // Include TypeScript/JS (default: true)
+	IncludePython   *bool    `json:"include_py,omitempty"`      // Include Python (default: true)
+	Incremental     bool     `json:"incremental,omitempty"`     // Only changed files
+	SinceCommit     string   `json:"since_commit,omitempty"`    // Git commit for incremental (default: HEAD~1)
+	ArchiveDeleted  *bool    `json:"archive_deleted,omitempty"` // Archive deleted file nodes (default: true)
+	ExcludeDirs     []string `json:"exclude_dirs,omitempty"`    // Directories to skip
+	Limit           int      `json:"limit,omitempty"`           // Max elements to ingest (0 = no limit)
+	DryRun          bool     `json:"dry_run,omitempty"`         // Preview without ingesting
 }
 
 // IngestTriggerResponse - response from POST /v1/memory/ingest/trigger
@@ -792,15 +797,15 @@ type ResumeResponse struct {
 
 // ConversationObsResult represents a conversation observation in resume/recall responses
 type ConversationObsResult struct {
-	NodeID        string    `json:"node_id"`
-	ObsType       string    `json:"obs_type"`       // decision, learning, preference, error, task, correction, technical_note, insight, context, progress, blocker, context_signal, note, constraint, self_improvement
-	Content       string    `json:"content"`
-	Summary       string    `json:"summary"`
-	SessionID     string    `json:"session_id"`
-	SurpriseScore float64   `json:"surprise_score"` // How novel/surprising (0.0-1.0)
-	Score         float64   `json:"score,omitempty"` // Relevance score (for recall)
-	Tags          []string  `json:"tags,omitempty"`
-	CreatedAt     string    `json:"created_at"`
+	NodeID        string   `json:"node_id"`
+	ObsType       string   `json:"obs_type"` // decision, learning, preference, error, task, correction, technical_note, insight, context, progress, blocker, context_signal, note, constraint, self_improvement
+	Content       string   `json:"content"`
+	Summary       string   `json:"summary"`
+	SessionID     string   `json:"session_id"`
+	SurpriseScore float64  `json:"surprise_score"`  // How novel/surprising (0.0-1.0)
+	Score         float64  `json:"score,omitempty"` // Relevance score (for recall)
+	Tags          []string `json:"tags,omitempty"`
+	CreatedAt     string   `json:"created_at"`
 }
 
 // ConversationThemeResult represents a conversation theme in resume/recall responses
@@ -862,11 +867,11 @@ type RecallResponse struct {
 
 // RecallResult represents a single result from conversation recall
 type RecallResult struct {
-	Type     string  `json:"type"`     // conversation_observation, conversation_theme, emergent_concept
-	NodeID   string  `json:"node_id"`
-	Content  string  `json:"content"`  // For observations: content, for themes/concepts: summary
-	Score    float64 `json:"score"`    // Relevance score (0.0-1.0)
-	Layer    int     `json:"layer"`    // 0 for observations, 1 for themes, 2+ for concepts
+	Type     string         `json:"type"` // conversation_observation, conversation_theme, emergent_concept
+	NodeID   string         `json:"node_id"`
+	Content  string         `json:"content"`            // For observations: content, for themes/concepts: summary
+	Score    float64        `json:"score"`              // Relevance score (0.0-1.0)
+	Layer    int            `json:"layer"`              // 0 for observations, 1 for themes, 2+ for concepts
 	Metadata map[string]any `json:"metadata,omitempty"` // Additional metadata
 }
 
@@ -884,9 +889,9 @@ type FreshnessResponse struct {
 // ContextRetrieveRequest extends RetrieveRequest with conversation context options
 // Used internally when blending conversation knowledge into retrieval.
 type ContextRetrieveRequest struct {
-	RetrieveRequest                       // Embedded base request
-	BlendConversationContext bool         `json:"blend_conversation_context,omitempty"` // Enable conversation blending
-	ConversationBoostFactor  float64      `json:"conversation_boost_factor,omitempty"`  // Boost factor for conversation-supported results (default: 1.2)
+	RetrieveRequest                  // Embedded base request
+	BlendConversationContext bool    `json:"blend_conversation_context,omitempty"` // Enable conversation blending
+	ConversationBoostFactor  float64 `json:"conversation_boost_factor,omitempty"`  // Boost factor for conversation-supported results (default: 1.2)
 }
 
 // =============================================================================
@@ -1031,10 +1036,10 @@ type SpacePruneResult struct {
 
 // AdminSpacePruneResponse - response from POST /v1/admin/spaces/prune
 type AdminSpacePruneResponse struct {
-	DryRun            bool              `json:"dry_run"`
-	SpacesPruned      int               `json:"spaces_pruned"`
-	SpacesSkipped     int               `json:"spaces_skipped"`
-	TotalNodesDeleted int               `json:"total_nodes_deleted"`
+	DryRun            bool               `json:"dry_run"`
+	SpacesPruned      int                `json:"spaces_pruned"`
+	SpacesSkipped     int                `json:"spaces_skipped"`
+	TotalNodesDeleted int                `json:"total_nodes_deleted"`
 	Results           []SpacePruneResult `json:"results"`
 }
 
@@ -1147,20 +1152,20 @@ type GraphVizNode struct {
 	ID            string  `json:"id"`
 	Title         string  `json:"title"`
 	SubTitle      string  `json:"subTitle"`
-	MainStat      string `json:"mainStat"`
-	SecondaryStat string `json:"secondaryStat"`
+	MainStat      string  `json:"mainStat"`
+	SecondaryStat string  `json:"secondaryStat"`
 	Color         string  `json:"color"`
 	NodeRadius    float64 `json:"nodeRadius,omitempty"`
 	// detail__* fields shown in click context menu
-	DetailRoleType    string `json:"detail__role_type"`
-	DetailObsType     string `json:"detail__obs_type"`
-	DetailTags        string `json:"detail__tags"`
-	DetailStability   string `json:"detail__stability"`
-	DetailSurprise    string `json:"detail__surprise"`
-	DetailCreatedAt   string `json:"detail__created_at"`
-	DetailLastActive  string `json:"detail__last_activated"`
-	DetailEdgeCount   string `json:"detail__edge_count"`
-	DetailStatus      string `json:"detail__status"`
+	DetailRoleType   string `json:"detail__role_type"`
+	DetailObsType    string `json:"detail__obs_type"`
+	DetailTags       string `json:"detail__tags"`
+	DetailStability  string `json:"detail__stability"`
+	DetailSurprise   string `json:"detail__surprise"`
+	DetailCreatedAt  string `json:"detail__created_at"`
+	DetailLastActive string `json:"detail__last_activated"`
+	DetailEdgeCount  string `json:"detail__edge_count"`
+	DetailStatus     string `json:"detail__status"`
 }
 
 // GraphVizEdge — an edge for Grafana Node Graph visualization (GAP-20)

@@ -236,6 +236,8 @@ type Config struct {
 	HiddenThemeIdentitySimThreshold     float64 // HIDDEN_THEME_IDENTITY_SIM_THRESHOLD — centroid cosine floor for matching a cluster to an EXISTING theme (in-place update, stable node identity) instead of recreating (default: 0.90; HIDDEN-CHURN-001)
 	HiddenPatternIdentitySimThreshold   float64 // HIDDEN_PATTERN_IDENTITY_SIM_THRESHOLD — centroid cosine floor for the FALLBACK match of a cluster to an EXISTING L1 hidden pattern when member-overlap finds none (in-place update, stable node identity) instead of recreating (default: 0.90; HIDDEN-CHURN-002)
 	HiddenPatternMemberJaccardThreshold float64 // HIDDEN_PATTERN_MEMBER_JACCARD_THRESHOLD — PRIMARY identity match: Jaccard overlap of a cluster's L0 member set with an existing pattern's members. Stable under KMeans repartition jitter (centroid-cosine alone left ~28% churn/cycle). 0 disables member matching (centroid-only). (default: 0.5; HIDDEN-CHURN-002)
+	HiddenIncrementalEnabled            bool    // HIDDEN_INCREMENTAL_ENABLED — default consolidation hidden step assigns only ORPHAN L0 nodes to existing patterns (incremental), never re-clustering stable patterns → ~0% identity churn + lower CPU; false = fall back to the CHURN-002 full re-cluster (default: true; HIDDEN-CHURN-003)
+	HiddenIncrementalAssignSimThreshold float64 // HIDDEN_INCREMENTAL_ASSIGN_SIM_THRESHOLD — cosine floor for assigning an orphan L0 node to an existing pattern (below it the orphan clusters into a new pattern instead) (default: 0.80; HIDDEN-CHURN-003)
 	ConsolidateTimeoutMs                int     // CONSOLIDATE_TIMEOUT_MS — server-side deadline for a full /v1/memory/consolidate cycle, DETACHED from caller cancellation so a client timeout can't abort it mid-cycle (re-clustering 50k+ L0 nodes takes ~10 min; default: 1800000 = 30 min, floor 60000; HIDDEN-CHURN-002)
 	HiddenThemeTargetRatio              float64 // HIDDEN_THEME_TARGET_RATIO — themes-per-observation ratio for KMeans k (default: 0.1 = ceil(n/10); was an inline equation; HIDDEN-CHURN-001 PR-B)
 	HiddenThemeAssignSimThreshold       float64 // HIDDEN_THEME_ASSIGN_SIM_THRESHOLD — cosine floor for density-assigning NOISE observations to their nearest theme (edges only, no new themes; 0 disables; default: 0.70; PR-B coverage retune)
@@ -2214,6 +2216,10 @@ func FromEnv() (Config, error) {
 		return Config{}, err
 	}
 	hiddenPatternMemberJaccardThreshold, err := atof("HIDDEN_PATTERN_MEMBER_JACCARD_THRESHOLD", 0.5)
+	if err != nil {
+		return Config{}, err
+	}
+	hiddenIncrementalAssignSimThreshold, err := atof("HIDDEN_INCREMENTAL_ASSIGN_SIM_THRESHOLD", 0.80)
 	if err != nil {
 		return Config{}, err
 	}
@@ -4767,6 +4773,8 @@ func FromEnv() (Config, error) {
 		HiddenThemeIdentitySimThreshold:     hiddenThemeIdentitySimThreshold,
 		HiddenPatternIdentitySimThreshold:   hiddenPatternIdentitySimThreshold,
 		HiddenPatternMemberJaccardThreshold: hiddenPatternMemberJaccardThreshold,
+		HiddenIncrementalEnabled:            getBool("HIDDEN_INCREMENTAL_ENABLED", true),
+		HiddenIncrementalAssignSimThreshold: hiddenIncrementalAssignSimThreshold,
 		ConsolidateTimeoutMs:                consolidateTimeoutMs,
 		HiddenThemeTargetRatio:              hiddenThemeTargetRatio,
 		HiddenThemeAssignSimThreshold:       hiddenThemeAssignSimThreshold,

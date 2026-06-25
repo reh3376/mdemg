@@ -479,3 +479,82 @@ func TestHiddenPatternIdentityStable(t *testing.T) {
 		t.Errorf("HIDDEN-CHURN-002 regression: %d/%d run-1 hidden node_ids survived the second cycle (expected all — destroy-recreate churn detected)", survived, len(idsRun1))
 	}
 }
+
+// TestHiddenIncrementalAssignment is the HIDDEN-CHURN-003 regression test: after
+// patterns form, ingesting MORE base nodes and re-consolidating (the default
+// incremental path) must assign the new orphans to existing/new patterns WITHOUT
+// destroying any existing pattern — every original node_id survives (~0% churn)
+// and the pattern count never drops (no deletes on the incremental path).
+func TestHiddenIncrementalAssignment(t *testing.T) {
+	RequireServiceReady(t)
+
+	cfg := GetTestConfig()
+	client := NewTestHTTPClient()
+	driver := SetupTestNeo4j(t)
+
+	spaceID := GenerateTestSpaceID("churn3")
+	t.Cleanup(func() { CleanupSpaceWithTest(t, driver, spaceID) })
+	ctx := context.Background()
+
+	ingest := func(start, n int) {
+		for i := start; i < start+n; i++ {
+			embedding := CreateControlledEmbedding(DefaultEmbeddingDims, 0.95-float64(i)*0.004, 1)
+			body, _ := json.Marshal(map[string]any{
+				"space_id": spaceID, "timestamp": time.Now().UTC().Format(time.RFC3339),
+				"source": "test", "name": fmt.Sprintf("Inc Base %d", i),
+				"content": fmt.Sprintf("package inc // node %d", i),
+				"path":    fmt.Sprintf("/test/inc/mod%d.go", i), "embedding": embedding,
+			})
+			resp, err := client.Post(cfg.MDEMGEndpoint+"/v1/memory/ingest", "application/json", bytes.NewReader(body))
+			if err != nil {
+				t.Fatalf("ingest %d: %v", i, err)
+			}
+			resp.Body.Close()
+			if resp.StatusCode != http.StatusOK {
+				t.Fatalf("ingest %d: status %d", i, resp.StatusCode)
+			}
+		}
+	}
+	consolidate := func() {
+		body, _ := json.Marshal(map[string]any{"space_id": spaceID})
+		resp, err := client.Post(cfg.MDEMGEndpoint+"/v1/memory/consolidate", "application/json", bytes.NewReader(body))
+		if err != nil {
+			t.Fatalf("consolidate: %v", err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("consolidate: status %d", resp.StatusCode)
+		}
+	}
+
+	ingest(0, 12)
+	consolidate()
+	idsBefore := hiddenNodeIDs(t, driver, ctx, spaceID)
+	if len(idsBefore) == 0 {
+		t.Skip("no hidden patterns formed (disabled / below min_samples)")
+	}
+	t.Logf("after first consolidate: %d patterns", len(idsBefore))
+
+	// Add more base nodes, then incremental re-consolidate.
+	ingest(12, 12)
+	consolidate()
+	idsAfter := hiddenNodeIDs(t, driver, ctx, spaceID)
+	t.Logf("after incremental consolidate: %d patterns", len(idsAfter))
+
+	afterSet := make(map[string]bool, len(idsAfter))
+	for _, id := range idsAfter {
+		afterSet[id] = true
+	}
+	survived := 0
+	for _, id := range idsBefore {
+		if afterSet[id] {
+			survived++
+		}
+	}
+	if survived != len(idsBefore) {
+		t.Errorf("HIDDEN-CHURN-003 regression: %d/%d original patterns survived incremental re-consolidate (expected ALL — incremental must never destroy existing patterns)", survived, len(idsBefore))
+	}
+	if len(idsAfter) < len(idsBefore) {
+		t.Errorf("incremental path must not reduce pattern count (no deletes): before=%d after=%d", len(idsBefore), len(idsAfter))
+	}
+}

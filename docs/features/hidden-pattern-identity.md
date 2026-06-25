@@ -1,4 +1,4 @@
-# Hidden-Pattern Identity Stability (HIDDEN-CHURN-002)
+# Hidden-Pattern Identity Stability (HIDDEN-CHURN-002 + 003)
 
 ## Why
 
@@ -46,13 +46,16 @@ Operator-transparent — the fix is in the consolidation write path. Tunables (a
 - Identity churn per cycle: **100% (pre-fix) → ~25%** (75% of patterns survive in place across consecutive cycles — live-measured 3093/4144).
 - Total-node gauge oscillation: **±2,676 → ±780**, converging.
 
-## Open defect — residual ~25% churn MUST be remedied (HIDDEN-CHURN-003)
+## Residual fully remedied — incremental clustering (HIDDEN-CHURN-003)
 
-⚠️ **This sprint is a PARTIAL fix.** Identity is stable for ~75% of patterns per cycle, not ~95% — the remaining ~25% per-cycle churn is an **open defect that must be fully remedied (HIDDEN-CHURN-003), not an accepted limitation.** Every cycle it still orphans ~25% of the reinforcement/abstraction edges referencing the churned patterns. The residual is **structural**, not a matching-threshold issue (raising the Jaccard/cosine floors does not help — the clusters genuinely differ between cycles):
+CHURN-002 left ~25% per-cycle churn because the hidden step **re-clustered all ~52k L0 nodes from scratch every cycle** (KMeans jitter + non-deterministic `RECLASS_ENABLED` reclassification reshuffled membership). **HIDDEN-CHURN-003 closes it** with **incremental clustering** (default; `HIDDEN_INCREMENTAL_ENABLED=true`):
 
-1. **Non-deterministic LLM reclassification.** `ReclassifyOversizedCategories` (`RECLASS_ENABLED=true`) calls the LLM to re-split oversized categories every cycle; its output varies, so the category→cluster structure of large categories changes run-to-run and members reshuffle.
-2. **Full re-clustering of a growing L0 set.** Every cycle re-clusters all ~52k+ L0 nodes from scratch; KMeans assignments near cluster boundaries flip as new observations are ingested.
+- The consolidation hidden step (`IncrementalHiddenNodes`) fetches only **orphan** L0 nodes (no `GENERALIZES`→pattern edge), assigns each to its nearest existing pattern (`nearestPatternByCentroid`, cosine ≥ `HIDDEN_INCREMENTAL_ASSIGN_SIM_THRESHOLD`, default 0.80) with a `GENERALIZES` edge + incremental-mean centroid update, and clusters only the **unassigned remainder** into new CUIDv2 patterns.
+- **Existing patterns are never destroyed or re-clustered** → node identity is preserved.
+- Full re-cluster (the CHURN-002 path) is retained as an explicit operator command: `mdemg concepts recluster --space-id <id>` (or the `full_recluster` consolidate field).
 
-Closing this to ~95% requires **incremental clustering** — assign only new/changed L0 nodes to existing patterns and leave stable patterns untouched — and/or deterministic/cached reclassification. That is an architectural change tracked as **HIDDEN-CHURN-003**.
+**Live Tier-3 result (mdemg-dev):** **100% identity survival** across consecutive cycles (4484/4484 — vs CHURN-002's 75%); patterns only **added**, never destroyed (4484→4758). Steady-state cycle wall-time **~10s** (82 orphans) vs the ~360s full re-cluster — the per-cycle Neo4j CPU cost drops with it.
 
-See `docs/development/hidden-churn-002/` for the sprint plan + verification.
+**Known trade-off:** incremental-only clustering lets pattern count grow slowly (no periodic re-cluster on the auto path); the explicit `concepts recluster` command is the quality-maintenance escape hatch, and split/merge maintenance is a possible future refinement. Operator can fall back to the full path with `HIDDEN_INCREMENTAL_ENABLED=false`.
+
+See `docs/development/hidden-churn-002/` and `docs/development/hidden-churn-003/` for sprint plans + verification.
