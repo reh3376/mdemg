@@ -34,13 +34,16 @@ func (s *Server) handleFeatures(w http.ResponseWriter, r *http.Request) {
 		s.featurePluginManager(),
 		// Config-only services (no Start/Stop)
 		s.featureConfigOnly("jiminy", s.jiminySvc != nil, "jiminy.enabled"),
+		// DASHBOARD-FIXES-001: populate config_key where a real enable flag exists.
+		// learning/retrieval/conversation are always-on core services with no
+		// enable flag, so their config_key stays empty (the UI shows "—") honestly.
 		s.featureConfigOnly("learning", s.learner != nil, ""),
 		s.featureConfigOnly("retrieval", s.retriever != nil, ""),
-		s.featureConfigOnly("embeddings", s.embedder != nil, ""),
-		s.featureConfigOnly("anomaly_detection", s.anomalyDetector != nil, ""),
+		s.featureConfigOnly("embeddings", s.embedder != nil, "EMBEDDING_PROVIDER"),
+		s.featureConfigOnly("anomaly_detection", s.anomalyDetector != nil, "ANOMALY_DETECTION_ENABLED"),
 		s.featureConfigOnly("conversation", s.conversationSvc != nil, ""),
-		s.featureConfigOnly("hidden_layer", s.hiddenLayer != nil, ""),
-		s.featureConfigOnly("scraper", s.scraperSvc != nil, ""),
+		s.featureConfigOnly("hidden_layer", s.hiddenLayer != nil, "HIDDEN_LAYER_ENABLED"),
+		s.featureConfigOnly("scraper", s.scraperSvc != nil, "SCRAPER_ENABLED"),
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{"features": features})
