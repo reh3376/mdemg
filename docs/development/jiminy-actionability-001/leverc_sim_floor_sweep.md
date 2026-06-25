@@ -15,6 +15,8 @@ JIMINY_SURFACE_ACTIONABLE_WEIGHT=1.5             # rank actionables a touch high
 
 **Live-measured (6 contexts): 25% actionable** (9 constraint / 36), 75% relevant context (13 pattern + 14 learning). Per-query 0–40%, varying with context (no padding to a target). **Relevance: every surfaced item was on-topic** — e.g. the "TSDB migration / bump schema version" context surfaced 2 TimescaleDB/schema constraints + patterns/learnings about `003_metric_types.sql`, `tsdb_schema_meta`, and schema-version tracking. This is the intended balance: the highly-relevant constraints (floor 0.70) surface via the modest quota, alongside relevant context.
 
+**Verified across 6 additional fresh contexts** (Docker deploy, RRF tuning, LLM timeout, Prometheus/Grafana, Hebbian pruning, embedding provider): composition stays relevance-driven — per-context 0–50% actionable (14% overall), **0% where no ≥0.70 constraint exists (no padding)**, and surfaced items on-topic (e.g. Hebbian-pruning→EdgePruner/CO_ACTIVATED_WITH-decay/MAINT-LIVE-001; LLM-timeout→SME-synthesis/GUIDANCE-SYNTH-001). The config surfaces what is relevant, not a fixed number.
+
 **Tune knobs:** raise `MIN_ACTIONABLE_FRACTION` for more actionable weight; lower `SIM_FLOOR` (toward 0.6) to admit more constraints; add a `MAX_ABSTRACTION_FRACTION` cap to bound context.
 
 ---
