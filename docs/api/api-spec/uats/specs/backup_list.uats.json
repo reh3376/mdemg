@@ -14,13 +14,13 @@
   "metadata": {
     "author": "reh3376",
     "created": "2026-02-07",
-    "description": "Validates GET /v1/backup/list returns backup list when enabled",
+    "description": "Validates GET /v1/backup/list returns backup list when enabled, with the item fields the UI depends on (DASHBOARD-FIXES-001: created_at, size_bytes, spaces, status)",
     "test_type": "contract",
     "priority": "medium"
   },
   "config": {
     "timeout_ms": 10000,
-    "sha256": "359eca1ae64660834bf2e3da19b30a431ceab7ebfcb507306905eda3766db375",
+    "sha256": "161df4ee81d16609e4162f6ded339731ec3d9b088e190f161a4b7df52868fa49",
     "tags": [
       "backup_required"
     ]
@@ -40,6 +40,26 @@
         "path": "$.count",
         "op": "type_is",
         "expected": "number"
+      },
+      {
+        "path": "$.backups[0].created_at",
+        "op": "type_is",
+        "expected": "string"
+      },
+      {
+        "path": "$.backups[0].size_bytes",
+        "op": "type_is",
+        "expected": "number"
+      },
+      {
+        "path": "$.backups[0].spaces",
+        "op": "type_is",
+        "expected": "array"
+      },
+      {
+        "path": "$.backups[0].status",
+        "op": "equals",
+        "expected": "completed"
       }
     ]
   }

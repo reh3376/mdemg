@@ -150,9 +150,9 @@ function backupTable(backups) {
         const id = b.backup_id || b.id || '—';
         const shortId = id.length > 12 ? id.slice(0, 12) + '…' : id;
         const type = b.type || '—';
-        const space = b.space_id || b.space_ids?.join(', ') || '—';
-        const created = b.created ? new Date(b.created).toLocaleString() : '—';
-        const size = b.size ? formatSize(b.size) : '—';
+        const space = b.spaces?.join(', ') || b.space_id || b.space_ids?.join(', ') || '—';
+        const created = b.created_at ? new Date(b.created_at).toLocaleString() : '—';
+        const size = b.size_bytes ? formatSize(b.size_bytes) : '—';
         const status = b.status || 'unknown';
         const typeCls = TYPE_BADGES[type] || 'badge-default';
         const statusCls = STATUS_BADGES[status] || 'badge-default';
@@ -189,7 +189,7 @@ function restoreForm(backups) {
     const select = h('select', { className: 'config-input', style: { width: '300px' } },
         ...completed.map(b => {
             const id = b.backup_id || b.id;
-            const label = `${id.slice(0, 12)}… (${b.type || '?'}, ${b.created ? new Date(b.created).toLocaleDateString() : '?'})`;
+            const label = `${id.slice(0, 12)}… (${b.type || '?'}, ${b.created_at ? new Date(b.created_at).toLocaleDateString() : '?'})`;
             return h('option', { value: id }, label);
         }),
     );
