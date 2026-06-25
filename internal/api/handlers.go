@@ -1633,6 +1633,11 @@ func (s *Server) handleConsolidate(w http.ResponseWriter, r *http.Request) {
 	// abort the cycle; bound it with a generous server-side deadline instead.
 	consolCtx, cancelConsol := context.WithTimeout(context.WithoutCancel(r.Context()), s.consolidateTimeout())
 	defer cancelConsol()
+	// HIDDEN-CHURN-003: explicit full re-cluster override (else the hidden step
+	// runs the default incremental path when HIDDEN_INCREMENTAL_ENABLED=true).
+	if req.FullRecluster {
+		consolCtx = hidden.WithFullRecluster(consolCtx)
+	}
 
 	// Step 1: Run node-creation pipeline (hidden, concern, config, comparison, temporal, ui, constraint)
 	if !req.SkipClustering {

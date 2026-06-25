@@ -15,6 +15,7 @@ package hidden
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
@@ -36,6 +37,146 @@ func (s *Service) hiddenPatternMemberJaccardThreshold() float64 {
 		return s.cfg.HiddenPatternMemberJaccardThreshold
 	}
 	return 0.5
+}
+
+// hiddenIncrementalAssignThreshold resolves the cosine floor for assigning an
+// orphan L0 node to an existing pattern in the incremental path
+// (HIDDEN_INCREMENTAL_ASSIGN_SIM_THRESHOLD, default 0.80). Below it, the orphan
+// is left for the new-pattern clustering step rather than forced into a
+// poorly-matching pattern.
+func (s *Service) hiddenIncrementalAssignThreshold() float64 {
+	if s.cfg.HiddenIncrementalAssignSimThreshold > 0 {
+		return s.cfg.HiddenIncrementalAssignSimThreshold
+	}
+	return 0.80
+}
+
+// assignOrphansToPatterns is HIDDEN-CHURN-003's incremental core: each orphan L0
+// node is attached to its nearest existing pattern (cosine ≥ threshold) via a
+// GENERALIZES edge, and that pattern's centroid is updated by incremental mean.
+// Existing patterns are NEVER destroyed or re-clustered — only extended — so
+// their node_ids (and everything referencing them) survive the cycle. Orphans
+// that clear no pattern are RETURNED for the caller to cluster into new
+// patterns. Mirrors assignNoiseToThemes (HIDDEN-CHURN-001 PR-B) for the L1 layer.
+func (s *Service) assignOrphansToPatterns(ctx context.Context, spaceID string, orphans []BaseNode, refs []hiddenPatternRef, threshold float64) (assigned int, unassigned []BaseNode, err error) {
+	if len(refs) == 0 {
+		return 0, orphans, nil // no patterns yet — everything clusters fresh
+	}
+
+	type assignment struct{ obsID, patternID string }
+	var pairs []assignment
+	// Per-pattern accumulation for the incremental-mean centroid update.
+	sums := map[string][]float64{}
+	counts := map[string]int{}
+	refByID := make(map[string]*hiddenPatternRef, len(refs))
+	for i := range refs {
+		refByID[refs[i].NodeID] = &refs[i]
+	}
+
+	for _, o := range orphans {
+		if len(o.Embedding) == 0 {
+			continue
+		}
+		best, bestSim := "", threshold
+		for _, r := range refs {
+			if len(r.Centroid) == 0 {
+				continue
+			}
+			if sim := cosineSimilarity(o.Embedding, r.Centroid); sim >= bestSim {
+				best, bestSim = r.NodeID, sim
+			}
+		}
+		if best == "" {
+			unassigned = append(unassigned, o)
+			continue
+		}
+		pairs = append(pairs, assignment{o.NodeID, best})
+		if sums[best] == nil {
+			sums[best] = make([]float64, len(o.Embedding))
+		}
+		for i, v := range o.Embedding {
+			sums[best][i] += v
+		}
+		counts[best]++
+	}
+
+	if len(pairs) == 0 {
+		return 0, unassigned, nil
+	}
+
+	// 1) Batch-create the GENERALIZES edges (cosine weight, CUIDv2 edge id).
+	rows := make([]map[string]any, len(pairs))
+	for i, p := range pairs {
+		rows[i] = map[string]any{"obsId": p.obsID, "patternId": p.patternID, "edgeId": memberEdgePairs([]string{p.obsID})[0]["edgeId"]}
+	}
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer sess.Close(ctx)
+	out, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, `
+UNWIND $rows AS row
+MATCH (b:MemoryNode {space_id: $spaceId, node_id: row.obsId})
+MATCH (h:HiddenPattern {space_id: $spaceId, node_id: row.patternId})
+WHERE NOT (b)-[:GENERALIZES]->(h)
+WITH b, h, row,
+     CASE WHEN b.embedding IS NOT NULL AND h.embedding IS NOT NULL
+          THEN vector.similarity.cosine(b.embedding, h.embedding)
+          ELSE 0.5 END AS similarity
+CREATE (b)-[:GENERALIZES {
+  space_id: $spaceId, edge_id: row.edgeId,
+  weight: similarity, incremental_assigned: true,
+  created_at: datetime(), updated_at: datetime()
+}]->(h)
+RETURN count(b) AS assigned`, map[string]any{"spaceId": spaceID, "rows": rows})
+		if err != nil {
+			return 0, err
+		}
+		if res.Next(ctx) {
+			n, _ := res.Record().Get("assigned")
+			return asInt(n), res.Err()
+		}
+		return 0, res.Err()
+	})
+	if err != nil {
+		return 0, orphans, fmt.Errorf("assign orphans to patterns: %w", err)
+	}
+	assigned = out.(int)
+
+	// 2) Incremental-mean centroid update for the patterns that gained members:
+	//    new = (old·n + Σnew) / (n + k). Keeps centroids honest without
+	//    re-fetching the full member set.
+	centroidRows := make([]map[string]any, 0, len(sums))
+	for pid, sum := range sums {
+		ref := refByID[pid]
+		if ref == nil || len(ref.Centroid) != len(sum) {
+			continue
+		}
+		n := float64(len(ref.Members))
+		k := float64(counts[pid])
+		newC := make([]float64, len(sum))
+		for i := range sum {
+			newC[i] = (ref.Centroid[i]*n + sum[i]) / (n + k)
+		}
+		centroidRows = append(centroidRows, map[string]any{"patternId": pid, "centroid": toFloat32Slice(newC), "count": int(n + k)})
+	}
+	if len(centroidRows) > 0 {
+		_, cErr := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+			return nil, func() error {
+				_, e := tx.Run(ctx, `
+UNWIND $rows AS row
+MATCH (h:HiddenPattern {space_id: $spaceId, node_id: row.patternId})
+SET h.embedding = row.centroid,
+    h.message_pass_embedding = row.centroid,
+    h.aggregation_count = row.count,
+    h.updated_at = datetime()`, map[string]any{"spaceId": spaceID, "rows": centroidRows})
+				return e
+			}()
+		})
+		if cErr != nil {
+			slog.Warn("assignOrphansToPatterns: centroid update failed", "error", cErr)
+		}
+	}
+
+	return assigned, unassigned, nil
 }
 
 // hiddenPatternRef is an existing L1 pattern available for identity matching. It

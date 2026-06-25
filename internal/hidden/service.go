@@ -494,6 +494,102 @@ func (s *Service) CreateHiddenNodes(ctx context.Context, spaceID string) (int, e
 	return created, nil
 }
 
+// IncrementalHiddenNodes is HIDDEN-CHURN-003's default consolidation hidden step:
+// it assigns only ORPHAN L0 nodes (no GENERALIZES edge) to their nearest existing
+// pattern, and clusters the unassigned remainder into NEW patterns. Existing
+// patterns are NEVER destroyed or re-clustered, so their node_ids (and every
+// reinforcement/abstraction edge referencing them) survive every cycle (~0%
+// churn), and only the small orphan set is clustered (no full-52k-node re-cluster
+// → much lower CPU). Returns (newPatternsCreated, orphansAssigned).
+func (s *Service) IncrementalHiddenNodes(ctx context.Context, spaceID string) (int, int, error) {
+	if !s.cfg.HiddenLayerEnabled {
+		return 0, 0, nil
+	}
+
+	orphans, err := s.fetchOrphanBaseNodes(ctx, spaceID)
+	if err != nil {
+		return 0, 0, fmt.Errorf("fetch orphan base nodes: %w", err)
+	}
+	valid := make([]BaseNode, 0, len(orphans))
+	for _, n := range orphans {
+		if len(n.Embedding) > 0 {
+			valid = append(valid, n)
+		}
+	}
+	if len(valid) == 0 {
+		return 0, 0, nil // nothing new to assign — existing patterns untouched
+	}
+	slog.Info("IncrementalHiddenNodes: orphan L0 nodes", "count", len(valid))
+
+	refs, err := s.listHiddenPatternRefs(ctx, spaceID)
+	if err != nil {
+		return 0, 0, fmt.Errorf("list hidden patterns: %w", err)
+	}
+
+	assigned, unassigned, err := s.assignOrphansToPatterns(ctx, spaceID, valid, refs, s.hiddenIncrementalAssignThreshold())
+	if err != nil {
+		return 0, 0, err
+	}
+
+	existingCount, err := s.countHiddenNodes(ctx, spaceID)
+	if err != nil {
+		return 0, assigned, fmt.Errorf("count existing hidden nodes: %w", err)
+	}
+	created, err := s.clusterNewBaseNodes(ctx, spaceID, unassigned, existingCount)
+	if err != nil {
+		return created, assigned, err
+	}
+
+	slog.Info("IncrementalHiddenNodes complete", "assigned", assigned, "new_patterns", created, "unassigned_clustered", len(unassigned))
+	return created, assigned, nil
+}
+
+// clusterNewBaseNodes clusters a set of base nodes into NEW hidden patterns
+// (classify → KMeans → create with a CUIDv2 id). Create-only: no matching, no
+// delete — used for the orphan remainder that cleared no existing pattern.
+// Reclassification (the non-deterministic LLM step) is intentionally skipped:
+// the remainder is small and reclassification is a churn source.
+func (s *Service) clusterNewBaseNodes(ctx context.Context, spaceID string, nodes []BaseNode, existingCount int) (int, error) {
+	if len(nodes) < s.cfg.HiddenLayerMinSamples {
+		return 0, nil
+	}
+	classes := ClassifyByExtension(nodes)
+	created := 0
+	clusterID := 0
+	for category, classNodes := range classes {
+		if len(classNodes) < s.cfg.HiddenLayerMinSamples {
+			continue
+		}
+		classK := (len(classNodes) + 9) / 10
+		if classK < 1 {
+			classK = 1
+		}
+		labels := KMeansCluster(extractEmbeddings(classNodes), classK, 50)
+		clusters, _ := GroupByCluster(classNodes, labels)
+		for _, members := range clusters {
+			if len(members) < s.cfg.HiddenLayerMinSamples {
+				continue
+			}
+			for _, subMembers := range SplitLargeCluster(members, s.cfg.HiddenLayerMaxClusterSize) {
+				if len(subMembers) < s.cfg.HiddenLayerMinSamples {
+					continue
+				}
+				centroid := ComputeCentroid(extractEmbeddings(subMembers))
+				if centroid == nil {
+					continue
+				}
+				name := fmt.Sprintf("Hidden-%s-%s-%d", category, inferClusterName(subMembers, s.cfg.HiddenLayerPathGroupDepth), existingCount+clusterID)
+				if err := s.createHiddenNodeWithEdges(ctx, spaceID, cuid2.Generate(), name, centroid, subMembers, category, ""); err != nil {
+					return created, fmt.Errorf("create hidden node %s: %w", name, err)
+				}
+				created++
+				clusterID++
+			}
+		}
+	}
+	return created, nil
+}
+
 // extractEmbeddings extracts embeddings from a slice of nodes
 func extractEmbeddings(nodes []BaseNode) [][]float64 {
 	embeddings := make([][]float64, len(nodes))
@@ -585,9 +681,22 @@ RETURN count(h) AS cnt`
 	return result.(int), nil
 }
 
-// fetchAllBaseNodes retrieves ALL L0 base nodes with embeddings for re-clustering.
-// Unlike fetchOrphanBaseNodes, this does not filter by existing GENERALIZES edges.
+// fetchAllBaseNodes retrieves ALL L0 base nodes with embeddings for full
+// re-clustering. Does not filter by existing GENERALIZES edges.
 func (s *Service) fetchAllBaseNodes(ctx context.Context, spaceID string) ([]BaseNode, error) {
+	return s.fetchBaseNodes(ctx, spaceID, false)
+}
+
+// fetchOrphanBaseNodes retrieves only L0 base nodes NOT yet assigned to any L1
+// hidden pattern (no GENERALIZES edge) — the incremental input for
+// HIDDEN-CHURN-003. Clustering only these (a few hundred per cycle) instead of
+// the full ~52k set is what eliminates the per-cycle membership reshuffle that
+// left ~25% identity churn (and drove the full-recluster CPU cost).
+func (s *Service) fetchOrphanBaseNodes(ctx context.Context, spaceID string) ([]BaseNode, error) {
+	return s.fetchBaseNodes(ctx, spaceID, true)
+}
+
+func (s *Service) fetchBaseNodes(ctx context.Context, spaceID string, orphanOnly bool) ([]BaseNode, error) {
 	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer sess.Close(ctx)
 
@@ -597,11 +706,15 @@ func (s *Service) fetchAllBaseNodes(ctx context.Context, spaceID string) ([]Base
 	// across cycles — which is what lets member-overlap / centroid matching find
 	// the same patterns next cycle. Without it, Neo4j's arbitrary scan order
 	// reshuffled members every run and defeated identity matching (~28% churn).
+	orphanFilter := ""
+	if orphanOnly {
+		orphanFilter = "  AND NOT (b)-[:GENERALIZES]->(:HiddenPattern {space_id: $spaceId, layer: 1})\n"
+	}
 	cypher := `
 MATCH (b:MemoryNode {space_id: $spaceId, layer: 0})
 WHERE b.embedding IS NOT NULL
   AND (b.role_type IS NULL OR b.role_type <> 'conversation_observation')
-RETURN b.node_id AS nodeId, b.path AS path, b.embedding AS embedding,
+` + orphanFilter + `RETURN b.node_id AS nodeId, b.path AS path, b.embedding AS embedding,
        coalesce(b.summary, '') AS summary
 ORDER BY b.node_id`
 

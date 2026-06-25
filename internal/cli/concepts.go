@@ -1,13 +1,19 @@
 package cli
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"sort"
 	"strings"
+	"time"
 
 	neo4j "github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"github.com/spf13/cobra"
+
+	"mdemg/internal/config"
 )
 
 // HIDDEN-CHURN-001 PR-B: concept hierarchy grounding tools.
@@ -30,6 +36,60 @@ func newConceptsCmd() *cobra.Command {
 	}
 	cmd.AddCommand(newConceptsRepairCmd())
 	cmd.AddCommand(newConceptsTraceCmd())
+	cmd.AddCommand(newConceptsReclusterCmd())
+	return cmd
+}
+
+// newConceptsReclusterCmd triggers an explicit FULL hidden-layer re-cluster
+// (the CHURN-002 path) via the consolidate endpoint, overriding the default
+// incremental step. HIDDEN-CHURN-003: the auto cycle is incremental (churn-free,
+// orphans-only); this command is the operator escape hatch for periodic
+// quality maintenance (re-clustering all L0 nodes from scratch — expensive).
+func newConceptsReclusterCmd() *cobra.Command {
+	var spaceID string
+	cmd := &cobra.Command{
+		Use:   "recluster",
+		Short: "Force a full hidden-layer re-cluster (explicit maintenance; default cycle is incremental)",
+		Long: `Triggers a FULL re-cluster of the hidden (L1) layer for a space — re-clusters
+all L0 base nodes from scratch (the HIDDEN-CHURN-002 path), overriding the
+default incremental consolidation step (HIDDEN_INCREMENTAL_ENABLED).
+
+This is expensive (the full 52k+ node re-cluster) and re-introduces some
+identity churn; use it for occasional quality maintenance, not routinely.
+
+  mdemg concepts recluster --space-id mdemg-dev`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if spaceID == "" {
+				spaceID = resolveSpaceID(cmd)
+			}
+			if spaceID == "" {
+				return fmt.Errorf("--space-id is required")
+			}
+			endpoint := config.ResolveEndpoint("http://localhost:9999")
+			body, _ := json.Marshal(map[string]any{"space_id": spaceID, "full_recluster": true})
+			client := &http.Client{Timeout: 35 * time.Minute}
+			fmt.Printf("MDEMG Concepts Recluster — full hidden-layer re-cluster\n")
+			fmt.Printf("Space: %s  (this may take ~10+ minutes on large spaces)\n", spaceID)
+			resp, err := client.Post(endpoint+"/v1/memory/consolidate", "application/json", bytes.NewReader(body))
+			if err != nil {
+				return fmt.Errorf("consolidate request: %w", err)
+			}
+			defer func() { _ = resp.Body.Close() }()
+			var result struct {
+				Data struct {
+					HiddenNodesCreated int     `json:"hidden_nodes_created"`
+					DurationMs         float64 `json:"duration_ms"`
+				} `json:"data"`
+			}
+			_ = json.NewDecoder(resp.Body).Decode(&result)
+			if resp.StatusCode != http.StatusOK {
+				return fmt.Errorf("consolidate failed: status %d", resp.StatusCode)
+			}
+			fmt.Printf("Done — hidden patterns created: %d (%.0f ms)\n", result.Data.HiddenNodesCreated, result.Data.DurationMs)
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&spaceID, "space-id", "", "Space to re-cluster (required)")
 	return cmd
 }
 
