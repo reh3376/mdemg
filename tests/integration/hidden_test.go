@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -359,5 +360,122 @@ func countEdgesOfType(t *testing.T, driver neo4j.DriverWithContext, ctx context.
 		return v
 	default:
 		return 0
+	}
+}
+
+// hiddenNodeIDs returns the node_ids of all L1 HiddenPattern nodes in a space.
+func hiddenNodeIDs(t *testing.T, driver neo4j.DriverWithContext, ctx context.Context, spaceID string) []string {
+	t.Helper()
+	sess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, `
+			MATCH (h:HiddenPattern {space_id: $spaceId, layer: 1})
+			RETURN h.node_id AS id`, map[string]any{"spaceId": spaceID})
+		if err != nil {
+			return nil, err
+		}
+		var ids []string
+		for res.Next(ctx) {
+			v, _ := res.Record().Get("id")
+			if s, ok := v.(string); ok && s != "" {
+				ids = append(ids, s)
+			}
+		}
+		return ids, res.Err()
+	})
+	if err != nil {
+		t.Fatalf("Failed to fetch hidden node ids: %v", err)
+	}
+	return result.([]string)
+}
+
+// TestHiddenPatternIdentityStable is the HIDDEN-CHURN-002 regression test:
+// consolidating twice over the SAME base nodes must NOT destroy-and-recreate
+// the L1 hidden patterns. Before the fix, every cycle wiped all hidden nodes
+// and re-created them with fresh randomUUID() ids (the CRITICAL node-count-drop
+// churn). After the fix, ids survive (match-in-place) and are CUIDv2-shaped.
+func TestHiddenPatternIdentityStable(t *testing.T) {
+	RequireServiceReady(t)
+
+	cfg := GetTestConfig()
+	client := NewTestHTTPClient()
+	driver := SetupTestNeo4j(t)
+
+	spaceID := GenerateTestSpaceID("churn2")
+	t.Cleanup(func() { CleanupSpaceWithTest(t, driver, spaceID) })
+
+	ctx := context.Background()
+
+	// Seed a clusterable set: enough same-category (.go) nodes with similar
+	// embeddings to exceed min_samples and form at least one hidden pattern.
+	for i := 0; i < 12; i++ {
+		embedding := CreateControlledEmbedding(DefaultEmbeddingDims, 0.95-float64(i)*0.005, 1)
+		ingestReq := map[string]any{
+			"space_id":  spaceID,
+			"timestamp": time.Now().UTC().Format(time.RFC3339),
+			"source":    "test",
+			"name":      fmt.Sprintf("Churn Base %d", i),
+			"content":   fmt.Sprintf("package churn // base node %d", i),
+			"path":      fmt.Sprintf("/test/churn/mod%d.go", i),
+			"embedding": embedding,
+		}
+		reqBody, _ := json.Marshal(ingestReq)
+		resp, err := client.Post(cfg.MDEMGEndpoint+"/v1/memory/ingest", "application/json", bytes.NewReader(reqBody))
+		if err != nil {
+			t.Fatalf("ingest base node %d: %v", i, err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("ingest node %d: status %d", i, resp.StatusCode)
+		}
+	}
+
+	consolidate := func() {
+		reqBody, _ := json.Marshal(map[string]any{"space_id": spaceID})
+		resp, err := client.Post(cfg.MDEMGEndpoint+"/v1/memory/consolidate", "application/json", bytes.NewReader(reqBody))
+		if err != nil {
+			t.Fatalf("consolidate: %v", err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("consolidate: status %d", resp.StatusCode)
+		}
+	}
+
+	// First cycle.
+	consolidate()
+	idsRun1 := hiddenNodeIDs(t, driver, ctx, spaceID)
+	if len(idsRun1) == 0 {
+		t.Skip("hidden layer produced no patterns (disabled or below min_samples) — nothing to assert")
+	}
+	t.Logf("run 1: %d hidden patterns", len(idsRun1))
+
+	// CUIDv2 shape: no hyphens (a UUID would have them).
+	for _, id := range idsRun1 {
+		if strings.Contains(id, "-") {
+			t.Errorf("hidden node_id %q contains a hyphen — looks like a UUID, not CUIDv2", id)
+		}
+	}
+
+	// Second cycle over identical data.
+	consolidate()
+	idsRun2 := hiddenNodeIDs(t, driver, ctx, spaceID)
+	t.Logf("run 2: %d hidden patterns", len(idsRun2))
+
+	// The core anti-churn assertion: every run-1 id must still exist after
+	// run 2 (matched-in-place), not be replaced by a fresh id.
+	run2Set := make(map[string]bool, len(idsRun2))
+	for _, id := range idsRun2 {
+		run2Set[id] = true
+	}
+	survived := 0
+	for _, id := range idsRun1 {
+		if run2Set[id] {
+			survived++
+		}
+	}
+	if survived != len(idsRun1) {
+		t.Errorf("HIDDEN-CHURN-002 regression: %d/%d run-1 hidden node_ids survived the second cycle (expected all — destroy-recreate churn detected)", survived, len(idsRun1))
 	}
 }
