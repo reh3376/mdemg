@@ -254,7 +254,7 @@
     },
     {
       "title": "Should-Follow Follow Rate",
-      "description": "JIMINY-RELEVANCE-001: follow rate on guidance that SHOULD have been followed — restricted to the ACTIONABLE guidance types (constraint/correction), excluding correctly-ignored advisory abstractions (pattern/learning/concept). This is what the >90% operator goal actually means (the naive follow rate counts correctly-ignored advisory as failures). Computed from guidance_training_rows within the dashboard time range (followed=1.0, partial_compliance=0.5). Certified-gold grounding via HITL-REVIEW-001 review_grades is a documented follow-up. Green ≥0.9 = the goal; red <0.5 = the alert floor.",
+      "description": "JIMINY-RELEVANCE-001: follow rate on guidance that SHOULD have been followed \u2014 restricted to the ACTIONABLE guidance types (constraint/correction), excluding correctly-ignored advisory abstractions (pattern/learning/concept). This is what the >90% operator goal actually means (the naive follow rate counts correctly-ignored advisory as failures). Computed from guidance_training_rows within the dashboard time range (followed=1.0, partial_compliance=0.5). Certified-gold grounding via HITL-REVIEW-001 review_grades is a documented follow-up. Green \u22650.9 = the goal; red <0.5 = the alert floor.",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -983,6 +983,97 @@
           ]
         }
       }
+    },
+    {
+      "title": "Surfaced Actionable Fraction (JIMINY-ACTIONABILITY-001)",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 43
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "targets": [
+        {
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name='mdemg_jiminy_surfaced_actionable_fraction' AND metric_type='gauge' AND space_id='$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "A"
+        },
+        {
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name='mdemg_jiminy_surfaced_abstraction_fraction' AND metric_type='gauge' AND space_id='$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "pointSize": 5,
+            "showPoints": "auto"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "mdemg_jiminy_follow_rate"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Follow Rate"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "mdemg_jiminy_constraint_effectiveness"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Constraint Effectiveness"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "mdemg_jiminy_source_diversity"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Source Diversity"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "lastNotNull",
+            "mean",
+            "min",
+            "max"
+          ]
+        }
+      },
+      "description": "Fraction of the surfaced guidance set that is the actionable class (constraint/correction) vs abstraction (pattern/learning/concept). Lever A moves this; target rises toward the actionable class."
     }
   ],
   "schemaVersion": 39,

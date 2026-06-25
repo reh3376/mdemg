@@ -40,5 +40,20 @@ The audit only inspects *existing* panels — it can't see metrics that have no 
 
 (HIDDEN-CHURN-003's incremental-clustering signals are surfaced via existing gauges; no dedicated gauge added.)
 
-## Phase 2 (improve) — see the sprint plan
-Triage the 7 EMPTY (fix/remove/document) + add panels for the deduped new-metric set. UOBS/UOTS dashboard specs gate the result.
+## Phase 2 (improve) — results
+
+**Re-audit after changes: 143 PASS / 6 EMPTY / 18 SKIP / 0 FAIL** (167 panel-targets; was 139/7/18/0).
+
+**Fixed (dead):**
+- `overview/Request Latency Distribution` — removed the dead `_p50` target (the recorder emits only `_p95`/`_p99`; `_p50` was never written → that series was permanently blank). Panel now renders p95/p99. EMPTY 7→6.
+
+**New panels added (all PASS, data confirmed):**
+- `mdemg-jiminy` → **Surfaced Actionable Fraction** (`mdemg_jiminy_surfaced_actionable_fraction` + `_abstraction_fraction`) — JIMINY-ACTIONABILITY-001.
+- `mdemg-neo4j` → **Null-Weight Abstraction Edges** (`mdemg_neo4j_graph_null_weight_edges`) — HIDDEN-WEIGHT-001 regression guard.
+- `mdemg-neo4j` → **Conversation Coverage Ratio** (`mdemg_neo4j_conversation_coverage_ratio`) — HIDDEN-CHURN-001.
+
+**Documented legit-empty (left as-is):** benchmark history (1 row >24h), ft-training LLM-endpoint/watchdog panels (7 events, none recent), Rate Limit Rejections (0 = healthy), Watchdog Force Triggers (0 = healthy).
+
+**No-producer (out of dashboard scope):** `ft-training/Entropy Health` reads `llm_interactions.quality`, which has **0 non-null** rows — the column has no writer. Left in place; resolving it is a metric-instrumentation task, not a dashboard one (noted as a follow-up).
+
+No UOTS/UOBS spec counts dashboard panels, so the additions introduce no CI drift; the audit harness (17 unit tests) + JSON-validity are the gate.

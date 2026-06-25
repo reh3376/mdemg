@@ -717,6 +717,98 @@
           ]
         }
       }
+    },
+    {
+      "title": "Null-Weight Abstraction Edges (HIDDEN-WEIGHT-001)",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 44
+      },
+      "targets": [
+        {
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name='mdemg_neo4j_graph_null_weight_edges' AND metric_type='gauge' AND space_id='$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "displayName": "CPU %",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 60
+              },
+              {
+                "color": "red",
+                "value": 85
+              }
+            ]
+          }
+        }
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "description": "Count of GENERALIZES/ABSTRACTS_TO edges with a NULL weight. Steady state should be ~0; a rise means the cosine-weight path regressed (point.distance class). Alert: null_weight_abstraction_edges."
+    },
+    {
+      "title": "Conversation Coverage Ratio (HIDDEN-CHURN-001)",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 44
+      },
+      "targets": [
+        {
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name='mdemg_neo4j_conversation_coverage_ratio' AND metric_type='gauge' AND space_id='$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "displayName": "CPU %",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 60
+              },
+              {
+                "color": "red",
+                "value": 85
+              }
+            ]
+          }
+        }
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "description": "Fraction of live conversation observations that are themed (in the hierarchy). Floor alert: low_conversation_coverage (<0.2)."
     }
   ],
   "schemaVersion": 39,

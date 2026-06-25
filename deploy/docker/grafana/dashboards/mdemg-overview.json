@@ -177,11 +177,6 @@
       },
       "targets": [
         {
-          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_http_request_duration_seconds_p50' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
-          "format": "time_series",
-          "refId": "A"
-        },
-        {
           "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_http_request_duration_seconds_p95' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
           "format": "time_series",
           "refId": "B"
