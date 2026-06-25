@@ -299,6 +299,10 @@ type Config struct {
 	JiminySurfaceMaxAbstractionFraction     float64 // JIMINY_SURFACE_MAX_ABSTRACTION_FRACTION — cap the abstraction share of the surfaced set (default: 1.0 = no cap, (0,1])
 	JiminyDirectiveSynthesisEnabled         bool    // JIMINY_DIRECTIVE_SYNTHESIS_ENABLED — Lever B: synthesize abstraction items as imperative directives (default: false)
 	JiminyDirectiveSynthesisMaxPromptTokens int     // JIMINY_DIRECTIVE_SYNTHESIS_MAX_PROMPT_TOKENS — bound on the directive synthesis prompt (default: 3500, floor 1000)
+	// JIMINY-ACTIONABILITY-001 Lever C (Epic 5): guarantee actionable candidates enter the guidance pool.
+	JiminyGuidanceConstraintBiasEnabled bool    // JIMINY_GUIDANCE_CONSTRAINT_BIAS_ENABLED — Lever C: fetch top-K constraint/correction nodes by embedding similarity and merge into the guidance pool (default: false). Addresses the Epic-4 finding that retrieval surfaces no actionable candidates for most contexts.
+	JiminyGuidanceConstraintIncludeTopK int     // JIMINY_GUIDANCE_CONSTRAINT_INCLUDE_TOPK — how many actionable nodes to merge (default: 5)
+	JiminyGuidanceConstraintSimFloor    float64 // JIMINY_GUIDANCE_CONSTRAINT_SIM_FLOOR — cosine (vector-index) similarity floor for a merged actionable node — STABLE [0,1] scale, NOT the RRF score (RRF-SCALE-001-safe). 0 disables the floor. (default: 0.30)
 	// JIMINY-OUTCOME-001 — minimum vector-index cosine similarity for an embedding-based
 	// constraint-code match. Concept-abstracted guidance rarely shares 3+ literal words
 	// with raw constraint text, so keyword matching missed everything and the Neo4j
@@ -2446,6 +2450,17 @@ func FromEnv() (Config, error) {
 	}
 	if jiminyDirectiveSynthesisMaxPromptTokens < 1000 {
 		jiminyDirectiveSynthesisMaxPromptTokens = 1000 // floor
+	}
+	jiminyGuidanceConstraintIncludeTopK, err := atoi("JIMINY_GUIDANCE_CONSTRAINT_INCLUDE_TOPK", 5)
+	if err != nil {
+		return Config{}, err
+	}
+	if jiminyGuidanceConstraintIncludeTopK < 0 {
+		jiminyGuidanceConstraintIncludeTopK = 0
+	}
+	jiminyGuidanceConstraintSimFloor, err := atof("JIMINY_GUIDANCE_CONSTRAINT_SIM_FLOOR", 0.30)
+	if err != nil {
+		return Config{}, err
 	}
 	jiminyMinConfidence, err := atof("JIMINY_MIN_CONFIDENCE", 0.3)
 	if err != nil {
@@ -4808,6 +4823,9 @@ func FromEnv() (Config, error) {
 		JiminySurfaceMaxAbstractionFraction:     jiminySurfaceMaxAbstractionFraction,
 		JiminyDirectiveSynthesisEnabled:         jiminyDirectiveSynthesisEnabled,
 		JiminyDirectiveSynthesisMaxPromptTokens: jiminyDirectiveSynthesisMaxPromptTokens,
+		JiminyGuidanceConstraintBiasEnabled:     getBool("JIMINY_GUIDANCE_CONSTRAINT_BIAS_ENABLED", false),
+		JiminyGuidanceConstraintIncludeTopK:     jiminyGuidanceConstraintIncludeTopK,
+		JiminyGuidanceConstraintSimFloor:        jiminyGuidanceConstraintSimFloor,
 		JiminyMinConfidence:                     jiminyMinConfidence,
 		JiminySignalStrengthWeight:              jiminySignalStrengthWeight,
 		JiminyConstraintCodeSimThreshold:        jiminyConstraintCodeSimThreshold,

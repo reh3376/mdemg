@@ -35,6 +35,15 @@ Levers off vs on, same 6 contexts against mdemg-dev (`docs/development/jiminy-ac
 
 - **Lever B works** — directive synthesis produces imperative narratives ("it is imperative... You MUST clean up... You MUST NOT delete..."). This is the higher-impact lever: it makes guidance actionable in *phrasing* regardless of *type*.
 - **Lever A is mechanically correct but modest** — surfaced actionable fraction 6.7% → 10.5%. It pulls actionables up *where they exist in the candidate pool* but cannot manufacture them; for most contexts retrieval surfaces no actionable candidates.
-- **Finding:** the binding constraint is **upstream retrieval candidate composition**, not the surfacing cut. Biasing retrieval toward actionable nodes (role-scoped boost) is the higher-leverage follow-up — **jiminy-actionability-002**.
+- **Finding:** the binding constraint is **upstream retrieval candidate composition**, not the surfacing cut.
 
-Ships **default-off**; operator recommendation is to enable Lever B. See `docs/development/jiminy-actionability-001/`.
+## Lever C — constraint-inclusion (Epic 5; the lever that works)
+
+Lever C addresses the Epic-4 finding directly: when `JIMINY_GUIDANCE_CONSTRAINT_BIAS_ENABLED=true`, `Guide()` runs a targeted query (`fetchActionableCandidates`) for the top-K `constraint`/`correction` nodes by **embedding cosine similarity** to the context (`vector.similarity.cosine` over the role-filtered set — *not* the RRF score; RRF-SCALE-001-safe) and merges them (dedup by node_id) into the candidate pool. The merged nodes are already correctly typed (the query filters role_type), sidestepping a discovered classification gap: the retrieval adapter drops role_type, so retrieval-sourced items were *all* mis-typed `learning`.
+
+**Config:** `JIMINY_GUIDANCE_CONSTRAINT_BIAS_ENABLED` (false), `JIMINY_GUIDANCE_CONSTRAINT_INCLUDE_TOPK` (5), `JIMINY_GUIDANCE_CONSTRAINT_SIM_FLOOR` (0.30 cosine — raise for tighter relevance).
+
+**Live A/B (controlled, `ab_results.md`):** surfaced **actionable fraction 11.1% → 47.7%** (4.3×), abstraction **88.9% → 52.3%** — **clears the ≤60%-abstraction milestone** Lever A couldn't move. Surfaced constraints are query-relevant. ⚠️ A live-smoke fix was needed mid-sprint: the initial index-scan query (top-50 then role-filter) returned 0 because actionables are ~0.1% of nodes; the role-filtered cosine query fixed it.
+
+## Shipping
+All three levers ship **default-off**. **Operator recommendation: enable Lever C** (the actionable-composition mover) and Lever B (imperative phrasing). Lever A's quota/cap then shapes the now-actionable-rich pool. See `docs/development/jiminy-actionability-001/`.

@@ -6,7 +6,11 @@ Re-derived 2026-06-25. The forward-looking work-list of sprints that are planned
 
 ---
 
-## A. jiminy-actionability-001 — finish the sprint (PARTIAL — shipped 5 of 7 epics)
+## A. jiminy-actionability-001 — ✅ COMPLETE 2026-06-25 (all 7 epics)
+
+Lever C shipped (Epic 5): constraint-inclusion mechanism → controlled live A/B **actionable fraction 11.1%→47.7%** (clears the ≤60%-abstraction milestone Lever A couldn't move). RRF-SCALE-001-safe. A/B harness committed (Epic 1), post.md written (Epic 6). All levers default-off; operator recommendation: enable Lever C + Lever B. See `docs/development/jiminy-actionability-001/{ab_results,leverc_score_audit,post}.md`.
+
+<details><summary>original (was: PARTIAL — shipped 5 of 7 epics)</summary>
 
 The original near-term guidance-surfacing lever. Plan: `docs/development/jiminy-actionability-001/sprint_plan_jiminy_actionability_001.md` (Epics 0–6). Lever A + Lever B + live A/B + docs shipped (PR #475); the rest is outstanding:
 
@@ -14,6 +18,7 @@ The original near-term guidance-surfacing lever. Plan: `docs/development/jiminy-
 - **Epic 4 — complete the binding gate** — tune Lever A/B from observed data; measure follow-rate movement (multi-week or windowed); record a proper `ab_results.md`. As shipped, the verdict was "Lever A insufficient" *without* the tuning pass.
 - **Epic 1 — commit the reusable A/B harness** — currently an ad-hoc `/tmp` script; the plan called for a committed reproducible harness.
 - **Epic 6 — write the missing `post.md`**; reconcile feature-doc name (`jiminy-actionability.md` shipped vs `guidance-actionability.md` planned).
+</details>
 
 ## B. DASHBOARD-FIXES-001 — `:9999/ui` tab correctness (READY, not executed) ← **STARTING NOW**
 
