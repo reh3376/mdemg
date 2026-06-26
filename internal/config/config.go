@@ -222,7 +222,7 @@ type Config struct {
 	IntentProvider  string // INTENT_PROVIDER — LLM provider for intent translation (openai/ollama, default: openai)
 	IntentModel     string // INTENT_MODEL — model for intent translation (default: gpt-4o-mini)
 	IntentMaxTokens int    // INTENT_MAX_TOKENS — max tokens for rewritten query (default: 150)
-	IntentTimeoutMs int    // INTENT_TIMEOUT_MS — timeout for intent translation in ms (default: 2000)
+	IntentTimeoutMs int    // INTENT_TIMEOUT_MS — timeout for intent translation in ms (default: 15000; INTENT-DISABLE-001 raised from 2000 which was below avg local-model latency ~4400ms → guaranteed timeouts. Intent is fail-open so operators MAY set lower for fast-fail, but the default honors the no-tight-timeout rule)
 
 	// Query Classification settings (PROD-READINESS)
 	QueryClassifyEnabled   bool   // QUERY_CLASSIFY_ENABLED — enable LLM query type classification (default: false)
@@ -2182,7 +2182,7 @@ func FromEnv() (Config, error) {
 	if intentMaxTokens < 10 || intentMaxTokens > 500 {
 		return Config{}, errors.New("INTENT_MAX_TOKENS must be in range [10, 500]")
 	}
-	intentTimeoutMs, err := atoi("INTENT_TIMEOUT_MS", 2000)
+	intentTimeoutMs, err := atoi("INTENT_TIMEOUT_MS", 15000)
 	if err != nil {
 		return Config{}, err
 	}
