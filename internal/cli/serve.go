@@ -478,6 +478,12 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 			// HIDDEN-WEIGHT-001: NULL-weight abstraction edges reappearing.
 			rules = append(rules, alert.WeightIntegrityRules(
 				cfg.NullWeightEdgeAlertThreshold)...)
+			// ORPHAN-ALERT-001: orphan count/ratio rules with a min-node
+			// significance floor (1-node test spaces were tripping ratio=1.0)
+			// and deterministic idle-safe aggregation.
+			rules = append(rules, alert.OrphanRules(
+				cfg.OrphanRatioMinNodes, cfg.OrphanRatioThreshold,
+				cfg.OrphanCountThreshold)...)
 			// HIDDEN-CHURN-001 PR-B: conversation coverage below floor.
 			rules = append(rules, alert.CoverageRules(
 				cfg.ConversationCoverageAlertFloor)...)

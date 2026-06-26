@@ -1208,6 +1208,11 @@ type Config struct {
 	// HIDDEN-WEIGHT-001 — abstraction-edge weight integrity.
 	NullWeightEdgeAlertThreshold int // NULL_WEIGHT_EDGE_ALERT_THRESHOLD — alert when NULL-weight GENERALIZES/ABSTRACTS_TO edges exceed this (default: 100; steady state is 0)
 
+	// Orphan alert rules (ORPHAN-ALERT-001)
+	OrphanRatioMinNodes  int     // ORPHAN_RATIO_MIN_NODES — minimum per-space node count for a space to be eligible to fire the orphan alerts; excludes tiny test/scratch spaces (1-node space = ratio 1.0) (default: 50)
+	OrphanRatioThreshold float64 // ORPHAN_RATIO_THRESHOLD — fire High Orphan Ratio when max live-orphan ratio among significant spaces exceeds this (default: 0.10)
+	OrphanCountThreshold int     // ORPHAN_COUNT_THRESHOLD — fire High Orphan Count when max live-orphan count among significant spaces exceeds this (default: 1000; above the accepted historical baseline — ratio rule is the scale-aware primary)
+
 	// MAINT-LIVE-001 — maintenance liveness (only-ever-dry-runs detection).
 	MaintLiveAlertEnabled bool // MAINT_LIVE_ALERT_ENABLED — enable the maintenance_no_live_run rule (default: true)
 	MaintLiveLookbackDays int  // MAINT_LIVE_LOOKBACK_DAYS — window in which at least one live (dry_run=false) maintenance run must appear when any maintenance runs exist (default: 8)
@@ -4574,6 +4579,18 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	orphanRatioMinNodes, err := atoi("ORPHAN_RATIO_MIN_NODES", 50)
+	if err != nil {
+		return Config{}, err
+	}
+	orphanRatioThreshold, err := atof("ORPHAN_RATIO_THRESHOLD", 0.10)
+	if err != nil {
+		return Config{}, err
+	}
+	orphanCountThreshold, err := atoi("ORPHAN_COUNT_THRESHOLD", 1000)
+	if err != nil {
+		return Config{}, err
+	}
 	maintLiveAlertEnabled := getBool("MAINT_LIVE_ALERT_ENABLED", true)
 	maintLiveLookbackDays, err := atoi("MAINT_LIVE_LOOKBACK_DAYS", 8)
 	if err != nil {
@@ -5404,6 +5421,9 @@ func FromEnv() (Config, error) {
 		HookSilentLookbackHours:      hookSilentLookbackHours,
 		HookActivityMinEvents:        hookActivityMinEvents,
 		NullWeightEdgeAlertThreshold: nullWeightEdgeAlertThreshold,
+		OrphanRatioMinNodes:          orphanRatioMinNodes,
+		OrphanRatioThreshold:         orphanRatioThreshold,
+		OrphanCountThreshold:         orphanCountThreshold,
 		MaintLiveAlertEnabled:        maintLiveAlertEnabled,
 		MaintLiveLookbackDays:        maintLiveLookbackDays,
 		JobBackupStalenessHours:      jobBackupStalenessHours,
