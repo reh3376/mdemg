@@ -4149,6 +4149,12 @@ func (s *Server) deriveQueryFingerprint(ctx context.Context, spaceID, queryText 
 	if topK <= 0 {
 		topK = 8
 	}
+	// Attribute the query + catalog-ref embeds done inside derive/getOrBuild
+	// so they record a call_site instead of an empty one (EMBED-CALLSITE-001).
+	ctx = embeddings.WithEmbeddingMeta(ctx, embeddings.EmbeddingMeta{
+		CallSite: "context_fingerprint",
+		SpaceID:  spaceID,
+	})
 	bits, err := s.contextFPCache.derive(ctx, cat, queryText, topK)
 	if err != nil {
 		slog.Warn("context fingerprint derive failed", "space_id", spaceID, "error", err)

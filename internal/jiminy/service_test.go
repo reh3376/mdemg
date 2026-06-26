@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"mdemg/internal/config"
+	"mdemg/internal/embeddings"
 	"mdemg/internal/models"
 )
 
@@ -232,9 +233,53 @@ func TestDeduplicateItems(t *testing.T) {
 	}
 	// No embedder → falls back to exact-match dedup
 	svc := &Service{}
-	result := svc.deduplicateItems(items)
+	result := svc.deduplicateItems(context.Background(), "test-space", items)
 	if len(result) != 2 {
 		t.Errorf("deduplicateItems() = %d items, want 2", len(result))
+	}
+}
+
+// callSiteCapturingEmbedder records the embedding meta seen on each Embed ctx,
+// so a test can assert the dedup path attributes its embeds (EMBED-CALLSITE-001).
+type callSiteCapturingEmbedder struct {
+	seenCallSite string
+	seenSpaceID  string
+}
+
+func (c *callSiteCapturingEmbedder) Embed(ctx context.Context, _ string) ([]float32, error) {
+	if m := embeddings.GetEmbeddingMeta(ctx); m != nil {
+		c.seenCallSite = m.CallSite
+		c.seenSpaceID = m.SpaceID
+	}
+	return []float32{1, 0, 0}, nil
+}
+
+func (c *callSiteCapturingEmbedder) EmbedBatch(_ context.Context, texts []string) ([][]float32, error) {
+	out := make([][]float32, len(texts))
+	for i := range texts {
+		out[i] = []float32{1, 0, 0}
+	}
+	return out, nil
+}
+func (c *callSiteCapturingEmbedder) Name() string    { return "test-capture" }
+func (c *callSiteCapturingEmbedder) Dimensions() int { return 3 }
+
+// TestDeduplicateItems_AttributesCallSite asserts the semantic dedup path
+// attaches call_site="jiminy.dedup" so recorded embeds are not empty-attributed
+// (the EMBED-CALLSITE-001 regression guard).
+func TestDeduplicateItems_AttributesCallSite(t *testing.T) {
+	emb := &callSiteCapturingEmbedder{}
+	svc := &Service{embedder: emb}
+	items := []GuidanceItem{
+		{Type: GuidanceConstraint, Content: "Rule A", Confidence: 0.9},
+		{Type: GuidancePattern, Content: "Rule B", Confidence: 0.7},
+	}
+	_ = svc.deduplicateItems(context.Background(), "dedup-space", items)
+	if emb.seenCallSite != "jiminy.dedup" {
+		t.Errorf("dedup embed call_site = %q, want %q", emb.seenCallSite, "jiminy.dedup")
+	}
+	if emb.seenSpaceID != "dedup-space" {
+		t.Errorf("dedup embed space_id = %q, want %q", emb.seenSpaceID, "dedup-space")
 	}
 }
 
