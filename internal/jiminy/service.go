@@ -998,7 +998,7 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 	}
 
 	// Deduplicate by content (semantic if embedder available, exact otherwise)
-	filtered = s.deduplicateItems(filtered)
+	filtered = s.deduplicateItems(ctx, req.SpaceID, filtered)
 
 	// Sort by priority (high > medium > low), then within equal priority by
 	// (1-w)·confidence + w·learned signal strength (DORMANT-CENSUS-001).
@@ -1452,7 +1452,7 @@ func join(parts []string, sep string) string {
 
 // deduplicateItems removes semantically similar items using embedding cosine similarity.
 // Falls back to exact-string dedup if the embedder is unavailable.
-func (s *Service) deduplicateItems(items []GuidanceItem) []GuidanceItem {
+func (s *Service) deduplicateItems(ctx context.Context, spaceID string, items []GuidanceItem) []GuidanceItem {
 	if len(items) <= 1 {
 		return items
 	}
@@ -1469,7 +1469,16 @@ func (s *Service) deduplicateItems(items []GuidanceItem) []GuidanceItem {
 			vec  []float32
 		}
 		var kept []embedded
-		ctx := context.Background()
+		// Attach embedding attribution so these dedup embeds record a
+		// call_site (EMBED-CALLSITE-001) instead of an empty one. Falls back
+		// to the incoming ctx's space if spaceID is blank.
+		if ctx == nil {
+			ctx = context.Background()
+		}
+		ctx = embeddings.WithEmbeddingMeta(ctx, embeddings.EmbeddingMeta{
+			CallSite: "jiminy.dedup",
+			SpaceID:  spaceID,
+		})
 
 		for _, item := range items {
 			vec, err := s.embedder.Embed(ctx, item.Content)
