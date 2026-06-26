@@ -290,12 +290,19 @@ func (a *Assessor) queryGraphMetrics(ctx context.Context, spaceID string, r *Sel
 	defer sess.Close(ctx)
 
 	_, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
-		// Orphan count + total nodes
+		// Orphan count + total nodes.
+		// ORPHAN-ALERT-001: EXCLUDE archived (tombstoned) nodes from BOTH the
+		// total and the orphan count. Tombstones have their edges removed so
+		// they are always zero-degree; counting them (4,457 in mdemg-dev)
+		// inflated OrphanRatio to 6.2% vs the true live 1.0% and polluted the
+		// RSIC health computation. The mdemg_neo4j_graph_orphans gauge already
+		// excludes archived — this aligns RSIC with it. (HIDDEN-CHURN-001 class.)
 		cypher := `
 			MATCH (n:MemoryNode {space_id: $spaceId})
+			WHERE NOT coalesce(n.is_archived, false)
 			WITH count(n) AS total
 			OPTIONAL MATCH (orphan:MemoryNode {space_id: $spaceId})
-			WHERE NOT (orphan)--()
+			WHERE NOT (orphan)--() AND NOT coalesce(orphan.is_archived, false)
 			RETURN total, count(orphan) AS orphans
 		`
 		res, err := tx.Run(ctx, cypher, map[string]any{"spaceId": spaceID})

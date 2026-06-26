@@ -19,8 +19,12 @@ type AlertRule struct {
 	Enabled     bool
 }
 
-// DefaultRules returns the 10 server-native alert rules migrated from Grafana.
+// DefaultRules returns the server-native alert rules migrated from Grafana.
 // SQL queries use raw TimescaleDB queries against the metric_samples table.
+//
+// The two orphan rules (high_orphan_count / high_orphan_ratio) were extracted
+// to OrphanRules() by ORPHAN-ALERT-001 (they needed a config-driven min-node
+// significance floor + deterministic idle-safe aggregation).
 //
 // Removed by TSDB-CONSUME-001:
 //   - high_p95_latency / critical_p99_latency — they read the synthetic
@@ -71,54 +75,11 @@ func DefaultRules() []AlertRule {
 			Operator:  "lt",
 			Enabled:   true,
 		},
-		{
-			ID:          "high_orphan_count",
-			Title:       "MDEMG High Orphan Count",
-			Service:     "graph-health",
-			Severity:    SeverityMedium,
-			Interval:    60 * time.Second,
-			ForDuration: 15 * time.Minute,
-			QuerySQL: `SELECT value FROM metric_samples
-				WHERE metric_name = 'mdemg_neo4j_graph_orphans'
-				  AND metric_type = 'gauge'
-				  AND time > now() - interval '15 minutes'
-				ORDER BY time DESC LIMIT 1`,
-			Threshold: 50,
-			Operator:  "gt",
-			Enabled:   true,
-		},
-		{
-			ID:          "high_orphan_ratio",
-			Title:       "MDEMG High Orphan Ratio",
-			Service:     "graph-health",
-			Severity:    SeverityMedium,
-			Interval:    60 * time.Second,
-			ForDuration: 15 * time.Minute,
-			QuerySQL: `WITH latest AS (
-				  SELECT DISTINCT ON (labels->>'space_id')
-				    labels->>'space_id' AS space_id, value AS orphans
-				  FROM metric_samples
-				  WHERE metric_name = 'mdemg_neo4j_graph_orphans'
-				    AND metric_type = 'gauge'
-				    AND time > now() - interval '15 minutes'
-				  ORDER BY labels->>'space_id', time DESC
-				),
-				nodes AS (
-				  SELECT DISTINCT ON (labels->>'space_id')
-				    labels->>'space_id' AS space_id, value AS total_nodes
-				  FROM metric_samples
-				  WHERE metric_name = 'mdemg_neo4j_graph_nodes'
-				    AND metric_type = 'gauge'
-				    AND time > now() - interval '15 minutes'
-				  ORDER BY labels->>'space_id', time DESC
-				)
-				SELECT CASE WHEN n.total_nodes > 0 THEN l.orphans / n.total_nodes ELSE 0 END AS ratio
-				FROM latest l JOIN nodes n ON l.space_id = n.space_id
-				ORDER BY ratio DESC LIMIT 1`,
-			Threshold: 0.10,
-			Operator:  "gt",
-			Enabled:   true,
-		},
+		// high_orphan_count + high_orphan_ratio extracted to OrphanRules()
+		// (ORPHAN-ALERT-001) — they needed a minimum-node significance floor
+		// (1-node test spaces were tripping ratio=1.0) and deterministic
+		// idle-safe aggregation, so they are config-parameterized + appended
+		// in serve.go like the other parameterized rule groups.
 		{
 			ID:          "neo4j_high_memory",
 			Title:       "MDEMG Neo4j High Memory Usage",
@@ -230,6 +191,97 @@ func DefaultRules() []AlertRule {
 				ORDER BY time DESC LIMIT 1`,
 			Threshold: 0.3,
 			Operator:  "lt",
+			Enabled:   true,
+		},
+	}
+}
+
+// OrphanRules returns the graph-health orphan alerts (ORPHAN-ALERT-001).
+//
+// Replaces the two hardcoded DefaultRules entries (high_orphan_count /
+// high_orphan_ratio) that produced chronic false positives:
+//   - The ratio rule used `ORDER BY ratio DESC LIMIT 1` with NO node floor, so
+//     a 1-node UATS/test space (1 orphan ⇒ ratio 1.0) tripped the 0.10
+//     threshold while the real substrate was healthy (mdemg-dev 693/83034 =
+//     0.8%). The count rule used `ORDER BY time DESC LIMIT 1` — whichever
+//     space's gauge was written last, non-deterministic across spaces.
+//
+// Both rules now join the per-space orphans + nodes gauges, EXCLUDE spaces
+// below `minNodes` (significance floor — tiny scratch/test spaces cannot fire
+// a graph-health alert), and aggregate with COALESCE(MAX(...),0) so they
+// ALWAYS return one non-NULL row (idle-safe; no `ORDER BY … LIMIT 1`, per the
+// TSDB-CONSUME-001 alert-SQL contract). The gauges already exclude archived
+// nodes, so the ratio is live-orphans / live-nodes.
+//
+// minNodes ≤ 0 → 50; ratioThreshold ≤ 0 → 0.10; countThreshold ≤ 0 → 1000
+// (above mdemg-dev's accepted historical-orphan baseline — the ratio rule is
+// the scale-aware primary signal; the count rule catches an absolute spike).
+func OrphanRules(minNodes int, ratioThreshold float64, countThreshold int) []AlertRule {
+	if minNodes <= 0 {
+		minNodes = 50
+	}
+	if ratioThreshold <= 0 {
+		ratioThreshold = 0.10
+	}
+	if countThreshold <= 0 {
+		countThreshold = 1000
+	}
+	// Shared per-space CTEs: latest orphan + node gauge per space, joined and
+	// floor-gated. MAX picks the worst SIGNIFICANT space; COALESCE makes an
+	// empty/idle window return 0 (a non-NULL row) instead of "no rows".
+	cte := `WITH latest AS (
+		  SELECT DISTINCT ON (labels->>'space_id')
+		    labels->>'space_id' AS space_id, value AS orphans
+		  FROM metric_samples
+		  WHERE metric_name = 'mdemg_neo4j_graph_orphans'
+		    AND metric_type = 'gauge'
+		    AND time > now() - interval '15 minutes'
+		  ORDER BY labels->>'space_id', time DESC
+		),
+		nodes AS (
+		  SELECT DISTINCT ON (labels->>'space_id')
+		    labels->>'space_id' AS space_id, value AS total_nodes
+		  FROM metric_samples
+		  WHERE metric_name = 'mdemg_neo4j_graph_nodes'
+		    AND metric_type = 'gauge'
+		    AND time > now() - interval '15 minutes'
+		  ORDER BY labels->>'space_id', time DESC
+		)`
+	return []AlertRule{
+		{
+			ID:    "high_orphan_count",
+			Title: "MDEMG High Orphan Count",
+			// Distinct Service per rule (NOSILENT-001 cooldown-key contract):
+			// low_graph_health already owns "graph-health"; sharing it would
+			// make the two alarms suppress each other.
+			Service:     "graph-health-count",
+			Severity:    SeverityMedium,
+			Interval:    60 * time.Second,
+			ForDuration: 15 * time.Minute,
+			QuerySQL: cte + fmt.Sprintf(`
+				SELECT COALESCE(MAX(
+				  CASE WHEN n.total_nodes >= %d THEN l.orphans ELSE 0 END
+				), 0) AS max_orphans
+				FROM latest l JOIN nodes n ON l.space_id = n.space_id`, minNodes),
+			Threshold: float64(countThreshold),
+			Operator:  "gt",
+			Enabled:   true,
+		},
+		{
+			ID:          "high_orphan_ratio",
+			Title:       "MDEMG High Orphan Ratio",
+			Service:     "graph-health-ratio",
+			Severity:    SeverityMedium,
+			Interval:    60 * time.Second,
+			ForDuration: 15 * time.Minute,
+			QuerySQL: cte + fmt.Sprintf(`
+				SELECT COALESCE(MAX(
+				  CASE WHEN n.total_nodes >= %d AND n.total_nodes > 0
+				    THEN l.orphans / n.total_nodes ELSE 0 END
+				), 0) AS ratio
+				FROM latest l JOIN nodes n ON l.space_id = n.space_id`, minNodes),
+			Threshold: ratioThreshold,
+			Operator:  "gt",
 			Enabled:   true,
 		},
 	}
