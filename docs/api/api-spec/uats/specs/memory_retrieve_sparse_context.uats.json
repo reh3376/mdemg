@@ -9,13 +9,14 @@
       "retrieval",
       "sparse",
       "context-fingerprint",
+      "intent",
       "read"
     ]
   },
   "metadata": {
     "author": "reh3376",
     "created": "2026-06-11",
-    "description": "Response-shape contract for the Phase 14.x retrieval URL params, default-on in production but previously referenced by ZERO specs: ?sparse=, ?sparse_percentile=, ?context=auto, ?strict_context=. CONTRACT: URL params override only fields the body left unset; the response always carries results[] + debug{}; ALL sparse_gate_*/below_threshold_* debug fields are conditional (present only when the gate fires) so clients MUST treat them as optional \u2014 these specs pin types-when-present, never presence. Invalid percentiles are ignored (still 200, default applies), never an error.",
+    "description": "Response-shape contract for the Phase 14.x retrieval URL params, default-on in production but previously referenced by ZERO specs: ?sparse=, ?sparse_percentile=, ?context=auto, ?strict_context=, ?intent= (INTENT-DISABLE-001). CONTRACT: URL params override only fields the body left unset; the response always carries results[] + debug{}; ALL sparse_gate_*/below_threshold_* debug fields are conditional (present only when the gate fires) so clients MUST treat them as optional \u2014 these specs pin types-when-present, never presence. Invalid percentiles are ignored (still 200, default applies), never an error. ?intent=true|false toggles intent translation per-call (recommended OFF per the 120q A/B); either value is a normal 200 with unchanged response shape.",
     "test_type": "contract",
     "priority": "high"
   },
@@ -24,7 +25,7 @@
     "tags": [
       "retrieval"
     ],
-    "sha256": "09c2e6901e3313d6757cbf413af75eb53cebe9c1488247f131fcb44f68311afe"
+    "sha256": "f9e4ba3a8bed8139fb9e356227e262df24770f7285218cc5daa584a63006f137"
   },
   "request": {
     "method": "POST",
@@ -179,6 +180,57 @@
         "body": {
           "space_id": "mdemg-dev",
           "query_text": "backup checksum verification and restore validation",
+          "top_k": 5
+        }
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "path": "$.results",
+            "op": "type_is",
+            "expected": "array"
+          }
+        ]
+      }
+    },
+    {
+      "name": "intent_translation_via_url",
+      "description": "?intent=true forces the per-call intent-translation rewrite (INTENT-DISABLE-001 override; only sets it when the body left translate_intent unset). The rewrite is internal/fail-open \u2014 the response shape is unchanged (results[] + debug{}), always a 200.",
+      "request": {
+        "method": "POST",
+        "path": "/v1/memory/retrieve?intent=true",
+        "body": {
+          "space_id": "mdemg-dev",
+          "query_text": "how do I bump the TSDB schema version when adding a migration",
+          "top_k": 5
+        }
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "path": "$.results",
+            "op": "type_is",
+            "expected": "array"
+          },
+          {
+            "path": "$.debug",
+            "op": "type_is",
+            "expected": "object"
+          }
+        ]
+      }
+    },
+    {
+      "name": "intent_disabled_via_url",
+      "description": "?intent=false (or absent) leaves intent translation off \u2014 the production-recommended default per the 120q A/B; a normal 200 retrieval with no rewrite.",
+      "request": {
+        "method": "POST",
+        "path": "/v1/memory/retrieve?intent=false",
+        "body": {
+          "space_id": "mdemg-dev",
+          "query_text": "how do I bump the TSDB schema version when adding a migration",
           "top_k": 5
         }
       },

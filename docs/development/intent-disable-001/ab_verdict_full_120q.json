@@ -1,0 +1,21 @@
+{
+  "framework": "uvts-ab",
+  "framework_version": "1.0.0",
+  "timestamp": "2026-06-26T03:28:44.590864+00:00",
+  "spec_path": "docs/tests/uvts/specs/lnl_demo_validation.uvts.json",
+  "baseline_grades_path": "/tmp/uvts-intent-off-full/grades.json",
+  "candidate_grades_path": "/tmp/uvts-intent-on-full/grades.json",
+  "verdict": {
+    "verdict": "fail",
+    "criterion": "B mean >= A mean AND no per-question regression > threshold",
+    "regression_threshold_per_question": 0.1,
+    "shared_question_count": 120,
+    "mean_gate_passed": false,
+    "baseline_mean": 0.417,
+    "candidate_mean": 0.407,
+    "mean_delta": -0.01,
+    "regressions": [],
+    "regression_count": 0,
+    "improvement_count": 4
+  }
+}

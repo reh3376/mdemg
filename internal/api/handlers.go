@@ -476,6 +476,17 @@ func (s *Server) handleRetrieve(w http.ResponseWriter, r *http.Request) {
 			req.Category = v
 		}
 	}
+	// `?intent=true|false` URL param override for the intent-translation
+	// rewrite, mirroring the `?sparse=` pattern. Lets the UVTS runner A/B
+	// intent on vs off via --extra-url-params without a JSON-body hook.
+	if !req.TranslateIntent {
+		if v := r.URL.Query().Get("intent"); v != "" {
+			switch strings.ToLower(strings.TrimSpace(v)) {
+			case "true", "1", "yes", "on":
+				req.TranslateIntent = true
+			}
+		}
+	}
 	// Phase 14.2 Epic 4 — `?strict_context=true` URL param falls back when
 	// JSON body did not set it. Operates on QueryContextFingerprint;
 	// gracefully no-ops when fingerprint is empty.
