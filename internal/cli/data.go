@@ -164,6 +164,10 @@ Use --json for structured output suitable for monitoring pipelines.`,
 					}
 					fmt.Printf("%-30s %8d %10.1f %10s %8s\n",
 						t.TaskName, t.TotalRows, t.AvgDailyRate, daysStr, readyStr)
+					// SF-7: surface why a task is not ready (which gate failed).
+					for _, reason := range t.NotReadyReasons {
+						fmt.Printf("%-30s   └─ %s\n", "", reason)
+					}
 				}
 			}
 

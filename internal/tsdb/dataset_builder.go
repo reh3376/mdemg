@@ -93,6 +93,11 @@ type TaskReadiness struct {
 	OldestRecord         time.Time `json:"oldest_record"`
 	NewestRecord         time.Time `json:"newest_record"`
 	Ready                bool      `json:"ready"`
+	// NotReadyReasons lists which readiness gate(s) a task failed when
+	// Ready=false (SF-7, FT-RECURSIVE-001). Empty when Ready=true. Surfaces
+	// the otherwise-invisible cause — e.g. ape.reflect has 70k+ rows but is
+	// Ready=NO because not every row carries a system prompt.
+	NotReadyReasons      []string  `json:"not_ready_reasons,omitempty"`
 	AvgDailyRate         float64   `json:"avg_daily_rate"`
 	ProjectedDaysToReady int       `json:"projected_days_to_ready"`
 }
@@ -465,14 +470,11 @@ func (b *DatasetBuilder) TrainingDataReadiness(ctx context.Context) (*TrainingDa
 		); err != nil {
 			return nil, fmt.Errorf("dataset_builder: training_readiness scan: %w", err)
 		}
-		// Ready if: sufficient rows, low error rate, all have system prompt
-		errorRate := 0.0
-		if t.TotalRows > 0 {
-			errorRate = float64(t.ErrorCount) / float64(t.TotalRows)
-		}
-		t.Ready = t.TotalRows >= b.readinessThreshold &&
-			errorRate < 0.05 &&
-			t.HasSystemPrompt == t.TotalRows
+		// Ready if: sufficient rows, low error rate, all have system prompt.
+		// Each gate is evaluated independently so the failing one(s) can be
+		// surfaced (SF-7) — not just the Ready boolean.
+		t.Ready, t.NotReadyReasons = evaluateReadinessGates(
+			t.TotalRows, t.ErrorCount, t.HasSystemPrompt, b.readinessThreshold)
 
 		// Compute accumulation rate: rows per day over the data span
 		if !t.OldestRecord.IsZero() && !t.NewestRecord.IsZero() && t.TotalRows > 0 {
@@ -490,4 +492,40 @@ func (b *DatasetBuilder) TrainingDataReadiness(ctx context.Context) (*TrainingDa
 	}
 
 	return &TrainingDataReadiness{Tasks: tasks}, rows.Err()
+}
+
+// ReadinessErrorRateThreshold is the maximum row error-rate a task may have and
+// still be training-ready.
+const ReadinessErrorRateThreshold = 0.05
+
+// evaluateReadinessGates applies the three readiness gates independently and
+// returns whether the task is ready plus, when not, a per-gate reason for each
+// failing gate (SF-7, FT-RECURSIVE-001). Pure (no DB) so it is unit-testable.
+func evaluateReadinessGates(totalRows, errorCount, hasSystemPrompt, threshold int) (bool, []string) {
+	errorRate := 0.0
+	if totalRows > 0 {
+		errorRate = float64(errorCount) / float64(totalRows)
+	}
+	rowsOK := totalRows >= threshold
+	errOK := errorRate < ReadinessErrorRateThreshold
+	sysOK := hasSystemPrompt == totalRows
+	if rowsOK && errOK && sysOK {
+		return true, nil
+	}
+	var reasons []string
+	if !rowsOK {
+		reasons = append(reasons,
+			fmt.Sprintf("insufficient_rows: %d < %d", totalRows, threshold))
+	}
+	if !errOK {
+		reasons = append(reasons,
+			fmt.Sprintf("error_rate_high: %.1f%% >= %.1f%% (%d errors / %d rows)",
+				errorRate*100, ReadinessErrorRateThreshold*100, errorCount, totalRows))
+	}
+	if !sysOK {
+		reasons = append(reasons,
+			fmt.Sprintf("missing_system_prompt: %d of %d rows lack a system prompt",
+				totalRows-hasSystemPrompt, totalRows))
+	}
+	return false, reasons
 }
