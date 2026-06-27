@@ -1149,7 +1149,13 @@ func (d *Dispatcher) executeAlertLog(ctx context.Context, spec RSICTaskSpec, mes
 		m.RSICActionTotal(spec.ActionType, "success").Inc()
 	}
 	if d.alertDispatcher != nil {
-		d.alertDispatcher.SendAlert(ctx, "rsic", "RSIC: "+spec.ActionType, message, SeverityMedium)
+		// SF-3 (FT-RECURSIVE-001): distinct Service per action. The dispatcher
+		// cooldown key is (Service, Severity); all six RSIC diagnostic executors
+		// previously shared ("rsic", Medium) and therefore mutually suppressed
+		// each other (the NOSILENT-001 class). A per-action Service gives each
+		// diagnostic its own cooldown so e.g. trigger_training_pipeline and
+		// alert_llm_health no longer mask one another.
+		d.alertDispatcher.SendAlert(ctx, "rsic-"+spec.ActionType, "RSIC: "+spec.ActionType, message, SeverityMedium)
 	}
 	return map[string]any{
 		"alerted":  true,

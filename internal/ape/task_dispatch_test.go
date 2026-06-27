@@ -6,6 +6,44 @@ import (
 	"testing"
 )
 
+// captureAlertDispatcher records the (service,title) of each SendAlert call so
+// the SF-3 contract (distinct Service per RSIC diagnostic action) can be pinned.
+type captureAlertDispatcher struct {
+	services []string
+	titles   []string
+}
+
+func (c *captureAlertDispatcher) SendAlert(_ context.Context, service, title, _ string, _ InsightSeverity) {
+	c.services = append(c.services, service)
+	c.titles = append(c.titles, title)
+}
+
+// TestExecuteAlertLog_DistinctServicePerAction pins SF-3 (FT-RECURSIVE-001):
+// each RSIC diagnostic action must alert under its own Service so the
+// dispatcher's (Service,Severity) cooldown key does not make them suppress
+// each other.
+func TestExecuteAlertLog_DistinctServicePerAction(t *testing.T) {
+	cap := &captureAlertDispatcher{}
+	d := &Dispatcher{alertDispatcher: cap}
+	actions := []string{"trigger_training_pipeline", "alert_llm_health", "alert_embedding_regression"}
+	for _, a := range actions {
+		if _, err := d.executeAlertLog(context.Background(), RSICTaskSpec{ActionType: a}, "msg"); err != nil {
+			t.Fatalf("executeAlertLog(%s): %v", a, err)
+		}
+	}
+	seen := make(map[string]bool)
+	for i, a := range actions {
+		want := "rsic-" + a
+		if cap.services[i] != want {
+			t.Errorf("action %s: service = %q, want %q", a, cap.services[i], want)
+		}
+		if seen[cap.services[i]] {
+			t.Errorf("duplicate service %q — actions would suppress each other", cap.services[i])
+		}
+		seen[cap.services[i]] = true
+	}
+}
+
 func TestExecutors_NilDriverReturnsError(t *testing.T) {
 	d := &Dispatcher{
 		activeTasks: make(map[string]*activeTask),
