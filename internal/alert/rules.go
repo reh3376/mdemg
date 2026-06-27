@@ -287,6 +287,39 @@ func OrphanRules(minNodes int, ratioThreshold float64, countThreshold int) []Ale
 	}
 }
 
+// ReadinessStalenessRule returns the FT-RECURSIVE-001 SF-1 rule: the RSIC
+// training-readiness assessment emits a heartbeat gauge
+// (mdemg_rsic_readiness_assessed) on every SUCCESSFUL run. If a silent query
+// failure stops it, the loop goes dormant with no other signal — this rule
+// fires when the most recent heartbeat is older than stalenessMin minutes.
+//
+// Idle-safe per the TSDB-CONSUME-001 alert-SQL contract: a wide window finds
+// the last sample's real age; COALESCE returns a large staleness when the
+// heartbeat is absent entirely (truly dormant), so the query always returns
+// one non-NULL row. stalenessMin ≤ 0 falls back to 30.
+func ReadinessStalenessRule(stalenessMin int) AlertRule {
+	if stalenessMin <= 0 {
+		stalenessMin = 30
+	}
+	return AlertRule{
+		ID:          "training_readiness_stale",
+		Title:       "MDEMG Training Readiness Assessment Stale",
+		Service:     "ft-readiness",
+		Severity:    SeverityMedium,
+		Interval:    60 * time.Second,
+		ForDuration: 5 * time.Minute,
+		QuerySQL: `SELECT COALESCE(
+			    EXTRACT(EPOCH FROM (now() - MAX(time))) / 60.0, 1000000) AS stale_minutes
+			FROM metric_samples
+			WHERE metric_name = 'mdemg_rsic_readiness_assessed'
+			  AND metric_type = 'gauge'
+			  AND time > now() - interval '24 hours'`,
+		Threshold: float64(stalenessMin),
+		Operator:  "gt",
+		Enabled:   true,
+	}
+}
+
 // GuidanceShouldFollowRules returns the should-follow follow-rate rule
 // (JIMINY-RELEVANCE-001 Epic 4).
 //

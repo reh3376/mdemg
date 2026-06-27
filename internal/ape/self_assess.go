@@ -236,6 +236,11 @@ func (a *Assessor) Assess(ctx context.Context, spaceID string, tier CycleTier) (
 		}
 		if readiness, dErr := a.datasetProvider.TrainingDataReadiness(ctx); dErr == nil {
 			report.TrainingReadiness = readiness
+			// SF-1 heartbeat: only on SUCCESS. A silent query failure stops
+			// this signal and the training_readiness_stale rule fires.
+			if m := metrics.Metrics(); m != nil {
+				m.RSICReadinessAssessed(spaceID).Set(1)
+			}
 		} else {
 			slog.Warn("RSIC assess: training readiness query failed", "error", dErr)
 		}

@@ -484,6 +484,10 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 			rules = append(rules, alert.OrphanRules(
 				cfg.OrphanRatioMinNodes, cfg.OrphanRatioThreshold,
 				cfg.OrphanCountThreshold)...)
+			// FT-RECURSIVE-001 SF-1: alert when the RSIC readiness assessment
+			// heartbeat goes stale (a silent query failure dormant-loops it).
+			rules = append(rules, alert.ReadinessStalenessRule(
+				cfg.FtReadinessStalenessMin))
 			// HIDDEN-CHURN-001 PR-B: conversation coverage below floor.
 			rules = append(rules, alert.CoverageRules(
 				cfg.ConversationCoverageAlertFloor)...)

@@ -342,3 +342,27 @@ func TestRuleFailureStreak_UnknownRuleID(t *testing.T) {
 		t.Fatalf("unexpected result for unseeded rule: verdict=%v n=%d", v, n)
 	}
 }
+
+// TestReadinessStalenessRule pins the SF-1 rule contract: idle-safe SQL
+// (COALESCE, no LIMIT 1), threshold wired, distinct Service, fallback default.
+func TestReadinessStalenessRule(t *testing.T) {
+	r := ReadinessStalenessRule(30)
+	if !strings.Contains(r.QuerySQL, "COALESCE(") {
+		t.Error("must COALESCE for idle-safe single-row result")
+	}
+	if strings.Contains(r.QuerySQL, "LIMIT 1") {
+		t.Error("must not use ORDER BY … LIMIT 1 (TSDB-CONSUME-001 contract)")
+	}
+	if !strings.Contains(r.QuerySQL, "mdemg_rsic_readiness_assessed") {
+		t.Error("must read the readiness heartbeat gauge")
+	}
+	if r.Threshold != 30 || r.Operator != "gt" {
+		t.Errorf("threshold/operator = %v/%s, want 30/gt", r.Threshold, r.Operator)
+	}
+	if r.Service != "ft-readiness" {
+		t.Errorf("service = %q, want ft-readiness (distinct cooldown key)", r.Service)
+	}
+	if ReadinessStalenessRule(0).Threshold != 30 {
+		t.Error("stalenessMin<=0 should fall back to 30")
+	}
+}
