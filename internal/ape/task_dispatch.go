@@ -51,6 +51,10 @@ type Dispatcher struct {
 	// SR-001: Alert delivery
 	alertDispatcher AlertDispatcher
 
+	// FT-RECURSIVE-002: trigger gate for trigger_training_pipeline (SF-2).
+	// nil → legacy alert behavior (the executor falls back).
+	trainingTriggerGate TrainingTriggerGate
+
 	// CONFIG-DEADFLAG-001: RSIC-SK1 guidance calibration thresholds
 	// (RSIC_GUIDANCE_* config). Zero values fall back to the historical
 	// literals via the accessor methods below, so direct-constructed
@@ -174,6 +178,13 @@ func (d *Dispatcher) SetFreshnessProvider(p FreshnessProvider) {
 // SetAlertDispatcher attaches an alert dispatcher for delivering RSIC alerts to the user.
 func (d *Dispatcher) SetAlertDispatcher(ad AlertDispatcher) {
 	d.alertDispatcher = ad
+}
+
+// SetTrainingTriggerGate attaches the FT-RECURSIVE-002 trigger gate, which
+// suppresses the per-cycle trigger_training_pipeline alert (SF-2) using the
+// ledger + config. nil leaves the legacy alert behavior.
+func (d *Dispatcher) SetTrainingTriggerGate(g TrainingTriggerGate) {
+	d.trainingTriggerGate = g
 }
 
 // ResetSafetySummary initializes a fresh safety summary for a cycle.
@@ -383,7 +394,7 @@ func (d *Dispatcher) executeTask(ctx context.Context, at *activeTask) {
 	case "alert_embedding_regression":
 		deliverables, execErr = d.executeAlertLog(ctx, at.Spec, "Embedding pipeline regression: empty call_sites")
 	case "trigger_training_pipeline":
-		deliverables, execErr = d.executeAlertLog(ctx, at.Spec, "Training data threshold reached")
+		deliverables, execErr = d.executeTriggerTrainingPipeline(ctx, at.Spec)
 	// Gap fixes: handlers referenced by existing reflection patterns
 	case "alert_tsdb_health":
 		deliverables, execErr = d.executeAlertLog(ctx, at.Spec, "TSDB health alert")
@@ -1140,6 +1151,37 @@ func (d *Dispatcher) postReport(taskID, status string, pct float64, milestone, s
 	}
 	d.reports[taskID] = append(d.reports[taskID], report)
 	d.mu.Unlock()
+}
+
+// executeTriggerTrainingPipeline gates the training-data-ready signal through
+// the FT-RECURSIVE-002 trigger gate (SF-2). When a cycle is open, a cycle ran
+// within the retrain interval, or the actuator is disabled, the trigger is
+// SUPPRESSED — no alert — which ends the per-reflection-cycle spam (the
+// readiness stays observable via `mdemg data status` + the SF-1 heartbeat). When
+// the gate says trigger (actuator enabled + fresh + clear), the legacy
+// informational alert fires until the controller (Epic 5) takes over the
+// trigger path. A nil/unwired gate falls back to the legacy alert (tests,
+// degraded environments).
+func (d *Dispatcher) executeTriggerTrainingPipeline(ctx context.Context, spec RSICTaskSpec) (map[string]any, error) {
+	if d.trainingTriggerGate == nil {
+		return d.executeAlertLog(ctx, spec, "Training data threshold reached")
+	}
+	decision, suppressed, err := d.trainingTriggerGate.EvaluateTrigger(ctx)
+	if err != nil {
+		slog.Warn("RSIC trigger gate: evaluation failed, suppressing to avoid spam", "error", err)
+		return map[string]any{"action": spec.ActionType, "suppressed": true, "decision": "gate_error"}, nil
+	}
+	if suppressed {
+		slog.Debug("RSIC trigger gate: suppressed", "decision", decision, "space", spec.TargetSpace)
+		return map[string]any{"action": spec.ActionType, "suppressed": true, "decision": decision}, nil
+	}
+	// decision == trigger: the gate has opened a cycle in the ledger; the
+	// supervised controller (a separate loop) consumes it out-of-band and
+	// alerts on the outcome (promote_pending / failed). No alert here — the
+	// ledger is the signal, and alerting on every trigger would re-introduce
+	// spam.
+	slog.Info("RSIC trigger gate: retrain cycle opened", "space", spec.TargetSpace)
+	return map[string]any{"action": spec.ActionType, "suppressed": false, "decision": decision, "cycle_opened": true}, nil
 }
 
 // executeAlertLog is a generic alert/log handler for RSIC-DATA and gap-fix actions.

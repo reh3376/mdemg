@@ -45,6 +45,84 @@ high-severity alert under the distinct "ft-loop" service). The autonomous
 actuator that calls these is a later phase (FT-RECURSIVE-002).`,
 	}
 	cmd.AddCommand(newFtLoopReportStageCmd())
+	cmd.AddCommand(newFtLoopPromoteCmd())
+	return cmd
+}
+
+func newFtLoopPromoteCmd() *cobra.Command {
+	var (
+		cycleID string
+		reject  bool
+		reason  string
+	)
+	cmd := &cobra.Command{
+		Use:   "promote",
+		Short: "Operator-confirm (or reject) a promote_pending retrain cycle",
+		Long: `Confirm or reject a cycle the controller left at promote_pending.
+
+The controller halts every cycle at promote_pending — promotion is operator-
+gated in Phase 6b (auto-promote + canary are Phase 7). --confirm records the
+cycle promoted; --reject records it rolled_back (with --reason). The actual
+GGUF symlink swap + llama-server restart is performed in the live promotion
+flow; this records the operator decision in the ft_training_cycles ledger.`,
+		RunE: func(_ *cobra.Command, _ []string) error {
+			if cycleID == "" {
+				return fmt.Errorf("--cycle-id is required")
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			defer cancel()
+
+			client, err := tsdb.NewClient(ctx, tsdbConfigFromEnv())
+			if err != nil {
+				return fmt.Errorf("connect TSDB: %w", err)
+			}
+			defer client.Close()
+			pool := client.Pool()
+
+			status, found, err := tsdb.CycleStatus(ctx, pool, cycleID)
+			if err != nil {
+				return fmt.Errorf("query cycle: %w", err)
+			}
+			if !found {
+				return fmt.Errorf("cycle %q not found in the ledger", cycleID)
+			}
+			if status != tsdb.FtCyclePromotePending {
+				return fmt.Errorf("cycle %q is %q, not promote_pending — nothing to confirm/reject", cycleID, status)
+			}
+
+			modelVersion := strings.TrimSpace(os.Getenv("FT_LOOP_MODEL_VERSION"))
+			if modelVersion == "" {
+				modelVersion = "mdemg-llm-v1"
+			}
+			ev := tsdb.FtCycleEvent{
+				CycleID:      cycleID,
+				ModelVersion: modelVersion,
+				EvalResults:  map[string]any{"operator_decision": "confirm", "reason": reason},
+			}
+			if reject {
+				ev.Status = tsdb.FtCycleRolledBack
+				ev.Stage = "operator_reject"
+				ev.Error = reason
+				ev.EvalResults["operator_decision"] = "reject"
+			} else {
+				ev.Status = tsdb.FtCyclePromoted
+				ev.Stage = "operator_confirm"
+			}
+			if err := tsdb.RecordCycleEvent(ctx, pool, ev); err != nil {
+				return fmt.Errorf("record decision: %w", err)
+			}
+			if reject {
+				fmt.Printf("cycle %s rejected (rolled_back). reason: %s\n", cycleID, reason)
+			} else {
+				fmt.Printf("cycle %s confirmed (promoted). Perform the GGUF symlink swap + llama-server restart to serve the new model.\n", cycleID)
+			}
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&cycleID, "cycle-id", "", "the promote_pending cycle to act on")
+	cmd.Flags().BoolVar(&reject, "reject", false, "reject the cycle (rolled_back) instead of confirming")
+	cmd.Flags().StringVar(&reason, "reason", "", "operator reasoning (recorded; required-ish for --reject)")
+	_ = cmd.MarkFlagRequired("cycle-id")
 	return cmd
 }
 

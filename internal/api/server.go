@@ -29,6 +29,7 @@ import (
 	"mdemg/internal/embeddings"
 	"mdemg/internal/eventgraph"
 	"mdemg/internal/filewatcher"
+	"mdemg/internal/ftloop"
 	"mdemg/internal/gaps"
 	"mdemg/internal/guardrail"
 	"mdemg/internal/hidden"
@@ -1335,9 +1336,19 @@ func (s *Server) SetTSDBClient(client *tsdb.Client) {
 		// Wire TSDB client into RSIC reflector for schema drift detection
 		if s.rsicCycle != nil {
 			s.rsicCycle.SetTSDBClient(client)
-			// Wire TSDB dataset builder for RSIC data-driven reflection
-			datasetBuilder := tsdb.NewDatasetBuilder(client.Pool())
+			// Wire TSDB dataset builder for RSIC data-driven reflection.
+			// AMD-7: drive the readiness threshold + per-task overrides from
+			// config instead of the hardcoded default.
+			datasetBuilder := tsdb.NewDatasetBuilder(client.Pool()).
+				SetReadinessThresholds(s.cfg.TrainingReadinessThreshold, s.cfg.TrainingReadinessThresholdOverrides)
 			s.rsicCycle.SetDatasetProvider(datasetBuilder)
+			// FT-RECURSIVE-002: wire the trigger gate (SF-2) — it needs the
+			// TSDB pool (available here) to read the ft_training_cycles ledger.
+			s.rsicCycle.SetTrainingTriggerGate(ftloop.NewGate(client.Pool(), ftloop.GateConfig{
+				Enabled:          s.cfg.FtLoopEnabled,
+				RetrainInterval:  time.Duration(s.cfg.FtLoopMinRetrainIntervalHours) * time.Hour,
+				MinFreshFraction: s.cfg.FtLoopMinFreshFraction,
+			}))
 		}
 		slog.Info("tsdb: metric writer attached", "flush_interval_sec", s.cfg.TSDBFlushIntervalSec)
 
@@ -2117,6 +2128,34 @@ func (s *Server) StartSupervisedBackground() {
 	if s.tsdbBackupScheduler != nil {
 		s.tsdbBackupScheduler.SetSupervise(s.superviseFn)
 		s.tsdbBackupScheduler.Start()
+	}
+	// FT-RECURSIVE-002 Epic 5: the recursive-retrain controller (supervised,
+	// default-off behind FT_LOOP_ENABLED — Run returns immediately when off).
+	if s.tsdbClient != nil {
+		repoDir, _ := os.Getwd()
+		leasePath := s.cfg.FtLoopLeasePath
+		if leasePath == "" {
+			if home, err := os.UserHomeDir(); err == nil {
+				leasePath = filepath.Join(home, ".mdemg", "ft-loop.lease")
+			} else {
+				leasePath = filepath.Join(os.TempDir(), "mdemg-ft-loop.lease")
+			}
+		}
+		ctrl := ftloop.NewController(s.tsdbClient.Pool(), s.orchestrationPolicy, s.alertDispatcher,
+			ftloop.ControllerConfig{
+				Enabled:         s.cfg.FtLoopEnabled,
+				PollInterval:    time.Duration(s.cfg.FtLoopPollIntervalSec) * time.Second,
+				LeasePath:       leasePath,
+				LeaseMax:        time.Duration(s.cfg.FtLoopLeaseMaxHours) * time.Hour,
+				MinFreeDiskGB:   s.cfg.FtLoopMinFreeDiskGB,
+				PythonBin:       s.cfg.FtLoopPythonBin,
+				ModelVersion:    s.cfg.FtLoopModelVersion,
+				EpochsCap:       s.cfg.FtLoraEpochsCap,
+				EarlyStopFactor: s.cfg.FtEarlyStopValLossFactor,
+				RepoDir:         repoDir,
+				InstanceID:      s.cfg.InstanceID,
+			})
+		s.goSupervised("ft-loop-controller", ctrl.Run)
 	}
 }
 

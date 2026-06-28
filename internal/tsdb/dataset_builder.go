@@ -115,6 +115,7 @@ const DefaultReadinessThreshold = 500
 type DatasetBuilder struct {
 	pool               *pgxpool.Pool
 	readinessThreshold int
+	thresholdOverrides map[string]int // per-task overrides (AMD-7)
 }
 
 // NewDatasetBuilder creates a DatasetBuilder from a connection pool.
@@ -123,6 +124,32 @@ func NewDatasetBuilder(pool *pgxpool.Pool) *DatasetBuilder {
 		pool:               pool,
 		readinessThreshold: DefaultReadinessThreshold,
 	}
+}
+
+// SetReadinessThresholds configures the base readiness threshold and optional
+// per-task overrides (AMD-7, FT-RECURSIVE-002). A base ≤ 0 keeps the current
+// value; nil overrides clears none. Lets the RSIC/CLI callers drive the
+// threshold from config instead of the hardcoded DefaultReadinessThreshold.
+func (b *DatasetBuilder) SetReadinessThresholds(base int, overrides map[string]int) *DatasetBuilder {
+	if base > 0 {
+		b.readinessThreshold = base
+	}
+	if len(overrides) > 0 {
+		b.thresholdOverrides = make(map[string]int, len(overrides))
+		for k, v := range overrides {
+			b.thresholdOverrides[k] = v
+		}
+	}
+	return b
+}
+
+// thresholdFor returns the readiness threshold for a task: its per-task override
+// if set, else the base threshold.
+func (b *DatasetBuilder) thresholdFor(taskName string) int {
+	if v, ok := b.thresholdOverrides[taskName]; ok {
+		return v
+	}
+	return b.readinessThreshold
 }
 
 // LLMPerformance returns per-task LLM performance summaries for the given window.
@@ -472,17 +499,19 @@ func (b *DatasetBuilder) TrainingDataReadiness(ctx context.Context) (*TrainingDa
 		}
 		// Ready if: sufficient rows, low error rate, all have system prompt.
 		// Each gate is evaluated independently so the failing one(s) can be
-		// surfaced (SF-7) — not just the Ready boolean.
+		// surfaced (SF-7) — not just the Ready boolean. Threshold is per-task
+		// (AMD-7).
+		taskThreshold := b.thresholdFor(t.TaskName)
 		t.Ready, t.NotReadyReasons = evaluateReadinessGates(
-			t.TotalRows, t.ErrorCount, t.HasSystemPrompt, b.readinessThreshold)
+			t.TotalRows, t.ErrorCount, t.HasSystemPrompt, taskThreshold)
 
 		// Compute accumulation rate: rows per day over the data span
 		if !t.OldestRecord.IsZero() && !t.NewestRecord.IsZero() && t.TotalRows > 0 {
 			daySpan := t.NewestRecord.Sub(t.OldestRecord).Hours() / 24.0
 			if daySpan > 0 {
 				t.AvgDailyRate = float64(t.TotalRows) / daySpan
-				if t.TotalRows < b.readinessThreshold && t.AvgDailyRate > 0 {
-					remaining := float64(b.readinessThreshold - t.TotalRows)
+				if t.TotalRows < taskThreshold && t.AvgDailyRate > 0 {
+					remaining := float64(taskThreshold - t.TotalRows)
 					t.ProjectedDaysToReady = int(remaining/t.AvgDailyRate) + 1
 				}
 			}

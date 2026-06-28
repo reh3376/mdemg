@@ -560,3 +560,13 @@ type FreshnessProvider interface {
 type AlertDispatcher interface {
 	SendAlert(ctx context.Context, service, title, message string, sev InsightSeverity)
 }
+
+// TrainingTriggerGate decides whether a training-data-ready signal should launch
+// a cycle, consulting the ft_training_cycles ledger + config (FT-RECURSIVE-002).
+// suppressed=true means "do not alert, do not trigger" — the SF-2 fix that ends
+// the per-cycle rsic-trigger_training_pipeline spam. Implemented by
+// *ftloop.Gate; nil when the actuator is unwired (executor falls back to the
+// legacy alert).
+type TrainingTriggerGate interface {
+	EvaluateTrigger(ctx context.Context) (decision string, suppressed bool, err error)
+}

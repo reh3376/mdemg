@@ -145,3 +145,60 @@ type stubGraduationProcessor struct{ graduated int }
 func (s stubGraduationProcessor) ProcessGraduations(_ context.Context, _ string) (int, error) {
 	return s.graduated, nil
 }
+
+// fakeTriggerGate is a stub TrainingTriggerGate for executor tests.
+type fakeTriggerGate struct {
+	decision   string
+	suppressed bool
+	err        error
+}
+
+func (f fakeTriggerGate) EvaluateTrigger(_ context.Context) (string, bool, error) {
+	return f.decision, f.suppressed, f.err
+}
+
+// TestExecuteTriggerTrainingPipeline_SF2 pins the SF-2 behavior: a suppressed
+// gate decision produces NO alert (ends the per-cycle spam); a trigger decision
+// alerts; a nil gate falls back to the legacy alert.
+func TestExecuteTriggerTrainingPipeline_SF2(t *testing.T) {
+	spec := RSICTaskSpec{ActionType: "trigger_training_pipeline", TargetSpace: "mdemg-dev"}
+
+	// Suppressed → no alert.
+	capSup := &captureAlertDispatcher{}
+	d := &Dispatcher{alertDispatcher: capSup, trainingTriggerGate: fakeTriggerGate{decision: "suppress_disabled", suppressed: true}}
+	out, err := d.executeTriggerTrainingPipeline(context.Background(), spec)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(capSup.services) != 0 {
+		t.Errorf("suppressed trigger must NOT alert, got %v", capSup.services)
+	}
+	if out["suppressed"] != true || out["decision"] != "suppress_disabled" {
+		t.Errorf("expected suppressed deliverables, got %v", out)
+	}
+
+	// Trigger → the gate opened a cycle; the executor does NOT alert (the
+	// controller owns outcome alerts) — cycle_opened=true, no spam.
+	capTrig := &captureAlertDispatcher{}
+	d2 := &Dispatcher{alertDispatcher: capTrig, trainingTriggerGate: fakeTriggerGate{decision: "trigger", suppressed: false}}
+	out2, err := d2.executeTriggerTrainingPipeline(context.Background(), spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(capTrig.services) != 0 {
+		t.Errorf("trigger must NOT alert (ledger is the signal), got %v", capTrig.services)
+	}
+	if out2["cycle_opened"] != true {
+		t.Errorf("trigger should report cycle_opened, got %v", out2)
+	}
+
+	// Nil gate → legacy alert (backward compat).
+	capNil := &captureAlertDispatcher{}
+	d3 := &Dispatcher{alertDispatcher: capNil}
+	if _, err := d3.executeTriggerTrainingPipeline(context.Background(), spec); err != nil {
+		t.Fatal(err)
+	}
+	if len(capNil.services) != 1 {
+		t.Errorf("nil gate should fall back to the legacy alert, got %v", capNil.services)
+	}
+}
