@@ -100,8 +100,8 @@ func TestDefaultRules_Count(t *testing.T) {
 	// neo4j_pool_exhausted (queried a perpetually-zero fake gauge) removed.
 	// 10 → 8 in ORPHAN-ALERT-001: high_orphan_count / high_orphan_ratio
 	// extracted to the config-parameterized OrphanRules().
-	if len(rules) != 8 {
-		t.Errorf("expected 8 default rules, got %d", len(rules))
+	if len(rules) != 7 {
+		t.Errorf("expected 7 default rules, got %d", len(rules))
 	}
 
 	// Verify all rules are enabled
@@ -126,17 +126,17 @@ func TestDefaultRules_Count(t *testing.T) {
 // aggregation (COALESCE+MAX, no ORDER BY … LIMIT 1), wired thresholds, and
 // distinct Service labels (cooldown-key contract).
 func TestOrphanRules_FloorAndAggregation(t *testing.T) {
-	rules := OrphanRules(50, 0.10, 1000)
-	if len(rules) != 2 {
-		t.Fatalf("expected 2 orphan rules, got %d", len(rules))
+	rules := OrphanRules(50, 0.10, 1000, 0.5)
+	if len(rules) != 3 {
+		t.Fatalf("expected 3 graph-health rules, got %d", len(rules))
 	}
 	services := make(map[string]bool)
 	for _, r := range rules {
 		if !strings.Contains(r.QuerySQL, "total_nodes >= 50") {
 			t.Errorf("%s: missing min-node floor (total_nodes >= 50): %s", r.ID, r.QuerySQL)
 		}
-		if !strings.Contains(r.QuerySQL, "COALESCE(MAX(") {
-			t.Errorf("%s: must use COALESCE(MAX(...)) for idle-safe deterministic aggregation", r.ID)
+		if !strings.Contains(r.QuerySQL, "COALESCE(MAX(") && !strings.Contains(r.QuerySQL, "COALESCE(MIN(") {
+			t.Errorf("%s: must use COALESCE(MAX/MIN(...)) for idle-safe deterministic aggregation", r.ID)
 		}
 		if strings.Contains(r.QuerySQL, "LIMIT 1") {
 			t.Errorf("%s: must NOT use ORDER BY … LIMIT 1 (TSDB-CONSUME-001 contract)", r.ID)
@@ -146,15 +146,18 @@ func TestOrphanRules_FloorAndAggregation(t *testing.T) {
 		}
 		services[r.Service] = true
 	}
-	// Thresholds wired through.
+	// Thresholds wired through (count, ratio, health-floor).
 	if rules[0].Threshold != 1000 {
 		t.Errorf("count threshold = %v, want 1000", rules[0].Threshold)
 	}
 	if rules[1].Threshold != 0.10 {
 		t.Errorf("ratio threshold = %v, want 0.10", rules[1].Threshold)
 	}
+	if rules[2].ID != "low_graph_health" || rules[2].Threshold != 0.5 {
+		t.Errorf("health rule = %s/%v, want low_graph_health/0.5", rules[2].ID, rules[2].Threshold)
+	}
 	// Default fallbacks for non-positive args.
-	def := OrphanRules(0, 0, 0)
+	def := OrphanRules(0, 0, 0, 0)
 	if !strings.Contains(def[0].QuerySQL, "total_nodes >= 50") {
 		t.Error("minNodes<=0 should fall back to 50")
 	}
