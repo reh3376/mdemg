@@ -10,12 +10,14 @@ Usage:
         --ults-dir docs/tests/ults/specs/ \
         --report eval_report.json
 
-    # With live inference (sends prompts to mlx_lm.server):
+    # With live inference (sends prompts to the production LLM endpoint —
+    # llama-server on :8102 since the Phase 13.5 cutover; mlx_lm.server :8101
+    # was decommissioned):
     #   Baseline (untuned dense base):
     python -m training.evaluate_ft \
         --test-data curated/v1/test.jsonl \
         --ults-dir docs/tests/ults/specs/ \
-        --base-url http://localhost:8101/v1 \
+        --base-url http://localhost:8102/v1 \
         --model mlx-community/Qwen3-14B-4bit \
         --report eval_report.json
 
@@ -23,7 +25,7 @@ Usage:
     python -m training.evaluate_ft \
         --test-data curated/v1/test.jsonl \
         --ults-dir docs/tests/ults/specs/ \
-        --base-url http://localhost:8101/v1 \
+        --base-url http://localhost:8102/v1 \
         --model .local-models/qwen3-14b-mdemg-v1 \
         --report eval_report.json
 

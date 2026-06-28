@@ -148,6 +148,12 @@ type StandardMetrics struct {
 
 	// RSIC health sub-scores (published after each assessment)
 	RSICHealthOverall    func(spaceID string) *Gauge
+	// RSICReadinessAssessed is a heartbeat set to 1 each time the RSIC
+	// training-readiness assessment query SUCCEEDS (SF-1, FT-RECURSIVE-001).
+	// Its sample freshness backs the training_readiness_stale alert rule: a
+	// silent readiness-query failure stops the heartbeat and the loop goes
+	// dormant — the rule catches that absence.
+	RSICReadinessAssessed func(spaceID string) *Gauge
 	RSICHealthRetrieval  func(spaceID string) *Gauge
 	RSICHealthMemory     func(spaceID string) *Gauge
 	RSICHealthEdge       func(spaceID string) *Gauge
@@ -483,6 +489,11 @@ func NewStandardMetrics(r *Registry) *StandardMetrics {
 	// RSIC health sub-scores
 	m.RSICHealthOverall = func(spaceID string) *Gauge {
 		return r.NewGauge("rsic_health_overall", "Overall cognitive health score (0-1)",
+			map[string]string{"space_id": spaceID})
+	}
+	m.RSICReadinessAssessed = func(spaceID string) *Gauge {
+		return r.NewGauge("rsic_readiness_assessed",
+			"Heartbeat=1 on each successful RSIC training-readiness assessment (SF-1)",
 			map[string]string{"space_id": spaceID})
 	}
 	m.RSICHealthRetrieval = func(spaceID string) *Gauge {

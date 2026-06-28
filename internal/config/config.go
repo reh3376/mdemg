@@ -1213,6 +1213,12 @@ type Config struct {
 	OrphanRatioThreshold float64 // ORPHAN_RATIO_THRESHOLD — fire High Orphan Ratio when max live-orphan ratio among significant spaces exceeds this (default: 0.10)
 	OrphanCountThreshold int     // ORPHAN_COUNT_THRESHOLD — fire High Orphan Count when max live-orphan count among significant spaces exceeds this (default: 1000; above the accepted historical baseline — ratio rule is the scale-aware primary)
 
+	// FT recursive-loop readiness staleness (FT-RECURSIVE-001 SF-1)
+	FtReadinessStalenessMin int // FT_READINESS_STALENESS_MIN — fire training_readiness_stale when no successful RSIC readiness assessment within this many minutes; catches a silently-dormant loop (default: 30; RSIC assesses every ~5 min)
+
+	// Training-data export retention (FT-RECURSIVE-001 SF-6)
+	ExportRetentionHours int // MDEMG_EXPORT_RETENTION_HOURS — prune training-data export archives in the temp export dir older than this on each new export; the dir grew unbounded (default: 168 = 7 days; 0 disables pruning)
+
 	// MAINT-LIVE-001 — maintenance liveness (only-ever-dry-runs detection).
 	MaintLiveAlertEnabled bool // MAINT_LIVE_ALERT_ENABLED — enable the maintenance_no_live_run rule (default: true)
 	MaintLiveLookbackDays int  // MAINT_LIVE_LOOKBACK_DAYS — window in which at least one live (dry_run=false) maintenance run must appear when any maintenance runs exist (default: 8)
@@ -4591,6 +4597,14 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	ftReadinessStalenessMin, err := atoi("FT_READINESS_STALENESS_MIN", 30)
+	if err != nil {
+		return Config{}, err
+	}
+	exportRetentionHours, err := atoi("MDEMG_EXPORT_RETENTION_HOURS", 168)
+	if err != nil {
+		return Config{}, err
+	}
 	maintLiveAlertEnabled := getBool("MAINT_LIVE_ALERT_ENABLED", true)
 	maintLiveLookbackDays, err := atoi("MAINT_LIVE_LOOKBACK_DAYS", 8)
 	if err != nil {
@@ -5424,6 +5438,8 @@ func FromEnv() (Config, error) {
 		OrphanRatioMinNodes:          orphanRatioMinNodes,
 		OrphanRatioThreshold:         orphanRatioThreshold,
 		OrphanCountThreshold:         orphanCountThreshold,
+		FtReadinessStalenessMin:      ftReadinessStalenessMin,
+		ExportRetentionHours:         exportRetentionHours,
 		MaintLiveAlertEnabled:        maintLiveAlertEnabled,
 		MaintLiveLookbackDays:        maintLiveLookbackDays,
 		JobBackupStalenessHours:      jobBackupStalenessHours,

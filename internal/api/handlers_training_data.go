@@ -82,6 +82,10 @@ func (s *Server) handleTrainingDataExport(w http.ResponseWriter, r *http.Request
 		writeInternalError(w, err, "create export dir")
 		return
 	}
+	// SF-6 (FT-RECURSIVE-001): the export dir grew unbounded. Prune archives
+	// older than the retention window on each new export (best-effort; a prune
+	// error never fails the export).
+	pruneOldExports(outputDir, s.cfg.ExportRetentionHours)
 	outputPath := filepath.Join(outputDir, exportID+".tar.gz")
 
 	cfg := tsdb.ExportConfig{
@@ -203,4 +207,40 @@ func (s *Server) handleTrainingDataDownload(w http.ResponseWriter, r *http.Reque
 	w.Header().Set("Content-Type", "application/gzip")
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filepath.Base(outputPath)))
 	http.ServeFile(w, r, outputPath)
+}
+
+// pruneOldExports removes *.tar.gz export archives in dir older than
+// retentionHours (SF-6, FT-RECURSIVE-001). Best-effort: errors are logged, not
+// returned — pruning must never fail the export it precedes. retentionHours<=0
+// disables pruning.
+func pruneOldExports(dir string, retentionHours int) {
+	if retentionHours <= 0 {
+		return
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		slog.Warn("export prune: read dir failed", "dir", dir, "error", err)
+		return
+	}
+	cutoff := time.Now().Add(-time.Duration(retentionHours) * time.Hour)
+	pruned := 0
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".tar.gz") {
+			continue
+		}
+		info, err := e.Info()
+		if err != nil {
+			continue
+		}
+		if info.ModTime().Before(cutoff) {
+			if err := os.Remove(filepath.Join(dir, e.Name())); err != nil {
+				slog.Warn("export prune: remove failed", "file", e.Name(), "error", err)
+				continue
+			}
+			pruned++
+		}
+	}
+	if pruned > 0 {
+		slog.Info("export prune: removed stale export archives", "count", pruned, "retention_hours", retentionHours)
+	}
 }

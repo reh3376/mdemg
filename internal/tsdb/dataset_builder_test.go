@@ -2,6 +2,7 @@ package tsdb
 
 import (
 	"math"
+	"strings"
 	"testing"
 	"time"
 )
@@ -208,5 +209,48 @@ func TestLLMPerformanceSummary_ErrorRate(t *testing.T) {
 func TestDefaultReadinessThreshold(t *testing.T) {
 	if DefaultReadinessThreshold != 500 {
 		t.Errorf("got %d, want 500", DefaultReadinessThreshold)
+	}
+}
+
+// TestEvaluateReadinessGates_PerGateReasons pins SF-7 (FT-RECURSIVE-001): a
+// not-ready task reports exactly which gate(s) it failed.
+func TestEvaluateReadinessGates_PerGateReasons(t *testing.T) {
+	const threshold = 500
+	cases := []struct {
+		name                                      string
+		totalRows, errorCount, hasSystemPrompt    int
+		wantReady                                 bool
+		wantReasonSubstr                          []string
+	}{
+		{"all_pass", 600, 0, 600, true, nil},
+		{"insufficient_rows", 100, 0, 100, false, []string{"insufficient_rows: 100 < 500"}},
+		{"error_rate_high", 600, 60, 600, false, []string{"error_rate_high"}},
+		{"missing_system_prompt", 600, 0, 550, false, []string{"missing_system_prompt: 50 of 600"}},
+		// ape.reflect-like: plenty of rows, low errors, but not every row has a prompt.
+		{"reflect_like", 70880, 0, 70000, false, []string{"missing_system_prompt"}},
+		{"multiple_gates", 100, 20, 80, false, []string{"insufficient_rows", "error_rate_high", "missing_system_prompt"}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			ready, reasons := evaluateReadinessGates(c.totalRows, c.errorCount, c.hasSystemPrompt, threshold)
+			if ready != c.wantReady {
+				t.Fatalf("ready = %v, want %v (reasons=%v)", ready, c.wantReady, reasons)
+			}
+			if c.wantReady && len(reasons) != 0 {
+				t.Fatalf("ready task should have no reasons, got %v", reasons)
+			}
+			for _, want := range c.wantReasonSubstr {
+				found := false
+				for _, r := range reasons {
+					if strings.Contains(r, want) {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("missing reason containing %q in %v", want, reasons)
+				}
+			}
+		})
 	}
 }

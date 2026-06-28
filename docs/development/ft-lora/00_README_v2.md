@@ -18,17 +18,21 @@
 > and any Phase-15/Note research work must re-derive from the CURRENT
 > architecture, not these).
 >
-> **NOT STARTED:** the recursive-retraining loop — Phases 6 (Recursive
+> **IN PROGRESS:** the recursive-retraining loop — Phases 6 (Recursive
 > Cycle Automation), 7 (RSIC Integration), 9 (Monitoring). This is the
 > line's largest unfinished promise and the bridge from shipped FT to the
-> RSIC vision. Trigger: FT-CLASSIFY-002 (Roadmap Q3 Phase 4) proving the
-> production-row → retrain → regression-gate path end-to-end.
-> **Buildable spec exists (FT-RECURSIVE-000, 2026-06-11):**
+> RSIC vision. The trigger — FT-CLASSIFY-002 (Roadmap Q3 Phase 4) proving
+> the production-row → retrain → regression-gate path — is **MET** (PR #446,
+> 2026-06-12, gate NO-PROMOTE operator-accepted). **Phase 6a (FT-RECURSIVE-001)
+> SHIPPED 2026-06-28:** the manual retrain path is fully observable
+> (`mdemg ft-loop report-stage` → `scheduled_job_events`; SF-1/3/6/7 closed;
+> the promotion-gate eval pinned). **NOT STARTED:** 6b FT-RECURSIVE-002 (the
+> actuator), 7 FT-RECURSIVE-003 (RSIC integration + canary), 9 FT-RECURSIVE-004
+> (drift + issue filer); + prerequisite GUARDRAIL-PRODUCER-001.
+> **Buildable spec (FT-RECURSIVE-000, 2026-06-11):**
 > `docs/development/ft-recursive-001/SPEC_recursive_retraining_loop.md` —
-> code-verified as-built audit (the readiness→RSIC→no-op-actuator
-> skeleton, silent-failure + dead-seam inventories), target state machine,
-> phased 6a/6b/7/9 build plan, operator decision forks. STATUS unchanged:
-> nothing is built; the spec honors the FT-CLASSIFY-002 trigger.
+> code-verified as-built audit, target state machine, phased 6a/6b/7/9 build
+> plan, operator decision forks.
 >
 > **Provenance notes:** memo `07_MODEL_UPDATE_AND_MOE_STRATEGY.md`, cited
 > by earlier CLAUDE.md revisions as canonical, never existed in this repo
