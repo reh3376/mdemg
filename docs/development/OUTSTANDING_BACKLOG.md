@@ -44,4 +44,5 @@ GRAFANA-AUDIT-001 (shipped 2026-05-21) built the harness `scripts/grafana_panel_
 
 ## Roadmap-tier follow-ups (not near-term queue; see ROADMAP §5 + the roadmap phases)
 - **HIDDEN-CHURN-003 split/merge maintenance** — *only if* incremental-clustering pattern-count drift is observed (the `concepts recluster` command is the interim escape hatch). Conditional, not committed.
-- Other ROADMAP_2026Q3 Phase 1–4 sprints (HOOKWIRE/HOOKSYNC, RSIC-VALIDATE, NEGFEED+COOLER, TSDB-CONSUME follow-ons, FT-CLASSIFY-002, etc.) — strategic queue, owned by the roadmap.
+- **FT recursive-retraining loop build** (the live FT frontier): FT-CLASSIFY-002 ✅ DONE (PR #446, the proving run) + **Phase 6a FT-RECURSIVE-001 ✅ DONE 2026-06-28** (manual-path observability). Remaining: **6b FT-RECURSIVE-002** (actuator), **7 FT-RECURSIVE-003** (RSIC integration + canary), **9 FT-RECURSIVE-004** (drift + issue filer); + prerequisite **GUARDRAIL-PRODUCER-001** (`guardrail.evaluate` has ~3 rows, no producer). Design: `docs/development/ft-recursive-001/SPEC_recursive_retraining_loop.md`.
+- Other ROADMAP_2026Q3 Phase 1–4 sprints (HOOKWIRE/HOOKSYNC, RSIC-VALIDATE, NEGFEED+COOLER, TSDB-CONSUME follow-ons, etc.) — strategic queue, owned by the roadmap.
