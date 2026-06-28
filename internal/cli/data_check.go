@@ -10,6 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"mdemg/internal/config"
 	"mdemg/internal/tsdb"
 )
 
@@ -220,6 +221,9 @@ func checkEventLogging() checkResult {
 
 func checkTaskAccumulation(ctx context.Context, pool *pgxpool.Pool) checkResult {
 	builder := tsdb.NewDatasetBuilder(pool)
+	if cfg, cErr := config.FromEnv(); cErr == nil {
+		builder.SetReadinessThresholds(cfg.TrainingReadinessThreshold, cfg.TrainingReadinessThresholdOverrides)
+	}
 	readiness, err := builder.TrainingDataReadiness(ctx)
 	if err != nil {
 		return checkResult{

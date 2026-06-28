@@ -15,6 +15,7 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
+	"mdemg/internal/config"
 	"mdemg/internal/tsdb"
 )
 
@@ -103,8 +104,12 @@ Use --json for structured output suitable for monitoring pipelines.`,
 				totalAnnotated += tr.Annotated
 			}
 
-			// Readiness with accumulation rates
+			// Readiness with accumulation rates (AMD-7: honor the configured
+			// threshold + per-task overrides so the CLI matches what RSIC sees).
 			builder := tsdb.NewDatasetBuilder(pool)
+			if cfg, cErr := config.FromEnv(); cErr == nil {
+				builder.SetReadinessThresholds(cfg.TrainingReadinessThreshold, cfg.TrainingReadinessThresholdOverrides)
+			}
 			readiness, readErr := builder.TrainingDataReadiness(ctx)
 
 			// Embedding + retrieval counts

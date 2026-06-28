@@ -1219,6 +1219,10 @@ type Config struct {
 	// Training-data export retention (FT-RECURSIVE-001 SF-6)
 	ExportRetentionHours int // MDEMG_EXPORT_RETENTION_HOURS — prune training-data export archives in the temp export dir older than this on each new export; the dir grew unbounded (default: 168 = 7 days; 0 disables pruning)
 
+	// FT recursive-retrain readiness threshold (FT-RECURSIVE-002 Phase 6b, AMD-7)
+	TrainingReadinessThreshold          int            // TRAINING_READINESS_THRESHOLD — minimum rows per task to be training-ready (replaces hardcoded DefaultReadinessThreshold=500)
+	TrainingReadinessThresholdOverrides map[string]int // TRAINING_READINESS_THRESHOLD_OVERRIDES — per-task JSON overrides, e.g. {"consulting.classify":300}
+
 	// MAINT-LIVE-001 — maintenance liveness (only-ever-dry-runs detection).
 	MaintLiveAlertEnabled bool // MAINT_LIVE_ALERT_ENABLED — enable the maintenance_no_live_run rule (default: true)
 	MaintLiveLookbackDays int  // MAINT_LIVE_LOOKBACK_DAYS — window in which at least one live (dry_run=false) maintenance run must appear when any maintenance runs exist (default: 8)
@@ -4605,6 +4609,27 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	trainingReadinessThreshold, err := atoi("TRAINING_READINESS_THRESHOLD", 500)
+	if err != nil {
+		return Config{}, err
+	}
+	if trainingReadinessThreshold < 1 {
+		return Config{}, errors.New("TRAINING_READINESS_THRESHOLD must be >= 1")
+	}
+	trainingReadinessThresholdOverrides := map[string]int{}
+	if raw := strings.TrimSpace(os.Getenv("TRAINING_READINESS_THRESHOLD_OVERRIDES")); raw != "" {
+		if err := json.Unmarshal([]byte(raw), &trainingReadinessThresholdOverrides); err != nil {
+			return Config{}, fmt.Errorf("TRAINING_READINESS_THRESHOLD_OVERRIDES must be valid JSON: %w", err)
+		}
+		for task, v := range trainingReadinessThresholdOverrides {
+			if task == "" {
+				return Config{}, errors.New("TRAINING_READINESS_THRESHOLD_OVERRIDES: empty task key")
+			}
+			if v < 1 {
+				return Config{}, fmt.Errorf("TRAINING_READINESS_THRESHOLD_OVERRIDES[%s] must be >= 1", task)
+			}
+		}
+	}
 	maintLiveAlertEnabled := getBool("MAINT_LIVE_ALERT_ENABLED", true)
 	maintLiveLookbackDays, err := atoi("MAINT_LIVE_LOOKBACK_DAYS", 8)
 	if err != nil {
@@ -5440,6 +5465,8 @@ func FromEnv() (Config, error) {
 		OrphanCountThreshold:         orphanCountThreshold,
 		FtReadinessStalenessMin:      ftReadinessStalenessMin,
 		ExportRetentionHours:         exportRetentionHours,
+		TrainingReadinessThreshold:          trainingReadinessThreshold,
+		TrainingReadinessThresholdOverrides: trainingReadinessThresholdOverrides,
 		MaintLiveAlertEnabled:        maintLiveAlertEnabled,
 		MaintLiveLookbackDays:        maintLiveLookbackDays,
 		JobBackupStalenessHours:      jobBackupStalenessHours,

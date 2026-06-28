@@ -254,3 +254,21 @@ func TestEvaluateReadinessGates_PerGateReasons(t *testing.T) {
 		})
 	}
 }
+
+// TestThresholdFor_PerTaskOverride pins AMD-7 (FT-RECURSIVE-002): per-task
+// overrides take precedence over the base readiness threshold.
+func TestThresholdFor_PerTaskOverride(t *testing.T) {
+	b := (&DatasetBuilder{readinessThreshold: 500}).
+		SetReadinessThresholds(500, map[string]int{"consulting.classify": 300})
+	if got := b.thresholdFor("consulting.classify"); got != 300 {
+		t.Errorf("override task threshold = %d, want 300", got)
+	}
+	if got := b.thresholdFor("ape.reflect"); got != 500 {
+		t.Errorf("non-override task threshold = %d, want base 500", got)
+	}
+	// base<=0 keeps current; nil overrides clears none.
+	b2 := (&DatasetBuilder{readinessThreshold: 500}).SetReadinessThresholds(0, nil)
+	if got := b2.thresholdFor("x"); got != 500 {
+		t.Errorf("base<=0 should keep 500, got %d", got)
+	}
+}
