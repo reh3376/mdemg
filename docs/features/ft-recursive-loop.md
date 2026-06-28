@@ -59,11 +59,46 @@ mdemg data status        # per-task Rows / Rate/day / Days Left / Ready + the fa
 | `FT_READINESS_STALENESS_MIN` | 30 | fire `training_readiness_stale` when no successful readiness assessment within N minutes |
 | `MDEMG_EXPORT_RETENTION_HOURS` | 168 | prune export archives older than this (0 disables) |
 
+## The actuator (Phase 6b — FT-RECURSIVE-002, shipped default-off)
+
+Phase 6b makes the no-op `trigger_training_pipeline` real — a supervised
+controller that runs a gated retrain cycle — but it ships **dormant behind
+`FT_LOOP_ENABLED=false`**. Nothing trains or mutates serving state until the
+operator opts in.
+
+- **Ledger** (`ft_training_cycles`): the cycle state machine
+  `triggered→curating→training→gating→promote_pending→{promoted|failed|rolled_back}`,
+  event-sourced; an open cycle is DB-backed single-flight (survives restarts).
+- **Trigger gate** (`internal/ftloop`): a cycle launches only when a task is
+  Ready **AND** enough new signal exists since the last cycle (`FT_LOOP_MIN_FRESH_FRACTION`)
+  **AND** none ran within `FT_LOOP_MIN_RETRAIN_INTERVAL_HOURS`. When disabled or
+  blocked, the trigger is **suppressed** (no alert — the SF-2 fix that ended the
+  per-cycle `rsic-trigger_training_pipeline` spam).
+- **Compute lease + RSIC quiesce**: a single-host lockfile (reclaimable on
+  expiry so a crashed trainer can't wedge RSIC) + `OrchestrationPolicy.Quiesce`
+  pauses new RSIC triggers while a retrain holds the box; disk-floor preflight.
+- **Controller**: walks curate→train→gate as ctx-cancellable Python subprocesses,
+  updating the ledger + `ft-loop:<stage>` jobhealth per stage. FAIL → archived +
+  one `ft-loop` alert; lease-expiry/disk-floor → class-4 high alert-and-halt;
+  PASS → `promote_pending` (it **halts** — promotion is operator-gated).
+- **Promotion** (operator-confirm): `mdemg ft-loop promote --cycle-id <id>
+  [--reject] [--reason …]` records the decision in the ledger. Auto-promote +
+  canary are Phase 7.
+
+To enable (after the live validation in the next sprint): set
+`FT_LOOP_ENABLED=true`. Tunables: `FT_LOOP_POLL_INTERVAL_SEC` (60),
+`FT_LOOP_MIN_RETRAIN_INTERVAL_HOURS` (168), `FT_LOOP_MIN_FRESH_FRACTION` (0.30),
+`FT_LOOP_LEASE_MAX_HOURS` (14), `FT_LOOP_MIN_FREE_DISK_GB` (100),
+`TRAINING_READINESS_THRESHOLD` (+ per-task overrides), `FT_LORA_EPOCHS_CAP` (3),
+`FT_EARLY_STOP_VAL_LOSS_FACTOR` (1.05).
+
+> ⚠️ The enabled path's live validation (a real SFT cycle + the FAIL path; the
+> subprocess arg-sets) is **Epic 6 — not yet run**. The default-off actuator is
+> code-complete + unit-tested; the SF-2 suppression is live-verified.
+
 ## What's next
 
-- **FT-RECURSIVE-002 (Phase 6b)** — the actuator: `ft_training_cycles` ledger,
-  trigger conditions (fresh-fraction + interval + single-flight), compute lease
-  + RSIC quiesce, the controller orchestrating the Python pipeline.
+- **FT-RECURSIVE-002 Epic 6** — the live gated cycle (enable + run on a fast task).
 - **FT-RECURSIVE-003 (Phase 7)** — RSIC integration, canary, auto-rollback.
 - **FT-RECURSIVE-004 (Phase 9)** — drift monitoring + the issue filer.
 - Prerequisite, separate: **GUARDRAIL-PRODUCER-001** — `guardrail.evaluate` has
