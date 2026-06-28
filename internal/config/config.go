@@ -1228,6 +1228,16 @@ type Config struct {
 	FtLoopMinRetrainIntervalHours int     // FT_LOOP_MIN_RETRAIN_INTERVAL_HOURS — suppress a new trigger if a cycle started within this window (single-flight at retrain scale, not the RSIC seconds cooldown) (default: 168 = 7 days)
 	FtLoopMinFreshFraction        float64 // FT_LOOP_MIN_FRESH_FRACTION — minimum fraction of interactions newer than the last cycle before retraining (retrain on new signal, never the same corpus) (default: 0.30)
 
+	// FT recursive-retrain controller (FT-RECURSIVE-002 Phase 6b, Epic 5)
+	FtLoopPollIntervalSec    int     // FT_LOOP_POLL_INTERVAL_SEC — controller poll cadence for a triggered cycle (default: 60)
+	FtLoopLeaseMaxHours      int     // FT_LOOP_LEASE_MAX_HOURS — compute-lease expiry (≈1.5× the ~9h actual) so a crashed trainer can't wedge RSIC (default: 14)
+	FtLoopLeasePath          string  // FT_LOOP_LEASE_PATH — compute-lease lockfile path (default: $HOME/.mdemg/ft-loop.lease)
+	FtLoopMinFreeDiskGB      float64 // FT_LOOP_MIN_FREE_DISK_GB — disk-floor preflight before TRAIN (~85GB transient) (default: 100)
+	FtLoopPythonBin          string  // FT_LOOP_PYTHON_BIN — python interpreter for the training subprocesses (default: python3)
+	FtLoopModelVersion       string  // FT_LOOP_MODEL_VERSION — model_version recorded on cycles (default: mdemg-llm-v1)
+	FtLoraEpochsCap          int     // FT_LORA_EPOCHS_CAP — hard epoch cap passed to train_ft.py (AMD-1; the `auto` rejection is never weakened) (default: 3)
+	FtEarlyStopValLossFactor float64 // FT_EARLY_STOP_VAL_LOSS_FACTOR — SFT early-stop trips when val_loss > best × this (AMD-1) (default: 1.05)
+
 	// MAINT-LIVE-001 — maintenance liveness (only-ever-dry-runs detection).
 	MaintLiveAlertEnabled bool // MAINT_LIVE_ALERT_ENABLED — enable the maintenance_no_live_run rule (default: true)
 	MaintLiveLookbackDays int  // MAINT_LIVE_LOOKBACK_DAYS — window in which at least one live (dry_run=false) maintenance run must appear when any maintenance runs exist (default: 8)
@@ -4650,6 +4660,44 @@ func FromEnv() (Config, error) {
 	if ftLoopMinFreshFraction < 0 || ftLoopMinFreshFraction > 1 {
 		return Config{}, errors.New("FT_LOOP_MIN_FRESH_FRACTION must be in [0,1]")
 	}
+	ftLoopPollIntervalSec, err := atoi("FT_LOOP_POLL_INTERVAL_SEC", 60)
+	if err != nil {
+		return Config{}, err
+	}
+	if ftLoopPollIntervalSec < 1 {
+		return Config{}, errors.New("FT_LOOP_POLL_INTERVAL_SEC must be >= 1")
+	}
+	ftLoopLeaseMaxHours, err := atoi("FT_LOOP_LEASE_MAX_HOURS", 14)
+	if err != nil {
+		return Config{}, err
+	}
+	if ftLoopLeaseMaxHours < 1 {
+		return Config{}, errors.New("FT_LOOP_LEASE_MAX_HOURS must be >= 1")
+	}
+	ftLoopLeasePath := strings.TrimSpace(os.Getenv("FT_LOOP_LEASE_PATH"))
+	ftLoopMinFreeDiskGB, err := atof("FT_LOOP_MIN_FREE_DISK_GB", 100)
+	if err != nil {
+		return Config{}, err
+	}
+	if ftLoopMinFreeDiskGB < 0 {
+		return Config{}, errors.New("FT_LOOP_MIN_FREE_DISK_GB must be >= 0")
+	}
+	ftLoopPythonBin := get("FT_LOOP_PYTHON_BIN", "python3")
+	ftLoopModelVersion := get("FT_LOOP_MODEL_VERSION", "mdemg-llm-v1")
+	ftLoraEpochsCap, err := atoi("FT_LORA_EPOCHS_CAP", 3)
+	if err != nil {
+		return Config{}, err
+	}
+	if ftLoraEpochsCap < 1 {
+		return Config{}, errors.New("FT_LORA_EPOCHS_CAP must be >= 1")
+	}
+	ftEarlyStopValLossFactor, err := atof("FT_EARLY_STOP_VAL_LOSS_FACTOR", 1.05)
+	if err != nil {
+		return Config{}, err
+	}
+	if ftEarlyStopValLossFactor <= 1.0 {
+		return Config{}, errors.New("FT_EARLY_STOP_VAL_LOSS_FACTOR must be > 1.0")
+	}
 	maintLiveAlertEnabled := getBool("MAINT_LIVE_ALERT_ENABLED", true)
 	maintLiveLookbackDays, err := atoi("MAINT_LIVE_LOOKBACK_DAYS", 8)
 	if err != nil {
@@ -5490,6 +5538,14 @@ func FromEnv() (Config, error) {
 		FtLoopEnabled:                       ftLoopEnabled,
 		FtLoopMinRetrainIntervalHours:       ftLoopMinRetrainIntervalHours,
 		FtLoopMinFreshFraction:              ftLoopMinFreshFraction,
+		FtLoopPollIntervalSec:               ftLoopPollIntervalSec,
+		FtLoopLeaseMaxHours:                 ftLoopLeaseMaxHours,
+		FtLoopLeasePath:                     ftLoopLeasePath,
+		FtLoopMinFreeDiskGB:                 ftLoopMinFreeDiskGB,
+		FtLoopPythonBin:                     ftLoopPythonBin,
+		FtLoopModelVersion:                  ftLoopModelVersion,
+		FtLoraEpochsCap:                     ftLoraEpochsCap,
+		FtEarlyStopValLossFactor:            ftEarlyStopValLossFactor,
 		MaintLiveAlertEnabled:        maintLiveAlertEnabled,
 		MaintLiveLookbackDays:        maintLiveLookbackDays,
 		JobBackupStalenessHours:      jobBackupStalenessHours,

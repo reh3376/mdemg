@@ -2129,6 +2129,34 @@ func (s *Server) StartSupervisedBackground() {
 		s.tsdbBackupScheduler.SetSupervise(s.superviseFn)
 		s.tsdbBackupScheduler.Start()
 	}
+	// FT-RECURSIVE-002 Epic 5: the recursive-retrain controller (supervised,
+	// default-off behind FT_LOOP_ENABLED — Run returns immediately when off).
+	if s.tsdbClient != nil {
+		repoDir, _ := os.Getwd()
+		leasePath := s.cfg.FtLoopLeasePath
+		if leasePath == "" {
+			if home, err := os.UserHomeDir(); err == nil {
+				leasePath = filepath.Join(home, ".mdemg", "ft-loop.lease")
+			} else {
+				leasePath = filepath.Join(os.TempDir(), "mdemg-ft-loop.lease")
+			}
+		}
+		ctrl := ftloop.NewController(s.tsdbClient.Pool(), s.orchestrationPolicy, s.alertDispatcher,
+			ftloop.ControllerConfig{
+				Enabled:         s.cfg.FtLoopEnabled,
+				PollInterval:    time.Duration(s.cfg.FtLoopPollIntervalSec) * time.Second,
+				LeasePath:       leasePath,
+				LeaseMax:        time.Duration(s.cfg.FtLoopLeaseMaxHours) * time.Hour,
+				MinFreeDiskGB:   s.cfg.FtLoopMinFreeDiskGB,
+				PythonBin:       s.cfg.FtLoopPythonBin,
+				ModelVersion:    s.cfg.FtLoopModelVersion,
+				EpochsCap:       s.cfg.FtLoraEpochsCap,
+				EarlyStopFactor: s.cfg.FtEarlyStopValLossFactor,
+				RepoDir:         repoDir,
+				InstanceID:      s.cfg.InstanceID,
+			})
+		s.goSupervised("ft-loop-controller", ctrl.Run)
+	}
 }
 
 // StartPeriodicConsolidation starts a background goroutine that consolidates conversation memory

@@ -1175,15 +1175,13 @@ func (d *Dispatcher) executeTriggerTrainingPipeline(ctx context.Context, spec RS
 		slog.Debug("RSIC trigger gate: suppressed", "decision", decision, "space", spec.TargetSpace)
 		return map[string]any{"action": spec.ActionType, "suppressed": true, "decision": decision}, nil
 	}
-	// decision == trigger: actuator enabled + fresh + clear. Until Epic 5's
-	// controller owns this path, surface the actionable signal once (the gate's
-	// interval/open-cycle checks already prevent spam).
-	out, aerr := d.executeAlertLog(ctx, spec, "Training data ready — launching retrain cycle")
-	if out != nil {
-		out["decision"] = decision
-		out["suppressed"] = false
-	}
-	return out, aerr
+	// decision == trigger: the gate has opened a cycle in the ledger; the
+	// supervised controller (a separate loop) consumes it out-of-band and
+	// alerts on the outcome (promote_pending / failed). No alert here — the
+	// ledger is the signal, and alerting on every trigger would re-introduce
+	// spam.
+	slog.Info("RSIC trigger gate: retrain cycle opened", "space", spec.TargetSpace)
+	return map[string]any{"action": spec.ActionType, "suppressed": false, "decision": decision, "cycle_opened": true}, nil
 }
 
 // executeAlertLog is a generic alert/log handler for RSIC-DATA and gap-fix actions.

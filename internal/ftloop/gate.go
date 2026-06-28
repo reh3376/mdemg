@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/nrednav/cuid2"
 
 	"mdemg/internal/tsdb"
 )
@@ -69,6 +70,7 @@ type GateConfig struct {
 	Enabled          bool
 	RetrainInterval  time.Duration
 	MinFreshFraction float64
+	ModelVersion     string // recorded on the opened cycle
 }
 
 // Gate consults the ledger + config to produce a Decision.
@@ -85,9 +87,31 @@ func NewGate(pool *pgxpool.Pool, cfg GateConfig) *Gate {
 
 // EvaluateTrigger adapts Evaluate to the consumer-side string+bool contract
 // (so the RSIC dispatcher consumes the gate without importing this package).
+// On a trigger decision it OPENS a cycle in the ledger — the controller (a
+// separate supervised loop) consumes it out-of-band (SPEC §5 fork 7). A failed
+// open downgrades to suppressed so the executor does not falsely alert.
 func (g *Gate) EvaluateTrigger(ctx context.Context) (decision string, suppressed bool, err error) {
 	d, e := g.Evaluate(ctx)
-	return string(d), d.IsSuppressed(), e
+	if e != nil {
+		return string(d), d.IsSuppressed(), e
+	}
+	if d == DecideTrigger {
+		if oerr := g.OpenCycle(ctx); oerr != nil {
+			return string(DecideSuppressOpenCycle), true, oerr
+		}
+	}
+	return string(d), d.IsSuppressed(), nil
+}
+
+// OpenCycle writes a fresh `triggered` cycle row (CUIDv2 id) for the controller
+// to pick up.
+func (g *Gate) OpenCycle(ctx context.Context) error {
+	return tsdb.RecordCycleEvent(ctx, g.pool, tsdb.FtCycleEvent{
+		CycleID:      cuid2.Generate(),
+		ModelVersion: g.cfg.ModelVersion,
+		Status:       tsdb.FtCycleTriggered,
+		Stage:        "triggered",
+	})
 }
 
 // Evaluate runs the full gate against the live ledger.

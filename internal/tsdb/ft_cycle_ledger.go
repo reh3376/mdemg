@@ -197,6 +197,23 @@ func OpenCycle(ctx context.Context, pool ftCycleQuerier) (*FtCycleState, error) 
 	return &st, nil
 }
 
+// CycleStatus returns the current (latest) status of a specific cycle, or
+// ("", false) if the cycle id is unknown.
+func CycleStatus(ctx context.Context, pool ftCycleQuerier, cycleID string) (FtCycleStatus, bool, error) {
+	if pool == nil {
+		return "", false, nil
+	}
+	const q = `SELECT status FROM ft_training_cycles WHERE cycle_id = $1 ORDER BY time DESC LIMIT 1`
+	var status string
+	if err := pool.QueryRow(ctx, q, cycleID).Scan(&status); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", false, nil
+		}
+		return "", false, err
+	}
+	return FtCycleStatus(status), true, nil
+}
+
 // FreshInteractionFraction returns the fraction of llm_interactions newer than
 // `since` over the total — the "is there new signal since we last trained"
 // trigger gate (SPEC §3). Returns 1.0 when there are no interactions (a fresh

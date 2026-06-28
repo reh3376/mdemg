@@ -177,14 +177,19 @@ func TestExecuteTriggerTrainingPipeline_SF2(t *testing.T) {
 		t.Errorf("expected suppressed deliverables, got %v", out)
 	}
 
-	// Trigger → alert fires (under the distinct rsic-<action> service from SF-3).
+	// Trigger → the gate opened a cycle; the executor does NOT alert (the
+	// controller owns outcome alerts) — cycle_opened=true, no spam.
 	capTrig := &captureAlertDispatcher{}
 	d2 := &Dispatcher{alertDispatcher: capTrig, trainingTriggerGate: fakeTriggerGate{decision: "trigger", suppressed: false}}
-	if _, err := d2.executeTriggerTrainingPipeline(context.Background(), spec); err != nil {
+	out2, err := d2.executeTriggerTrainingPipeline(context.Background(), spec)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if len(capTrig.services) != 1 || capTrig.services[0] != "rsic-trigger_training_pipeline" {
-		t.Errorf("trigger should alert under rsic-trigger_training_pipeline, got %v", capTrig.services)
+	if len(capTrig.services) != 0 {
+		t.Errorf("trigger must NOT alert (ledger is the signal), got %v", capTrig.services)
+	}
+	if out2["cycle_opened"] != true {
+		t.Errorf("trigger should report cycle_opened, got %v", out2)
 	}
 
 	// Nil gate → legacy alert (backward compat).
