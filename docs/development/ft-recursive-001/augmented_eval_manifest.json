@@ -1,0 +1,224 @@
+{
+  "artifact": "augmented-eval-pin",
+  "pinned_by": "FT-RECURSIVE-001 (Phase 6a, [AMD-2])",
+  "pinned_at": "2026-06-28",
+  "purpose": "SHA-pinned, leak-audited reference for the recursive-loop promotion gate. The eval JSONL + its build manifest live under training_data/eval/ which is gitignored (data), so the gate previously referenced an ad-hoc rebuild. This committed manifest pins the exact artifact + recipe + leak verdict the gate must use.",
+  "eval_file": {
+    "path": "training_data/eval/valid_clean.jsonl",
+    "sha256": "f215a34a6ffbf7149444525a189e1c46c3259466431c66c5e41ef48024149e4e",
+    "rows_total": 240,
+    "specs_total": 17,
+    "target_per_task": 20,
+    "built_at": "2026-06-13T13:10:51-0400",
+    "built_by_sprint": "FT-LORA-PHASE11.5c"
+  },
+  "recipe": {
+    "command": "python scripts/build_clean_eval.py --target-per-task 20 --config configs/benchmark_phase10.yaml",
+    "leak_audit_command": "python scripts/audit_eval_leakage.py --eval training_data/eval/valid_clean.jsonl --against training_data/sft/tier1/train.jsonl,training_data/sft/tier1/valid.jsonl,training_data/eval/valid_golden.jsonl --out <report>.json",
+    "leakage_sources": {
+      "training_data/sft/tier1/train.jsonl": {
+        "sha256": "d739a69c54da9f5de1a83d11181f84740b4817e044bd94ae0f60a87afb628aa6",
+        "rows": 3150,
+        "bytes": 23560399
+      },
+      "training_data/sft/tier1/valid.jsonl": {
+        "sha256": "031d1c08b95d8efb2fb29d72de4dcf4954f86d5d4bec905f1895e3a28da003f6",
+        "rows": 350,
+        "bytes": 2633001
+      },
+      "training_data/sft/family_classify_notink/train.jsonl": {
+        "sha256": "8d0fa1fefbba2e35c1f78e31d636e63851d6361aff78e2b6d73b8d50a8475c5c",
+        "rows": 1080,
+        "bytes": 7551789
+      },
+      "training_data/sft/family_classify_notink/valid.jsonl": {
+        "sha256": "9e2a02449ee340d6f2fec975f0052ebca9ff52e0b2c6cfdf6d374565c3041f3a",
+        "rows": 120,
+        "bytes": 846990
+      },
+      "training_data/sft/family_reasoning_think/train.jsonl": {
+        "sha256": "c170fcd0f3b24f07771a9b9e99b939d9297f8be82041764e0e78e124165fefde",
+        "rows": 1530,
+        "bytes": 11790137
+      },
+      "training_data/sft/family_reasoning_think/valid.jsonl": {
+        "sha256": "f70748246b5d4d87831ac5a2cb3699c987aa72c3df485bb65281722c43a86f68",
+        "rows": 170,
+        "bytes": 1305038
+      },
+      "training_data/sft/family_structured_notink/train.jsonl": {
+        "sha256": "5933678b92309c030646d0bdad33a022096b5e6c151ae598eb9277ef9972937e",
+        "rows": 540,
+        "bytes": 4169927
+      },
+      "training_data/sft/family_structured_notink/valid.jsonl": {
+        "sha256": "a5a0534b1fdb9220e1439357ab92e6857b8d5f15d029e68c9dd7e28031b0f804",
+        "rows": 60,
+        "bytes": 498486
+      },
+      "training_data/eval/valid_golden.jsonl": {
+        "sha256": "b2004783607cd4934b2da6a3e7d95f066e82a936d677bcfb42d246864116fe3e",
+        "rows": 108,
+        "bytes": 754358
+      }
+    }
+  },
+  "per_task": [
+    {
+      "task_name": "ape.reflect",
+      "sampling_group": "T",
+      "spec_hashes": [
+        "39b2bc11c799a5de6eb2dcb9c6fb29dec424de5a6bf865b353047320e0e1957c"
+      ],
+      "rows": 1000
+    },
+    {
+      "task_name": "consulting.classify",
+      "sampling_group": "C",
+      "spec_hashes": [
+        "d0d51f50deedba09e8cec236f5352f8d811b6227d88913f2d00312ce3f658377"
+      ],
+      "rows": 1000
+    },
+    {
+      "task_name": "consulting.synthesis",
+      "sampling_group": "T",
+      "spec_hashes": [],
+      "rows": 0
+    },
+    {
+      "task_name": "guardrail.evaluate",
+      "sampling_group": "J",
+      "spec_hashes": [
+        "6432d4ec634337cd9a176f74b367030cad8925e14a83ca448abcbf78a58f41f1",
+        "d73a725d8781f570b26af3804c20bd1c5e8998ba0a501a7be92ba43c07c183f2"
+      ],
+      "rows": 3
+    },
+    {
+      "task_name": "hidden.name_emergence",
+      "sampling_group": "J",
+      "spec_hashes": [
+        "bb90d13f0ae210ec0e916e5067aa7d9e3740f68e4f1c38bec21c7504b031a591",
+        "eefddf2ed714178a500f78a2ada0847f26e9c2f42dedeba2cd40b5f3c5152aff"
+      ],
+      "rows": 1000
+    },
+    {
+      "task_name": "hidden.reclassify",
+      "sampling_group": "C",
+      "spec_hashes": [
+        "2933a2e63f5be63e199c9849a4768bbee69fb21dcc12330550120d6619092c17"
+      ],
+      "rows": 781
+    },
+    {
+      "task_name": "hidden.summarize",
+      "sampling_group": "T",
+      "spec_hashes": [
+        "ddeac4afb6344d6e54067560361582195c24041f1a5f4d7c2df0901bd6d090a4"
+      ],
+      "rows": 72
+    },
+    {
+      "task_name": "jiminy.codegen",
+      "sampling_group": "C",
+      "spec_hashes": [
+        "0a82506152827fef03fc7fe7bfa6715e55c3391926549978c7d3e311b5a26832"
+      ],
+      "rows": 760
+    },
+    {
+      "task_name": "jiminy.evaluate",
+      "sampling_group": "C",
+      "spec_hashes": [
+        "caf70a3d392f37d4d5b2d70d10b03d07b59a2f1cf18ed8cfd75d597cafa0a773"
+      ],
+      "rows": 213
+    },
+    {
+      "task_name": "jiminy.evaluate_llm",
+      "sampling_group": "J",
+      "spec_hashes": [
+        "6b41aab39bfd43c02e30aeb2046ad2515551efa24275fb00724644b8d9ce3f38",
+        "8e38851cb1b8d2a62f611ee99f8ac7ec0ecb881b8c6b390ab2d273298f416703"
+      ],
+      "rows": 974
+    },
+    {
+      "task_name": "jiminy.synthesize",
+      "sampling_group": "T",
+      "spec_hashes": [
+        "8cf0ae2dbba97fcc627342e27653139b78bd1a04ce1a07556bb85c94a1937f39"
+      ],
+      "rows": 452
+    },
+    {
+      "task_name": "metalearn.generalize",
+      "sampling_group": "T",
+      "spec_hashes": [
+        "3f44c1ae2583659b84937846392c2cd69303e9eacc9c6745530a6cddeedea5f2"
+      ],
+      "rows": 0
+    },
+    {
+      "task_name": "retrieval.intent_translate",
+      "sampling_group": "C",
+      "spec_hashes": [
+        "fe1c14a2c1504ae7833f5cf58c22063db0d069dca823ed8e7e751eea8cf697e5"
+      ],
+      "rows": 1000
+    },
+    {
+      "task_name": "retrieval.query_classify",
+      "sampling_group": "C",
+      "spec_hashes": [
+        "dd598bef7150afc2b44764ee53d47e66992966e8a65be850f9d8d92f93c04a8a"
+      ],
+      "rows": 1000
+    },
+    {
+      "task_name": "retrieval.rerank_cross",
+      "sampling_group": "J",
+      "spec_hashes": [
+        "8a7750d2893929ed53fed531021190be391fd231d792df519f892a06d024046b",
+        "1f0f374d83bf6eb7d60d940cb46ef6c80e4eee8ce36db21242e121014e441ddb"
+      ],
+      "rows": 1000
+    },
+    {
+      "task_name": "retrieval.rerank_nli",
+      "sampling_group": "T",
+      "spec_hashes": [
+        "1f0f374d83bf6eb7d60d940cb46ef6c80e4eee8ce36db21242e121014e441ddb"
+      ],
+      "rows": 0
+    },
+    {
+      "task_name": "summarize.generate",
+      "sampling_group": "T",
+      "spec_hashes": [
+        "6f5be281b9d99b9bfd396e626c51e6507df7f5423ecd9a3cfa84ca0e2adeaeb7"
+      ],
+      "rows": 0
+    }
+  ],
+  "leak_audit": {
+    "verdict": "clean",
+    "eval_rows": 240,
+    "overlapping_prompts": 0,
+    "audited_against": [
+      "training_data/sft/tier1/train.jsonl",
+      "training_data/sft/tier1/valid.jsonl",
+      "training_data/eval/valid_golden.jsonl"
+    ],
+    "note": "build_clean_eval.py subtracts all 9 LEAKAGE_SOURCES at build time; this is the independent post-build audit_eval_leakage.py verdict over the sources present on disk.",
+    "eval_total": 240
+  },
+  "gating_policy": {
+    "use_with": "live valid_clean.jsonl + the 16-task augmented set (never valid_clean alone) \u2014 [AMD-2]",
+    "valid_golden_barred": true,
+    "valid_golden_reason": "~99% leaked with training data; permanently barred from gating (Phase 11.5d precedent).",
+    "dual_gate": "5a vs current production aggregate (the model being replaced) / 5b vs fresh-merge \u22640.005"
+  }
+}
