@@ -65,6 +65,29 @@ type OrchestrationPolicy struct {
 
 	// sessionCounters tracks session counts per space for meso periodic
 	sessionCounters map[string]*SessionCounter // key: spaceID
+
+	// quiesceUntil pauses RSIC trigger admission while a recursive-retrain
+	// cycle holds the compute lease (FT-RECURSIVE-002 Epic 4). Zero = not
+	// quiesced. New triggers are rejected while held; already-active cycles are
+	// untouched (the overlap check owns those).
+	quiesceUntil time.Time
+}
+
+// Quiesce pauses new trigger admission until `until` (FT-RECURSIVE-002): the
+// recursive-retrain controller calls this around a training run so RSIC's
+// LLM-heavy reflection cycles do not contend with the ~36 GB trainer. A zero or
+// past time clears the quiesce.
+func (p *OrchestrationPolicy) Quiesce(until time.Time) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.quiesceUntil = until
+}
+
+// IsQuiesced reports whether trigger admission is currently paused.
+func (p *OrchestrationPolicy) IsQuiesced() bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return !p.quiesceUntil.IsZero() && time.Now().Before(p.quiesceUntil)
 }
 
 // NewOrchestrationPolicy creates a new policy from config.
@@ -132,6 +155,18 @@ func (p *OrchestrationPolicy) EvaluateTrigger(source TriggerSource, spaceID stri
 		return TriggerDecision{
 			Allowed: false,
 			Reason:  fmt.Sprintf("source %s cannot trigger tier %s", source, tier),
+			Meta:    meta,
+		}
+	}
+
+	// 1b. Quiesce gate (FT-RECURSIVE-002): a recursive-retrain cycle holds the
+	// compute lease — pause new RSIC triggers so reflection LLM fan-out does
+	// not contend with the trainer. Already-active cycles are unaffected.
+	if !p.quiesceUntil.IsZero() && now.Before(p.quiesceUntil) {
+		metrics.Metrics().RSICTriggerRejected(string(source), "quiesced").Inc()
+		return TriggerDecision{
+			Allowed: false,
+			Reason:  fmt.Sprintf("RSIC quiesced for recursive-retrain until %s", p.quiesceUntil.Format(time.RFC3339)),
 			Meta:    meta,
 		}
 	}
