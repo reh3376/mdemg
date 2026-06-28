@@ -1223,6 +1223,11 @@ type Config struct {
 	TrainingReadinessThreshold          int            // TRAINING_READINESS_THRESHOLD — minimum rows per task to be training-ready (replaces hardcoded DefaultReadinessThreshold=500)
 	TrainingReadinessThresholdOverrides map[string]int // TRAINING_READINESS_THRESHOLD_OVERRIDES — per-task JSON overrides, e.g. {"consulting.classify":300}
 
+	// FT recursive-retrain trigger gate (FT-RECURSIVE-002 Phase 6b)
+	FtLoopEnabled                 bool    // FT_LOOP_ENABLED — master gate for the recursive-retrain actuator; default false keeps it dormant (the no-op→real cutover is reversible by config). When false the trigger insight is suppressed (readiness stays observable via `mdemg data status` + the SF-1 heartbeat).
+	FtLoopMinRetrainIntervalHours int     // FT_LOOP_MIN_RETRAIN_INTERVAL_HOURS — suppress a new trigger if a cycle started within this window (single-flight at retrain scale, not the RSIC seconds cooldown) (default: 168 = 7 days)
+	FtLoopMinFreshFraction        float64 // FT_LOOP_MIN_FRESH_FRACTION — minimum fraction of interactions newer than the last cycle before retraining (retrain on new signal, never the same corpus) (default: 0.30)
+
 	// MAINT-LIVE-001 — maintenance liveness (only-ever-dry-runs detection).
 	MaintLiveAlertEnabled bool // MAINT_LIVE_ALERT_ENABLED — enable the maintenance_no_live_run rule (default: true)
 	MaintLiveLookbackDays int  // MAINT_LIVE_LOOKBACK_DAYS — window in which at least one live (dry_run=false) maintenance run must appear when any maintenance runs exist (default: 8)
@@ -4630,6 +4635,21 @@ func FromEnv() (Config, error) {
 			}
 		}
 	}
+	ftLoopEnabled := getBool("FT_LOOP_ENABLED", false)
+	ftLoopMinRetrainIntervalHours, err := atoi("FT_LOOP_MIN_RETRAIN_INTERVAL_HOURS", 168)
+	if err != nil {
+		return Config{}, err
+	}
+	if ftLoopMinRetrainIntervalHours < 1 {
+		return Config{}, errors.New("FT_LOOP_MIN_RETRAIN_INTERVAL_HOURS must be >= 1")
+	}
+	ftLoopMinFreshFraction, err := atof("FT_LOOP_MIN_FRESH_FRACTION", 0.30)
+	if err != nil {
+		return Config{}, err
+	}
+	if ftLoopMinFreshFraction < 0 || ftLoopMinFreshFraction > 1 {
+		return Config{}, errors.New("FT_LOOP_MIN_FRESH_FRACTION must be in [0,1]")
+	}
 	maintLiveAlertEnabled := getBool("MAINT_LIVE_ALERT_ENABLED", true)
 	maintLiveLookbackDays, err := atoi("MAINT_LIVE_LOOKBACK_DAYS", 8)
 	if err != nil {
@@ -5467,6 +5487,9 @@ func FromEnv() (Config, error) {
 		ExportRetentionHours:         exportRetentionHours,
 		TrainingReadinessThreshold:          trainingReadinessThreshold,
 		TrainingReadinessThresholdOverrides: trainingReadinessThresholdOverrides,
+		FtLoopEnabled:                       ftLoopEnabled,
+		FtLoopMinRetrainIntervalHours:       ftLoopMinRetrainIntervalHours,
+		FtLoopMinFreshFraction:              ftLoopMinFreshFraction,
 		MaintLiveAlertEnabled:        maintLiveAlertEnabled,
 		MaintLiveLookbackDays:        maintLiveLookbackDays,
 		JobBackupStalenessHours:      jobBackupStalenessHours,

@@ -29,6 +29,7 @@ import (
 	"mdemg/internal/embeddings"
 	"mdemg/internal/eventgraph"
 	"mdemg/internal/filewatcher"
+	"mdemg/internal/ftloop"
 	"mdemg/internal/gaps"
 	"mdemg/internal/guardrail"
 	"mdemg/internal/hidden"
@@ -1341,6 +1342,13 @@ func (s *Server) SetTSDBClient(client *tsdb.Client) {
 			datasetBuilder := tsdb.NewDatasetBuilder(client.Pool()).
 				SetReadinessThresholds(s.cfg.TrainingReadinessThreshold, s.cfg.TrainingReadinessThresholdOverrides)
 			s.rsicCycle.SetDatasetProvider(datasetBuilder)
+			// FT-RECURSIVE-002: wire the trigger gate (SF-2) — it needs the
+			// TSDB pool (available here) to read the ft_training_cycles ledger.
+			s.rsicCycle.SetTrainingTriggerGate(ftloop.NewGate(client.Pool(), ftloop.GateConfig{
+				Enabled:          s.cfg.FtLoopEnabled,
+				RetrainInterval:  time.Duration(s.cfg.FtLoopMinRetrainIntervalHours) * time.Hour,
+				MinFreshFraction: s.cfg.FtLoopMinFreshFraction,
+			}))
 		}
 		slog.Info("tsdb: metric writer attached", "flush_interval_sec", s.cfg.TSDBFlushIntervalSec)
 

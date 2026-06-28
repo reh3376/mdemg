@@ -197,6 +197,33 @@ func OpenCycle(ctx context.Context, pool ftCycleQuerier) (*FtCycleState, error) 
 	return &st, nil
 }
 
+// FreshInteractionFraction returns the fraction of llm_interactions newer than
+// `since` over the total — the "is there new signal since we last trained"
+// trigger gate (SPEC §3). Returns 1.0 when there are no interactions (a fresh
+// corpus is trivially "all new"). The fraction is a coarse all-task proxy; the
+// controller refines per-task at curation time.
+func FreshInteractionFraction(ctx context.Context, pool ftCycleQuerier, since time.Time) (float64, error) {
+	if pool == nil {
+		return 1.0, nil
+	}
+	const q = `
+		SELECT
+			COUNT(*) FILTER (WHERE time > $1)::float8 AS fresh,
+			COUNT(*)::float8 AS total
+		FROM llm_interactions`
+	var fresh, total float64
+	if err := pool.QueryRow(ctx, q, since).Scan(&fresh, &total); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return 1.0, nil
+		}
+		return 0, err
+	}
+	if total <= 0 {
+		return 1.0, nil
+	}
+	return fresh / total, nil
+}
+
 // LastCycleStart returns the most recent cycle's first (triggered) timestamp,
 // for the retrain-interval gate. ok=false when no cycle has ever run.
 func LastCycleStart(ctx context.Context, pool ftCycleQuerier) (time.Time, bool, error) {

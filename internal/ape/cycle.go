@@ -570,6 +570,14 @@ func (c *CycleOrchestrator) SetDatasetProvider(p tsdb.DatasetProvider) {
 	}
 }
 
+// SetTrainingTriggerGate forwards the FT-RECURSIVE-002 trigger gate to the
+// dispatcher (it gates trigger_training_pipeline — SF-2).
+func (c *CycleOrchestrator) SetTrainingTriggerGate(g TrainingTriggerGate) {
+	if c.dispatcher != nil {
+		c.dispatcher.SetTrainingTriggerGate(g)
+	}
+}
+
 // SetTierEffectivenessProvider attaches a tier effectiveness dataset builder for RSIC.
 func (c *CycleOrchestrator) SetTierEffectivenessProvider(p TierEffectivenessProvider) {
 	c.tierEffProvider = p
