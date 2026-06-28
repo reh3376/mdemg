@@ -198,6 +198,10 @@ Use "mdemg <command> --help" for more information about a command.`,
 	eventgraphCmd.GroupID = "advanced"
 	rootCmd.AddCommand(eventgraphCmd)
 
+	ftLoopCmd := newFtLoopCmd()
+	ftLoopCmd.GroupID = "advanced"
+	rootCmd.AddCommand(ftLoopCmd)
+
 	// Advanced
 	mcpCmd := newMCPCmd()
 	mcpCmd.GroupID = "advanced"
