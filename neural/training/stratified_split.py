@@ -43,7 +43,7 @@ from training.recurate import SPRINT_PLAN_RAW_SHA_PIN  # noqa: E402
 
 # Sprint C model config pin (docs/development/ft-lora/sprint_plan_ft_lora_data.md §1)
 SPRINT_C_MODEL_CONFIG_SHA = (
-    "cdc167566e54ebe6d5c6df308649670b5f1cacfe71a198688edba8471ea64734"
+    "a54ec18ffe24f3c909e9556471dc156ed9b3b61b872008831c7cba9d4768b4a5"
 )
 
 # Plan §5 Epic 4 — 90/10 split ratio (train:valid)

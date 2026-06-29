@@ -80,9 +80,13 @@ FT_OAI_001_REF = (
     "val_loss degradation."
 )
 
-# Sprint C config.json SHA pin (Gate 3).
+# Base config.json SHA pin (Gate 3). Updated 2026-06-29 (FT-RECURSIVE-002
+# Epic 6 E6-8): upstream mlx-community/Qwen3-14B-4bit re-published its config
+# (old Sprint-C pin cdc167566e… → a54ec18f…). Verified byte-identical to the
+# production model (qwen3-14b-mdemg-v1) config, so the base is functionally
+# unchanged — the pin had simply rotted. Drift-guard preserved at the new value.
 SPRINT_C_CONFIG_SHA = (
-    "cdc167566e54ebe6d5c6df308649670b5f1cacfe71a198688edba8471ea64734"
+    "a54ec18ffe24f3c909e9556471dc156ed9b3b61b872008831c7cba9d4768b4a5"
 )
 
 # Canonical family names (hyphen form = CLI flag; underscore form = file).
