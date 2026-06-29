@@ -1212,6 +1212,7 @@ type Config struct {
 	OrphanRatioMinNodes  int     // ORPHAN_RATIO_MIN_NODES — minimum per-space node count for a space to be eligible to fire the orphan alerts; excludes tiny test/scratch spaces (1-node space = ratio 1.0) (default: 50)
 	OrphanRatioThreshold float64 // ORPHAN_RATIO_THRESHOLD — fire High Orphan Ratio when max live-orphan ratio among significant spaces exceeds this (default: 0.10)
 	OrphanCountThreshold int     // ORPHAN_COUNT_THRESHOLD — fire High Orphan Count when max live-orphan count among significant spaces exceeds this (default: 1000; above the accepted historical baseline — ratio rule is the scale-aware primary)
+	GraphHealthScoreFloor float64 // GRAPH_HEALTH_SCORE_FLOOR — fire Low Graph Health when the MIN graph-health score among significant spaces drops below this (default: 0.5; same min-node floor as the orphan rules so degenerate 1-2-node test spaces can't trip it)
 
 	// FT recursive-loop readiness staleness (FT-RECURSIVE-001 SF-1)
 	FtReadinessStalenessMin int // FT_READINESS_STALENESS_MIN — fire training_readiness_stale when no successful RSIC readiness assessment within this many minutes; catches a silently-dormant loop (default: 30; RSIC assesses every ~5 min)
@@ -4616,6 +4617,13 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	graphHealthScoreFloor, err := atof("GRAPH_HEALTH_SCORE_FLOOR", 0.5)
+	if err != nil {
+		return Config{}, err
+	}
+	if graphHealthScoreFloor < 0 || graphHealthScoreFloor > 1 {
+		return Config{}, errors.New("GRAPH_HEALTH_SCORE_FLOOR must be in [0,1]")
+	}
 	ftReadinessStalenessMin, err := atoi("FT_READINESS_STALENESS_MIN", 30)
 	if err != nil {
 		return Config{}, err
@@ -5531,6 +5539,7 @@ func FromEnv() (Config, error) {
 		OrphanRatioMinNodes:          orphanRatioMinNodes,
 		OrphanRatioThreshold:         orphanRatioThreshold,
 		OrphanCountThreshold:         orphanCountThreshold,
+		GraphHealthScoreFloor:        graphHealthScoreFloor,
 		FtReadinessStalenessMin:      ftReadinessStalenessMin,
 		ExportRetentionHours:         exportRetentionHours,
 		TrainingReadinessThreshold:          trainingReadinessThreshold,

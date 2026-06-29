@@ -59,22 +59,10 @@ func DefaultRules() []AlertRule {
 			Operator:  "gt",
 			Enabled:   true,
 		},
-		{
-			ID:          "low_graph_health",
-			Title:       "MDEMG Low Graph Health Score",
-			Service:     "graph-health",
-			Severity:    SeverityMedium,
-			Interval:    60 * time.Second,
-			ForDuration: 10 * time.Minute,
-			QuerySQL: `SELECT value FROM metric_samples
-				WHERE metric_name = 'mdemg_neo4j_graph_health_score'
-				  AND metric_type = 'gauge'
-				  AND time > now() - interval '10 minutes'
-				ORDER BY time DESC LIMIT 1`,
-			Threshold: 0.5,
-			Operator:  "lt",
-			Enabled:   true,
-		},
+		// low_graph_health extracted to OrphanRules() (ORPHAN-ALERT-001 follow-up)
+		// — it had the same `ORDER BY time DESC LIMIT 1` + no-floor defect: the
+		// degenerate `global` test space (health 0.0) tripped it while mdemg-dev
+		// was healthy (0.995).
 		// high_orphan_count + high_orphan_ratio extracted to OrphanRules()
 		// (ORPHAN-ALERT-001) — they needed a minimum-node significance floor
 		// (1-node test spaces were tripping ratio=1.0) and deterministic
@@ -215,8 +203,12 @@ func DefaultRules() []AlertRule {
 //
 // minNodes ≤ 0 → 50; ratioThreshold ≤ 0 → 0.10; countThreshold ≤ 0 → 1000
 // (above mdemg-dev's accepted historical-orphan baseline — the ratio rule is
-// the scale-aware primary signal; the count rule catches an absolute spike).
-func OrphanRules(minNodes int, ratioThreshold float64, countThreshold int) []AlertRule {
+// the scale-aware primary signal; the count rule catches an absolute spike);
+// healthFloor ≤ 0 → 0.5. The low_graph_health rule (ORPHAN-ALERT-001 follow-up)
+// shares the same min-node floor + deterministic aggregation — it had the same
+// `ORDER BY time DESC LIMIT 1`/no-floor defect (the degenerate `global` space's
+// 0.0 health tripped it).
+func OrphanRules(minNodes int, ratioThreshold float64, countThreshold int, healthFloor float64) []AlertRule {
 	if minNodes <= 0 {
 		minNodes = 50
 	}
@@ -225,6 +217,9 @@ func OrphanRules(minNodes int, ratioThreshold float64, countThreshold int) []Ale
 	}
 	if countThreshold <= 0 {
 		countThreshold = 1000
+	}
+	if healthFloor <= 0 {
+		healthFloor = 0.5
 	}
 	// Shared per-space CTEs: latest orphan + node gauge per space, joined and
 	// floor-gated. MAX picks the worst SIGNIFICANT space; COALESCE makes an
@@ -282,6 +277,43 @@ func OrphanRules(minNodes int, ratioThreshold float64, countThreshold int) []Ale
 				FROM latest l JOIN nodes n ON l.space_id = n.space_id`, minNodes),
 			Threshold: ratioThreshold,
 			Operator:  "gt",
+			Enabled:   true,
+		},
+		{
+			ID:          "low_graph_health",
+			Title:       "MDEMG Low Graph Health Score",
+			Service:     "graph-health", // distinct from -count / -ratio
+			Severity:    SeverityMedium,
+			Interval:    60 * time.Second,
+			ForDuration: 10 * time.Minute,
+			// MIN health among SIGNIFICANT spaces (total_nodes >= minNodes);
+			// COALESCE to 1.0 (healthy) when none — idle-safe, deterministic, no
+			// `ORDER BY … LIMIT 1` (TSDB-CONSUME-001 contract). Degenerate 1-2
+			// node test spaces (e.g. `global` at health 0.0) are excluded.
+			QuerySQL: `WITH health AS (
+				  SELECT DISTINCT ON (labels->>'space_id')
+				    labels->>'space_id' AS space_id, value AS score
+				  FROM metric_samples
+				  WHERE metric_name = 'mdemg_neo4j_graph_health_score'
+				    AND metric_type = 'gauge'
+				    AND time > now() - interval '15 minutes'
+				  ORDER BY labels->>'space_id', time DESC
+				),
+				nodes AS (
+				  SELECT DISTINCT ON (labels->>'space_id')
+				    labels->>'space_id' AS space_id, value AS total_nodes
+				  FROM metric_samples
+				  WHERE metric_name = 'mdemg_neo4j_graph_nodes'
+				    AND metric_type = 'gauge'
+				    AND time > now() - interval '15 minutes'
+				  ORDER BY labels->>'space_id', time DESC
+				)
+				SELECT COALESCE(MIN(
+				  CASE WHEN n.total_nodes >= ` + fmt.Sprintf("%d", minNodes) + ` THEN h.score ELSE NULL END
+				), 1.0) AS min_health
+				FROM health h JOIN nodes n ON h.space_id = n.space_id`,
+			Threshold: healthFloor,
+			Operator:  "lt",
 			Enabled:   true,
 		},
 	}

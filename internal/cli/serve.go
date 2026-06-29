@@ -483,7 +483,7 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 			// and deterministic idle-safe aggregation.
 			rules = append(rules, alert.OrphanRules(
 				cfg.OrphanRatioMinNodes, cfg.OrphanRatioThreshold,
-				cfg.OrphanCountThreshold)...)
+				cfg.OrphanCountThreshold, cfg.GraphHealthScoreFloor)...)
 			// FT-RECURSIVE-001 SF-1: alert when the RSIC readiness assessment
 			// heartbeat goes stale (a silent query failure dormant-loops it).
 			rules = append(rules, alert.ReadinessStalenessRule(
