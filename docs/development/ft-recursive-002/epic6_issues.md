@@ -16,6 +16,9 @@ llama-server `:8102` → 200; `consulting.classify` Ready (4782 rows).
 | E6-4 | No MLX→GGUF conversion stage between train and gate (the run_record rule: candidate evals always use the GGUF form). | controller pipeline | [6b-followup] add a convert stage |
 | E6-5 | Curate `--input-dir` (exported JSONL) has no producer in the loop — the controller must run `mdemg data export` (or read TSDB) to materialize the curate input. | controller pipeline | **[SOLVED]** `mdemg data export --tables llm_interactions[,…] --since … --output <tar>` → extract `llm_interactions.jsonl` into `<input-dir>/`. The export schema matches `quality_filter`'s `TEXT_FIELDS` exactly. |
 
+| E6-8 | **Train base-model SHA pin is STALE (drift-guard rot).** `train_ft.SPRINT_C_CONFIG_SHA = cdc167566e…` but upstream `mlx-community/Qwen3-14B-4bit` `config.json` is now `a54ec18f…` (re-published since the pin). A real retrain **drift-aborts**. Verified: the current upstream config is **byte-identical** to the local production model's config (`qwen3-14b-mdemg-v1`), so the base is functionally the production base; the pin just rotted. Same class as the run_record's "configs rot at cutovers" — now for the base-model pin. | `neural/training/train_ft.py:83`; `expert_selection.py:10` | **[decision]** update the pin to `a54ec18f…` (safe — identical to production) **or** pin to a specific HF revision. A deliberate provenance call (the pin is a drift-guard) — surfaced, not silently bypassed. |
+| E6-9 | **The dense 4bit base model dir is absent locally** (not in HF cache or `.local-models`; only the fine-tune + bf16 dequants are present). Train needs `--base-model <dir>` = the dense `Qwen3-14B-4bit` (~8 GB download). | `.local-models/` | [6b-continuation] download `mlx-community/Qwen3-14B-4bit` after the pin decision (E6-8) |
+
 ## Stage-1 (data-prep + curate) — VALIDATED (2026-06-29)
 
 Empirically validated against the live system (the exact commands the controller will wire):
