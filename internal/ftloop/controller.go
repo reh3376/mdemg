@@ -12,7 +12,9 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -214,14 +216,46 @@ func (c *Controller) reportStage(ctx context.Context, cycleID, stage string, dur
 // arg sets are validated live in Epic 6 (the manual FT-CLASSIFY-002 run is the
 // reference); this is the supervised-subprocess wiring + working dir + the
 // no-zero-call discipline. Runs under ctx so a shutdown cancels the trainer.
+//
+// E6-1: resolves the training interpreter — `mlx_lm` lives in `neural/.venv`,
+// not the system python. E6-2: per-stage working dir — `training.*` modules
+// import from `neural/`, `neural.benchmarks.*` from the repo root.
 func (c *Controller) execPythonStage(ctx context.Context, stage string, args []string) error {
-	cmd := exec.CommandContext(ctx, c.cfg.PythonBin, args...) //nolint:gosec // G204: args are controller-constructed, not user input
-	cmd.Dir = c.cfg.RepoDir
+	cmd := exec.CommandContext(ctx, c.resolvePython(), args...) //nolint:gosec // G204: args are controller-constructed, not user input
+	cmd.Dir = c.stageDir(stage)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("stage %s: %w (output tail: %s)", stage, err, tail(out, 400))
 	}
 	return nil
+}
+
+// resolvePython prefers the neural venv interpreter (where mlx_lm is installed)
+// when PythonBin is the bare default; an explicit non-default PythonBin wins.
+func (c *Controller) resolvePython() string {
+	if c.cfg.PythonBin != "" && c.cfg.PythonBin != "python3" {
+		return c.cfg.PythonBin
+	}
+	venv := filepath.Join(c.cfg.RepoDir, "neural", ".venv", "bin", "python")
+	if _, err := os.Stat(venv); err == nil {
+		return venv
+	}
+	if c.cfg.PythonBin != "" {
+		return c.cfg.PythonBin
+	}
+	return "python3"
+}
+
+// stageDir is the working dir for a stage: training stages run from neural/
+// (their modules are `training.*`); the gate runs from the repo root
+// (`neural.benchmarks.*`).
+func (c *Controller) stageDir(stage string) string {
+	switch stage {
+	case "curate", "train":
+		return filepath.Join(c.cfg.RepoDir, "neural")
+	default:
+		return c.cfg.RepoDir
+	}
 }
 
 func tail(b []byte, n int) string {
