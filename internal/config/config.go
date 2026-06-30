@@ -941,6 +941,15 @@ type Config struct {
 	L5GroundingInitialWeight float64 // L5_GROUNDING_INITIAL_WEIGHT — initial weight for GROUNDED_BY edges (default: 0.5)
 	EdgeAttentionGroundedBy  float64 // EDGE_ATTENTION_GROUNDED_BY — attention weight for GROUNDED_BY edges (default: 0.70)
 
+	// Typed semantic-edge attention weights (RETRIEVAL-TYPED-EDGES-001 — were hardcoded in activation.go).
+	EdgeAttentionAnalogousTo   float64 // EDGE_ATTENTION_ANALOGOUS_TO — attention weight for ANALOGOUS_TO edges (default: 0.55)
+	EdgeAttentionBridges       float64 // EDGE_ATTENTION_BRIDGES — attention weight for BRIDGES edges (default: 0.60)
+	EdgeAttentionComposesWith  float64 // EDGE_ATTENTION_COMPOSES_WITH — attention weight for COMPOSES_WITH edges (default: 0.50)
+	EdgeAttentionContrastsWith float64 // EDGE_ATTENTION_CONTRASTS_WITH — attention weight for CONTRASTS_WITH edges (default: 0.40)
+	EdgeAttentionInfluences    float64 // EDGE_ATTENTION_INFLUENCES — attention weight for INFLUENCES edges (default: 0.45)
+	EdgeAttentionDefinesSymbol float64 // EDGE_ATTENTION_DEFINES_SYMBOL — attention weight for DEFINES_SYMBOL edges (default: 0.70)
+	EdgeAttentionThemeOf       float64 // EDGE_ATTENTION_THEME_OF — attention weight for THEME_OF edges (default: 0.65)
+
 	// ===== ANN Optimization: Cluster Summary =====
 	ClusterSummaryEnabled   bool   // CLUSTER_SUMMARY_ENABLED — enable LLM cluster summarization for L1-L4 (default: false)
 	ClusterSummaryProvider  string // CLUSTER_SUMMARY_PROVIDER — LLM provider for summaries (openai/ollama, default: cascade)
@@ -3919,6 +3928,34 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	edgeAttentionAnalogousTo, err := atof("EDGE_ATTENTION_ANALOGOUS_TO", 0.55)
+	if err != nil {
+		return Config{}, err
+	}
+	edgeAttentionBridges, err := atof("EDGE_ATTENTION_BRIDGES", 0.60)
+	if err != nil {
+		return Config{}, err
+	}
+	edgeAttentionComposesWith, err := atof("EDGE_ATTENTION_COMPOSES_WITH", 0.50)
+	if err != nil {
+		return Config{}, err
+	}
+	edgeAttentionContrastsWith, err := atof("EDGE_ATTENTION_CONTRASTS_WITH", 0.40)
+	if err != nil {
+		return Config{}, err
+	}
+	edgeAttentionInfluences, err := atof("EDGE_ATTENTION_INFLUENCES", 0.45)
+	if err != nil {
+		return Config{}, err
+	}
+	edgeAttentionDefinesSymbol, err := atof("EDGE_ATTENTION_DEFINES_SYMBOL", 0.70)
+	if err != nil {
+		return Config{}, err
+	}
+	edgeAttentionThemeOf, err := atof("EDGE_ATTENTION_THEME_OF", 0.65)
+	if err != nil {
+		return Config{}, err
+	}
 
 	// ===== ANN Optimization: Negative Feedback =====
 	learningNegativeWeight, err := atof("LEARNING_NEGATIVE_WEIGHT", 0.15)
@@ -5474,6 +5511,13 @@ func FromEnv() (Config, error) {
 		L5GroundingMinSim:        l5GroundingMinSim,
 		L5GroundingInitialWeight: l5GroundingInitialWeight,
 		EdgeAttentionGroundedBy:  edgeAttentionGroundedBy,
+		EdgeAttentionAnalogousTo:   edgeAttentionAnalogousTo,
+		EdgeAttentionBridges:       edgeAttentionBridges,
+		EdgeAttentionComposesWith:  edgeAttentionComposesWith,
+		EdgeAttentionContrastsWith: edgeAttentionContrastsWith,
+		EdgeAttentionInfluences:    edgeAttentionInfluences,
+		EdgeAttentionDefinesSymbol: edgeAttentionDefinesSymbol,
+		EdgeAttentionThemeOf:       edgeAttentionThemeOf,
 
 		// ANN Optimization: Cluster Summary
 		ClusterSummaryEnabled:   clusterSummaryEnabled,

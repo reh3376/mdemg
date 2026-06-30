@@ -241,13 +241,15 @@ func ComputeEdgeAttention(ctx QueryContext, cfg config.Config) EdgeAttentionWeig
 	}
 
 	// Set weights for dynamic edge types (Phase 75)
-	weights.AnalogousTo = 0.55
-	weights.Bridges = 0.60
-	weights.ComposesWith = 0.50
-	weights.ContrastsWith = 0.40
-	weights.Influences = 0.45
-	weights.DefinesSymbol = 0.70
-	weights.ThemeOf = 0.65
+	// Typed semantic-edge weights — config-driven (RETRIEVAL-TYPED-EDGES-001;
+	// were hardcoded). Defaults preserve the prior literals.
+	weights.AnalogousTo = cfg.EdgeAttentionAnalogousTo
+	weights.Bridges = cfg.EdgeAttentionBridges
+	weights.ComposesWith = cfg.EdgeAttentionComposesWith
+	weights.ContrastsWith = cfg.EdgeAttentionContrastsWith
+	weights.Influences = cfg.EdgeAttentionInfluences
+	weights.DefinesSymbol = cfg.EdgeAttentionDefinesSymbol
+	weights.ThemeOf = cfg.EdgeAttentionThemeOf
 
 	// Set weights for parser-derived edge types (Phase 75A)
 	weights.Imports = 0.50
