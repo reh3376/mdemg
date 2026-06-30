@@ -1,4 +1,11 @@
-# FT-RECURSIVE-002 Epic 6 — Live Gated Cycle (run plan, next session)
+# FT-RECURSIVE-002 Epic 6 — Live Gated Cycle (run plan)
+
+> ✅ **EXECUTED 2026-06-29/30.** Every pipeline stage was validated live and the
+> controller wired with the proven commands (PRs #488/#489/#492); the
+> orchestration (lease/quiesce/ledger/FAIL) ran live in "Option A". Outcomes are
+> in `epic6_issues.md` + `run_record.md`. The one remaining item is a single
+> *enabled* tiny-subset integration drill off-peak. This file is retained as the
+> original run plan.
 
 The actuator (Epics 0–5) is merged **default-off**. Epic 6 is the SPEC's exit
 criterion: a real gated cycle end-to-end with `FT_LOOP_ENABLED=true`, plus the

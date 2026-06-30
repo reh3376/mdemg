@@ -1,11 +1,14 @@
 # FT-RECURSIVE-002 (Phase 6b) — Post
 
-**Status: actuator SHIPPED default-off (Epics 0–5 + docs); live gated cycle (Epic 6) deferred to the next session by operator decision.** · 2026-06-28 · branch `reh3376_dev01` · PR #486
+**Status: SHIPPED — actuator default-off (Epics 0–5, PR #486) + Epic 6 pipeline wired & validated live (PRs #488/#489/#492).** · 2026-06-28 → 2026-06-30 · branch `reh3376_dev01`
 
 The no-op `trigger_training_pipeline` actuator is now a real, supervised
-controller — but it ships **dormant behind `FT_LOOP_ENABLED=false`**, so nothing
-trains or mutates serving state until the operator opts in. The enabled path's
-live validation (a real SFT cycle + the FAIL path) is Epic 6, run next session.
+controller — shipping **dormant behind `FT_LOOP_ENABLED=false`**, so nothing
+trains or mutates serving state until the operator opts in. **Epic 6 (2026-06-29/30)
+wired the controller's five stages with the exact export→curate→train→convert→gate
+commands, each validated live against the real system**, and caught + fixed a real
+latent bug (the stale base-model SHA pin, E6-8). The one remaining item is a
+single *enabled* tiny-subset integration drill off-peak.
 
 ## Shipped (Epics 0–5 + 7)
 1. **Epic 1 — ledger.** `ft_training_cycles` (V0002, first writer): event-sourced
@@ -43,14 +46,31 @@ live validation (a real SFT cycle + the FAIL path) is Epic 6, run next session.
 - **Tier 3 (live, partial — the safe default-off surface):** controller dormant
   when disabled; **SF-2 suppression confirmed** (0 trigger dispatches post-restart).
 
-## ⚠️ Deferred to Epic 6 (next session)
-- **The real gated cycle** end-to-end with `FT_LOOP_ENABLED=true` on a fast Ready
-  task, + the FAIL path, + the lease/quiesce drill — the SPEC's exit criterion.
-- **The Python subprocess arg-sets** (`execPythonStage`) are wired but their
-  exact arguments are validated against the live pipeline in Epic 6 (the
-  FT-CLASSIFY-002 manual run is the reference). Preflight (`mlx_lm` env present,
-  disk floor, endpoint reachable, no-zero-call discipline) runs first.
-- Produces `docs/development/ft-recursive-002/run_record.md`.
+## ✅ Epic 6 — DONE (2026-06-29/30, PRs #488/#489/#492)
+Each pipeline stage was validated **live against the real system** before being
+wired into the controller (`internal/ftloop/controller_stages.go`):
+- **export** — `mdemg data export --tables llm_interactions --since <ts>`
+  (corrected `--from`→`--since`, E6-5).
+- **curate** — `python -m training.paradigm_router` (venv, cwd `neural/`),
+  4660-row SFT split; `val.jsonl`→`valid.jsonl` bridge (E6-10); subset-manifest
+  row-count fix so `train_ft` iters track the file (E6-11).
+- **train** — `python -m training.train_ft --tier 1 --mode sft …`; a real 168 MB
+  LoRA adapter, loss 3.28→2.41.
+- **convert** — `mlx_lm.fuse --dequantize` (E6-14, the 4bit-fused tensors can't
+  map directly) → `convert_hf_to_gguf --outtype f16` → `llama-quantize Q5_K_M`,
+  an 11 GB candidate GGUF.
+- **gate** — side-port `llama-server` + `run_benchmark` with real (non-zero) calls.
+- **Orchestration drill (Option A):** a real cycle walked `triggered→curating→failed`,
+  SF-2 held, the lease released — `run_record.md` has the timings.
+- **Latent bug caught + fixed (E6-8, PR #489):** the base-model SHA pin had rotted
+  (`cdc16756…` → `a54ec18f…`, byte-identical to the production model config); it
+  would have failed any retrain. **E6-12:** on-box training saturates the machine
+  and degrades the production `llama-server` — confirms the quiesce design.
+- **Controller wired (PR #492):** `runCmd`/`execCmd` + the five `stage*` methods;
+  `ControllerConfig` extended with the 11 Epic-6 pipeline fields; `runCycle`
+  orchestrates the stages. Config guard 756/756; lint 0.
+- All 14 findings ledgered in `epic6_issues.md`. **Remaining:** one *enabled*
+  tiny-subset integration drill off-peak.
 
 ## Why merging now is safe
 The actuator is **default-off**; with `FT_LOOP_ENABLED` unset the controller

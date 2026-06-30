@@ -85,21 +85,51 @@ operator opts in.
   [--reject] [--reason …]` records the decision in the ledger. Auto-promote +
   canary are Phase 7.
 
-To enable (after the live validation in the next sprint): set
-`FT_LOOP_ENABLED=true`. Tunables: `FT_LOOP_POLL_INTERVAL_SEC` (60),
+To enable: set `FT_LOOP_ENABLED=true`. Tunables: `FT_LOOP_POLL_INTERVAL_SEC` (60),
 `FT_LOOP_MIN_RETRAIN_INTERVAL_HOURS` (168), `FT_LOOP_MIN_FRESH_FRACTION` (0.30),
 `FT_LOOP_LEASE_MAX_HOURS` (14), `FT_LOOP_MIN_FREE_DISK_GB` (100),
 `TRAINING_READINESS_THRESHOLD` (+ per-task overrides), `FT_LORA_EPOCHS_CAP` (3),
-`FT_EARLY_STOP_VAL_LOSS_FACTOR` (1.05).
+`FT_EARLY_STOP_VAL_LOSS_FACTOR` (1.05). Epic-6 pipeline knobs (the proven
+commands): `FT_LOOP_{WORK_DIR, BASE_MODEL, BASE_SHA, UAITS_SPEC, BENCHMARK_CONFIG,
+LORA_RANK, LORA_ALPHA, GATE_PORT, EXPORT_SINCE_DAYS, GATE_TASK_FILTER,
+GATE_MIN_SCORE}`.
 
-> ⚠️ The enabled path's live validation (a real SFT cycle + the FAIL path; the
-> subprocess arg-sets) is **Epic 6 — not yet run**. The default-off actuator is
-> code-complete + unit-tested; the SF-2 suppression is live-verified.
+### Epic 6 — the pipeline is wired and validated (2026-06-29/30)
+
+The controller's five stages (`internal/ftloop/controller_stages.go`) are wired
+with the exact commands proven **live against the real system**, stage by stage:
+
+| Stage | Command (validated live) | Artifact |
+|-------|--------------------------|----------|
+| export  | `mdemg data export --tables llm_interactions --since <ts>` | `llm_interactions.jsonl` |
+| curate  | `python -m training.paradigm_router --spec <uaits> …` (venv, cwd `neural/`) | versioned SFT split (`val.jsonl`→`valid.jsonl` bridged) |
+| train   | `python -m training.train_ft --tier 1 --mode sft --base-model … --expected-sha256 … --rank 32 --alpha 64` | `adapters.safetensors` (real 168 MB LoRA) |
+| convert | `mlx_lm.fuse --dequantize` → `convert_hf_to_gguf --outtype f16` → `llama-quantize Q5_K_M` | candidate `Q5_K_M.gguf` (~11 GB) |
+| gate    | side-port `llama-server` + `python -m neural.benchmarks.run_benchmark` (real calls, no-zero-call) | `gate-report.json`; PASS → `promote_pending` |
+
+The orchestration (lease / quiesce / ledger transitions / FAIL path) was validated
+live in "Option A" — a real cycle walked `triggered→curating→failed`, the SF-2
+suppression held, and the lease released cleanly. 14 findings are ledgered in
+`docs/development/ft-recursive-002/epic6_issues.md`; the run timings are in
+`run_record.md`.
+
+> ⚠️ A real latent bug surfaced and was fixed here: the base-model SHA drift-guard
+> had rotted (**E6-8** — upstream `mlx-community/Qwen3-14B-4bit` re-published its
+> `config.json`; the pin would have failed *any* retrain). The new pin
+> `a54ec18f…` is byte-identical to the production model. The quiesce design was
+> also confirmed necessary (**E6-12**: an on-box training run saturates the
+> machine and degrades the production `llama-server`).
+>
+> The one remaining item before flipping the default on a schedule is a single
+> *enabled* tiny-subset integration drill (the heavy convert + the slow
+> contended-box train end-to-end through the live controller, off-peak).
 
 ## What's next
 
-- **FT-RECURSIVE-002 Epic 6** — the live gated cycle (enable + run on a fast task).
-- **FT-RECURSIVE-003 (Phase 7)** — RSIC integration, canary, auto-rollback.
+- **A single enabled tiny-subset drill** — flip `FT_LOOP_ENABLED=true` off-peak,
+  run one full cycle through the wired controller, confirm `promote_pending`.
+- **FT-RECURSIVE-003 (Phase 7)** — RSIC integration, canary, auto-rollback, the
+  mutating-action class (auto-promote).
 - **FT-RECURSIVE-004 (Phase 9)** — drift monitoring + the issue filer.
 - Prerequisite, separate: **GUARDRAIL-PRODUCER-001** — `guardrail.evaluate` has
   only 3 production rows (no live producer); it cannot be retrained until one exists.

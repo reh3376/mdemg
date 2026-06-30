@@ -26,11 +26,13 @@
 > 2026-06-12, gate NO-PROMOTE operator-accepted). **Phase 6a (FT-RECURSIVE-001)
 > SHIPPED 2026-06-28:** the manual retrain path is fully observable
 > (`mdemg ft-loop report-stage` → `scheduled_job_events`; SF-1/3/6/7 closed;
-> the promotion-gate eval pinned). **Phase 6b (FT-RECURSIVE-002) actuator
-> SHIPPED default-off 2026-06-28:** supervised controller + `ft_training_cycles`
+> the promotion-gate eval pinned). **Phase 6b (FT-RECURSIVE-002)
+> SHIPPED default-off 2026-06-28→30:** supervised controller + `ft_training_cycles`
 > ledger + trigger gate (SF-2 fixed) + compute lease + RSIC quiesce +
-> operator-confirm promote, all dormant behind `FT_LOOP_ENABLED=false`; the live
-> gated cycle (Epic 6) is 6b's one remaining item, deferred to the next session.
+> operator-confirm promote, all dormant behind `FT_LOOP_ENABLED=false`. **Epic 6
+> (2026-06-29/30) wired the five-stage export→curate→train→convert→gate pipeline
+> with commands validated live + caught/fixed the rotted base-model SHA pin
+> (E6-8); only a single enabled tiny-subset drill remains.**
 > **NOT STARTED:** 7 FT-RECURSIVE-003 (RSIC integration + canary), 9
 > FT-RECURSIVE-004 (drift + issue filer); + prerequisite GUARDRAIL-PRODUCER-001.
 > **Buildable spec (FT-RECURSIVE-000, 2026-06-11):**
