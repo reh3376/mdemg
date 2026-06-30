@@ -1798,14 +1798,20 @@ func FromEnv() (Config, error) {
 
 	// Top-level LLM cascade (defaults for all text-generation features)
 	llmProvider := get("LLM_PROVIDER", "openai")
-	llmModel := get("LLM_MODEL", "gpt-5.4-mini")
+	// Local-first defaults (CONFIG-LOCAL-DEFAULTS-001): the production runtime is
+	// the local llama-server (Phase 13.5 cutover), so the LLM model + endpoint
+	// default to local — a no-env install must NOT silently route to OpenAI's
+	// cloud (the prior gpt-5.4-mini + EffectiveLLMEndpoint→OpenAIEndpoint default
+	// contradicted the always-local architecture). OpenAI stays available only via
+	// explicit OPENAI_* config (the teacher/embedding path).
+	llmModel := get("LLM_MODEL", "mdemg-llm-v1")
 
 	// Embedding provider settings
 	embProvider := get("EMBEDDING_PROVIDER", "openai")
 	openaiKey := get("OPENAI_API_KEY", "")
 	openaiModel := get("OPENAI_MODEL", "text-embedding-3-large")
 	openaiEndpoint := get("OPENAI_ENDPOINT", "https://api.openai.com/v1")
-	llmEndpoint := get("LLM_ENDPOINT", "")
+	llmEndpoint := get("LLM_ENDPOINT", "http://127.0.0.1:8102/v1")
 	ollamaEndpoint := get("OLLAMA_ENDPOINT", "http://localhost:11434")
 	ollamaModel := get("OLLAMA_MODEL", "qwen3-embedding:8b")
 

@@ -1069,7 +1069,7 @@ type ConfigSource struct {
 // defaultValues maps YAML config keys to their built-in defaults so the
 // Config tab can display what the server actually uses when nothing is set.
 var defaultValues = map[string]string{
-	"llm.model":                        "gpt-4.1",
+	"llm.model":                        "mdemg-llm-v1",
 	"embedding.model":                  "text-embedding-3-large",
 	"embedding.endpoint":               "https://api.openai.com/v1",
 	"learning.eta":                     "0.02",
@@ -1077,8 +1077,8 @@ var defaultValues = map[string]string{
 	"plugins.dir":                      "./plugins",
 	"backup.interval_hours":            "24",
 	"backup.retention_count":           "4",
-	"jiminy.synthesis_model":           "gpt-4.1",
-	"jiminy.evaluate_llm_model":        "gpt-4.1",
+	"jiminy.synthesis_model":           "mdemg-llm-v1",
+	"jiminy.evaluate_llm_model":        "mdemg-llm-v1",
 	"jiminy.guidance_context_max_chars": "200000",
 	"jiminy.guidance_output_max_chars":  "200000",
 	"jiminy.evaluate_output_max_chars":  "200000",
