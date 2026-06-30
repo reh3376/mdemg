@@ -3068,6 +3068,30 @@ RETURN n.node_id`
 	return classified, nil
 }
 
+// countNodesAtOrAboveLayer counts MemoryNodes at layer >= minLayer in a space
+// (CONSOLIDATE-PERF-001). Uses the memorynode_layer_idx (space_id, layer) index
+// — cheap relative to the O(n²) cross-join it guards.
+func (s *Service) countNodesAtOrAboveLayer(ctx context.Context, spaceID string, minLayer int) (int, error) {
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+	out, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx,
+			`MATCH (n:MemoryNode {space_id: $spaceId}) WHERE n.layer >= $minLayer RETURN count(n) AS c`,
+			map[string]any{"spaceId": spaceID, "minLayer": minLayer})
+		if err != nil {
+			return nil, err
+		}
+		if res.Next(ctx) {
+			return asInt(res.Record().Values[0]), res.Err()
+		}
+		return 0, res.Err()
+	})
+	if err != nil {
+		return 0, err
+	}
+	return out.(int), nil
+}
+
 // CreateDynamicEdges creates edges with inferred types for upper layer relationships
 func (s *Service) CreateDynamicEdges(ctx context.Context, spaceID string) (int, error) {
 	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
@@ -3078,6 +3102,24 @@ func (s *Service) CreateDynamicEdges(ctx context.Context, spaceID string) (int, 
 	if minLayer < 1 {
 		minLayer = 3
 	}
+
+	// CONSOLIDATE-PERF-001 circuit-breaker: the find-pairs query below is a
+	// Cartesian product over all L≥minLayer nodes (O(n²)). At scale it dominates
+	// consolidation — live: 8705 L3+ nodes → ~75M pairs, ~29 min, hitting the
+	// cycle timeout. Skip (loudly) above a node-count ceiling until the Sprint-B
+	// vector-index rewrite makes this O(n·logn). Small graphs keep full behavior;
+	// DYNAMIC_EDGES_MAX_NODES=0 disables the guard.
+	if ceiling := s.cfg.DynamicEdgesMaxNodes; ceiling > 0 {
+		cnt, cErr := s.countNodesAtOrAboveLayer(ctx, spaceID, minLayer)
+		if cErr != nil {
+			slog.Warn("dynamic_edges: upper-layer node count failed; running unguarded", "space_id", spaceID, "error", cErr)
+		} else if cnt > ceiling {
+			slog.Warn("dynamic_edges: SKIPPED — upper-layer node count exceeds the O(n²) cross-join ceiling; awaiting the vector-index rewrite",
+				"space_id", spaceID, "count", cnt, "ceiling", ceiling, "min_layer", minLayer)
+			return 0, nil
+		}
+	}
+
 	findPairsCypher := `
 MATCH (a:MemoryNode {space_id: $spaceId}), (b:MemoryNode {space_id: $spaceId})
 WHERE a.layer >= $minLayer AND b.layer >= $minLayer

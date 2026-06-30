@@ -810,6 +810,7 @@ type Config struct {
 
 	// Phase 75B: Topology Hardening
 	DynamicEdgesEnabled      bool    // DYNAMIC_EDGES_ENABLED — enable dynamic edge creation during retrieval (default: true)
+	DynamicEdgesMaxNodes     int     // DYNAMIC_EDGES_MAX_NODES — circuit-breaker on the O(n²) find-pairs cross-join (CONSOLIDATE-PERF-001): skip dynamic_edges (loudly) when the L≥minLayer node count exceeds this. The query is a Cartesian product over all upper-layer nodes; at scale (live: 8705 L3+ nodes → ~75M pairs) it ran ~29 min and dominated consolidation / hit the timeout. Skipped above the ceiling until the Sprint-B vector-index rewrite makes it O(n·logn); small graphs keep full behavior. 0 disables the guard (default: 2000)
 	DynamicEdgeDegreeCap     int     // DYNAMIC_EDGE_DEGREE_CAP — max dynamic edges per node (default: 10)
 	DynamicEdgeMinConfidence float64 // DYNAMIC_EDGE_MIN_CONFIDENCE — minimum confidence for dynamic edges (default: 0.5)
 	L5EmergentEnabled        bool    // L5_EMERGENT_ENABLED — enable Layer 5 emergent concept nodes (default: true)
@@ -3760,6 +3761,10 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	dynamicEdgesMaxNodes, err := atoi("DYNAMIC_EDGES_MAX_NODES", 2000)
+	if err != nil {
+		return Config{}, err
+	}
 	dynamicEdgeMinConfidenceStr := get("DYNAMIC_EDGE_MIN_CONFIDENCE", "0.5")
 	dynamicEdgeMinConfidence, err := strconv.ParseFloat(dynamicEdgeMinConfidenceStr, 64)
 	if err != nil {
@@ -5420,6 +5425,7 @@ func FromEnv() (Config, error) {
 		RelResolutionTimeout:     relResolutionTimeout,
 		DynamicEdgesEnabled:      dynamicEdgesEnabled,
 		DynamicEdgeDegreeCap:     dynamicEdgeDegreeCap,
+		DynamicEdgesMaxNodes:     dynamicEdgesMaxNodes,
 		DynamicEdgeMinConfidence: dynamicEdgeMinConfidence,
 		L5EmergentEnabled:        l5EmergentEnabled,
 		L5BridgeEvidenceMin:      l5BridgeEvidenceMin,
