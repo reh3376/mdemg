@@ -238,7 +238,7 @@ type Config struct {
 	HiddenPatternMemberJaccardThreshold float64 // HIDDEN_PATTERN_MEMBER_JACCARD_THRESHOLD — PRIMARY identity match: Jaccard overlap of a cluster's L0 member set with an existing pattern's members. Stable under KMeans repartition jitter (centroid-cosine alone left ~28% churn/cycle). 0 disables member matching (centroid-only). (default: 0.5; HIDDEN-CHURN-002)
 	HiddenIncrementalEnabled            bool    // HIDDEN_INCREMENTAL_ENABLED — default consolidation hidden step assigns only ORPHAN L0 nodes to existing patterns (incremental), never re-clustering stable patterns → ~0% identity churn + lower CPU; false = fall back to the CHURN-002 full re-cluster (default: true; HIDDEN-CHURN-003)
 	HiddenIncrementalAssignSimThreshold float64 // HIDDEN_INCREMENTAL_ASSIGN_SIM_THRESHOLD — cosine floor for assigning an orphan L0 node to an existing pattern (below it the orphan clusters into a new pattern instead) (default: 0.80; HIDDEN-CHURN-003)
-	ConsolidateTimeoutMs                int     // CONSOLIDATE_TIMEOUT_MS — server-side deadline for a full /v1/memory/consolidate cycle, DETACHED from caller cancellation so a client timeout can't abort it mid-cycle (re-clustering 50k+ L0 nodes takes ~10 min; default: 1800000 = 30 min, floor 60000; HIDDEN-CHURN-002)
+	ConsolidateTimeoutMs                int     // CONSOLIDATE_TIMEOUT_MS — server-side deadline for a full /v1/memory/consolidate cycle, DETACHED from caller cancellation so a client timeout can't abort it mid-cycle. CONSOLIDATE-PERF-001 raised the default 30→60 min: live cycles run ~38 min on an 83k-node graph, so the old 30-min default aborted the manual path mid-ForwardPass leaving partial state (the watchdog path has no deadline and completed). Floor 60000; HIDDEN-CHURN-002. (default: 3600000 = 60 min)
 	HiddenThemeTargetRatio              float64 // HIDDEN_THEME_TARGET_RATIO — themes-per-observation ratio for KMeans k (default: 0.1 = ceil(n/10); was an inline equation; HIDDEN-CHURN-001 PR-B)
 	HiddenThemeAssignSimThreshold       float64 // HIDDEN_THEME_ASSIGN_SIM_THRESHOLD — cosine floor for density-assigning NOISE observations to their nearest theme (edges only, no new themes; 0 disables; default: 0.70; PR-B coverage retune)
 	ConversationCoverageAlertFloor      float64 // CONVERSATION_COVERAGE_ALERT_FLOOR — alert when themed/total conversation-observation coverage stays below this (default: 0.2; PR-B)
@@ -2275,7 +2275,7 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	consolidateTimeoutMs, err := atoi("CONSOLIDATE_TIMEOUT_MS", 1800000)
+	consolidateTimeoutMs, err := atoi("CONSOLIDATE_TIMEOUT_MS", 3600000)
 	if err != nil {
 		return Config{}, err
 	}
