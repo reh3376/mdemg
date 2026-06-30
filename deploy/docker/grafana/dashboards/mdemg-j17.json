@@ -200,7 +200,12 @@
       ],
       "options": {
         "colorMode": "value",
-        "graphMode": "area"
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
       },
       "fieldConfig": {
         "defaults": {

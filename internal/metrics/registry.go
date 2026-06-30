@@ -25,8 +25,14 @@ func DefaultConfig() Config {
 	return Config{
 		Enabled:   true,
 		Namespace: "mdemg",
-		// Default latency buckets: 5ms, 10ms, 25ms, 50ms, 100ms, 250ms, 500ms, 1s, 2.5s, 5s, 10s
-		HistogramBuckets: []float64{0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0},
+		// Default latency buckets: 5ms … 10s, then 20s/30s/60s/120s.
+		// ALERT-TRUTH-001: the old set topped out at le=10s, so any LLM-backed
+		// path (retrieval includes the cross-encoder rerank; ape.reflect /
+		// jiminy.synthesize run 10–76s) landed in +Inf and the p95/p99 estimate
+		// clamped at 10s — a permanent red on every latency panel. The added
+		// high buckets let those percentiles escape the clamp; they stay empty
+		// (and percentile-neutral) for the fast non-LLM histograms.
+		HistogramBuckets: []float64{0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 20.0, 30.0, 60.0, 120.0},
 	}
 }
 

@@ -81,11 +81,11 @@
               },
               {
                 "color": "yellow",
-                "value": 0.1
+                "value": 60
               },
               {
                 "color": "red",
-                "value": 0.25
+                "value": 120
               }
             ]
           }
