@@ -125,3 +125,47 @@ The evaluator (`internal/alert/evaluator.go`) queries TSDB on a periodic schedul
 | `jiminy_follow_rate_drop` | rate < 0.3 | 30m | warning |
 
 Rules are defined in `internal/alert/rules.go`. SQL queries run against the `metric_samples` table via `pgxpool.Pool`. ForDuration state tracking ensures alerts only fire after the condition persists for the specified duration.
+
+> ⚠️ The table above is the **original** Phase-3 rule set and has since drifted.
+> `high_p95_latency`, `critical_p99_latency`, and `neo4j_pool_exhausted` were
+> **removed** by TSDB-CONSUME-001 (they read lifetime-cumulative synthetic gauges
+> or perpetually-zero fake gauges). Many rules are now config-parameterized and
+> appended in `serve.go` (`OrphanRules`, `CoverageRules`, `RetrieveLatencyRules`,
+> `Neo4jCPURule`, …). Treat `rules.go` + `serve.go` as the source of truth.
+
+## Alert calibration (ALERT-TRUTH-001, 2026-06-30)
+
+A Grafana review found 50 pending alerts while the substrate was healthy — the
+channel was **miscalibration noise, not failure**. The fixes:
+
+- **No `ORDER BY time DESC LIMIT 1`.** Every rule aggregates (`AVG`/`MAX`/`MIN`)
+  + `COALESCE`s so it returns exactly one non-NULL row on an idle window. A
+  single latest-sample read returns zero rows on idle (rule-health noise) and
+  flaps on bursty gauges. The last 4 offenders (`neo4j_high_cpu`/`_memory`,
+  `low_cache_hit_ratio`, `jiminy_follow_rate_drop`) were swept. **Contract pins**
+  `TestAllRules_NoLimitOneAntiPattern` + `TestAllRules_DistinctServicePerSeverity`
+  gather *every* rule group, so new rules are covered automatically.
+- **Neo4j CPU is host-relative.** `docker stats` CPU% is reported **per single
+  core**, so on multi-core hardware healthy parallel graph work (consolidation,
+  Hebbian writes) routinely runs several hundred percent. The old fixed `80`
+  fired on any real activity. `Neo4jCPURule(NEO4J_CPU_ALERT_THRESHOLD_PERCENT`,
+  default **500**) evaluates the **5-min windowed AVG** against a host-relative
+  threshold, calibrated above the worst normal-operation windowed AVG (live 24h
+  max 471, 0 windows >500). Lower it on smaller machines. Distinct Service
+  `neo4j-cpu` so it doesn't share the memory rule's `(neo4j, medium)` cooldown
+  key. *Note:* the full 22-phase consolidation re-cluster on a large graph is
+  expected to be CPU-heavy — reducing that cost is a separate concern.
+- **LLM error-count floor.** `llm_error_rate_spike` requires an absolute
+  `RSIC_LLM_ERROR_MIN_COUNT` (default 5) errors in addition to the rate gate, so
+  a couple of transient errors at low call volume don't re-fire a HIGH alert. A
+  genuine spike (e.g. a task at 9.6% / 9 errors) still fires — truthfully.
+- **No stale NLI bias.** `GetNLICalibrationReport()` returns nil when the NLI
+  sidecar isn't operational, so a gated-off sidecar's stale window can't emit a
+  phantom `j17_nli_mean_bias` / pin a continuously-firing `nli_bias_alert`.
+
+Companion Grafana dashboard fixes (same sprint): extended the latency histogram
+buckets 10s→120s (LLM-backed p95/p99 were clamping at the 10s top bucket), and
+corrected four panel threshold/unit/calc bugs (`P95 Latency`, `Neo4j Memory`,
+`Null-Weight Abstraction Edges`, `Conversation Coverage Ratio`, `Avg
+Comprehension`). New config: `NEO4J_CPU_ALERT_THRESHOLD_PERCENT` (500),
+`RSIC_LLM_ERROR_MIN_COUNT` (5). Sprint: `docs/development/alert-truth-001/`.
