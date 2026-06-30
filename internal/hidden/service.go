@@ -1696,10 +1696,12 @@ func (s *Service) RunConsolidation(ctx context.Context, spaceID string) (*Consol
 	// EMERGENCE_ENABLED=true the AUTOMATED consolidation path never ran LLM
 	// concept emergence while the manual path did. RunNodeCreationPipeline
 	// owns the range (10–22) and the emergence gate.
+	phaseStart := time.Now()
 	pipelineResult, err := s.RunNodeCreationPipeline(ctx, spaceID, s.cfg.EmergenceEnabled)
 	if err != nil {
 		return nil, fmt.Errorf("node creation pipeline: %w", err)
 	}
+	metrics.RecordConsolidationPhase(spaceID, "node_creation", phaseStart)
 	result.PipelineSteps = pipelineResult.Steps
 
 	// Map pipeline results back to ConsolidationResult for backward compatibility
@@ -1724,10 +1726,12 @@ func (s *Service) RunConsolidation(ctx context.Context, spaceID string) (*Consol
 	}
 
 	// Step 2: Forward pass (update embeddings up the hierarchy)
+	phaseStart = time.Now()
 	fwdResult, err := s.ForwardPass(ctx, spaceID)
 	if err != nil {
 		return nil, fmt.Errorf("forward pass: %w", err)
 	}
+	metrics.RecordConsolidationPhase(spaceID, "forward_initial", phaseStart)
 	result.ForwardPass = fwdResult
 
 	// Guard: skip concept clustering and backward pass if graph is empty
@@ -1742,6 +1746,8 @@ func (s *Service) RunConsolidation(ctx context.Context, spaceID string) (*Consol
 	// Step 3: Multi-layer concept clustering (L1 → L2, L2 → L3, etc.)
 	// Try ALL layers - don't break early. Upper layers have looser constraints
 	// and may form clusters even if intermediate layers don't.
+	phaseStart = time.Now()
+	var repeatedForwardDur time.Duration // the per-layer ForwardPass re-runs (Sprint-B signal)
 	maxLayers := 5
 	for targetLayer := 2; targetLayer <= maxLayers; targetLayer++ {
 		conceptCreated, conceptMerged, err := s.CreateConceptNodes(ctx, spaceID, targetLayer)
@@ -1753,21 +1759,30 @@ func (s *Service) RunConsolidation(ctx context.Context, spaceID string) (*Consol
 			result.ConceptNodesCreated[targetLayer] = conceptCreated
 
 			// Run forward pass to update new concept embeddings
+			fwdStart := time.Now()
 			_, err = s.ForwardPass(ctx, spaceID)
 			if err != nil {
 				return nil, fmt.Errorf("forward pass after layer %d: %w", targetLayer, err)
 			}
+			repeatedForwardDur += time.Since(fwdStart)
 		}
 	}
+	metrics.RecordConsolidationPhase(spaceID, "concept_clustering", phaseStart)
+	// Sub-signal: how much of the cycle is the per-layer ForwardPass re-runs
+	// (the "run ForwardPass once, not 5×" Sprint-B opportunity).
+	metrics.Metrics().ConsolidationPhaseDuration(spaceID, "concept_forward_repeats").Set(repeatedForwardDur.Seconds())
 
 	// Step 4: Backward pass (propagate signals down)
+	phaseStart = time.Now()
 	bwdResult, err := s.BackwardPass(ctx, spaceID)
 	if err != nil {
 		return nil, fmt.Errorf("backward pass: %w", err)
 	}
+	metrics.RecordConsolidationPhase(spaceID, "backward", phaseStart)
 	result.BackwardPass = bwdResult
 
 	// Step 5: Post-clustering pipeline (phase 25-30: dynamic edges + L5 emergent nodes)
+	phaseStart = time.Now()
 	postResult, err := s.pipeline.RunPhaseRange(ctx, spaceID, nil, 25, 30)
 	if err != nil {
 		fmt.Printf("warning: post-clustering pipeline failed: %v\n", err)
@@ -1787,16 +1802,19 @@ func (s *Service) RunConsolidation(ctx context.Context, spaceID string) (*Consol
 			result.L5GroundingEdgesCreated = sr.EdgesCreated
 		}
 	}
+	metrics.RecordConsolidationPhase(spaceID, "post_clustering", phaseStart)
 
 	// Step 6: Auto-prune excess edges per node (F18: GAP-18)
 	// Only runs when both the config flag is set and an EdgePruner has been wired in.
 	if s.cfg.LearningAutoPruneExcessEnabled && s.edgePruner != nil {
+		phaseStart = time.Now()
 		pruned, err := s.edgePruner.PruneExcessEdgesPerNode(ctx, spaceID)
 		if err != nil {
 			fmt.Printf("warning: auto-prune excess edges failed: %v\n", err)
 		} else if pruned > 0 {
 			slog.Info("RunConsolidation: auto-pruned excess edges", "count", pruned, "space_id", spaceID)
 		}
+		metrics.RecordConsolidationPhase(spaceID, "auto_prune", phaseStart)
 	}
 
 	result.TotalDuration = time.Since(start)
