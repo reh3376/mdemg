@@ -170,6 +170,15 @@ var yamlEnvMapping = []struct {
 	{"jiminy.j17_ticket_ttl_hours", "J17_TICKET_TTL_HOURS", nil},
 	// Ingest
 	{"ingest.speed", "INGEST_SPEED", nil},
+	// Retrieval: typed semantic edges (RETRIEVAL-TYPED-EDGES-001)
+	{"retrieval.graph_typed_edges_enabled", "RETRIEVAL_GRAPH_TYPED_EDGES_ENABLED", nil},
+	{"retrieval.edge_attention_analogous_to", "EDGE_ATTENTION_ANALOGOUS_TO", nil},
+	{"retrieval.edge_attention_bridges", "EDGE_ATTENTION_BRIDGES", nil},
+	{"retrieval.edge_attention_composes_with", "EDGE_ATTENTION_COMPOSES_WITH", nil},
+	{"retrieval.edge_attention_contrasts_with", "EDGE_ATTENTION_CONTRASTS_WITH", nil},
+	{"retrieval.edge_attention_influences", "EDGE_ATTENTION_INFLUENCES", nil},
+	{"retrieval.edge_attention_defines_symbol", "EDGE_ATTENTION_DEFINES_SYMBOL", nil},
+	{"retrieval.edge_attention_theme_of", "EDGE_ATTENTION_THEME_OF", nil},
 }
 
 // convertPort converts a port number string to ":PORT" format for LISTEN_ADDR.
@@ -1074,6 +1083,15 @@ var defaultValues = map[string]string{
 	"jiminy.guidance_output_max_chars":  "200000",
 	"jiminy.evaluate_output_max_chars":  "200000",
 	"jiminy.evaluate_item_max_chars":    "0",
+	// Retrieval: typed semantic edges (RETRIEVAL-TYPED-EDGES-001)
+	"retrieval.graph_typed_edges_enabled":     "false",
+	"retrieval.edge_attention_analogous_to":   "0.55",
+	"retrieval.edge_attention_bridges":        "0.60",
+	"retrieval.edge_attention_composes_with":  "0.50",
+	"retrieval.edge_attention_contrasts_with": "0.40",
+	"retrieval.edge_attention_influences":     "0.45",
+	"retrieval.edge_attention_defines_symbol": "0.70",
+	"retrieval.edge_attention_theme_of":       "0.65",
 }
 
 func EffectiveConfig(yamlPath string) []ConfigSource {
