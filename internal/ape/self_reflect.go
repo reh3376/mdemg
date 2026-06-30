@@ -479,6 +479,16 @@ func (r *Reflector) Reflect(ctx context.Context, report *SelfAssessmentReport) (
 	recency := time.Duration(r.cfg.RSICLLMErrorRecencyMin) * time.Minute
 	for _, perf := range report.LLMPerformance {
 		if perf.ErrorRate > 0.05 && perf.TotalCalls > 10 {
+			// ALERT-TRUTH-001: absolute error-count floor. The rate-only gate
+			// re-fired HIGH 23× on just 2 "context canceled" errors (5.7% of 35
+			// low-volume calls). Require a meaningful absolute count so a couple
+			// of transient errors at low volume can't pin a HIGH alert.
+			errorCount := int(perf.ErrorRate*float64(perf.TotalCalls) + 0.5)
+			if r.cfg.RSICLLMErrorMinCount > 0 && errorCount < r.cfg.RSICLLMErrorMinCount {
+				slog.Debug("RSIC reflect: llm_error_rate_spike suppressed (below count floor)",
+					"task", perf.TaskName, "error_count", errorCount, "min_count", r.cfg.RSICLLMErrorMinCount)
+				continue
+			}
 			if recency > 0 && !perf.LastErrorAt.IsZero() && time.Since(perf.LastErrorAt) > recency {
 				slog.Debug("RSIC reflect: llm_error_rate_spike suppressed (stale)",
 					"task", perf.TaskName, "last_error_at", perf.LastErrorAt, "recency_gate", recency)

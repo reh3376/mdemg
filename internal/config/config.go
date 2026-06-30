@@ -1148,6 +1148,7 @@ type Config struct {
 
 	// ===== RSIC LLM-Health Recency Gate (SUPERVISOR-002) =====
 	RSICLLMErrorRecencyMin int // RSIC_LLM_ERROR_RECENCY_MIN — minutes; llm_error_rate_spike fires only if the most recent error is this fresh (default: 60, 0 disables the gate)
+	RSICLLMErrorMinCount   int // RSIC_LLM_ERROR_MIN_COUNT — absolute minimum error count for llm_error_rate_spike to fire (ALERT-TRUTH-001); the rate-only floor (>5% & >10 calls) re-fired HIGH 23× on just 2 "context canceled" errors at low call volume (default: 5, 0 disables the count floor)
 
 	// ===== LLM Client Retry =====
 	LLMRetryEnabled     bool    // LLM_RETRY_ENABLED — enable retry for transient LLM errors (default: true)
@@ -4501,6 +4502,10 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	rsicLLMErrorMinCount, err := atoi("RSIC_LLM_ERROR_MIN_COUNT", 5)
+	if err != nil {
+		return Config{}, err
+	}
 	rsicLLMErrorRecencyMin, err := atoi("RSIC_LLM_ERROR_RECENCY_MIN", 60)
 	if err != nil {
 		return Config{}, err
@@ -5578,6 +5583,7 @@ func FromEnv() (Config, error) {
 		SupervisorBackoffBaseSec:   supervisorBackoffBaseSec,
 		AlertRuleFailureThreshold:  alertRuleFailureThreshold,
 		RSICLLMErrorRecencyMin:     rsicLLMErrorRecencyMin,
+		RSICLLMErrorMinCount:       rsicLLMErrorMinCount,
 
 		// LLM Client Retry
 		LLMRetryEnabled:     llmRetryEnabled,
