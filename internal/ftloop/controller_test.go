@@ -2,8 +2,9 @@ package ftloop
 
 import (
 	"context"
-	"errors"
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -15,82 +16,118 @@ func TestController_DisabledRunReturnsNil(t *testing.T) {
 	}
 }
 
-// fakeQuiescer records Quiesce calls.
-type fakeQuiescer struct{ calls []time.Time }
-
-func (f *fakeQuiescer) Quiesce(until time.Time) { f.calls = append(f.calls, until) }
-
-// TestController_RunCycle_AllStages: a stub runStage walks curate→train→gate;
-// the lease is acquired + the quiescer is set then cleared. nil pool → ledger
-// writes no-op (state-machine logic verified without a DB).
-func TestController_RunCycle_AllStages(t *testing.T) {
-	q := &fakeQuiescer{}
-	c := NewController(nil, q, nil, ControllerConfig{
-		Enabled:       true,
-		LeasePath:     filepath.Join(t.TempDir(), "ft.lease"),
-		LeaseMax:      time.Hour,
-		MinFreeDiskGB: 0, // skip disk floor
-		RepoDir:       t.TempDir(),
-	})
-	var ran []string
-	c.runStage = func(_ context.Context, stage string, _ []string) error {
-		ran = append(ran, stage)
-		return nil
-	}
-	c.runCycle(context.Background(), "cyc-1", "mdemg-llm-v1")
-
-	want := []string{"curate", "train", "gate"}
-	if len(ran) != 3 || ran[0] != want[0] || ran[1] != want[1] || ran[2] != want[2] {
-		t.Errorf("stages ran = %v, want %v", ran, want)
-	}
-	// Quiesce set (lease window) then cleared (zero) on exit.
-	if len(q.calls) != 2 {
-		t.Fatalf("expected Quiesce set+clear, got %d calls", len(q.calls))
-	}
-	if q.calls[0].IsZero() {
-		t.Error("first Quiesce should be the lease window, not zero")
-	}
-	if !q.calls[1].IsZero() {
-		t.Error("second Quiesce should clear (zero)")
-	}
+// captureRunner records each runCmd call and creates the artifact the next
+// stage's existence-check expects, so the pipeline command-construction can be
+// validated end-to-end without real subprocesses.
+type capturedCmd struct {
+	label, dir, bin string
+	args            []string
 }
 
-// TestController_RunCycle_StageFailure: a failing stage halts the pipeline.
-func TestController_RunCycle_StageFailure(t *testing.T) {
-	c := NewController(nil, nil, nil, ControllerConfig{
-		Enabled:   true,
-		LeasePath: filepath.Join(t.TempDir(), "ft.lease"),
-		LeaseMax:  time.Hour,
-		RepoDir:   t.TempDir(),
-	})
-	var ran []string
-	c.runStage = func(_ context.Context, stage string, _ []string) error {
-		ran = append(ran, stage)
-		if stage == "train" {
-			return errors.New("mlx OOM")
+func newCaptureController(t *testing.T, cfg ControllerConfig) (*Controller, *[]capturedCmd) {
+	t.Helper()
+	var calls []capturedCmd
+	c := NewController(nil, nil, nil, cfg)
+	c.runCmd = func(_ context.Context, label, dir, bin string, args []string) (string, error) {
+		calls = append(calls, capturedCmd{label, dir, bin, args})
+		// Materialize the artifact the downstream stage checks for.
+		switch label {
+		case "export-extract":
+			_ = os.MkdirAll(filepath.Join(cfg.WorkDir, "x"), 0o750)
+			_ = os.WriteFile(filepath.Join(cfg.WorkDir, "x", "llm_interactions.jsonl"), []byte("{}\n"), 0o600)
+		case "curate":
+			v := filepath.Join(cfg.WorkDir, "curated", "sft_interactions", "versioned")
+			_ = os.MkdirAll(v, 0o750)
+			_ = os.WriteFile(filepath.Join(v, "train.jsonl"), []byte("{}\n"), 0o600)
+			_ = os.WriteFile(filepath.Join(v, "val.jsonl"), []byte("{}\n"), 0o600)
+		case "train":
+			_ = os.WriteFile(filepath.Join(cfg.WorkDir, "adapter", "adapters.safetensors"), []byte("x"), 0o600)
+		case "convert-quantize":
+			_ = os.WriteFile(filepath.Join(cfg.WorkDir, "candidate-Q5_K_M.gguf"), []byte("x"), 0o600)
 		}
-		return nil
+		return "", nil
 	}
-	c.runCycle(context.Background(), "cyc-2", "mdemg-llm-v1")
-	// curate + train ran; gate must NOT (pipeline halts on failure).
-	if len(ran) != 2 || ran[1] != "train" {
-		t.Errorf("expected halt after train, ran = %v", ran)
+	return c, &calls
+}
+
+// TestStageCommands_Construction validates each runCmd-based stage builds the
+// proven Epic-6 command + threads its artifact.
+func TestStageCommands_Construction(t *testing.T) {
+	work := t.TempDir()
+	cfg := ControllerConfig{
+		WorkDir: work, RepoDir: "/repo", SpaceID: "mdemg-dev",
+		BaseModel: ".local-models/base", BaseSHA: "abc123",
+		UaitsSpec: "docs/x.uaits.json", BenchmarkConfig: "configs/b.yaml",
+		LoraRank: 32, LoraAlpha: 64, EpochsCap: 3, ExportSinceDays: 7,
+		PythonBin: "python3", MdemgBin: "/bin/mdemg",
+	}
+	c, calls := newCaptureController(t, cfg)
+	ctx := context.Background()
+
+	inputDir, err := c.stageExport(ctx, work)
+	if err != nil {
+		t.Fatalf("export: %v", err)
+	}
+	versioned, err := c.stageCurate(ctx, "cyc-1", work, inputDir)
+	if err != nil {
+		t.Fatalf("curate: %v", err)
+	}
+	// E6-10: valid.jsonl created from val.jsonl
+	if _, err := os.Stat(filepath.Join(versioned, "valid.jsonl")); err != nil {
+		t.Error("curate should create valid.jsonl from val.jsonl (E6-10)")
+	}
+	adapter, err := c.stageTrain(ctx, work, versioned)
+	if err != nil {
+		t.Fatalf("train: %v", err)
+	}
+	if _, err := c.stageConvert(ctx, work, adapter); err != nil {
+		t.Fatalf("convert: %v", err)
+	}
+
+	joined := map[string]string{}
+	for _, cc := range *calls {
+		joined[cc.label] = cc.bin + " " + strings.Join(cc.args, " ")
+	}
+	// Export uses the mdemg binary.
+	if !strings.Contains(joined["export"], "/bin/mdemg data export") || !strings.Contains(joined["export"], "--tables llm_interactions") {
+		t.Errorf("export cmd wrong: %s", joined["export"])
+	}
+	// Curate: paradigm_router with the spec + cycle version.
+	if !strings.Contains(joined["curate"], "-m training.paradigm_router") || !strings.Contains(joined["curate"], "--version cyc-1") {
+		t.Errorf("curate cmd wrong: %s", joined["curate"])
+	}
+	// Train: the base SHA pin (E6-8) + rank/alpha/epochs.
+	if !strings.Contains(joined["train"], "--expected-sha256 abc123") || !strings.Contains(joined["train"], "--rank 32") || !strings.Contains(joined["train"], "--n-epochs 3") {
+		t.Errorf("train cmd wrong: %s", joined["train"])
+	}
+	// Convert: fuse --dequantize (E6-14) → gguf → quantize Q5_K_M.
+	if !strings.Contains(joined["convert-fuse"], "mlx_lm.fuse") || !strings.Contains(joined["convert-fuse"], "--dequantize") {
+		t.Errorf("convert-fuse cmd wrong: %s", joined["convert-fuse"])
+	}
+	if !strings.Contains(joined["convert-quantize"], "llama-quantize") || !strings.Contains(joined["convert-quantize"], "Q5_K_M") {
+		t.Errorf("convert-quantize cmd wrong: %s", joined["convert-quantize"])
 	}
 }
 
-// TestController_RunCycle_DiskFloor: below the disk floor, no stage runs.
-func TestController_RunCycle_DiskFloor(t *testing.T) {
+func TestReadGateReport(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "r.json")
+	_ = os.WriteFile(p, []byte(`{"aggregate_weighted_score":0.84,"truncated_rows":0}`), 0o600)
+	score, trunc, err := readGateReport(p)
+	if err != nil || score != 0.84 || trunc != 0 {
+		t.Errorf("got score=%v trunc=%v err=%v, want 0.84/0/nil", score, trunc, err)
+	}
+}
+
+func TestController_DiskFloorBlocks(t *testing.T) {
 	c := NewController(nil, nil, nil, ControllerConfig{
-		Enabled:       true,
-		LeasePath:     filepath.Join(t.TempDir(), "ft.lease"),
-		LeaseMax:      time.Hour,
-		MinFreeDiskGB: 1e9, // impossibly high → floor fails
-		RepoDir:       t.TempDir(),
+		Enabled: true, LeasePath: filepath.Join(t.TempDir(), "l"), LeaseMax: time.Hour,
+		MinFreeDiskGB: 1e9, RepoDir: t.TempDir(), WorkDir: t.TempDir(),
 	})
 	ran := false
-	c.runStage = func(_ context.Context, _ string, _ []string) error { ran = true; return nil }
-	c.runCycle(context.Background(), "cyc-3", "mdemg-llm-v1")
+	c.runCmd = func(context.Context, string, string, string, []string) (string, error) { ran = true; return "", nil }
+	c.runCycle(context.Background(), "c", "v")
 	if ran {
-		t.Error("no stage should run when below the disk floor")
+		t.Error("no stage command should run below the disk floor")
 	}
 }

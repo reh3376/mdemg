@@ -12,8 +12,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"os"
-	"os/exec"
 	"path/filepath"
 	"time"
 
@@ -42,6 +40,21 @@ type ControllerConfig struct {
 	EarlyStopFactor float64
 	RepoDir         string // working dir for `python -m training.X` subprocesses
 	InstanceID      string
+	SpaceID         string
+
+	// Epic-6 pipeline wiring (the proven curate→train→convert→gate commands).
+	WorkDir         string // per-cycle artifact root
+	BaseModel       string // dense base model dir (relative to RepoDir or absolute)
+	BaseSHA         string // base config.json SHA pin (train_ft --expected-sha256)
+	UaitsSpec       string // paradigm_router curation spec (relative to RepoDir)
+	BenchmarkConfig string // gate benchmark config yaml (relative to RepoDir)
+	LoraRank        int
+	LoraAlpha       int
+	GatePort        int     // side-port for serving the candidate during the gate
+	ExportSinceDays int     // export window for the curate input
+	GateTaskFilter  string  // optional run_benchmark --task-filter
+	GateMinScore    float64 // minimum aggregate benchmark score to PASS
+	MdemgBin        string  // path to the mdemg binary (for `mdemg data export`)
 }
 
 // Controller orchestrates a recursive-retrain cycle.
@@ -51,15 +64,15 @@ type Controller struct {
 	disp     *alert.Dispatcher
 	cfg      ControllerConfig
 	now      func() time.Time
-	// runStage runs one pipeline stage; overridable in tests (the production
-	// impl shells out to the Python pipeline).
-	runStage func(ctx context.Context, stage string, args []string) error
+	// runCmd runs one subprocess (bin + args in dir) and returns its combined
+	// output; overridable in tests. The production impl is execCmd.
+	runCmd func(ctx context.Context, label, dir, bin string, args []string) (string, error)
 }
 
 // NewController builds a controller. quiescer may be nil (no RSIC quiesce).
 func NewController(pool *pgxpool.Pool, quiescer Quiescer, disp *alert.Dispatcher, cfg ControllerConfig) *Controller {
 	c := &Controller{pool: pool, quiescer: quiescer, disp: disp, cfg: cfg, now: time.Now}
-	c.runStage = c.execPythonStage
+	c.runCmd = c.execCmd
 	return c
 }
 
@@ -109,12 +122,6 @@ func (c *Controller) tick(ctx context.Context) {
 	c.runCycle(ctx, open.CycleID, open.ModelVersion)
 }
 
-type stageDef struct {
-	status tsdb.FtCycleStatus
-	name   string // ft-loop:<name>
-	args   []string
-}
-
 // runCycle drives one cycle through the pipeline, holding the lease + quiesce.
 func (c *Controller) runCycle(ctx context.Context, cycleID, modelVersion string) {
 	// Preflight: disk floor (a training run needs ~85 GB transient disk).
@@ -141,25 +148,34 @@ func (c *Controller) runCycle(ctx context.Context, cycleID, modelVersion string)
 		defer c.quiescer.Quiesce(time.Time{}) // clear on exit
 	}
 
-	stages := []stageDef{
-		{tsdb.FtCycleCurating, "curate", []string{"-m", "training.paradigm_router"}},
-		{tsdb.FtCycleTraining, "train", []string{"-m", "training.train_ft",
-			"--n-epochs", fmt.Sprintf("%d", c.cfg.EpochsCap)}},
-		{tsdb.FtCycleGating, "gate", []string{"-m", "neural.benchmarks.run_benchmark"}},
+	// Per-cycle artifact workspace.
+	work := filepath.Join(c.workRoot(), cycleID)
+
+	// The pipeline: export → curate → train → convert → gate. Each stage
+	// records the ledger + ft-loop:<stage> jobhealth and threads its artifact
+	// to the next. The lease-expiry guard runs before each (class-4 halt).
+	type stage struct {
+		status tsdb.FtCycleStatus
+		name   string
+		run    func() error
+	}
+	var inputDir, versionedDir, adapterDir, candidate string
+	stages := []stage{
+		{tsdb.FtCycleCurating, "export", func() (err error) { inputDir, err = c.stageExport(ctx, work); return }},
+		{tsdb.FtCycleCurating, "curate", func() (err error) { versionedDir, err = c.stageCurate(ctx, cycleID, work, inputDir); return }},
+		{tsdb.FtCycleTraining, "train", func() (err error) { adapterDir, err = c.stageTrain(ctx, work, versionedDir); return }},
+		{tsdb.FtCycleGating, "convert", func() (err error) { candidate, err = c.stageConvert(ctx, work, adapterDir); return }},
+		{tsdb.FtCycleGating, "gate", func() error { return c.stageGate(ctx, work, candidate) }},
 	}
 
 	for _, st := range stages {
-		// Lease-expiry guard before each stage (class-4 alert-and-halt).
 		if lease.Expired(c.now()) {
-			c.failCycle(ctx, cycleID, modelVersion, "lease_expired",
-				"compute lease expired mid-cycle", true)
+			c.failCycle(ctx, cycleID, modelVersion, "lease_expired", "compute lease expired mid-cycle", true)
 			return
 		}
-		c.record(ctx, tsdb.FtCycleEvent{
-			CycleID: cycleID, ModelVersion: modelVersion, Status: st.status, Stage: st.name,
-		})
+		c.record(ctx, tsdb.FtCycleEvent{CycleID: cycleID, ModelVersion: modelVersion, Status: st.status, Stage: st.name})
 		started := c.now()
-		runErr := c.runStage(ctx, st.name, st.args)
+		runErr := st.run()
 		c.reportStage(ctx, cycleID, st.name, c.now().Sub(started), runErr)
 		if runErr != nil {
 			c.failCycle(ctx, cycleID, modelVersion, st.name+"_failed", runErr.Error(), false)
@@ -167,12 +183,14 @@ func (c *Controller) runCycle(ctx context.Context, cycleID, modelVersion string)
 		}
 	}
 
-	// PASS → promote_pending (operator confirms; auto-promote is Phase 7).
+	// PASS → promote_pending (operator confirms; auto-promote is Phase 7). The
+	// candidate path is recorded so `mdemg ft-loop promote` knows what to swap.
 	c.record(ctx, tsdb.FtCycleEvent{
 		CycleID: cycleID, ModelVersion: modelVersion, Status: tsdb.FtCyclePromotePending, Stage: "gate",
+		EvalResults: map[string]any{"candidate_gguf": candidate},
 	})
 	slog.Info("ft-loop cycle reached promote_pending — operator confirm required",
-		"cycle_id", cycleID, "model_version", modelVersion)
+		"cycle_id", cycleID, "model_version", modelVersion, "candidate", candidate)
 }
 
 // failCycle records the terminal failed state + one alert (distinct ft-loop
@@ -210,52 +228,6 @@ func (c *Controller) reportStage(ctx context.Context, cycleID, stage string, dur
 		ev.ErrorMessage = runErr.Error()
 	}
 	jobhealth.ReportWithService(ctx, c.pool, c.disp, ev, "ft-loop")
-}
-
-// execPythonStage shells out to the Python pipeline for one stage. ⚠️ The exact
-// arg sets are validated live in Epic 6 (the manual FT-CLASSIFY-002 run is the
-// reference); this is the supervised-subprocess wiring + working dir + the
-// no-zero-call discipline. Runs under ctx so a shutdown cancels the trainer.
-//
-// E6-1: resolves the training interpreter — `mlx_lm` lives in `neural/.venv`,
-// not the system python. E6-2: per-stage working dir — `training.*` modules
-// import from `neural/`, `neural.benchmarks.*` from the repo root.
-func (c *Controller) execPythonStage(ctx context.Context, stage string, args []string) error {
-	cmd := exec.CommandContext(ctx, c.resolvePython(), args...) //nolint:gosec // G204: args are controller-constructed, not user input
-	cmd.Dir = c.stageDir(stage)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("stage %s: %w (output tail: %s)", stage, err, tail(out, 400))
-	}
-	return nil
-}
-
-// resolvePython prefers the neural venv interpreter (where mlx_lm is installed)
-// when PythonBin is the bare default; an explicit non-default PythonBin wins.
-func (c *Controller) resolvePython() string {
-	if c.cfg.PythonBin != "" && c.cfg.PythonBin != "python3" {
-		return c.cfg.PythonBin
-	}
-	venv := filepath.Join(c.cfg.RepoDir, "neural", ".venv", "bin", "python")
-	if _, err := os.Stat(venv); err == nil {
-		return venv
-	}
-	if c.cfg.PythonBin != "" {
-		return c.cfg.PythonBin
-	}
-	return "python3"
-}
-
-// stageDir is the working dir for a stage: training stages run from neural/
-// (their modules are `training.*`); the gate runs from the repo root
-// (`neural.benchmarks.*`).
-func (c *Controller) stageDir(stage string) string {
-	switch stage {
-	case "curate", "train":
-		return filepath.Join(c.cfg.RepoDir, "neural")
-	default:
-		return c.cfg.RepoDir
-	}
 }
 
 func tail(b []byte, n int) string {
