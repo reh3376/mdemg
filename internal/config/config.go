@@ -1214,6 +1214,9 @@ type Config struct {
 	OrphanCountThreshold int     // ORPHAN_COUNT_THRESHOLD — fire High Orphan Count when max live-orphan count among significant spaces exceeds this (default: 1000; above the accepted historical baseline — ratio rule is the scale-aware primary)
 	GraphHealthScoreFloor float64 // GRAPH_HEALTH_SCORE_FLOOR — fire Low Graph Health when the MIN graph-health score among significant spaces drops below this (default: 0.5; same min-node floor as the orphan rules so degenerate 1-2-node test spaces can't trip it)
 
+	// Neo4j container CPU alert (ALERT-TRUTH-001)
+	Neo4jCPUAlertThresholdPercent float64 // NEO4J_CPU_ALERT_THRESHOLD_PERCENT — fire Neo4j High CPU when the 5-min windowed AVG of mdemg_neo4j_container_cpu_percent exceeds this. docker-stats CPU% is per-single-core, so this is HOST-RELATIVE; default 500 is calibrated above the worst normal-operation 5-min windowed AVG (live 24h max 471, heavy consolidation) so it fires only on genuinely pathological sustained load; lower it on smaller machines (default: 500)
+
 	// FT recursive-loop readiness staleness (FT-RECURSIVE-001 SF-1)
 	FtReadinessStalenessMin int // FT_READINESS_STALENESS_MIN — fire training_readiness_stale when no successful RSIC readiness assessment within this many minutes; catches a silently-dormant loop (default: 30; RSIC assesses every ~5 min)
 
@@ -4634,6 +4637,10 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	neo4jCPUAlertThresholdPercent, err := atof("NEO4J_CPU_ALERT_THRESHOLD_PERCENT", 500)
+	if err != nil {
+		return Config{}, err
+	}
 	if graphHealthScoreFloor < 0 || graphHealthScoreFloor > 1 {
 		return Config{}, errors.New("GRAPH_HEALTH_SCORE_FLOOR must be in [0,1]")
 	}
@@ -5592,6 +5599,7 @@ func FromEnv() (Config, error) {
 		NullWeightEdgeAlertThreshold: nullWeightEdgeAlertThreshold,
 		OrphanRatioMinNodes:          orphanRatioMinNodes,
 		OrphanRatioThreshold:         orphanRatioThreshold,
+		Neo4jCPUAlertThresholdPercent: neo4jCPUAlertThresholdPercent,
 		OrphanCountThreshold:         orphanCountThreshold,
 		GraphHealthScoreFloor:        graphHealthScoreFloor,
 		FtReadinessStalenessMin:      ftReadinessStalenessMin,

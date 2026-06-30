@@ -100,8 +100,10 @@ func TestDefaultRules_Count(t *testing.T) {
 	// neo4j_pool_exhausted (queried a perpetually-zero fake gauge) removed.
 	// 10 → 8 in ORPHAN-ALERT-001: high_orphan_count / high_orphan_ratio
 	// extracted to the config-parameterized OrphanRules().
-	if len(rules) != 7 {
-		t.Errorf("expected 7 default rules, got %d", len(rules))
+	// 7 → 6 in ALERT-TRUTH-001: neo4j_high_cpu extracted to the config-driven
+	// host-relative Neo4jCPURule().
+	if len(rules) != 6 {
+		t.Errorf("expected 6 default rules, got %d", len(rules))
 	}
 
 	// Verify all rules are enabled

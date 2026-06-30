@@ -69,37 +69,30 @@ func DefaultRules() []AlertRule {
 		// idle-safe aggregation, so they are config-parameterized + appended
 		// in serve.go like the other parameterized rule groups.
 		{
+			// ALERT-TRUTH-001: LIMIT 1 → windowed AVG + COALESCE (TSDB-CONSUME-001
+			// idle-safe contract). mem_percent is 0–100 normalized, so 80% is a
+			// real fixed threshold; AVG over the window removes single-sample flap.
 			ID:          "neo4j_high_memory",
 			Title:       "MDEMG Neo4j High Memory Usage",
 			Service:     "neo4j",
 			Severity:    SeverityMedium,
 			Interval:    30 * time.Second,
 			ForDuration: 5 * time.Minute,
-			QuerySQL: `SELECT value FROM metric_samples
+			QuerySQL: `SELECT COALESCE(AVG(value), 0) AS mem_pct FROM metric_samples
 				WHERE metric_name = 'mdemg_neo4j_container_mem_percent'
 				  AND metric_type = 'gauge'
-				  AND time > now() - interval '5 minutes'
-				ORDER BY time DESC LIMIT 1`,
+				  AND time > now() - interval '5 minutes'`,
 			Threshold: 80,
 			Operator:  "gt",
 			Enabled:   true,
 		},
-		{
-			ID:          "neo4j_high_cpu",
-			Title:       "MDEMG Neo4j High CPU Usage",
-			Service:     "neo4j",
-			Severity:    SeverityMedium,
-			Interval:    30 * time.Second,
-			ForDuration: 5 * time.Minute,
-			QuerySQL: `SELECT value FROM metric_samples
-				WHERE metric_name = 'mdemg_neo4j_container_cpu_percent'
-				  AND metric_type = 'gauge'
-				  AND time > now() - interval '5 minutes'
-				ORDER BY time DESC LIMIT 1`,
-			Threshold: 80,
-			Operator:  "gt",
-			Enabled:   true,
-		},
+		// neo4j_high_cpu extracted to Neo4jCPURule() (ALERT-TRUTH-001): the
+		// threshold needs to be config-driven + host-relative. The old fixed 80
+		// was "% of ONE core" read via ORDER BY time DESC LIMIT 1 — on multi-core
+		// hardware normal consolidation runs 200–837%, so it tripped on any real
+		// graph work, and the single-sample read flapped on the 0/burst probe
+		// pattern (7d p50=1, p95=255). Appended in serve.go like the other
+		// config-parameterized rule groups.
 		{
 			ID:          "graph_node_drop",
 			Title:       "MDEMG Significant Node Count Drop",
@@ -155,12 +148,13 @@ func DefaultRules() []AlertRule {
 			Severity:    SeverityLow,
 			Interval:    60 * time.Second,
 			ForDuration: 10 * time.Minute,
-			QuerySQL: `SELECT value FROM metric_samples
+			// ALERT-TRUTH-001: LIMIT 1 → windowed AVG; COALESCE to 1.0 (healthy)
+			// on an idle window so absence never fires this "lt" rule.
+			QuerySQL: `SELECT COALESCE(AVG(value), 1.0) AS hit_ratio FROM metric_samples
 				WHERE metric_name = 'mdemg_cache_hit_ratio'
 				  AND metric_type = 'gauge'
 				  AND labels->>'cache' = 'query'
-				  AND time > now() - interval '10 minutes'
-				ORDER BY time DESC LIMIT 1`,
+				  AND time > now() - interval '10 minutes'`,
 			Threshold: 0.5,
 			Operator:  "lt",
 			Enabled:   true,
@@ -172,11 +166,12 @@ func DefaultRules() []AlertRule {
 			Severity:    SeverityMedium,
 			Interval:    60 * time.Second,
 			ForDuration: 30 * time.Minute,
-			QuerySQL: `SELECT value FROM metric_samples
+			// ALERT-TRUTH-001: LIMIT 1 → windowed AVG; COALESCE to 1.0 (healthy)
+			// on an idle window so absence never fires this "lt" rule.
+			QuerySQL: `SELECT COALESCE(AVG(value), 1.0) AS follow_rate FROM metric_samples
 				WHERE metric_name = 'mdemg_jiminy_follow_rate'
 				  AND metric_type = 'gauge'
-				  AND time > now() - interval '30 minutes'
-				ORDER BY time DESC LIMIT 1`,
+				  AND time > now() - interval '30 minutes'`,
 			Threshold: 0.3,
 			Operator:  "lt",
 			Enabled:   true,
@@ -843,5 +838,39 @@ func CoverageRules(floor float64) []AlertRule {
 			Operator:  "lt",
 			Enabled:   true,
 		},
+	}
+}
+
+// Neo4jCPURule returns the Neo4j container CPU alert (ALERT-TRUTH-001).
+//
+// docker-stats CPU% is reported relative to a SINGLE core, so on multi-core
+// hardware healthy parallel graph work (consolidation, Hebbian writes) routinely
+// runs several hundred percent — the old fixed `80` tripped on any real activity.
+// The probe also alternates near-zero/burst samples (live 7d p50=1, p95=255), so
+// a single `ORDER BY time DESC LIMIT 1` read flapped. This rule instead evaluates
+// the AVG over the 5-minute window (idle-safe via COALESCE) against a host-relative
+// threshold. Calibrated default 500: the worst NORMAL-operation 5-min windowed AVG
+// observed in 24h was 471 (heavy consolidation); 0 windows exceeded 500 — so it
+// fires only on load worse than any normal consolidation. Operators on smaller
+// machines lower NEO4J_CPU_ALERT_THRESHOLD_PERCENT. Reducing the consolidation
+// cost itself is a separate concern (it is expected to be CPU-heavy).
+func Neo4jCPURule(thresholdPercent float64) AlertRule {
+	if thresholdPercent <= 0 {
+		thresholdPercent = 500
+	}
+	return AlertRule{
+		ID:          "neo4j_high_cpu",
+		Title:       "MDEMG Neo4j High CPU Usage",
+		Service:     "neo4j-cpu", // distinct Service (NOSILENT-001 cooldown-key rule)
+		Severity:    SeverityMedium,
+		Interval:    30 * time.Second,
+		ForDuration: 5 * time.Minute,
+		QuerySQL: `SELECT COALESCE(AVG(value), 0) AS cpu_pct FROM metric_samples
+			WHERE metric_name = 'mdemg_neo4j_container_cpu_percent'
+			  AND metric_type = 'gauge'
+			  AND time > now() - interval '5 minutes'`,
+		Threshold: thresholdPercent,
+		Operator:  "gt",
+		Enabled:   true,
 	}
 }

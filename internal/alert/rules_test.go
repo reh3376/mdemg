@@ -156,6 +156,76 @@ func TestDefaultRules_RemovedRulesStayRemoved(t *testing.T) {
 	}
 }
 
+// allRules gathers every rule the evaluator can run, mirroring the serve.go
+// assembly, so contract pins cover the parameterized groups too.
+func allRules() []AlertRule {
+	rules := DefaultRules()
+	rules = append(rules, WeightIntegrityRules(0)...)
+	rules = append(rules, OrphanRules(0, 0, 0, 0)...)
+	rules = append(rules, ReadinessStalenessRule(0))
+	rules = append(rules, CoverageRules(0)...)
+	rules = append(rules, MaintenanceLivenessRules(0)...)
+	rules = append(rules, RetrieveLatencyRules(0, 0, 0)...)
+	rules = append(rules, GuidanceShouldFollowRules(0.5, 0)...)
+	rules = append(rules, TSDBWriterRules(0)...)
+	rules = append(rules, ScorerDriftRules(0, 0, 0, 0, 0)...)
+	rules = append(rules, EmergenceCycleRules(0, 0)...)
+	rules = append(rules, Neo4jCPURule(0))
+	return rules
+}
+
+// TSDB-CONSUME-001 contract pin (ALERT-TRUTH-001 swept the last 4 offenders:
+// neo4j_high_cpu/_memory, low_cache_hit_ratio, jiminy_follow_rate_drop): NO rule
+// may use `ORDER BY ... LIMIT 1` — an idle window returns zero rows (rule-health
+// noise) and a single latest sample flaps on bursty gauges. Rules must aggregate
+// + COALESCE so they always return exactly one non-NULL row.
+func TestAllRules_NoLimitOneAntiPattern(t *testing.T) {
+	for _, r := range allRules() {
+		if strings.Contains(r.QuerySQL, "LIMIT 1") {
+			t.Errorf("rule %s uses LIMIT 1 — aggregate + COALESCE instead (TSDB-CONSUME-001)", r.ID)
+		}
+	}
+}
+
+// NOSILENT-001 cooldown-key contract: every rule needs a non-empty Service, and
+// no two rules at the same Severity may share a Service (one would mask the other
+// via the (Service,Severity) cooldown key).
+func TestAllRules_DistinctServicePerSeverity(t *testing.T) {
+	seen := map[string]string{} // service|severity -> ruleID
+	for _, r := range allRules() {
+		if r.Service == "" {
+			t.Errorf("rule %s has empty Service", r.ID)
+			continue
+		}
+		key := r.Service + "|" + string(r.Severity)
+		if prior, ok := seen[key]; ok {
+			t.Errorf("rules %s and %s share Service %q at the same Severity — cooldown collision", r.ID, prior, r.Service)
+		}
+		seen[key] = r.ID
+	}
+}
+
+// ALERT-TRUTH-001: Neo4j CPU rule is config-driven + host-relative, windowed AVG.
+func TestNeo4jCPURule(t *testing.T) {
+	def := Neo4jCPURule(0)
+	if def.Threshold != 500 {
+		t.Errorf("zero/neg → default 500, got %v", def.Threshold)
+	}
+	if def.ID != "neo4j_high_cpu" {
+		t.Errorf("ID = %q", def.ID)
+	}
+	// Distinct from the memory rule's "neo4j" Service (NOSILENT-001).
+	if def.Service != "neo4j-cpu" {
+		t.Errorf("Service = %q — must be distinct from neo4j_high_memory", def.Service)
+	}
+	if !strings.Contains(def.QuerySQL, "AVG(value)") || !strings.Contains(def.QuerySQL, "COALESCE") {
+		t.Errorf("query must be a COALESCE'd windowed AVG, got: %s", def.QuerySQL)
+	}
+	if got := Neo4jCPURule(750); got.Threshold != 750 {
+		t.Errorf("custom threshold not honored, got %v", got.Threshold)
+	}
+}
+
 // TSDB-CONSUME-001: writer flush-failure rule pins — per-writer MAX-MIN
 // delta (restart-safe) over metric_samples (time column), COALESCE'd.
 func TestTSDBWriterRules(t *testing.T) {

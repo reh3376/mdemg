@@ -484,6 +484,12 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 			rules = append(rules, alert.OrphanRules(
 				cfg.OrphanRatioMinNodes, cfg.OrphanRatioThreshold,
 				cfg.OrphanCountThreshold, cfg.GraphHealthScoreFloor)...)
+			// ALERT-TRUTH-001: Neo4j CPU alert with a host-relative, config-driven
+			// threshold over a 5-min windowed AVG (the fixed 80 = % of one core
+			// tripped on normal multi-core consolidation; LIMIT 1 flapped on the
+			// 0/burst probe pattern).
+			rules = append(rules, alert.Neo4jCPURule(
+				cfg.Neo4jCPUAlertThresholdPercent))
 			// FT-RECURSIVE-001 SF-1: alert when the RSIC readiness assessment
 			// heartbeat goes stale (a silent query failure dormant-loops it).
 			rules = append(rules, alert.ReadinessStalenessRule(
