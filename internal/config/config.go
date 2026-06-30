@@ -1239,6 +1239,19 @@ type Config struct {
 	FtLoraEpochsCap          int     // FT_LORA_EPOCHS_CAP — hard epoch cap passed to train_ft.py (AMD-1; the `auto` rejection is never weakened) (default: 3)
 	FtEarlyStopValLossFactor float64 // FT_EARLY_STOP_VAL_LOSS_FACTOR — SFT early-stop trips when val_loss > best × this (AMD-1) (default: 1.05)
 
+	// FT recursive-retrain pipeline wiring (FT-RECURSIVE-002 Phase 6b, Epic 6 — the proven curate→train→convert→gate commands)
+	FtLoopWorkDir         string  // FT_LOOP_WORK_DIR — per-cycle artifact root (export/curate/adapter/candidate) (default: $TMPDIR/mdemg-ft-loop)
+	FtLoopBaseModel       string  // FT_LOOP_BASE_MODEL — dense base model dir for LoRA training (default: .local-models/qwen3-14b-4bit-base)
+	FtLoopBaseSHA         string  // FT_LOOP_BASE_SHA — base config.json SHA pin passed to train_ft --expected-sha256 (default: a54ec18f… — the E6-8 updated pin)
+	FtLoopUaitsSpec       string  // FT_LOOP_UAITS_SPEC — curation spec for paradigm_router (default: docs/tests/uaits/specs/mdemg.uaits.json)
+	FtLoopBenchmarkConfig string  // FT_LOOP_BENCHMARK_CONFIG — gate benchmark config yaml (default: configs/benchmark_phase10.yaml)
+	FtLoopLoraRank        int     // FT_LOOP_LORA_RANK — LoRA rank for train_ft (default: 32 — production recipe)
+	FtLoopLoraAlpha       int     // FT_LOOP_LORA_ALPHA — LoRA alpha for train_ft (default: 64)
+	FtLoopGatePort        int     // FT_LOOP_GATE_PORT — side-port for serving the candidate during the gate (default: 18102)
+	FtLoopExportSinceDays int     // FT_LOOP_EXPORT_SINCE_DAYS — export window for the curate input (default: 7)
+	FtLoopGateTaskFilter  string  // FT_LOOP_GATE_TASK_FILTER — optional run_benchmark --task-filter to scope the gate (default: empty = all tasks)
+	FtLoopGateMinScore    float64 // FT_LOOP_GATE_MIN_SCORE — minimum aggregate benchmark score for the gate to PASS (default: 0.80, matches UBENCH min_aggregate_weighted_score)
+
 	// MAINT-LIVE-001 — maintenance liveness (only-ever-dry-runs detection).
 	MaintLiveAlertEnabled bool // MAINT_LIVE_ALERT_ENABLED — enable the maintenance_no_live_run rule (default: true)
 	MaintLiveLookbackDays int  // MAINT_LIVE_LOOKBACK_DAYS — window in which at least one live (dry_run=false) maintenance run must appear when any maintenance runs exist (default: 8)
@@ -4706,6 +4719,47 @@ func FromEnv() (Config, error) {
 	if ftEarlyStopValLossFactor <= 1.0 {
 		return Config{}, errors.New("FT_EARLY_STOP_VAL_LOSS_FACTOR must be > 1.0")
 	}
+	ftLoopWorkDir := strings.TrimSpace(os.Getenv("FT_LOOP_WORK_DIR"))
+	ftLoopBaseModel := get("FT_LOOP_BASE_MODEL", ".local-models/qwen3-14b-4bit-base")
+	ftLoopBaseSHA := get("FT_LOOP_BASE_SHA", "a54ec18ffe24f3c909e9556471dc156ed9b3b61b872008831c7cba9d4768b4a5")
+	ftLoopUaitsSpec := get("FT_LOOP_UAITS_SPEC", "docs/tests/uaits/specs/mdemg.uaits.json")
+	ftLoopBenchmarkConfig := get("FT_LOOP_BENCHMARK_CONFIG", "configs/benchmark_phase10.yaml")
+	ftLoopLoraRank, err := atoi("FT_LOOP_LORA_RANK", 32)
+	if err != nil {
+		return Config{}, err
+	}
+	if ftLoopLoraRank < 1 {
+		return Config{}, errors.New("FT_LOOP_LORA_RANK must be >= 1")
+	}
+	ftLoopLoraAlpha, err := atoi("FT_LOOP_LORA_ALPHA", 64)
+	if err != nil {
+		return Config{}, err
+	}
+	if ftLoopLoraAlpha < 1 {
+		return Config{}, errors.New("FT_LOOP_LORA_ALPHA must be >= 1")
+	}
+	ftLoopGatePort, err := atoi("FT_LOOP_GATE_PORT", 18102)
+	if err != nil {
+		return Config{}, err
+	}
+	if ftLoopGatePort < 1024 || ftLoopGatePort > 65535 {
+		return Config{}, errors.New("FT_LOOP_GATE_PORT must be in [1024,65535]")
+	}
+	ftLoopExportSinceDays, err := atoi("FT_LOOP_EXPORT_SINCE_DAYS", 7)
+	if err != nil {
+		return Config{}, err
+	}
+	if ftLoopExportSinceDays < 1 {
+		return Config{}, errors.New("FT_LOOP_EXPORT_SINCE_DAYS must be >= 1")
+	}
+	ftLoopGateTaskFilter := strings.TrimSpace(os.Getenv("FT_LOOP_GATE_TASK_FILTER"))
+	ftLoopGateMinScore, err := atof("FT_LOOP_GATE_MIN_SCORE", 0.80)
+	if err != nil {
+		return Config{}, err
+	}
+	if ftLoopGateMinScore < 0 || ftLoopGateMinScore > 1 {
+		return Config{}, errors.New("FT_LOOP_GATE_MIN_SCORE must be in [0,1]")
+	}
 	maintLiveAlertEnabled := getBool("MAINT_LIVE_ALERT_ENABLED", true)
 	maintLiveLookbackDays, err := atoi("MAINT_LIVE_LOOKBACK_DAYS", 8)
 	if err != nil {
@@ -5555,6 +5609,17 @@ func FromEnv() (Config, error) {
 		FtLoopModelVersion:                  ftLoopModelVersion,
 		FtLoraEpochsCap:                     ftLoraEpochsCap,
 		FtEarlyStopValLossFactor:            ftEarlyStopValLossFactor,
+		FtLoopWorkDir:                       ftLoopWorkDir,
+		FtLoopBaseModel:                     ftLoopBaseModel,
+		FtLoopBaseSHA:                       ftLoopBaseSHA,
+		FtLoopUaitsSpec:                     ftLoopUaitsSpec,
+		FtLoopBenchmarkConfig:               ftLoopBenchmarkConfig,
+		FtLoopLoraRank:                      ftLoopLoraRank,
+		FtLoopLoraAlpha:                     ftLoopLoraAlpha,
+		FtLoopGatePort:                      ftLoopGatePort,
+		FtLoopExportSinceDays:               ftLoopExportSinceDays,
+		FtLoopGateTaskFilter:                ftLoopGateTaskFilter,
+		FtLoopGateMinScore:                  ftLoopGateMinScore,
 		MaintLiveAlertEnabled:        maintLiveAlertEnabled,
 		MaintLiveLookbackDays:        maintLiveLookbackDays,
 		JobBackupStalenessHours:      jobBackupStalenessHours,

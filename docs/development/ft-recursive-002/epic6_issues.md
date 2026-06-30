@@ -64,3 +64,22 @@ arg-sets + the train→convert→gate artifact chain) — the focused 6b continu
 | E6-13 | **Training on the dev box is very slow + degrades the live server.** With the mdemg server + neo4j running, mlx_lm.lora hit **~52 s/iter** (It/sec 0.019), peak 23.6 GB, and starved llama-server `:8102` → HIGH `jiminy.evaluate_llm` timeouts. A full 1-epoch run on 4660 rows (1165 iters) would be ~17 h at this rate; even a 50-iter subset is ~43 min. The controller's `Quiesce` pauses RSIC LLM fan-out but the server+neo4j load remains. | live (M5 Max) | **[viability]** a real retrain wants the box mostly idle (or dedicated/off-peak); consider the loop scheduling retrains during quiet windows, and/or a smaller per-cycle row budget. Pipeline-mechanics validation uses a tiny subset (quality irrelevant for convert/gate). |
 
 | E6-14 | **Convert must dequantize first.** `convert_hf_to_gguf.py` on a 4bit-fused MLX model fails (`Can not map tensor 'model.embed_tokens.biases'` — MLX 4bit quant tensors). The convert stage MUST `mlx_lm.fuse --dequantize` → bf16 HF safetensors → `convert_hf_to_gguf --outtype f16` → `llama-quantize Q5_K_M` (the CLAUDE.md path; ~85GB transient). | convert stage | [6b-continuation] wire the 3-step dequantize→gguf→quantize convert; confirmed required |
+
+## Controller WIRED (2026-06-30)
+
+The proven Epic-6 commands are now threaded into the controller
+(`internal/ftloop/controller_stages.go`), replacing the placeholder
+`execPythonStage`. `runCycle` orchestrates 5 stages with artifact handoff,
+ledger + `ft-loop:<stage>` jobhealth per stage, lease/quiesce, and FAIL-on-error:
+
+| Stage | Command (proven Epic-6) | Artifact |
+|---|---|---|
+| export | `mdemg data export --tables llm_interactions --since … --output <tar>` + extract | `<work>/input/llm_interactions.jsonl` |
+| curate | `python -m training.paradigm_router --spec … --input-dir … --output-dir … --version <cycle>` (cwd neural/) + val→valid (E6-10) | `…/sft_interactions/versioned/` |
+| train | `python -m training.train_ft --tier 1 --mode sft --base-model … --expected-sha256 <pin> --dataset … --adapter-path … --rank 32 --alpha 64 --n-epochs <cap>` (cwd neural/) | `<work>/adapter/adapters.safetensors` |
+| convert | `mlx_lm.fuse --dequantize` (E6-14) → `convert_hf_to_gguf --outtype f16` → `llama-quantize Q5_K_M` | `<work>/candidate-Q5_K_M.gguf` |
+| gate | serve candidate on `FT_LOOP_GATE_PORT` (readiness = `/health`) → `run_benchmark --mlx-base-url … --out <report>` → PASS iff aggregate ≥ `FT_LOOP_GATE_MIN_SCORE` and 0 truncated | promote_pending (records `candidate_gguf`) |
+
+New config (all proven defaults): `FT_LOOP_{WORK_DIR,BASE_MODEL,BASE_SHA,UAITS_SPEC,BENCHMARK_CONFIG,LORA_RANK,LORA_ALPHA,GATE_PORT,EXPORT_SINCE_DAYS,GATE_TASK_FILTER,GATE_MIN_SCORE}`. Default-off behind `FT_LOOP_ENABLED`. Unit tests pin the command construction + the report parser + the disk-floor guard.
+
+**Component validation status:** every stage's command validated live in Epic 6; the orchestration (lease/quiesce/ledger/stage-sequence/FAIL) validated live in Option A + unit-tested. A full enabled cycle to `promote_pending` re-runs the heavy convert (~5 min) + the slow train (E6-13) — the final integration run is a tiny-subset drill (operator-scheduled, off-peak).

@@ -2154,6 +2154,20 @@ func (s *Server) StartSupervisedBackground() {
 				EarlyStopFactor: s.cfg.FtEarlyStopValLossFactor,
 				RepoDir:         repoDir,
 				InstanceID:      s.cfg.InstanceID,
+				SpaceID:         s.cfg.RSICWatchdogSpaceID,
+				// Epic-6 pipeline wiring (the proven curate→train→convert→gate commands).
+				WorkDir:         s.cfg.FtLoopWorkDir,
+				BaseModel:       s.cfg.FtLoopBaseModel,
+				BaseSHA:         s.cfg.FtLoopBaseSHA,
+				UaitsSpec:       s.cfg.FtLoopUaitsSpec,
+				BenchmarkConfig: s.cfg.FtLoopBenchmarkConfig,
+				LoraRank:        s.cfg.FtLoopLoraRank,
+				LoraAlpha:       s.cfg.FtLoopLoraAlpha,
+				GatePort:        s.cfg.FtLoopGatePort,
+				ExportSinceDays: s.cfg.FtLoopExportSinceDays,
+				GateTaskFilter:  s.cfg.FtLoopGateTaskFilter,
+				GateMinScore:    s.cfg.FtLoopGateMinScore,
+				MdemgBin:        resolveMdemgBin(),
 			})
 		s.goSupervised("ft-loop-controller", ctrl.Run)
 	}
