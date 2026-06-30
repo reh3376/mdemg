@@ -1,12 +1,25 @@
 package metrics
 
 import (
+	"log/slog"
 	"sync/atomic"
+	"time"
 
 	"mdemg/internal/circuitbreaker"
 	"mdemg/internal/ratelimit"
 	"mdemg/internal/tsdb"
 )
+
+// RecordConsolidationPhase emits the per-phase duration gauge + a structured log
+// (CONSOLIDATE-PERF-001 Sprint A, Epic 1). Shared by both consolidation paths —
+// the service-level RunConsolidation (the RSIC-watchdog driver) and the
+// handleConsolidate HTTP handler (manual triggers) — so the per-phase breakdown
+// that targets the Sprint-B optimization is captured regardless of trigger.
+func RecordConsolidationPhase(spaceID, phase string, start time.Time) {
+	dur := time.Since(start)
+	Metrics().ConsolidationPhaseDuration(spaceID, phase).Set(dur.Seconds())
+	slog.Info("consolidation phase complete", "space_id", spaceID, "phase", phase, "dur_ms", dur.Milliseconds())
+}
 
 // StandardMetrics holds pre-registered standard metrics.
 type StandardMetrics struct {
@@ -74,6 +87,11 @@ type StandardMetrics struct {
 	// exactly like the HTTP percentiles this sprint un-broke, and at ~1-6
 	// cycles per flush window a percentile is noise anyway.
 	EmergenceCycleDuration func(spaceID, cycle string) *Gauge
+
+	// ConsolidationPhaseDuration is the wall time of the last run of each
+	// consolidation phase (CONSOLIDATE-PERF-001 Sprint A) — the per-phase
+	// breakdown that targets the Sprint-B algorithmic optimization.
+	ConsolidationPhaseDuration func(spaceID, phase string) *Gauge
 
 	// Memory pressure metrics (Phase 48.4.4)
 	MemoryPressureRejected *Gauge // Requests rejected due to memory pressure (cumulative)
@@ -363,6 +381,9 @@ func NewStandardMetrics(r *Registry) *StandardMetrics {
 	}
 	m.EmergenceCycleDuration = func(spaceID, cycle string) *Gauge {
 		return r.NewGauge("emergence_cycle_duration_seconds", "Wall time of the last completed emergence/consolidation cycle (DBSCAN O(n²) deferral tripwire)", map[string]string{"space_id": spaceID, "cycle": cycle})
+	}
+	m.ConsolidationPhaseDuration = func(spaceID, phase string) *Gauge {
+		return r.NewGauge("consolidation_phase_duration_seconds", "Wall time of the last run of each consolidation phase (CONSOLIDATE-PERF-001 per-phase breakdown)", map[string]string{"space_id": spaceID, "phase": phase})
 	}
 
 	// Memory pressure metrics (Phase 48.4.4)

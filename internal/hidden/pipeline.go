@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"sort"
 	"time"
+
+	"mdemg/internal/metrics"
 )
 
 // StepResult is the universal result type for any pipeline step.
@@ -83,7 +85,12 @@ func (p *Pipeline) RunAll(ctx context.Context, spaceID string, skip map[string]b
 			continue
 		}
 
+		stepStart := time.Now()
 		sr, err := step.Run(ctx, spaceID)
+		// CONSOLIDATE-PERF-001: per-step timing so the post-clustering breakdown
+		// (dynamic_edges vs emergent_l5 vs cluster_summary) is observable — it was
+		// the ~29-min dynamic_edges O(n²) cross-join hiding inside post_clustering.
+		metrics.RecordConsolidationPhase(spaceID, "step:"+step.Name(), stepStart)
 		if err != nil {
 			if step.Required() {
 				return nil, fmt.Errorf("pipeline step %q: %w", step.Name(), err)
@@ -122,7 +129,12 @@ func (p *Pipeline) RunPhaseRange(ctx context.Context, spaceID string, skip map[s
 			continue
 		}
 
+		stepStart := time.Now()
 		sr, err := step.Run(ctx, spaceID)
+		// CONSOLIDATE-PERF-001: per-step timing so the post-clustering breakdown
+		// (dynamic_edges vs emergent_l5 vs cluster_summary) is observable — it was
+		// the ~29-min dynamic_edges O(n²) cross-join hiding inside post_clustering.
+		metrics.RecordConsolidationPhase(spaceID, "step:"+step.Name(), stepStart)
 		if err != nil {
 			if step.Required() {
 				return nil, fmt.Errorf("pipeline step %q: %w", step.Name(), err)

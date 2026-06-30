@@ -26,6 +26,7 @@ import (
 	"mdemg/internal/jobhealth"
 	"mdemg/internal/jobs"
 	"mdemg/internal/llmclient"
+	"mdemg/internal/metrics"
 	"mdemg/internal/models"
 	"mdemg/internal/retrieval"
 	"mdemg/internal/symbols"
@@ -1652,11 +1653,13 @@ func (s *Server) handleConsolidate(w http.ResponseWriter, r *http.Request) {
 
 	// Step 1: Run node-creation pipeline (hidden, concern, config, comparison, temporal, ui, constraint)
 	if !req.SkipClustering {
+		phaseStart := time.Now()
 		pipelineResult, err := s.hiddenLayer.RunNodeCreationPipeline(consolCtx, req.SpaceID, req.EnableDynamicEmergence)
 		if err != nil {
 			writeInternalError(w, err, "node creation pipeline")
 			return
 		}
+		metrics.RecordConsolidationPhase(req.SpaceID, "node_creation", phaseStart)
 
 		// Log non-fatal pipeline step errors
 		for _, stepErr := range pipelineResult.Errors {
@@ -1710,6 +1713,7 @@ func (s *Server) handleConsolidate(w http.ResponseWriter, r *http.Request) {
 
 	// Step 2: Forward pass (unless skipped)
 	if !req.SkipForward {
+		phaseStart := time.Now()
 		fwdResult, err := s.hiddenLayer.ForwardPass(consolCtx, req.SpaceID)
 		if err != nil {
 			writeInternalError(w, err, "forward pass")
@@ -1717,12 +1721,15 @@ func (s *Server) handleConsolidate(w http.ResponseWriter, r *http.Request) {
 		}
 		resp.HiddenNodesUpdated = fwdResult.HiddenNodesUpdated
 		resp.ConceptNodesUpdated = fwdResult.ConceptNodesUpdated
+		metrics.RecordConsolidationPhase(req.SpaceID, "forward_initial", phaseStart)
 	}
 
 	// Step 3: Multi-layer concept clustering (unless skipped)
 	// Build concept layers: hidden (L1) → concepts (L2, L3, etc.)
 	// Try ALL layers - upper layers have adaptive (looser) constraints for emergence
 	if !req.SkipClustering {
+		phaseStart := time.Now()
+		var repeatedForwardDur time.Duration // the per-layer ForwardPass re-runs (Sprint-B signal)
 		maxLayers := 5
 		for targetLayer := 2; targetLayer <= maxLayers; targetLayer++ {
 			conceptCreated, conceptMerged, err := s.hiddenLayer.CreateConceptNodes(consolCtx, req.SpaceID, targetLayer)
@@ -1737,18 +1744,25 @@ func (s *Server) handleConsolidate(w http.ResponseWriter, r *http.Request) {
 				resp.ConceptNodesCreated += conceptCreated
 
 				// Run forward pass to update new concept embeddings
+				fwdStart := time.Now()
 				fwdResult, err := s.hiddenLayer.ForwardPass(consolCtx, req.SpaceID)
 				if err != nil {
 					writeInternalError(w, err, fmt.Sprintf("forward pass after layer %d", targetLayer))
 					return
 				}
+				repeatedForwardDur += time.Since(fwdStart)
 				resp.ConceptNodesUpdated += fwdResult.ConceptNodesUpdated
 			}
 		}
+		metrics.RecordConsolidationPhase(req.SpaceID, "concept_clustering", phaseStart)
+		// Sub-signal: how much of the cycle is the per-layer ForwardPass re-runs
+		// (the "run ForwardPass once, not 5×" Sprint-B opportunity).
+		metrics.Metrics().ConsolidationPhaseDuration(req.SpaceID, "concept_forward_repeats").Set(repeatedForwardDur.Seconds())
 	}
 
 	// Step 4: Backward pass (unless skipped)
 	if !req.SkipBackward {
+		phaseStart := time.Now()
 		bwdResult, err := s.hiddenLayer.BackwardPass(consolCtx, req.SpaceID)
 		if err != nil {
 			writeInternalError(w, err, "backward pass")
@@ -1757,9 +1771,11 @@ func (s *Server) handleConsolidate(w http.ResponseWriter, r *http.Request) {
 		// Add to existing count if forward pass was also run
 		resp.HiddenNodesUpdated += bwdResult.HiddenNodesUpdated
 		resp.EdgesStrengthened = bwdResult.EdgesStrengthened
+		metrics.RecordConsolidationPhase(req.SpaceID, "backward", phaseStart)
 	}
 
 	// Step 5: Post-clustering pipeline (dynamic edges + L5 emergent nodes)
+	postStart := time.Now()
 	postResult, err := s.hiddenLayer.RunPostClusteringPipeline(consolCtx, req.SpaceID)
 	if err != nil {
 		slog.Warn("post-clustering pipeline failed", "error", err)
@@ -1788,32 +1804,39 @@ func (s *Server) handleConsolidate(w http.ResponseWriter, r *http.Request) {
 			resp.L5NodesCreated = sr.NodesCreated
 		}
 	}
+	metrics.RecordConsolidationPhase(req.SpaceID, "post_clustering", postStart)
 
 	// Step 6: Generate summaries for hidden and concept nodes
+	summariesStart := time.Now()
 	summariesUpdated, err := s.hiddenLayer.GenerateSummaries(consolCtx, req.SpaceID)
 	if err != nil {
 		// Log but don't fail - summaries are nice-to-have
 		slog.Warn("failed to generate summaries", "error", err)
 	}
 	resp.SummariesGenerated = summariesUpdated
+	metrics.RecordConsolidationPhase(req.SpaceID, "summaries", summariesStart)
 
 	// Step 6b: Enhance mechanical summaries with LLM (opt-in)
 	if s.hiddenLayer != nil {
+		llmStart := time.Now()
 		enhanced, enhErr := s.hiddenLayer.EnhanceSummariesWithLLM(consolCtx, req.SpaceID)
 		if enhErr != nil {
 			slog.Warn("failed to enhance cluster summaries", "error", enhErr)
 		} else if enhanced > 0 {
 			slog.Info("enhanced cluster summaries with LLM", "count", enhanced)
 		}
+		metrics.RecordConsolidationPhase(req.SpaceID, "summaries_llm", llmStart)
 	}
 
 	// Step 6: Refresh stale edges (Phase 9.5.3)
+	refreshStart := time.Now()
 	edgesRefreshed, err := s.retriever.RefreshStaleEdges(consolCtx, req.SpaceID)
 	if err != nil {
 		slog.Warn("failed to refresh stale edges", "error", err)
 	} else {
 		resp.EdgesRefreshed = edgesRefreshed
 	}
+	metrics.RecordConsolidationPhase(req.SpaceID, "refresh_edges", refreshStart)
 
 	resp.DurationMs = float64(time.Since(start).Milliseconds())
 
