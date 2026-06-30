@@ -13,6 +13,38 @@ func TestCalibrationTracker_Track(t *testing.T) {
 	}
 }
 
+// ALERT-TRUTH-001: GetNLICalibrationReport must return nil when the NLI sidecar
+// isn't operational, even with a stale-but-biased window — otherwise the phantom
+// mean-bias pins a continuously-firing nli_bias_alert (live: 0.638 at 0 requests).
+func TestGetNLICalibrationReport_GatedOnOperational(t *testing.T) {
+	tracker := NewNLICalibrationTracker(10, 0.05)
+	tracker.Track(0.9, 0.2) // big bias → BiasAlert would be true if surfaced
+	tracker.Track(0.85, 0.25)
+
+	// Sanity: the tracker itself does report a bias.
+	if rep := tracker.Report(); rep == nil || !rep.BiasAlert {
+		t.Fatalf("precondition: tracker should report a bias alert")
+	}
+
+	// Non-operational scorer (enabled but no sidecar URL) → nil report.
+	svc := &Service{calibrationTracker: tracker, nliScorer: &NLIComprehensionScorer{enabled: true}}
+	if rep := svc.GetNLICalibrationReport(); rep != nil {
+		t.Errorf("sidecar off → want nil report, got mean_bias=%v alert=%v", rep.MeanBias, rep.BiasAlert)
+	}
+
+	// Operational scorer → the real report flows through.
+	svc.nliScorer = &NLIComprehensionScorer{enabled: true, sidecarURL: "http://127.0.0.1:8101"}
+	if rep := svc.GetNLICalibrationReport(); rep == nil {
+		t.Errorf("sidecar operational → want a report, got nil")
+	}
+
+	// Nil scorer → nil report (no panic).
+	svc.nliScorer = nil
+	if rep := svc.GetNLICalibrationReport(); rep != nil {
+		t.Errorf("nil scorer → want nil report")
+	}
+}
+
 func TestCalibrationTracker_Report_NoBias(t *testing.T) {
 	tracker := NewNLICalibrationTracker(100, 0.15)
 	for range 10 {

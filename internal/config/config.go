@@ -1148,6 +1148,7 @@ type Config struct {
 
 	// ===== RSIC LLM-Health Recency Gate (SUPERVISOR-002) =====
 	RSICLLMErrorRecencyMin int // RSIC_LLM_ERROR_RECENCY_MIN — minutes; llm_error_rate_spike fires only if the most recent error is this fresh (default: 60, 0 disables the gate)
+	RSICLLMErrorMinCount   int // RSIC_LLM_ERROR_MIN_COUNT — absolute minimum error count for llm_error_rate_spike to fire (ALERT-TRUTH-001); the rate-only floor (>5% & >10 calls) re-fired HIGH 23× on just 2 "context canceled" errors at low call volume (default: 5, 0 disables the count floor)
 
 	// ===== LLM Client Retry =====
 	LLMRetryEnabled     bool    // LLM_RETRY_ENABLED — enable retry for transient LLM errors (default: true)
@@ -1213,6 +1214,9 @@ type Config struct {
 	OrphanRatioThreshold float64 // ORPHAN_RATIO_THRESHOLD — fire High Orphan Ratio when max live-orphan ratio among significant spaces exceeds this (default: 0.10)
 	OrphanCountThreshold int     // ORPHAN_COUNT_THRESHOLD — fire High Orphan Count when max live-orphan count among significant spaces exceeds this (default: 1000; above the accepted historical baseline — ratio rule is the scale-aware primary)
 	GraphHealthScoreFloor float64 // GRAPH_HEALTH_SCORE_FLOOR — fire Low Graph Health when the MIN graph-health score among significant spaces drops below this (default: 0.5; same min-node floor as the orphan rules so degenerate 1-2-node test spaces can't trip it)
+
+	// Neo4j container CPU alert (ALERT-TRUTH-001)
+	Neo4jCPUAlertThresholdPercent float64 // NEO4J_CPU_ALERT_THRESHOLD_PERCENT — fire Neo4j High CPU when the 5-min windowed AVG of mdemg_neo4j_container_cpu_percent exceeds this. docker-stats CPU% is per-single-core, so this is HOST-RELATIVE; default 500 is calibrated above the worst normal-operation 5-min windowed AVG (live 24h max 471, heavy consolidation) so it fires only on genuinely pathological sustained load; lower it on smaller machines (default: 500)
 
 	// FT recursive-loop readiness staleness (FT-RECURSIVE-001 SF-1)
 	FtReadinessStalenessMin int // FT_READINESS_STALENESS_MIN — fire training_readiness_stale when no successful RSIC readiness assessment within this many minutes; catches a silently-dormant loop (default: 30; RSIC assesses every ~5 min)
@@ -4498,6 +4502,10 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	rsicLLMErrorMinCount, err := atoi("RSIC_LLM_ERROR_MIN_COUNT", 5)
+	if err != nil {
+		return Config{}, err
+	}
 	rsicLLMErrorRecencyMin, err := atoi("RSIC_LLM_ERROR_RECENCY_MIN", 60)
 	if err != nil {
 		return Config{}, err
@@ -4631,6 +4639,10 @@ func FromEnv() (Config, error) {
 		return Config{}, err
 	}
 	graphHealthScoreFloor, err := atof("GRAPH_HEALTH_SCORE_FLOOR", 0.5)
+	if err != nil {
+		return Config{}, err
+	}
+	neo4jCPUAlertThresholdPercent, err := atof("NEO4J_CPU_ALERT_THRESHOLD_PERCENT", 500)
 	if err != nil {
 		return Config{}, err
 	}
@@ -5571,6 +5583,7 @@ func FromEnv() (Config, error) {
 		SupervisorBackoffBaseSec:   supervisorBackoffBaseSec,
 		AlertRuleFailureThreshold:  alertRuleFailureThreshold,
 		RSICLLMErrorRecencyMin:     rsicLLMErrorRecencyMin,
+		RSICLLMErrorMinCount:       rsicLLMErrorMinCount,
 
 		// LLM Client Retry
 		LLMRetryEnabled:     llmRetryEnabled,
@@ -5592,6 +5605,7 @@ func FromEnv() (Config, error) {
 		NullWeightEdgeAlertThreshold: nullWeightEdgeAlertThreshold,
 		OrphanRatioMinNodes:          orphanRatioMinNodes,
 		OrphanRatioThreshold:         orphanRatioThreshold,
+		Neo4jCPUAlertThresholdPercent: neo4jCPUAlertThresholdPercent,
 		OrphanCountThreshold:         orphanCountThreshold,
 		GraphHealthScoreFloor:        graphHealthScoreFloor,
 		FtReadinessStalenessMin:      ftReadinessStalenessMin,

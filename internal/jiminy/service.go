@@ -2432,6 +2432,17 @@ func (s *Service) GetNLICalibrationReport() *NLICalibrationReport {
 	if s.calibrationTracker == nil {
 		return nil
 	}
+	// ALERT-TRUTH-001: a gated-off / misconfigured NLI sidecar is NOT a runtime
+	// calibration-drift signal. When the scorer isn't operational the tracker may
+	// still hold a stale window producing a phantom mean-bias (live: 0.638 while
+	// the sidecar served 0 requests → a continuously-firing nli_bias_alert). Return
+	// nil so every consumer (the j17_nli_mean_bias gauge emitters + the RSIC
+	// calibration-drift insight, which all read this via the adapter) sees the
+	// zero-value, not stale bias. Mirrors DH-004's RecordNLIFallback IsOperational
+	// guard, extended to the bias/alert path.
+	if s.nliScorer == nil || !s.nliScorer.IsOperational() {
+		return nil
+	}
 	return s.calibrationTracker.Report()
 }
 
