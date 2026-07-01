@@ -90,8 +90,20 @@ func (s *Service) scorerVersion() string {
 	// per-category context weights + sparse overrides — operator edits to
 	// either JSON map must flip the cache namespace (the v0.7.0 cache-key
 	// class).
+	// RETRIEVAL-TYPED-EDGES-001: the typed-edges flag + its 7 semantic weights
+	// join the namespace so flipping the flag or tuning a weight invalidates the
+	// cache (the v0.7.0 cache-key class). Only meaningful when the flag is on, but
+	// always included for a stable, collision-free key.
+	typedEdges := "off"
+	if s.cfg.RetrievalGraphTypedEdgesEnabled {
+		typedEdges = fmt.Sprintf("on|an=%.3f|br=%.3f|cw=%.3f|ct=%.3f|in=%.3f|ds=%.3f|th=%.3f",
+			s.cfg.EdgeAttentionAnalogousTo, s.cfg.EdgeAttentionBridges,
+			s.cfg.EdgeAttentionComposesWith, s.cfg.EdgeAttentionContrastsWith,
+			s.cfg.EdgeAttentionInfluences, s.cfg.EdgeAttentionDefinesSymbol,
+			s.cfg.EdgeAttentionThemeOf)
+	}
 	return fmt.Sprintf(
-		"v2-rrf5|e=%.3f|b=%.3f|g=%.3f|s=%.3f|c=%.3f|hops=%d|emb=%t|bm=%t|gr=%t|st=%t|ctx=%t|strict=%.3f|catmaps=%s",
+		"v2-rrf5|e=%.3f|b=%.3f|g=%.3f|s=%.3f|c=%.3f|hops=%d|emb=%t|bm=%t|gr=%t|st=%t|ctx=%t|strict=%.3f|catmaps=%s|tge=%s",
 		s.cfg.RetrievalColumnWeightEmbedding,
 		s.cfg.RetrievalColumnWeightBM25,
 		s.cfg.RetrievalColumnWeightGraph,
@@ -105,6 +117,7 @@ func (s *Service) scorerVersion() string {
 		s.cfg.RetrievalContextColumnEnabled,
 		s.cfg.RetrievalContextStrictThreshold,
 		s.categoryMapsHash(),
+		typedEdges,
 	)
 }
 

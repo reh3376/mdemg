@@ -99,7 +99,18 @@ func (c *GraphColumn) Run(ctx context.Context, q ColumnQuery) ColumnResult {
 		lambda = 0.5
 	)
 	hopMin := []float64{0.0, 0.05}
-	act := SpreadingActivation(seeds, edges, steps, lambda, hopMin)
+	// RETRIEVAL-TYPED-EDGES-001: by default the column spreads only through
+	// CO_ACTIVATED_WITH (basic SpreadingActivation) — the typed semantic edges
+	// (ANALOGOUS_TO/BRIDGES/etc.) are fetched but ignored. With the flag on, use
+	// attention spreading so those edges (config-weighted) influence retrieval.
+	// Default-off until the UVTS A/B confirms it lifts quality without saturation.
+	var act map[string]float64
+	if c.svc.cfg.RetrievalGraphTypedEdgesEnabled {
+		attention := ComputeEdgeAttention(QueryContext{QueryText: q.QueryText}, c.svc.cfg)
+		act = SpreadingActivationWithAttention(seeds, edges, steps, lambda, attention, hopMin)
+	} else {
+		act = SpreadingActivation(seeds, edges, steps, lambda, hopMin)
+	}
 
 	// Build output Candidates ranked by activation. Reuse seed metadata
 	// where available; for activated-but-not-seeded nodes we have only the

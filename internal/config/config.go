@@ -599,6 +599,7 @@ type Config struct {
 	// commit if the merge gate clears (B mean ≥ A mean AND no per-question
 	// regression > 10%).
 	RetrievalColumnVotingEnabled     bool    // RETRIEVAL_COLUMN_VOTING_ENABLED — route to RRF aggregator instead of linear scorer (default: true after Phase 13.1 embedding-heavy preset passed full 120q A/B with mean +0.023, 30 improvements, 2 boundary regressions)
+	RetrievalGraphTypedEdgesEnabled  bool    // RETRIEVAL_GRAPH_TYPED_EDGES_ENABLED — RRF graph column spreads activation through typed semantic edges (ANALOGOUS_TO/BRIDGES/etc.) via SpreadingActivationWithAttention instead of the CO_ACTIVATED_WITH-only basic spreading (RETRIEVAL-TYPED-EDGES-001; default: false until the UVTS A/B passes — the basic filter exists to prevent activation saturation from dense structural connectivity)
 	RetrievalRRFK                    int     // RETRIEVAL_RRF_K — RRF constant `score = w / (k + rank)` (default: 60 per Cormack et al.)
 	RetrievalColumnTimeoutFrac       float64 // RETRIEVAL_COLUMN_TIMEOUT_FRACTION — fraction of parent ctx remaining each column may consume (default: 0.8)
 	RetrievalStructuralHops          int     // RETRIEVAL_STRUCTURAL_HOPS — max hops walked by the structural column (default: 2; clamp to 1–9)
@@ -940,6 +941,15 @@ type Config struct {
 	L5GroundingMinSim        float64 // L5_GROUNDING_MIN_SIM — min cosine similarity for grounding edge (default: 0.4)
 	L5GroundingInitialWeight float64 // L5_GROUNDING_INITIAL_WEIGHT — initial weight for GROUNDED_BY edges (default: 0.5)
 	EdgeAttentionGroundedBy  float64 // EDGE_ATTENTION_GROUNDED_BY — attention weight for GROUNDED_BY edges (default: 0.70)
+
+	// Typed semantic-edge attention weights (RETRIEVAL-TYPED-EDGES-001 — were hardcoded in activation.go).
+	EdgeAttentionAnalogousTo   float64 // EDGE_ATTENTION_ANALOGOUS_TO — attention weight for ANALOGOUS_TO edges (default: 0.55)
+	EdgeAttentionBridges       float64 // EDGE_ATTENTION_BRIDGES — attention weight for BRIDGES edges (default: 0.60)
+	EdgeAttentionComposesWith  float64 // EDGE_ATTENTION_COMPOSES_WITH — attention weight for COMPOSES_WITH edges (default: 0.50)
+	EdgeAttentionContrastsWith float64 // EDGE_ATTENTION_CONTRASTS_WITH — attention weight for CONTRASTS_WITH edges (default: 0.40)
+	EdgeAttentionInfluences    float64 // EDGE_ATTENTION_INFLUENCES — attention weight for INFLUENCES edges (default: 0.45)
+	EdgeAttentionDefinesSymbol float64 // EDGE_ATTENTION_DEFINES_SYMBOL — attention weight for DEFINES_SYMBOL edges (default: 0.70)
+	EdgeAttentionThemeOf       float64 // EDGE_ATTENTION_THEME_OF — attention weight for THEME_OF edges (default: 0.65)
 
 	// ===== ANN Optimization: Cluster Summary =====
 	ClusterSummaryEnabled   bool   // CLUSTER_SUMMARY_ENABLED — enable LLM cluster summarization for L1-L4 (default: false)
@@ -1788,14 +1798,20 @@ func FromEnv() (Config, error) {
 
 	// Top-level LLM cascade (defaults for all text-generation features)
 	llmProvider := get("LLM_PROVIDER", "openai")
-	llmModel := get("LLM_MODEL", "gpt-5.4-mini")
+	// Local-first defaults (CONFIG-LOCAL-DEFAULTS-001): the production runtime is
+	// the local llama-server (Phase 13.5 cutover), so the LLM model + endpoint
+	// default to local — a no-env install must NOT silently route to OpenAI's
+	// cloud (the prior gpt-5.4-mini + EffectiveLLMEndpoint→OpenAIEndpoint default
+	// contradicted the always-local architecture). OpenAI stays available only via
+	// explicit OPENAI_* config (the teacher/embedding path).
+	llmModel := get("LLM_MODEL", "mdemg-llm-v1")
 
 	// Embedding provider settings
 	embProvider := get("EMBEDDING_PROVIDER", "openai")
 	openaiKey := get("OPENAI_API_KEY", "")
 	openaiModel := get("OPENAI_MODEL", "text-embedding-3-large")
 	openaiEndpoint := get("OPENAI_ENDPOINT", "https://api.openai.com/v1")
-	llmEndpoint := get("LLM_ENDPOINT", "")
+	llmEndpoint := get("LLM_ENDPOINT", "http://127.0.0.1:8102/v1")
 	ollamaEndpoint := get("OLLAMA_ENDPOINT", "http://localhost:11434")
 	ollamaModel := get("OLLAMA_MODEL", "qwen3-embedding:8b")
 
@@ -3117,6 +3133,7 @@ func FromEnv() (Config, error) {
 	// at exactly -0.10 in business_logic_constraints. See
 	// docs/development/post-ft-lora/phase_13_1_post.md.
 	retrievalColumnVotingEnabled := getBool("RETRIEVAL_COLUMN_VOTING_ENABLED", true)
+	retrievalGraphTypedEdgesEnabled := getBool("RETRIEVAL_GRAPH_TYPED_EDGES_ENABLED", false)
 	retrievalRRFK, err := atoi("RETRIEVAL_RRF_K", 60)
 	if err != nil {
 		return Config{}, err
@@ -3916,6 +3933,34 @@ func FromEnv() (Config, error) {
 		return Config{}, err
 	}
 	edgeAttentionGroundedBy, err := atof("EDGE_ATTENTION_GROUNDED_BY", 0.70)
+	if err != nil {
+		return Config{}, err
+	}
+	edgeAttentionAnalogousTo, err := atof("EDGE_ATTENTION_ANALOGOUS_TO", 0.55)
+	if err != nil {
+		return Config{}, err
+	}
+	edgeAttentionBridges, err := atof("EDGE_ATTENTION_BRIDGES", 0.60)
+	if err != nil {
+		return Config{}, err
+	}
+	edgeAttentionComposesWith, err := atof("EDGE_ATTENTION_COMPOSES_WITH", 0.50)
+	if err != nil {
+		return Config{}, err
+	}
+	edgeAttentionContrastsWith, err := atof("EDGE_ATTENTION_CONTRASTS_WITH", 0.40)
+	if err != nil {
+		return Config{}, err
+	}
+	edgeAttentionInfluences, err := atof("EDGE_ATTENTION_INFLUENCES", 0.45)
+	if err != nil {
+		return Config{}, err
+	}
+	edgeAttentionDefinesSymbol, err := atof("EDGE_ATTENTION_DEFINES_SYMBOL", 0.70)
+	if err != nil {
+		return Config{}, err
+	}
+	edgeAttentionThemeOf, err := atof("EDGE_ATTENTION_THEME_OF", 0.65)
 	if err != nil {
 		return Config{}, err
 	}
@@ -5270,6 +5315,7 @@ func FromEnv() (Config, error) {
 
 		// Phase 13 — Column-Voting Retrieval
 		RetrievalColumnVotingEnabled:     retrievalColumnVotingEnabled,
+		RetrievalGraphTypedEdgesEnabled:  retrievalGraphTypedEdgesEnabled,
 		RetrievalRRFK:                    retrievalRRFK,
 		RetrievalColumnTimeoutFrac:       retrievalColumnTimeoutFrac,
 		RetrievalStructuralHops:          retrievalStructuralHops,
@@ -5474,6 +5520,13 @@ func FromEnv() (Config, error) {
 		L5GroundingMinSim:        l5GroundingMinSim,
 		L5GroundingInitialWeight: l5GroundingInitialWeight,
 		EdgeAttentionGroundedBy:  edgeAttentionGroundedBy,
+		EdgeAttentionAnalogousTo:   edgeAttentionAnalogousTo,
+		EdgeAttentionBridges:       edgeAttentionBridges,
+		EdgeAttentionComposesWith:  edgeAttentionComposesWith,
+		EdgeAttentionContrastsWith: edgeAttentionContrastsWith,
+		EdgeAttentionInfluences:    edgeAttentionInfluences,
+		EdgeAttentionDefinesSymbol: edgeAttentionDefinesSymbol,
+		EdgeAttentionThemeOf:       edgeAttentionThemeOf,
 
 		// ANN Optimization: Cluster Summary
 		ClusterSummaryEnabled:   clusterSummaryEnabled,
