@@ -3068,81 +3068,77 @@ RETURN n.node_id`
 	return classified, nil
 }
 
-// countNodesAtOrAboveLayer counts MemoryNodes at layer >= minLayer in a space
-// (CONSOLIDATE-PERF-001). Uses the memorynode_layer_idx (space_id, layer) index
-// — cheap relative to the O(n²) cross-join it guards.
-func (s *Service) countNodesAtOrAboveLayer(ctx context.Context, spaceID string, minLayer int) (int, error) {
-	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
-	defer sess.Close(ctx)
-	out, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
-		res, err := tx.Run(ctx,
-			`MATCH (n:MemoryNode {space_id: $spaceId}) WHERE n.layer >= $minLayer RETURN count(n) AS c`,
-			map[string]any{"spaceId": spaceID, "minLayer": minLayer})
-		if err != nil {
-			return nil, err
-		}
-		if res.Next(ctx) {
-			return asInt(res.Record().Values[0]), res.Err()
-		}
-		return 0, res.Err()
-	})
-	if err != nil {
-		return 0, err
-	}
-	return out.(int), nil
-}
-
 // CreateDynamicEdges creates edges with inferred types for upper layer relationships
 func (s *Service) CreateDynamicEdges(ctx context.Context, spaceID string) (int, error) {
 	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer sess.Close(ctx)
 
-	// Find pairs of L3+ nodes that should be connected but aren't
-	minLayer := s.cfg.L5SourceMinLayer
+	// RETRIEVAL-TYPED-EDGES-002: connect semantically-similar concept nodes.
+	// MinLayer default 1 (not the old L5SourceMinLayer=3) — a fresh corpus has
+	// almost no L3+ concepts, so semantic edges must reach the abundant L1/L2
+	// layers for the population to grow.
+	minLayer := s.cfg.DynamicEdgeMinLayer
 	if minLayer < 1 {
-		minLayer = 3
+		minLayer = 1
+	}
+	topK := s.cfg.DynamicEdgeTopK
+	if topK <= 0 {
+		topK = 10
+	}
+	oversample := s.cfg.DynamicEdgeOversample
+	if oversample <= 0 {
+		oversample = 8
+	}
+	simThreshold := s.cfg.DynamicEdgeSimThreshold
+	if simThreshold <= 0 {
+		simThreshold = 0.30
 	}
 
-	// CONSOLIDATE-PERF-001 circuit-breaker: the find-pairs query below is a
-	// Cartesian product over all L≥minLayer nodes (O(n²)). At scale it dominates
-	// consolidation — live: 8705 L3+ nodes → ~75M pairs, ~29 min, hitting the
-	// cycle timeout. Skip (loudly) above a node-count ceiling until the Sprint-B
-	// vector-index rewrite makes this O(n·logn). Small graphs keep full behavior;
-	// DYNAMIC_EDGES_MAX_NODES=0 disables the guard.
-	if ceiling := s.cfg.DynamicEdgesMaxNodes; ceiling > 0 {
-		cnt, cErr := s.countNodesAtOrAboveLayer(ctx, spaceID, minLayer)
-		if cErr != nil {
-			slog.Warn("dynamic_edges: upper-layer node count failed; running unguarded", "space_id", spaceID, "error", cErr)
-		} else if cnt > ceiling {
-			slog.Warn("dynamic_edges: SKIPPED — upper-layer node count exceeds the O(n²) cross-join ceiling; awaiting the vector-index rewrite",
-				"space_id", spaceID, "count", cnt, "ceiling", ceiling, "min_layer", minLayer)
-			return 0, nil
-		}
-	}
-
+	// RETRIEVAL-TYPED-EDGES-002: the O(n²) Cartesian cross-join (which the
+	// CONSOLIDATE-PERF-001 circuit-breaker had to skip on large graphs) is
+	// replaced by a per-node top-K query via the memNodeEmbedding vector index
+	// (O(n·logn)). For each L≥minLayer node, fetch its top (K×oversample) nearest
+	// neighbours from the index, filter to same-space ∧ L≥minLayer ∧ not-already-
+	// connected ∧ under the degree cap ∧ sim ≥ threshold, keep the best K. The
+	// oversample absorbs L0 crowding the global top-K. No circuit-breaker needed
+	// (the fan-out is per-node bounded).
+	// The degree cap counts only the DYNAMIC semantic-edge types (not the
+	// structural GENERALIZES/ABSTRACTS_TO membership edges) — else L1/L2 concept
+	// nodes, which have many member edges, would always exceed the cap and be
+	// excluded, defeating the whole point of connecting the concept layers.
 	findPairsCypher := `
-MATCH (a:MemoryNode {space_id: $spaceId}), (b:MemoryNode {space_id: $spaceId})
-WHERE a.layer >= $minLayer AND b.layer >= $minLayer
+MATCH (a:MemoryNode {space_id: $spaceId})
+WHERE a.layer >= $minLayer AND a.embedding IS NOT NULL
+  AND COUNT { (a)-[:ANALOGOUS_TO|CONTRASTS_WITH|COMPOSES_WITH|INFLUENCES|SPECIALIZES|GENERALIZES_TO|BRIDGES]-() } < $degreeCap
+CALL db.index.vector.queryNodes('memNodeEmbedding', $fetchK, a.embedding) YIELD node AS b, score
+WITH a, b, score
+WHERE b.space_id = $spaceId AND b.layer >= $minLayer
   AND a.node_id < b.node_id
+  AND b.embedding IS NOT NULL
+  AND COUNT { (b)-[:ANALOGOUS_TO|CONTRASTS_WITH|COMPOSES_WITH|INFLUENCES|SPECIALIZES|GENERALIZES_TO|BRIDGES]-() } < $degreeCap
   AND NOT (a)-[:ANALOGOUS_TO|CONTRASTS_WITH|COMPOSES_WITH|INFLUENCES|SPECIALIZES|GENERALIZES_TO|BRIDGES]-(b)
-  AND a.embedding IS NOT NULL AND b.embedding IS NOT NULL
-  AND COUNT { (a)--() } < $degreeCap AND COUNT { (b)--() } < $degreeCap
-WITH a, b,
-     vector.similarity.cosine(a.embedding, b.embedding) AS sim
-WHERE sim > 0.3
+  AND score >= $simThreshold
+WITH a, b, score
+ORDER BY score DESC
+WITH a, collect({b: b, sim: score})[0..$topK] AS tops
+UNWIND tops AS t
+WITH a, t.b AS b, t.sim AS sim
 RETURN a.node_id AS sourceId, b.node_id AS targetId,
        a.embedding AS sourceEmb, b.embedding AS targetEmb,
        a.layer AS sourceLayer, b.layer AS targetLayer,
        a.name AS sourceName, b.name AS targetName,
        sim
-ORDER BY sim DESC
-LIMIT 50`
+LIMIT $maxEdges`
 
 	pairs, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 		res, err := tx.Run(ctx, findPairsCypher, map[string]any{
-			"spaceId":   spaceID,
-			"degreeCap": s.cfg.DynamicEdgeDegreeCap,
-			"minLayer":  minLayer,
+			"spaceId":      spaceID,
+			"degreeCap":    s.cfg.DynamicEdgeDegreeCap,
+			"minLayer":     minLayer,
+			"fetchK":       topK * oversample,
+			"topK":         topK,
+			"simThreshold": simThreshold,
+			"maxEdges":     500000, // global safety cap; the per-node topK is the real bound
 		})
 		if err != nil {
 			return nil, err
@@ -3215,6 +3211,9 @@ LIMIT 50`
 			"confidence": inference.Confidence,
 			"evidence":   inference.Evidence,
 			"spaceId":    spaceID,
+			// CUIDv2 minted in Go — Cypher cannot mint CUIDv2 (the project
+			// identifier standard; randomUUID() was a CUIDv2-rule violation).
+			"edgeId": cuid2.Generate(),
 		})
 	}
 
@@ -3226,7 +3225,7 @@ MATCH (a:MemoryNode {space_id: rel.spaceId, node_id: rel.sourceId})
 MATCH (b:MemoryNode {space_id: rel.spaceId, node_id: rel.targetId})
 MERGE (a)-[r:%s {space_id: rel.spaceId}]->(b)
 ON CREATE SET
-    r.edge_id = randomUUID(),
+    r.edge_id = rel.edgeId,
     r.weight = rel.confidence,
     r.confidence = rel.confidence,
     r.evidence = rel.evidence,

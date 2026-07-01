@@ -811,9 +811,20 @@ type Config struct {
 
 	// Phase 75B: Topology Hardening
 	DynamicEdgesEnabled      bool    // DYNAMIC_EDGES_ENABLED — enable dynamic edge creation during retrieval (default: true)
-	DynamicEdgesMaxNodes     int     // DYNAMIC_EDGES_MAX_NODES — circuit-breaker on the O(n²) find-pairs cross-join (CONSOLIDATE-PERF-001): skip dynamic_edges (loudly) when the L≥minLayer node count exceeds this. The query is a Cartesian product over all upper-layer nodes; at scale (live: 8705 L3+ nodes → ~75M pairs) it ran ~29 min and dominated consolidation / hit the timeout. Skipped above the ceiling until the Sprint-B vector-index rewrite makes it O(n·logn); small graphs keep full behavior. 0 disables the guard (default: 2000)
+	// DynamicEdgesMaxNodes (DYNAMIC_EDGES_MAX_NODES) removed by RETRIEVAL-TYPED-EDGES-002:
+	// the O(n²) cross-join circuit-breaker it guarded is gone (CreateDynamicEdges
+	// now uses a per-node vector-index query, O(n·logn)).
 	DynamicEdgeDegreeCap     int     // DYNAMIC_EDGE_DEGREE_CAP — max dynamic edges per node (default: 10)
 	DynamicEdgeMinConfidence float64 // DYNAMIC_EDGE_MIN_CONFIDENCE — minimum confidence for dynamic edges (default: 0.5)
+	// Vector-index dynamic-edge creation (RETRIEVAL-TYPED-EDGES-002): the O(n²)
+	// cross-join is replaced by per-node top-K via the memNodeEmbedding vector
+	// index (O(n·logn)). MinLayer default lowered 3→1 because a fresh corpus has
+	// almost no L3+ concepts (lnl-demo-whk: 4) — semantic edges must connect the
+	// abundant L1/L2 concept layers for the population to grow.
+	DynamicEdgeMinLayer      int     // DYNAMIC_EDGE_MIN_LAYER — minimum layer for dynamic semantic-edge endpoints (default: 1; L0 observations excluded)
+	DynamicEdgeTopK          int     // DYNAMIC_EDGE_TOPK — per-node nearest-neighbor edges to consider (default: 10)
+	DynamicEdgeSimThreshold  float64 // DYNAMIC_EDGE_SIM_THRESHOLD — minimum cosine similarity for a dynamic edge (default: 0.30)
+	DynamicEdgeOversample    int     // DYNAMIC_EDGE_OVERSAMPLE — vector-index fetch multiplier (fetch TopK×Oversample then layer/space/degree-filter; accounts for L0 crowding the global top-K) (default: 8)
 	L5EmergentEnabled        bool    // L5_EMERGENT_ENABLED — enable Layer 5 emergent concept nodes (default: true)
 	L5BridgeEvidenceMin      int     // L5_BRIDGE_EVIDENCE_MIN — minimum bridge evidence for L5 promotion (default: 1)
 	L5SourceMinLayer         int     // L5_SOURCE_MIN_LAYER — minimum layer for L5/dynamic edge source nodes (default: 3)
@@ -3778,14 +3789,26 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	dynamicEdgesMaxNodes, err := atoi("DYNAMIC_EDGES_MAX_NODES", 2000)
-	if err != nil {
-		return Config{}, err
-	}
 	dynamicEdgeMinConfidenceStr := get("DYNAMIC_EDGE_MIN_CONFIDENCE", "0.5")
 	dynamicEdgeMinConfidence, err := strconv.ParseFloat(dynamicEdgeMinConfidenceStr, 64)
 	if err != nil {
 		return Config{}, fmt.Errorf("DYNAMIC_EDGE_MIN_CONFIDENCE must be float: %w", err)
+	}
+	dynamicEdgeMinLayer, err := atoi("DYNAMIC_EDGE_MIN_LAYER", 1)
+	if err != nil {
+		return Config{}, err
+	}
+	dynamicEdgeTopK, err := atoi("DYNAMIC_EDGE_TOPK", 10)
+	if err != nil {
+		return Config{}, err
+	}
+	dynamicEdgeSimThreshold, err := atof("DYNAMIC_EDGE_SIM_THRESHOLD", 0.30)
+	if err != nil {
+		return Config{}, err
+	}
+	dynamicEdgeOversample, err := atoi("DYNAMIC_EDGE_OVERSAMPLE", 8)
+	if err != nil {
+		return Config{}, err
 	}
 	l5EmergentEnabled := getBool("L5_EMERGENT_ENABLED", true)
 	l5BridgeEvidenceMin, err := atoi("L5_BRIDGE_EVIDENCE_MIN", 1)
@@ -5471,8 +5494,11 @@ func FromEnv() (Config, error) {
 		RelResolutionTimeout:     relResolutionTimeout,
 		DynamicEdgesEnabled:      dynamicEdgesEnabled,
 		DynamicEdgeDegreeCap:     dynamicEdgeDegreeCap,
-		DynamicEdgesMaxNodes:     dynamicEdgesMaxNodes,
 		DynamicEdgeMinConfidence: dynamicEdgeMinConfidence,
+		DynamicEdgeMinLayer:      dynamicEdgeMinLayer,
+		DynamicEdgeTopK:          dynamicEdgeTopK,
+		DynamicEdgeSimThreshold:  dynamicEdgeSimThreshold,
+		DynamicEdgeOversample:    dynamicEdgeOversample,
 		L5EmergentEnabled:        l5EmergentEnabled,
 		L5BridgeEvidenceMin:      l5BridgeEvidenceMin,
 		L5SourceMinLayer:         l5SourceMinLayer,
