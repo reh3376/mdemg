@@ -41,12 +41,12 @@ func TestLLMCascade_AllDefaultToOpenAI(t *testing.T) {
 		t.Fatalf("FromEnv() error: %v", err)
 	}
 
-	// Top-level defaults (now openai/gpt-5.4-mini)
+	// Top-level defaults (now openai/mdemg-llm-v1 — local-first (CONFIG-LOCAL-DEFAULTS-001))
 	if cfg.LLMProvider != "openai" {
 		t.Errorf("LLMProvider = %q, want %q", cfg.LLMProvider, "openai")
 	}
-	if cfg.LLMModel != "gpt-5.4-mini" {
-		t.Errorf("LLMModel = %q, want %q", cfg.LLMModel, "gpt-5.4-mini")
+	if cfg.LLMModel != "mdemg-llm-v1" {
+		t.Errorf("LLMModel = %q, want %q", cfg.LLMModel, "mdemg-llm-v1")
 	}
 
 	// All features should cascade from top-level
@@ -67,8 +67,8 @@ func TestLLMCascade_AllDefaultToOpenAI(t *testing.T) {
 		if f.provider != "openai" {
 			t.Errorf("%s.Provider = %q, want %q", f.name, f.provider, "openai")
 		}
-		if f.model != "gpt-5.4-mini" {
-			t.Errorf("%s.Model = %q, want %q", f.name, f.model, "gpt-5.4-mini")
+		if f.model != "mdemg-llm-v1" {
+			t.Errorf("%s.Model = %q, want %q", f.name, f.model, "mdemg-llm-v1")
 		}
 	}
 }
@@ -138,8 +138,8 @@ func TestLLMCascade_MetaLearnDoubleInherit(t *testing.T) {
 	if cfg.MetaLearnProvider != "openai" {
 		t.Errorf("MetaLearnProvider = %q, want %q", cfg.MetaLearnProvider, "openai")
 	}
-	if cfg.MetaLearnModel != "gpt-5.4-mini" {
-		t.Errorf("MetaLearnModel = %q, want %q", cfg.MetaLearnModel, "gpt-5.4-mini")
+	if cfg.MetaLearnModel != "mdemg-llm-v1" {
+		t.Errorf("MetaLearnModel = %q, want %q", cfg.MetaLearnModel, "mdemg-llm-v1")
 	}
 }
 
