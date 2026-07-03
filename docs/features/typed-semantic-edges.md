@@ -35,35 +35,62 @@ The flag + weights are folded into `scorerVersion()`, so flipping the flag or
 tuning a weight invalidates the retrieval cache. All 8 keys appear in the `/ui/`
 config tab.
 
-## Status: default-off (the A/B says Phase 1 alone is a no-op)
+## Status: default-ON (Phase 2 grew the edges; clean A/B passed)
 
-The UVTS A/B (flag off vs on, on a freshly-ingested corpus) found **zero
-difference** — because:
+Phase 1's A/B was +0.0000 because the semantic edges barely existed. Phase 2
+(RETRIEVAL-TYPED-EDGES-002) grew them via a `dynamic_edges` vector-index rewrite
+(O(n·logn) per-node top-K over `memNodeEmbedding`; `DYNAMIC_EDGE_MIN_LAYER`
+lowered to 1 so semantic edges reach the abundant L1/L2 concept layers) — **4,415
+typed semantic edges on a test corpus, up from ~1**. The clean full-120q A/B on a
+quiet, warmed system:
 
-1. **The semantic edges barely exist.** Their only producer, `dynamic_edges`,
-   creates almost none (it's an O(n²) cross-join, gated by a node-count
-   circuit-breaker; see CONSOLIDATE-PERF-001). A fresh corpus has ~0
-   ANALOGOUS_TO/BRIDGES; mdemg-dev has only ~300 across 355k edges.
-2. **The graph column's spreading doesn't reach the final ranking** — at weight
-   0.15 it's dominated by embedding (0.50) + BM25 (0.20), and it re-ranks the
-   existing vector-recall seeds without surfacing new candidates.
+| Config | mean | correct_file |
+|---|---|---|
+| OFF | 0.4120 | 0.608 |
+| **ON (default)** | **0.4130** | **0.617** |
 
-## What's needed to fulfil the goal (Phase 2)
+**+0.0010 mean, +0.009 correct-file, 0 regressions, 5 improvements, no latency
+cost** (flag-on = flag-off, ~4.2s). Small but real and harmless — so
+`RETRIEVAL_GRAPH_TYPED_EDGES_ENABLED` is now **default-on**.
 
-1. **Grow the semantic edges** — rewrite `dynamic_edges` to O(n·logn) via the
-   Neo4j vector index (`db.index.vector.queryNodes`, top-K per node) so
-   ANALOGOUS_TO/BRIDGES form in quantity and the circuit-breaker can lift.
-2. **Make typed edges expand the candidate pool** — surface semantically-connected
-   nodes that vector recall misses (not just re-rank existing candidates), or add
-   a dedicated typed-edge column with enough weight. Then re-run the A/B.
+⚠️ **Amplification is a dead end:** raising the graph column weight (0.15→0.25) to
+amplify the typed-edge signal *regresses* (crowds out embedding/BM25 — the
+Phase-13 finding). Keep the natural graph weight 0.15.
+
+## Dynamic-edge creation (the vector-index rewrite)
+
+`CreateDynamicEdges` now, per L≥`DYNAMIC_EDGE_MIN_LAYER` node, fetches its top
+(`DYNAMIC_EDGE_TOPK`×`DYNAMIC_EDGE_OVERSAMPLE`) nearest neighbours from the
+`memNodeEmbedding` vector index, keeps those in the same space at the same
+min-layer, not-already-connected, under the degree cap, and with cosine
+`sim ≥ DYNAMIC_EDGE_SIM_THRESHOLD` — then infers the typed edge (ANALOGOUS_TO /
+BRIDGES / etc.). O(n·logn), bounded per-node.
+
+| Env var | Default |
+|---|---|
+| `DYNAMIC_EDGE_MIN_LAYER` | 1 |
+| `DYNAMIC_EDGE_TOPK` | 10 |
+| `DYNAMIC_EDGE_SIM_THRESHOLD` | 0.30 |
+| `DYNAMIC_EDGE_OVERSAMPLE` | 8 |
+
+## What's next (optional research)
+
+- A **dedicated additive typed-edge column** (6th RRF column) — the one untried
+  amplification lever (adds the typed-edge signal without weakening
+  embedding/BM25). Uncertain ROI given the weak signal on the test corpus.
 
 ## How to use
 
-- **Operators:** default-off; no action. To experiment: set
-  `RETRIEVAL_GRAPH_TYPED_EDGES_ENABLED=true` (or toggle in the `/ui/` config tab)
-  and tune the `EDGE_ATTENTION_*` weights. Re-verify with the UVTS A/B before
-  relying on it — Phase 2 is the prerequisite for a real effect.
+- **Operators:** default-**on**; no action needed — typed edges influence
+  retrieval out of the box. To opt out: `RETRIEVAL_GRAPH_TYPED_EDGES_ENABLED=false`
+  (or toggle in the `/ui/` config tab). The `EDGE_ATTENTION_*` weights and the
+  `DYNAMIC_EDGE_*` edge-growth knobs are tunable; re-verify any change with the
+  UVTS A/B (Note-02 gate). ⚠️ Do **not** raise the graph column weight to amplify
+  the signal — that regresses (see above).
 
 ## Reference
-- Sprint: `docs/development/retrieval-typed-edges-001/` (`ab_verdict_quick.json`)
-- Code: `internal/retrieval/{activation.go,column_graph.go,service.go}`
+- Sprint: `docs/development/retrieval-typed-edges-001/` (Phase 1 — scorer) +
+  `docs/development/retrieval-typed-edges-002/` (Phase 2 — grow edges, default-on;
+  `post.md`, `ab_verdict_full.json`)
+- Code: `internal/retrieval/{activation.go,column_graph.go,service.go}`,
+  `internal/hidden/service.go` (`CreateDynamicEdges`)

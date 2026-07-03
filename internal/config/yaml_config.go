@@ -1084,7 +1084,7 @@ var defaultValues = map[string]string{
 	"jiminy.evaluate_output_max_chars":  "200000",
 	"jiminy.evaluate_item_max_chars":    "0",
 	// Retrieval: typed semantic edges (RETRIEVAL-TYPED-EDGES-001)
-	"retrieval.graph_typed_edges_enabled":     "false",
+	"retrieval.graph_typed_edges_enabled":     "true",
 	"retrieval.edge_attention_analogous_to":   "0.55",
 	"retrieval.edge_attention_bridges":        "0.60",
 	"retrieval.edge_attention_composes_with":  "0.50",
