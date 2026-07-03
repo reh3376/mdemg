@@ -477,6 +477,7 @@ type Config struct {
 	J17NLICalibrationWindowSize    int     // J17_NLI_CALIBRATION_WINDOW_SIZE — ring buffer size for NLI/heuristic comparison (default: 500)
 	J17NLICalibrationBiasThreshold float64 // J17_NLI_CALIBRATION_BIAS_THRESHOLD — max acceptable NLI-vs-heuristic mean bias over the like-for-like (ignored-excluded) window (default: 0.15; DASHBOARD-TRUTH-001)
 	J17NLICalibrationMinSamples    int     // J17_NLI_CALIBRATION_MIN_SAMPLES — min like-for-like samples before the bias alert can fire; below this the window is "insufficient data" (default: 50, 0 disables the floor; DASHBOARD-TRUTH-001)
+	J17CompressionTargetRatio      float64 // J17_COMPRESSION_TARGET_RATIO — compression ratio scored as "excellent" (sub-score 1.0) by the RSIC Protocol dimension; must be > 1.0 (ratio 1.0 = no compression), else falls back to default with a warning (default: 3.0; DASHBOARD-TRUTH-001 Epic 3)
 
 	// Plugin system settings (V0006)
 	PluginsEnabled  bool   // Feature toggle for plugin system (default: true)
@@ -2916,6 +2917,19 @@ func FromEnv() (Config, error) {
 	if j17NLICalibrationMinSamples < 0 {
 		j17NLICalibrationMinSamples = 0
 	}
+	// DASHBOARD-TRUTH-001 Epic 3: calibration anchor for the RSIC Protocol
+	// compression sub-score (score 1.0 at target, 0.0 at ratio 1.0, linear
+	// between). Must be > 1.0 — a target at or below 1.0 (no compression)
+	// makes the sub-score degenerate.
+	j17CompressionTargetRatio, err := atof("J17_COMPRESSION_TARGET_RATIO", 3.0)
+	if err != nil {
+		return Config{}, err
+	}
+	if j17CompressionTargetRatio <= 1.0 {
+		slog.Warn("J17_COMPRESSION_TARGET_RATIO must be > 1.0, falling back to default",
+			"requested", j17CompressionTargetRatio, "default", 3.0)
+		j17CompressionTargetRatio = 3.0
+	}
 
 	// Startup validation: active mode requires sidecar URL
 	if j17SidecarMode == "active" && j17SidecarURL == "" {
@@ -5231,6 +5245,7 @@ func FromEnv() (Config, error) {
 		J17NLICalibrationWindowSize:    j17NLICalibrationWindowSize,
 		J17NLICalibrationBiasThreshold: j17NLICalibrationBiasThreshold,
 		J17NLICalibrationMinSamples:    j17NLICalibrationMinSamples,
+		J17CompressionTargetRatio:      j17CompressionTargetRatio,
 
 		// Dynamic Reclassification
 		ReclassEnabled:       reclassEnabled,

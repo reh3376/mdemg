@@ -211,6 +211,54 @@ func TestJ17NLICalibrationMinSamples_NegativeClampedToZero(t *testing.T) {
 	}
 }
 
+// DASHBOARD-TRUTH-001 Epic 3: config-driven compression calibration anchor
+// for the RSIC Protocol dimension.
+func TestJ17CompressionTargetRatio_Default(t *testing.T) {
+	setMinimalEnv(t)
+	clearLLMEnv(t)
+	t.Setenv("J17_COMPRESSION_TARGET_RATIO", "")
+
+	cfg, err := FromEnv()
+	if err != nil {
+		t.Fatalf("FromEnv() error: %v", err)
+	}
+	if cfg.J17CompressionTargetRatio != 3.0 {
+		t.Errorf("J17CompressionTargetRatio = %f, want 3.0", cfg.J17CompressionTargetRatio)
+	}
+}
+
+func TestJ17CompressionTargetRatio_EnvOverride(t *testing.T) {
+	setMinimalEnv(t)
+	clearLLMEnv(t)
+	t.Setenv("J17_COMPRESSION_TARGET_RATIO", "2.5")
+
+	cfg, err := FromEnv()
+	if err != nil {
+		t.Fatalf("FromEnv() error: %v", err)
+	}
+	if cfg.J17CompressionTargetRatio != 2.5 {
+		t.Errorf("J17CompressionTargetRatio = %f, want 2.5", cfg.J17CompressionTargetRatio)
+	}
+}
+
+func TestJ17CompressionTargetRatio_AtOrBelowOneFallsBack(t *testing.T) {
+	for _, bad := range []string{"1.0", "0.5", "-2"} {
+		t.Run(bad, func(t *testing.T) {
+			setMinimalEnv(t)
+			clearLLMEnv(t)
+			t.Setenv("J17_COMPRESSION_TARGET_RATIO", bad)
+
+			cfg, err := FromEnv()
+			if err != nil {
+				t.Fatalf("FromEnv() error: %v", err)
+			}
+			if cfg.J17CompressionTargetRatio != 3.0 {
+				t.Errorf("J17CompressionTargetRatio = %f, want 3.0 (fallback for <= 1.0)", cfg.J17CompressionTargetRatio)
+			}
+		})
+	}
+}
+
 func TestJ17SidecarTimeoutMs_FloorBoundaryValuesAllowed(t *testing.T) {
 	setMinimalEnv(t)
 	clearLLMEnv(t)

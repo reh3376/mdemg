@@ -383,6 +383,11 @@ const (
 	confidenceThresholdProtocolEvents = 30  // TotalEvents
 )
 
+// defaultCompressionTargetRatio mirrors the J17_COMPRESSION_TARGET_RATIO
+// config default (DASHBOARD-TRUTH-001 Epic 3) — used as a defensive fallback
+// when the Assessor is built with a Config literal (target unset / <= 1.0).
+const defaultCompressionTargetRatio = 3.0
+
 // scoreRetrieval returns (score, confidence). Confidence is derived from
 // LearningPhase maturity: warm/saturated phases reflect enough edge history
 // to trust the retrieval signal; cold reflects minimal data.
@@ -521,8 +526,20 @@ func (a *Assessor) scoreProtocol(stats ProtocolStatsResult) (float64, float64) {
 		calibrationScore = 0.3
 	}
 
-	// 25% compression (ratio of 5.0 = perfect, 1.0 = no compression)
-	compressionScore := clamp((stats.CompressionRatio-1.0)/4.0, 0, 1)
+	// 25% compression (ratio of target = excellent, 1.0 = no compression).
+	// Calibration anchor (DH-005 class): J17_COMPRESSION_TARGET_RATIO sets
+	// the ratio scored as 1.0 — raising the target LOWERS the Protocol score,
+	// lowering it RAISES it. The old hardcoded 5.0 anchor was unreachable
+	// (real J17 compression: ~1.8 typical, ~3 achievable; 30d live p50 1.56,
+	// p95 2.0) and permanently dragged the dimension by ~0.20
+	// (DASHBOARD-TRUTH-001 Epic 3). Default 3.0 = defensibly-excellent.
+	target := a.cfg.J17CompressionTargetRatio
+	if target <= 1.0 {
+		// Defensive fallback for Config literals that never went through
+		// FromEnv (which warns + falls back on misconfiguration).
+		target = defaultCompressionTargetRatio
+	}
+	compressionScore := clamp((stats.CompressionRatio-1.0)/(target-1.0), 0, 1)
 
 	// 20% coverage (do all constraints have codes?)
 	coverageScore := clamp(stats.CodeCoverage, 0, 1)
