@@ -100,6 +100,17 @@ type Config struct {
 	HTTPReadTimeout  int // Read timeout in seconds (default: 600)
 	HTTPWriteTimeout int // Write timeout in seconds (default: 600)
 
+	// RETRIEVE_TIMEOUT_MS — bounded server-side deadline for a single retrieve
+	// (RETRIEVAL-TYPED-EDGES-002 robustness fix). handleRetrieve previously used
+	// the raw request ctx, bounded only by HTTPWriteTimeout=600s, so under Neo4j
+	// load (a concurrent consolidation) the unbounded column Cypher queries hung
+	// for tens of seconds to MINUTES — starving the hooks (short timeouts → no
+	// memory recall) and holding Neo4j connections/slots that compounded the
+	// contention. A tight deadline makes the per-column timeout fraction
+	// meaningful and lets a slow retrieve fail-fast (not cached, per the
+	// empty-result cache guard) instead of hanging. 0 disables (default: 20000).
+	RetrieveTimeoutMs int
+
 	// Anomaly detection settings
 	AnomalyDetectionEnabled   bool    // Feature toggle (default: true)
 	AnomalyDuplicateThreshold float64 // Vector similarity threshold for duplicates (default: 0.95)
@@ -1635,6 +1646,10 @@ func FromEnv() (Config, error) {
 	}
 	if httpWriteTimeout < 1 {
 		return Config{}, errors.New("HTTP_WRITE_TIMEOUT must be >= 1")
+	}
+	retrieveTimeoutMs, err := atoi("RETRIEVE_TIMEOUT_MS", 20000)
+	if err != nil {
+		return Config{}, err
 	}
 
 	// Anomaly detection settings
@@ -4928,6 +4943,7 @@ func FromEnv() (Config, error) {
 		BatchIngestMaxItems:            batchMaxItems,
 		HTTPReadTimeout:                httpReadTimeout,
 		HTTPWriteTimeout:               httpWriteTimeout,
+		RetrieveTimeoutMs:              retrieveTimeoutMs,
 		AnomalyDetectionEnabled:        anomalyEnabled,
 		AnomalyDuplicateThreshold:      anomalyDupThreshold,
 		AnomalyOutlierStdDevs:          anomalyOutlierStdDevs,

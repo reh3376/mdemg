@@ -561,6 +561,16 @@ func (s *Server) handleRetrieve(w http.ResponseWriter, r *http.Request) {
 	if req.SpaceID != "" {
 		ctx = llmclient.WithSpaceID(ctx, req.SpaceID)
 	}
+	// RETRIEVAL-TYPED-EDGES-002 robustness: bound the retrieve. Without this the
+	// only deadline is HTTPWriteTimeout (600s), so under Neo4j load the unbounded
+	// column queries hung for tens of seconds to minutes — starving the hooks and
+	// compounding contention by holding connections/slots. A tight deadline makes
+	// the per-column timeout fraction meaningful and fails fast instead of hanging.
+	if s.cfg.RetrieveTimeoutMs > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, time.Duration(s.cfg.RetrieveTimeoutMs)*time.Millisecond)
+		defer cancel()
+	}
 
 	resp, err := s.retriever.Retrieve(ctx, req)
 	if err != nil {
