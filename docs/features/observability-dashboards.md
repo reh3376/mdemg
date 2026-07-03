@@ -131,6 +131,18 @@ For each FAIL, the `error` field captures the exact PostgreSQL error message. Fo
 - **Coverage expansion**: 11 TSDB tables currently have ZERO dashboard panels — `sparse_gate_metrics` (V0019), `context_catalog_versions` (V0020), `model_install_events` (V0021), `retrieval_audit` (V0017), `embedding_events`, `guidance_conflicts` (V0015), `rl_training_runs/_steps` (V0013), `uvts_results/_runs` (V0016), `ft_hitl_decisions`. Many are currently sparse / never-populated on the dev TSDB; expansion gated on data accumulation OR per-table operator priority.
 - **CI integration**: run `grafana_panel_audit.py` in CI nightly against a snapshot TSDB; alert on net-new FAILs.
 
+## Metric honesty — DASHBOARD-TRUTH-001 (2026-07-03)
+
+A follow-up to ALERT-TRUTH-001, fixing 6 measurement artifacts that made healthy subsystems read as failing. Corrected metric semantics operators should know:
+
+- **RSIC "Cycle Success Rate"** is a *single windowed aggregate* over `mdemg_rsic_cycle_total` (completed+dry_run ÷ all terminal), NOT a per-`time_bucket` ratio. A per-bucket ratio reduced by `lastNotNull` latches 0 on a started-only bucket — the defect that showed 0% while RSIC was at 100%. **Any stat panel showing a rate must aggregate over the whole window, never bucket-then-`lastNotNull`.** A genuinely empty window shows `N/A`.
+- **J17 "NLI Mean Bias" / Bias Alert** compares NLI *comprehension* vs a *compliance* heuristic — these diverge by design on `ignored` outcomes, so `ignored` samples are excluded and the alert only fires above a min-sample floor (`J17_NLI_CALIBRATION_MIN_SAMPLES`, default 50). Below the floor the gauge reads 0 / no-alert (insufficient data), gated at the source (`nli_calibration.Report()`) so every consumer agrees. **"Sidecar Requests" counts the tier-prediction shadow client only** — real NLI-call volume/latency is `mdemg_j17_nli_requests_total` / `mdemg_j17_nli_latency_ms`.
+- **J17 "Protocol" health** anchors its compression sub-score to `J17_COMPRESSION_TARGET_RATIO` (default 3.0 = "excellent"), calibrated above the 30d p95 (~2.0). A freshly-restarted server reads low Protocol until its in-memory J17 window warms (cold-start transient; DH-005 confidence down-weights it).
+- **J17 "Min/Avg/Max/Count Trust"** count only *significant live* sessions — within the TTL of last update AND ≥ `J17_TRUST_MIN_FEEDBACK_COUNT` (default 5) feedback events. Stale test sessions expire (TTL cleanup now actually runs; hydration preserves `last_feed_at` provenance).
+- **Jiminy "Outcome Distribution" / "Outcome Trends"** read *windowed* `constraint_outcomes` counts, NOT the lifetime-cumulative multi-credit gauges (which credit a guidance_id as followed if ANY edge followed → inflated ~3× vs the honest follow rate). **"Should-Follow Follow Rate"** excludes `not_applicable` from the denominator. **"Guidance Items With Recorded Outcomes"** (formerly "Total Guidance Issued") counts distinct guidance_ids with ≥1 outcome edge, all-time — not issuance volume.
+
+New config knobs: `J17_NLI_CALIBRATION_MIN_SAMPLES` (50), `J17_COMPRESSION_TARGET_RATIO` (3.0, >1.0), `J17_TRUST_MIN_FEEDBACK_COUNT` (5). Sprint: `docs/development/dashboard-truth-001/`.
+
 ## References
 
 - Sprint plan: `docs/development/grafana-audit-001/sprint_plan_grafana_audit_001.md`
