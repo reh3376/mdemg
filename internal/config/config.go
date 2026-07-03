@@ -8,6 +8,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -777,6 +778,17 @@ type Config struct {
 	ConstraintDetectionEnabled bool    // CONSTRAINT_DETECTION_ENABLED — enable constraint detection in observations (default: true)
 	ConstraintMinConfidence    float64 // CONSTRAINT_MIN_CONFIDENCE — minimum confidence to tag as constraint (default: 0.6)
 	ConstraintProtectFromDecay bool    // CONSTRAINT_PROTECT_FROM_DECAY — protect constraint-tagged obs from tombstoning (default: true)
+
+	// JIMINY-CORPUS-001 Epic 1: ConvObs→constraint promotion gate.
+	// Guards the ONLY site that mints role_type='constraint' nodes from
+	// conversation observations (hidden.CreateConstraintNodes, run in
+	// consolidation). Rejects transient/status content (fabricated
+	// "Build/test succeeded" observations, bash errors, PR/sprint status
+	// notes, doc/template dumps) so junk never becomes a constraint node
+	// that Lever C would then surface as guidance.
+	ConstraintPromotionGateEnabled    bool     // CONSTRAINT_PROMOTION_GATE_ENABLED — enable the promotion gate (default: true)
+	ConstraintPromotionDenyObsTypes   []string // CONSTRAINT_PROMOTION_DENY_OBS_TYPES — comma-separated obs_types that are NEVER promoted (transient provenance; default: "progress,error,task,context")
+	ConstraintPromotionRejectPatterns []string // CONSTRAINT_PROMOTION_REJECT_PATTERNS — JSON array of Go regexes; observation content matching ANY is never promoted (default: built-in junk-class set; "[]" disables the pattern layer)
 	// COOLER-001 — decay-rate multiplier for CO_ACTIVATED_WITH edges incident
 	// to a GRADUATED (volatile=false) node: this is what "graduated" means to
 	// retrieval — stable memory's associations resist time decay. 1.0 = no
@@ -1330,7 +1342,35 @@ const (
 
 	// GUIDANCE-SYNTH-001 — per-node constraint classifier concurrency.
 	DefaultConsultingClassifyConcurrency = 4 // CONSULTING_CLASSIFY_CONCURRENCY
+
+	// JIMINY-CORPUS-001 — ConvObs→constraint promotion gate: obs_types that
+	// are transient by definition (run status / failures / todo / ambient
+	// context) and therefore never legitimate durable rules. Provenance is
+	// the principled rejection signal; the pattern list below is only the
+	// backstop for junk that arrives under a durable-looking obs_type.
+	DefaultConstraintPromotionDenyObsTypes = "progress,error,task,context" // CONSTRAINT_PROMOTION_DENY_OBS_TYPES
 )
+
+// DefaultConstraintPromotionRejectPatterns returns the built-in content-shape
+// backstop for the ConvObs→constraint promotion gate (JIMINY-CORPUS-001).
+// Each entry is a Go regexp matched against observation content; a match
+// means "this is a transient observation / document dump, not a durable
+// rule" and blocks promotion to a role_type='constraint' node. Anchored to
+// the junk classes diagnosed live in mdemg-dev (fabricated build/test-status
+// observations, bash errors, PR/sprint status notes, doc/template dumps).
+// Returned as a fresh slice so callers cannot mutate the defaults.
+func DefaultConstraintPromotionRejectPatterns() []string {
+	return []string{
+		`^Build/test succeeded`,                          // pre-HOOKWIRE-001 fabricated tool-status observations
+		`^Bash error`,                                    // hook-captured command failures
+		`(?i)\bapproved\s*(?:&|and)\s*merged\b`,          // PR status notes
+		`(?i)^(?:sprint|phase|pr)\s+[#\w./+-]+\s*(?:is\s+)?(?:fully\s+)?(?:complete|completed|implemented|shipped|merged|executed|done)\b`, // sprint/phase/PR completion status
+		`^\s*#{1,6}\s`,                                   // markdown-heading-led doc/template dumps
+		`(?i)^(?:sprint|phase)\s+[#\w./+-]+\s+spec\b`,    // "PHASE 105 SPEC: …" design-doc dumps
+		`(?i)^skill:`,                                    // skill-registry dumps
+		`(?i)^sprint plan\b`,                             // sprint-plan format/checklist dumps
+	}
+}
 
 // JiminyWarmComputeTimeout returns the effective Guide()-compute timeout as a
 // Duration, applying the default when unset. Call sites use this instead of
@@ -3693,6 +3733,29 @@ func FromEnv() (Config, error) {
 		return Config{}, err
 	}
 	constraintProtectFromDecay := getBool("CONSTRAINT_PROTECT_FROM_DECAY", true)
+
+	// JIMINY-CORPUS-001: ConvObs→constraint promotion gate
+	constraintPromotionGateEnabled := getBool("CONSTRAINT_PROMOTION_GATE_ENABLED", true)
+	var constraintPromotionDenyObsTypes []string
+	for _, t := range strings.Split(get("CONSTRAINT_PROMOTION_DENY_OBS_TYPES", DefaultConstraintPromotionDenyObsTypes), ",") {
+		if t = strings.ToLower(strings.TrimSpace(t)); t != "" {
+			constraintPromotionDenyObsTypes = append(constraintPromotionDenyObsTypes, t)
+		}
+	}
+	constraintPromotionRejectPatterns := DefaultConstraintPromotionRejectPatterns()
+	if raw := strings.TrimSpace(os.Getenv("CONSTRAINT_PROMOTION_REJECT_PATTERNS")); raw != "" {
+		var parsed []string
+		if err := json.Unmarshal([]byte(raw), &parsed); err != nil {
+			return Config{}, fmt.Errorf("CONSTRAINT_PROMOTION_REJECT_PATTERNS must be a valid JSON string array: %w", err)
+		}
+		constraintPromotionRejectPatterns = parsed
+	}
+	for _, p := range constraintPromotionRejectPatterns {
+		if _, err := regexp.Compile(p); err != nil {
+			return Config{}, fmt.Errorf("CONSTRAINT_PROMOTION_REJECT_PATTERNS: invalid regexp %q: %w", p, err)
+		}
+	}
+
 	graduatedDecayProtectionFactor, err := atof("GRADUATED_DECAY_PROTECTION_FACTOR", 0.5)
 	if err != nil {
 		return Config{}, err
@@ -5497,6 +5560,11 @@ func FromEnv() (Config, error) {
 		ConstraintDetectionEnabled:     constraintDetectionEnabled,
 		ConstraintMinConfidence:        constraintMinConfidence,
 		ConstraintProtectFromDecay:     constraintProtectFromDecay,
+
+		ConstraintPromotionGateEnabled:    constraintPromotionGateEnabled,
+		ConstraintPromotionDenyObsTypes:   constraintPromotionDenyObsTypes,
+		ConstraintPromotionRejectPatterns: constraintPromotionRejectPatterns,
+
 		GraduatedDecayProtectionFactor: graduatedDecayProtectionFactor,
 
 		ConsolidateOnWatchdogEnabled: consolidateOnWatchdog,

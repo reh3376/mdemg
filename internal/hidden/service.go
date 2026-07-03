@@ -29,6 +29,10 @@ type Service struct {
 	cbRegistry *circuitbreaker.Registry
 	edgePruner EdgePruner // optional; nil if auto-prune is disabled
 
+	// JIMINY-CORPUS-001: gates ConvObs→role_type='constraint' promotion in
+	// CreateConstraintNodes. nil (e.g. hand-built Service in tests) = pass.
+	constraintGate *ConstraintPromotionGate
+
 	// Per-space consolidation lock: prevents concurrent consolidation on the same space
 	consolidateLocks sync.Map // map[string]*sync.Mutex
 }
@@ -37,6 +41,7 @@ type Service struct {
 // cbRegistry may be nil (e.g. CLI consolidation); LLM steps that need it will skip gracefully.
 func NewService(cfg config.Config, driver neo4j.DriverWithContext, cbRegistry *circuitbreaker.Registry) *Service {
 	s := &Service{cfg: cfg, driver: driver, cbRegistry: cbRegistry}
+	s.constraintGate = NewConstraintPromotionGate(cfg)
 	s.pipeline = s.buildPipeline()
 	return s
 }
