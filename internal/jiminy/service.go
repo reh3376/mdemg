@@ -70,6 +70,13 @@ type Service struct {
 	codeComprehensionTracker *CodeComprehensionTracker     // P1-15: code comprehension feedback loop
 	outcomeWriter            OutcomeWriter                 // TSDB writer for constraint outcomes
 	guidanceTrainingWriter   GuidanceTrainingWriter        // JIMINY-RELEVANCE-001: TSDB writer for the guidance training-evidence corpus
+	surfaceCooldown          *SurfaceCooldownTracker       // JIMINY-CORPUS-001 Lever A: per-session surfacing cooldown
+
+	// JIMINY-CORPUS-001 Lever B: per-space effectiveness-prior cache (TTL-bounded;
+	// expired entries pruned on every refresh, so size is bounded by the number of
+	// spaces actively calling Guide within one TTL window).
+	effPriorMu    sync.Mutex
+	effPriorCache map[string]effPriorCacheEntry
 
 	// B4: Per-session feedback tracking for protocol status endpoint
 	feedbackMu     sync.RWMutex
@@ -304,6 +311,14 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext, consultant Co
 		slog.Warn("J17_TICKET_SECRET not set — auto-generated key, not persistent across restarts")
 	}
 
+	// JIMINY-CORPUS-001 Lever A: per-session surfacing cooldown (0 disables).
+	var surfaceCooldown *SurfaceCooldownTracker
+	if cfg.JiminySurfaceCooldownIgnoredCount > 0 {
+		surfaceCooldown = NewSurfaceCooldownTracker(cfg.JiminySurfaceCooldownCapacity)
+		slog.Info("jiminy: surfacing cooldown enabled",
+			"ignored_count", cfg.JiminySurfaceCooldownIgnoredCount, "capacity", cfg.JiminySurfaceCooldownCapacity)
+	}
+
 	return &Service{
 		cfg:                cfg,
 		driver:             driver,
@@ -333,6 +348,7 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext, consultant Co
 		strictMode:         strictMode,
 		reformulator:       reformulator,
 		strictClassifier:   strictClassifier,
+		surfaceCooldown:    surfaceCooldown,
 		feedbackCounts:     make(map[string]*sessionFeedback),
 	}
 }
@@ -1062,20 +1078,25 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 	// Deduplicate by content (semantic if embedder available, exact otherwise)
 	filtered = s.deduplicateItems(ctx, req.SpaceID, filtered)
 
+	// JIMINY-CORPUS-001 Lever B: per-constraint effectiveness prior — cached,
+	// bounded, best-effort (nil map = neutral ordering). Fetched once here so
+	// the sort comparator does map lookups only.
+	effRates := s.effectivenessPriorRates(ctx, req.SpaceID)
+
 	// Sort by priority (high > medium > low), then within equal priority by
-	// (1-w)·confidence + w·learned signal strength (DORMANT-CENSUS-001).
-	// Ordering only — selection/filtering above is untouched.
-	sort.Slice(filtered, func(i, j int) bool {
-		pi, pj := priorityRank(filtered[i].Priority), priorityRank(filtered[j].Priority)
-		if pi != pj {
-			return pi < pj
-		}
-		// JIMINY-ACTIONABILITY-001 Lever A: actionable types out-rank equal-priority
-		// abstractions by JIMINY_SURFACE_ACTIONABLE_WEIGHT (1.0 = no-op default).
-		ki := s.guidanceSortKey(filtered[i]) * s.guidanceTypeWeight(filtered[i].Type)
-		kj := s.guidanceSortKey(filtered[j]) * s.guidanceTypeWeight(filtered[j].Type)
-		return ki > kj
-	})
+	// (1-w)·confidence + w·learned signal strength (DORMANT-CENSUS-001),
+	// weighted by the actionable-type multiplier (JIMINY-ACTIONABILITY-001) and
+	// the effectiveness prior (JIMINY-CORPUS-001). Ordering only — selection/
+	// filtering above is untouched.
+	s.sortGuidanceItems(filtered, effRates)
+
+	// JIMINY-CORPUS-001 Lever A: suppress nodes this session has already
+	// surfaced-and-ignored ≥ N consecutive times. Releasable (a followed/partial
+	// outcome resets the counter) and never suppresses ALL guidance — if
+	// everything is cooled, the least-recently-ignored items surface instead,
+	// and cooled actionable items are released to keep the min-actionable
+	// quota below satisfiable.
+	filtered = s.applySurfaceCooldown(req.SessionID, filtered, maxItems)
 
 	// JIMINY-ACTIONABILITY-001 Lever A: min-actionable quota + abstraction cap +
 	// truncate (default-preserving — byte-identical to a plain truncate at defaults).
@@ -1653,6 +1674,15 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 		if s.escalation != nil && len(item.SourceNodes) > 0 && outcome != OutcomeNotApplicable {
 			for _, nodeID := range item.SourceNodes {
 				s.escalation.RecordOutcome(feedbackSessionID, nodeID, outcome)
+			}
+		}
+
+		// JIMINY-CORPUS-001 Lever A: feed the surfacing cooldown tracker. The
+		// tracker itself decides which outcomes count (ignored increments,
+		// followed/partial releases, contradicted/not_applicable no-op).
+		if s.surfaceCooldown != nil && len(item.SourceNodes) > 0 {
+			for _, nodeID := range item.SourceNodes {
+				s.surfaceCooldown.RecordOutcome(feedbackSessionID, nodeID, outcome)
 			}
 		}
 
@@ -3053,17 +3083,222 @@ func (s *Service) guidanceTypeWeight(t GuidanceType) float64 {
 	return 1.0
 }
 
-// applyActionableComposition enforces Lever A's min-actionable quota +
-// abstraction cap on an already-sorted item list, then truncates to maxItems.
-// At defaults (quota 0, cap 1.0) it is byte-identical to the prior truncation.
-// Actionable items are never dropped to satisfy the cap; abstraction-tail is.
-func (s *Service) applyActionableComposition(items []GuidanceItem, maxItems int) []GuidanceItem {
+// minActionableQuota resolves the effective min-actionable surfacing quota
+// from the absolute + fractional config knobs (JIMINY-ACTIONABILITY-001 Lever A).
+func (s *Service) minActionableQuota(maxItems int) int {
 	minActionable := s.cfg.JiminySurfaceMinActionable
 	if f := s.cfg.JiminySurfaceMinActionableFraction; f > 0 {
 		if c := int(math.Ceil(f * float64(maxItems))); c > minActionable {
 			minActionable = c
 		}
 	}
+	return minActionable
+}
+
+// sortGuidanceItems orders guidance items in place: priority dominates; within
+// equal priority the key is signal-blended confidence (DORMANT-CENSUS-001) ×
+// actionable-type weight (JIMINY-ACTIONABILITY-001 Lever A) × effectiveness
+// prior (JIMINY-CORPUS-001 Lever B). effRates nil ⇒ the prior is neutral and
+// the ordering is identical to the pre-Epic-3 sort.
+func (s *Service) sortGuidanceItems(items []GuidanceItem, effRates map[string]float64) {
+	sort.Slice(items, func(i, j int) bool {
+		pi, pj := priorityRank(items[i].Priority), priorityRank(items[j].Priority)
+		if pi != pj {
+			return pi < pj
+		}
+		ki := s.guidanceSortKey(items[i]) * s.guidanceTypeWeight(items[i].Type) * s.effectivenessPriorMultiplier(effRates, items[i])
+		kj := s.guidanceSortKey(items[j]) * s.guidanceTypeWeight(items[j].Type) * s.effectivenessPriorMultiplier(effRates, items[j])
+		return ki > kj
+	})
+}
+
+// effPriorCacheEntry is one per-space cached effectiveness snapshot.
+type effPriorCacheEntry struct {
+	rates     map[string]float64 // node_id → effectiveness rate (followed/surfaced, [0,1])
+	fetchedAt time.Time
+}
+
+// effectivenessPriorRates returns the per-node effectiveness-rate map for a
+// space (JIMINY-CORPUS-001 Lever B), cached per space with a config TTL so the
+// Neo4j aggregate runs at most once per TTL per space. Returns nil (= neutral
+// prior everywhere) when the prior is disabled (weight ≤ 0), persistence is
+// unavailable, or the fetch fails — the prior is strictly best-effort and must
+// never block or fail guidance surfacing. Only nodes with at least
+// JIMINY_SURFACE_EFFECTIVENESS_PRIOR_MIN_SAMPLES surfaced outcomes enter the
+// map: sparse data is "no data", and no-data nodes stay neutral (not penalised).
+//
+// RRF-SCALE-001-safe: the rate is followed/surfaced over GUIDANCE_OUTCOME
+// edges — a stable [0,1] outcome ratio, never the RRF RetrieveResult.Score.
+func (s *Service) effectivenessPriorRates(ctx context.Context, spaceID string) map[string]float64 {
+	if s.cfg.JiminySurfaceEffectivenessPriorWeight <= 0 || s.persistence == nil || spaceID == "" {
+		return nil
+	}
+	ttl := time.Duration(s.cfg.JiminySurfaceEffectivenessPriorTTLSec) * time.Second
+	if ttl <= 0 {
+		ttl = 5 * time.Minute
+	}
+
+	s.effPriorMu.Lock()
+	if s.effPriorCache == nil {
+		s.effPriorCache = make(map[string]effPriorCacheEntry)
+	}
+	if entry, ok := s.effPriorCache[spaceID]; ok && time.Since(entry.fetchedAt) < ttl {
+		s.effPriorMu.Unlock()
+		return entry.rates
+	}
+	s.effPriorMu.Unlock()
+
+	rows, err := s.persistence.GetConstraintEffectiveness(ctx, spaceID)
+	if err != nil {
+		slog.Debug("jiminy: effectiveness prior fetch failed (neutral prior)", "space_id", spaceID, "error", err)
+		return nil
+	}
+	minSamples := s.cfg.JiminySurfaceEffectivenessPriorMinSamples
+	if minSamples < 1 {
+		minSamples = 1
+	}
+	rates := make(map[string]float64, len(rows))
+	for _, r := range rows {
+		if r.NodeID == "" || r.TotalSurfaced < minSamples {
+			continue // insufficient sample — stay neutral, never penalise
+		}
+		rates[r.NodeID] = r.EffectivenessRate
+	}
+
+	s.effPriorMu.Lock()
+	// Prune expired entries so the cache stays bounded by the number of spaces
+	// active within one TTL window.
+	for sp, entry := range s.effPriorCache {
+		if time.Since(entry.fetchedAt) >= ttl {
+			delete(s.effPriorCache, sp)
+		}
+	}
+	s.effPriorCache[spaceID] = effPriorCacheEntry{rates: rates, fetchedAt: time.Now()}
+	s.effPriorMu.Unlock()
+	return rates
+}
+
+// effectivenessPriorMultiplier computes the Lever B soft re-rank prior for one
+// item: (1-w) + w·rate, so a chronically-ignored node (rate→0) is down-weighted
+// to at most (1-w) of its key and a perfectly-followed node (rate=1) is
+// untouched — a SOFT prior, never a hard drop. Items whose source nodes carry
+// no effectiveness data are neutral (1.0). Weight ≤ 0 or a nil rate map is an
+// exact no-op (returns 1.0 without lookups ⇒ byte-identical ordering).
+func (s *Service) effectivenessPriorMultiplier(rates map[string]float64, item GuidanceItem) float64 {
+	w := s.cfg.JiminySurfaceEffectivenessPriorWeight
+	if w <= 0 || len(rates) == 0 {
+		return 1.0
+	}
+	if w > 1 {
+		w = 1
+	}
+	// Most-conservative across source nodes: the worst-performing cited node
+	// drives the down-weight (repetition is per-node, and multi-source items
+	// citing a chronically-ignored node re-surface it).
+	best := -1.0
+	for _, n := range item.SourceNodes {
+		if r, ok := rates[n]; ok {
+			if best < 0 || r < best {
+				best = r
+			}
+		}
+	}
+	if best < 0 {
+		return 1.0 // no data → neutral
+	}
+	if best > 1 {
+		best = 1
+	}
+	return (1 - w) + w*best
+}
+
+// applySurfaceCooldown is JIMINY-CORPUS-001 Lever A: drop items whose source
+// nodes this session has surfaced-and-ignored ≥ JIMINY_SURFACE_COOLDOWN_IGNORED_COUNT
+// consecutive times (per the SurfaceCooldownTracker fed by RecordOutcome).
+// Runs on the already-sorted list, before applyActionableComposition.
+//
+// Two fail-open fallbacks guarantee guidance never goes fully dark and the
+// min-actionable quota stays satisfiable:
+//  1. If EVERY item is cooled, the cooled items are surfaced anyway, ordered
+//     least-recently-ignored first.
+//  2. If the surviving set has fewer actionable items than the min-actionable
+//     quota, cooled ACTIONABLE items are released back (least-recently-ignored
+//     first, appended = de-prioritised) until the quota is coverable.
+func (s *Service) applySurfaceCooldown(sessionID string, items []GuidanceItem, maxItems int) []GuidanceItem {
+	threshold := s.cfg.JiminySurfaceCooldownIgnoredCount
+	if threshold <= 0 || sessionID == "" || s.surfaceCooldown == nil || len(items) == 0 {
+		return items
+	}
+
+	type cooledItem struct {
+		item          GuidanceItem
+		lastIgnoredAt time.Time
+	}
+	var active []GuidanceItem
+	var cooled []cooledItem
+	for _, it := range items {
+		isCooled := false
+		var lastIgnored time.Time
+		for _, nodeID := range it.SourceNodes {
+			count, last := s.surfaceCooldown.State(sessionID, nodeID)
+			if count >= threshold {
+				isCooled = true
+				if last.After(lastIgnored) {
+					lastIgnored = last
+				}
+			}
+		}
+		if isCooled {
+			cooled = append(cooled, cooledItem{item: it, lastIgnoredAt: lastIgnored})
+		} else {
+			active = append(active, it)
+		}
+	}
+	if len(cooled) == 0 {
+		return items
+	}
+
+	// Least-recently-ignored first — the release order for both fallbacks.
+	sort.SliceStable(cooled, func(i, j int) bool {
+		return cooled[i].lastIgnoredAt.Before(cooled[j].lastIgnoredAt)
+	})
+
+	// Fallback 1: never suppress ALL guidance.
+	if len(active) == 0 {
+		out := make([]GuidanceItem, 0, len(cooled))
+		for _, c := range cooled {
+			out = append(out, c.item)
+		}
+		return out
+	}
+
+	// Fallback 2: keep the min-actionable quota satisfiable.
+	if quota := s.minActionableQuota(maxItems); quota > 0 {
+		activeActionable := 0
+		for _, it := range active {
+			if isActionableType(it.Type) {
+				activeActionable++
+			}
+		}
+		for _, c := range cooled {
+			if activeActionable >= quota {
+				break
+			}
+			if isActionableType(c.item.Type) {
+				active = append(active, c.item) // appended = de-prioritised
+				activeActionable++
+			}
+		}
+	}
+	return active
+}
+
+// applyActionableComposition enforces Lever A's min-actionable quota +
+// abstraction cap on an already-sorted item list, then truncates to maxItems.
+// At defaults (quota 0, cap 1.0) it is byte-identical to the prior truncation.
+// Actionable items are never dropped to satisfy the cap; abstraction-tail is.
+func (s *Service) applyActionableComposition(items []GuidanceItem, maxItems int) []GuidanceItem {
+	minActionable := s.minActionableQuota(maxItems)
 	capFrac := s.cfg.JiminySurfaceMaxAbstractionFraction
 	noQuota := minActionable <= 0
 	// ≤0 means unset (zero-value config) → no cap, same as the 1.0 default.

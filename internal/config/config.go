@@ -311,6 +311,19 @@ type Config struct {
 	JiminySurfaceMaxAbstractionFraction     float64 // JIMINY_SURFACE_MAX_ABSTRACTION_FRACTION — cap the abstraction share of the surfaced set (default: 1.0 = no cap, (0,1])
 	JiminyDirectiveSynthesisEnabled         bool    // JIMINY_DIRECTIVE_SYNTHESIS_ENABLED — Lever B: synthesize abstraction items as imperative directives (default: false)
 	JiminyDirectiveSynthesisMaxPromptTokens int     // JIMINY_DIRECTIVE_SYNTHESIS_MAX_PROMPT_TOKENS — bound on the directive synthesis prompt (default: 3500, floor 1000)
+	// JIMINY-CORPUS-001 Epic 3 — repetition control for guidance surfacing.
+	// Lever A: per-session surfacing cooldown — a node ignored N consecutive times
+	// in a session is suppressed from surfacing (releasable: a followed/partial
+	// outcome resets the counter; never suppresses ALL guidance — least-recently-
+	// ignored items are released as a fallback and the min-actionable quota stays satisfiable).
+	JiminySurfaceCooldownIgnoredCount int // JIMINY_SURFACE_COOLDOWN_IGNORED_COUNT — consecutive ignored outcomes in a session before a node cools down (default: 3, 0 disables)
+	JiminySurfaceCooldownCapacity     int // JIMINY_SURFACE_COOLDOWN_CAPACITY — LRU bound on tracked (session,node) cooldown entries (default: 5000)
+	// Lever B: effectiveness prior — soft down-weight of chronically-ignored nodes in the
+	// surfaced-set ordering. Gates on the per-constraint effectiveness RATE (followed/surfaced,
+	// stable [0,1] outcome ratio — RRF-SCALE-001-safe, NEVER the RRF retrieval score).
+	JiminySurfaceEffectivenessPriorWeight     float64 // JIMINY_SURFACE_EFFECTIVENESS_PRIOR_WEIGHT — prior strength in [0,1]; multiplier is (1-w)+w·rate, soft re-rank only (default: 0.3, 0 disables)
+	JiminySurfaceEffectivenessPriorTTLSec     int     // JIMINY_SURFACE_EFFECTIVENESS_PRIOR_TTL_SEC — per-space effectiveness cache TTL (default: 300)
+	JiminySurfaceEffectivenessPriorMinSamples int     // JIMINY_SURFACE_EFFECTIVENESS_PRIOR_MIN_SAMPLES — minimum surfaced outcomes before the prior applies to a node; below it the node is neutral, not penalised (default: 5)
 	// JIMINY-ACTIONABILITY-001 Lever C (Epic 5): guarantee actionable candidates enter the guidance pool.
 	JiminyGuidanceConstraintBiasEnabled bool    // JIMINY_GUIDANCE_CONSTRAINT_BIAS_ENABLED — Lever C: fetch top-K constraint/correction nodes by embedding similarity and merge into the guidance pool (default: false). Addresses the Epic-4 finding that retrieval surfaces no actionable candidates for most contexts.
 	JiminyGuidanceConstraintIncludeTopK int     // JIMINY_GUIDANCE_CONSTRAINT_INCLUDE_TOPK — how many actionable nodes to merge (default: 5)
@@ -2596,6 +2609,45 @@ func FromEnv() (Config, error) {
 	}
 	if jiminySurfaceMaxAbstractionFraction <= 0 || jiminySurfaceMaxAbstractionFraction > 1 {
 		jiminySurfaceMaxAbstractionFraction = 1.0
+	}
+	// JIMINY-CORPUS-001 Epic 3 — repetition control (Lever A cooldown + Lever B effectiveness prior).
+	jiminySurfaceCooldownIgnoredCount, err := atoi("JIMINY_SURFACE_COOLDOWN_IGNORED_COUNT", 3)
+	if err != nil {
+		return Config{}, err
+	}
+	if jiminySurfaceCooldownIgnoredCount < 0 {
+		jiminySurfaceCooldownIgnoredCount = 0 // negative = disabled
+	}
+	jiminySurfaceCooldownCapacity, err := atoi("JIMINY_SURFACE_COOLDOWN_CAPACITY", 5000)
+	if err != nil {
+		return Config{}, err
+	}
+	if jiminySurfaceCooldownCapacity <= 0 {
+		jiminySurfaceCooldownCapacity = 5000 // must stay bounded and usable
+	}
+	jiminySurfaceEffectivenessPriorWeight, err := atof("JIMINY_SURFACE_EFFECTIVENESS_PRIOR_WEIGHT", 0.3)
+	if err != nil {
+		return Config{}, err
+	}
+	if jiminySurfaceEffectivenessPriorWeight < 0 {
+		jiminySurfaceEffectivenessPriorWeight = 0 // negative = disabled
+	}
+	if jiminySurfaceEffectivenessPriorWeight > 1 {
+		jiminySurfaceEffectivenessPriorWeight = 1 // full-prior ceiling
+	}
+	jiminySurfaceEffectivenessPriorTTLSec, err := atoi("JIMINY_SURFACE_EFFECTIVENESS_PRIOR_TTL_SEC", 300)
+	if err != nil {
+		return Config{}, err
+	}
+	if jiminySurfaceEffectivenessPriorTTLSec <= 0 {
+		jiminySurfaceEffectivenessPriorTTLSec = 300
+	}
+	jiminySurfaceEffectivenessPriorMinSamples, err := atoi("JIMINY_SURFACE_EFFECTIVENESS_PRIOR_MIN_SAMPLES", 5)
+	if err != nil {
+		return Config{}, err
+	}
+	if jiminySurfaceEffectivenessPriorMinSamples < 1 {
+		jiminySurfaceEffectivenessPriorMinSamples = 1
 	}
 	jiminyDirectiveSynthesisEnabled := getBool("JIMINY_DIRECTIVE_SYNTHESIS_ENABLED", false)
 	jiminyDirectiveSynthesisMaxPromptTokens, err := atoi("JIMINY_DIRECTIVE_SYNTHESIS_MAX_PROMPT_TOKENS", 3500)
@@ -5220,6 +5272,11 @@ func FromEnv() (Config, error) {
 		JiminySurfaceMinActionable:              jiminySurfaceMinActionable,
 		JiminySurfaceMinActionableFraction:      jiminySurfaceMinActionableFraction,
 		JiminySurfaceMaxAbstractionFraction:     jiminySurfaceMaxAbstractionFraction,
+		JiminySurfaceCooldownIgnoredCount:       jiminySurfaceCooldownIgnoredCount,
+		JiminySurfaceCooldownCapacity:           jiminySurfaceCooldownCapacity,
+		JiminySurfaceEffectivenessPriorWeight:   jiminySurfaceEffectivenessPriorWeight,
+		JiminySurfaceEffectivenessPriorTTLSec:   jiminySurfaceEffectivenessPriorTTLSec,
+		JiminySurfaceEffectivenessPriorMinSamples: jiminySurfaceEffectivenessPriorMinSamples,
 		JiminyDirectiveSynthesisEnabled:         jiminyDirectiveSynthesisEnabled,
 		JiminyDirectiveSynthesisMaxPromptTokens: jiminyDirectiveSynthesisMaxPromptTokens,
 		JiminyGuidanceConstraintBiasEnabled:     getBool("JIMINY_GUIDANCE_CONSTRAINT_BIAS_ENABLED", false),
