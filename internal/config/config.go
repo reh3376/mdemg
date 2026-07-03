@@ -388,6 +388,7 @@ type Config struct {
 	JiminyOutcomeLLMEnabled        bool    // JIMINY_OUTCOME_LLM_ENABLED — enable LLM Tier 2 classification (default: true)
 	JiminyOutcomeSimilarityHigh    float64 // JIMINY_OUTCOME_SIMILARITY_HIGH — threshold for "followed" (default: 0.55)
 	JiminyOutcomeSimilarityLow     float64 // JIMINY_OUTCOME_SIMILARITY_LOW — threshold for "ignored" (default: 0.20)
+	JiminyOutcomeNotApplicableSim  float64 // JIMINY_OUTCOME_NOT_APPLICABLE_SIMILARITY — relevance gate: below this the guidance did not apply → not_applicable; [this, LOW) is a real "ignored" (default: 0.10; ≤0 disables — whole sub-LOW tail is not_applicable)
 	JiminyOutcomeLLMMaxTokens      int     // JIMINY_OUTCOME_LLM_MAX_TOKENS — max tokens for classification (default: 100)
 	JiminyOutcomeCacheSize         int     // JIMINY_OUTCOME_CACHE_SIZE — LRU cache capacity (default: 256)
 	JiminyClassifyCompress         bool    // JIMINY_CLASSIFY_COMPRESS — compress outcome classification prompts (default: true)
@@ -854,7 +855,7 @@ type Config struct {
 	RelResolutionTimeout  int  // REL_RESOLUTION_TIMEOUT_SEC — timeout for symbol resolution in seconds (default: 60)
 
 	// Phase 75B: Topology Hardening
-	DynamicEdgesEnabled      bool    // DYNAMIC_EDGES_ENABLED — enable dynamic edge creation during retrieval (default: true)
+	DynamicEdgesEnabled bool // DYNAMIC_EDGES_ENABLED — enable dynamic edge creation during retrieval (default: true)
 	// DynamicEdgesMaxNodes (DYNAMIC_EDGES_MAX_NODES) removed by RETRIEVAL-TYPED-EDGES-002:
 	// the O(n²) cross-join circuit-breaker it guarded is gone (CreateDynamicEdges
 	// now uses a per-node vector-index query, O(n·logn)).
@@ -865,14 +866,14 @@ type Config struct {
 	// index (O(n·logn)). MinLayer default lowered 3→1 because a fresh corpus has
 	// almost no L3+ concepts (lnl-demo-whk: 4) — semantic edges must connect the
 	// abundant L1/L2 concept layers for the population to grow.
-	DynamicEdgeMinLayer      int     // DYNAMIC_EDGE_MIN_LAYER — minimum layer for dynamic semantic-edge endpoints (default: 1; L0 observations excluded)
-	DynamicEdgeTopK          int     // DYNAMIC_EDGE_TOPK — per-node nearest-neighbor edges to consider (default: 10)
-	DynamicEdgeSimThreshold  float64 // DYNAMIC_EDGE_SIM_THRESHOLD — minimum cosine similarity for a dynamic edge (default: 0.30)
-	DynamicEdgeOversample    int     // DYNAMIC_EDGE_OVERSAMPLE — vector-index fetch multiplier (fetch TopK×Oversample then layer/space/degree-filter; accounts for L0 crowding the global top-K) (default: 8)
-	L5EmergentEnabled        bool    // L5_EMERGENT_ENABLED — enable Layer 5 emergent concept nodes (default: true)
-	L5BridgeEvidenceMin      int     // L5_BRIDGE_EVIDENCE_MIN — minimum bridge evidence for L5 promotion (default: 1)
-	L5SourceMinLayer         int     // L5_SOURCE_MIN_LAYER — minimum layer for L5/dynamic edge source nodes (default: 3)
-	SymbolActivationEnabled  bool    // SYMBOL_ACTIVATION_ENABLED — enable symbol-aware activation boost (default: true)
+	DynamicEdgeMinLayer     int     // DYNAMIC_EDGE_MIN_LAYER — minimum layer for dynamic semantic-edge endpoints (default: 1; L0 observations excluded)
+	DynamicEdgeTopK         int     // DYNAMIC_EDGE_TOPK — per-node nearest-neighbor edges to consider (default: 10)
+	DynamicEdgeSimThreshold float64 // DYNAMIC_EDGE_SIM_THRESHOLD — minimum cosine similarity for a dynamic edge (default: 0.30)
+	DynamicEdgeOversample   int     // DYNAMIC_EDGE_OVERSAMPLE — vector-index fetch multiplier (fetch TopK×Oversample then layer/space/degree-filter; accounts for L0 crowding the global top-K) (default: 8)
+	L5EmergentEnabled       bool    // L5_EMERGENT_ENABLED — enable Layer 5 emergent concept nodes (default: true)
+	L5BridgeEvidenceMin     int     // L5_BRIDGE_EVIDENCE_MIN — minimum bridge evidence for L5 promotion (default: 1)
+	L5SourceMinLayer        int     // L5_SOURCE_MIN_LAYER — minimum layer for L5/dynamic edge source nodes (default: 3)
+	SymbolActivationEnabled bool    // SYMBOL_ACTIVATION_ENABLED — enable symbol-aware activation boost (default: true)
 
 	// Deterministic consolidation trigger (Phase 45.5)
 	ConsolidateOnWatchdogEnabled bool // CONSOLIDATE_ON_WATCHDOG_ENABLED — trigger consolidation alongside RSIC force (default: true)
@@ -1276,9 +1277,9 @@ type Config struct {
 	NullWeightEdgeAlertThreshold int // NULL_WEIGHT_EDGE_ALERT_THRESHOLD — alert when NULL-weight GENERALIZES/ABSTRACTS_TO edges exceed this (default: 100; steady state is 0)
 
 	// Orphan alert rules (ORPHAN-ALERT-001)
-	OrphanRatioMinNodes  int     // ORPHAN_RATIO_MIN_NODES — minimum per-space node count for a space to be eligible to fire the orphan alerts; excludes tiny test/scratch spaces (1-node space = ratio 1.0) (default: 50)
-	OrphanRatioThreshold float64 // ORPHAN_RATIO_THRESHOLD — fire High Orphan Ratio when max live-orphan ratio among significant spaces exceeds this (default: 0.10)
-	OrphanCountThreshold int     // ORPHAN_COUNT_THRESHOLD — fire High Orphan Count when max live-orphan count among significant spaces exceeds this (default: 1000; above the accepted historical baseline — ratio rule is the scale-aware primary)
+	OrphanRatioMinNodes   int     // ORPHAN_RATIO_MIN_NODES — minimum per-space node count for a space to be eligible to fire the orphan alerts; excludes tiny test/scratch spaces (1-node space = ratio 1.0) (default: 50)
+	OrphanRatioThreshold  float64 // ORPHAN_RATIO_THRESHOLD — fire High Orphan Ratio when max live-orphan ratio among significant spaces exceeds this (default: 0.10)
+	OrphanCountThreshold  int     // ORPHAN_COUNT_THRESHOLD — fire High Orphan Count when max live-orphan count among significant spaces exceeds this (default: 1000; above the accepted historical baseline — ratio rule is the scale-aware primary)
 	GraphHealthScoreFloor float64 // GRAPH_HEALTH_SCORE_FLOOR — fire Low Graph Health when the MIN graph-health score among significant spaces drops below this (default: 0.5; same min-node floor as the orphan rules so degenerate 1-2-node test spaces can't trip it)
 
 	// Neo4j container CPU alert (ALERT-TRUTH-001)
@@ -1374,9 +1375,9 @@ const (
 // Returned as a fresh slice so callers cannot mutate the defaults.
 func DefaultConstraintPromotionRejectPatterns() []string {
 	return []string{
-		`^Build/test succeeded`,                          // pre-HOOKWIRE-001 fabricated tool-status observations
-		`^Bash error`,                                    // hook-captured command failures
-		`(?i)\bapproved\s*(?:&|and)\s*merged\b`,          // PR status notes
+		`^Build/test succeeded`,                 // pre-HOOKWIRE-001 fabricated tool-status observations
+		`^Bash error`,                           // hook-captured command failures
+		`(?i)\bapproved\s*(?:&|and)\s*merged\b`, // PR status notes
 		`(?i)^(?:sprint|phase|pr)\s+[#\w./+-]+\s*(?:is\s+)?(?:fully\s+)?(?:complete|completed|implemented|shipped|merged|executed|done)\b`, // sprint/phase/PR completion status (completion word adjacent to the identifier)
 		// JIMINY-CORPUS-001 Epic 2 widening: the t8j3 class — completion-status
 		// observations whose completion words are NOT adjacent to the phase/PR
@@ -1394,9 +1395,9 @@ func DefaultConstraintPromotionRejectPatterns() []string {
 		//      are not over-matched.
 		`(?i)^(?:sprint|phase|pr)\s+[#\w./+-]*\d[#\w./+-]*[^\n]*?\b(?:fully\s+)?(?:complete|completed|implemented|shipped|merged|executed|done)\b`,
 		`^\s*#{1,6}\s`, // markdown-heading-led doc/template dumps
-		`(?i)^(?:sprint|phase)\s+[#\w./+-]+\s+spec\b`,    // "PHASE 105 SPEC: …" design-doc dumps
-		`(?i)^skill:`,                                    // skill-registry dumps
-		`(?i)^sprint plan\b`,                             // sprint-plan format/checklist dumps
+		`(?i)^(?:sprint|phase)\s+[#\w./+-]+\s+spec\b`, // "PHASE 105 SPEC: …" design-doc dumps
+		`(?i)^skill:`,        // skill-registry dumps
+		`(?i)^sprint plan\b`, // sprint-plan format/checklist dumps
 	}
 }
 
@@ -2762,6 +2763,18 @@ func FromEnv() (Config, error) {
 		return Config{}, err
 	}
 	jiminyOutcomeSimilarityLow, err := atof("JIMINY_OUTCOME_SIMILARITY_LOW", 0.20)
+	if err != nil {
+		return Config{}, err
+	}
+	// JIMINY-CORPUS-001 Epic 4: relevance gate. Below this similarity the guidance
+	// topic was unrelated to the action — the outcome is not_applicable, not ignored.
+	// The [gate, LOW) band stays a real "ignored" (relevant domain, not followed).
+	// Default 0.10 = half the LOW relevance floor: with the production embedding
+	// model, unrelated-domain pairs cluster near 0 while pairs sharing topical
+	// vocabulary sit ≥ ~0.15, so 0.10 carves only the clearly-unrelated tail.
+	// Must be ≤ LOW (classifier clamps + Validate warns); ≤ 0 disables the gate
+	// (the entire sub-LOW tail is then not_applicable — JIMINY-OUTCOME-002 behavior).
+	jiminyOutcomeNotApplicableSim, err := atof("JIMINY_OUTCOME_NOT_APPLICABLE_SIMILARITY", 0.10)
 	if err != nil {
 		return Config{}, err
 	}
@@ -5264,36 +5277,36 @@ func FromEnv() (Config, error) {
 		GuardrailCompress:       guardrailCompress,
 
 		// Phase Jiminy: Jiminy Guidance
-		JiminyEnabled:                           jiminyEnabled,
-		JiminyContradictedWeakenEnabled:         jiminyContradictedWeakenEnabled,
-		JiminyTimeoutMs:                         jiminyTimeoutMs,
-		JiminyMaxItems:                          jiminyMaxItems,
-		JiminySurfaceActionableWeight:           jiminySurfaceActionableWeight,
-		JiminySurfaceMinActionable:              jiminySurfaceMinActionable,
-		JiminySurfaceMinActionableFraction:      jiminySurfaceMinActionableFraction,
-		JiminySurfaceMaxAbstractionFraction:     jiminySurfaceMaxAbstractionFraction,
-		JiminySurfaceCooldownIgnoredCount:       jiminySurfaceCooldownIgnoredCount,
-		JiminySurfaceCooldownCapacity:           jiminySurfaceCooldownCapacity,
-		JiminySurfaceEffectivenessPriorWeight:   jiminySurfaceEffectivenessPriorWeight,
-		JiminySurfaceEffectivenessPriorTTLSec:   jiminySurfaceEffectivenessPriorTTLSec,
+		JiminyEnabled:                             jiminyEnabled,
+		JiminyContradictedWeakenEnabled:           jiminyContradictedWeakenEnabled,
+		JiminyTimeoutMs:                           jiminyTimeoutMs,
+		JiminyMaxItems:                            jiminyMaxItems,
+		JiminySurfaceActionableWeight:             jiminySurfaceActionableWeight,
+		JiminySurfaceMinActionable:                jiminySurfaceMinActionable,
+		JiminySurfaceMinActionableFraction:        jiminySurfaceMinActionableFraction,
+		JiminySurfaceMaxAbstractionFraction:       jiminySurfaceMaxAbstractionFraction,
+		JiminySurfaceCooldownIgnoredCount:         jiminySurfaceCooldownIgnoredCount,
+		JiminySurfaceCooldownCapacity:             jiminySurfaceCooldownCapacity,
+		JiminySurfaceEffectivenessPriorWeight:     jiminySurfaceEffectivenessPriorWeight,
+		JiminySurfaceEffectivenessPriorTTLSec:     jiminySurfaceEffectivenessPriorTTLSec,
 		JiminySurfaceEffectivenessPriorMinSamples: jiminySurfaceEffectivenessPriorMinSamples,
-		JiminyDirectiveSynthesisEnabled:         jiminyDirectiveSynthesisEnabled,
-		JiminyDirectiveSynthesisMaxPromptTokens: jiminyDirectiveSynthesisMaxPromptTokens,
-		JiminyGuidanceConstraintBiasEnabled:     getBool("JIMINY_GUIDANCE_CONSTRAINT_BIAS_ENABLED", false),
-		JiminyGuidanceConstraintIncludeTopK:     jiminyGuidanceConstraintIncludeTopK,
-		JiminyGuidanceConstraintSimFloor:        jiminyGuidanceConstraintSimFloor,
-		JiminyMinConfidence:                     jiminyMinConfidence,
-		JiminySignalStrengthWeight:              jiminySignalStrengthWeight,
-		JiminyConstraintCodeSimThreshold:        jiminyConstraintCodeSimThreshold,
-		JiminyIncludeFrontiers:                  jiminyIncludeFrontiers,
-		JiminyFrontierMinSim:                    jiminyFrontierMinSim,
-		JiminyEffectivenessTTLSec:               jiminyEffectivenessTTLSec,
-		JiminyWarmEnabled:                       jiminyWarmEnabled,
-		JiminyWarmDebounceSec:                   jiminyWarmDebounceSec,
-		JiminyWarmComputeTimeoutMs:              jiminyWarmComputeTimeoutMs,
-		JiminyReformulateTimeoutMs:              jiminyReformulateTimeoutMs,
-		JiminyFeedbackTimeoutMs:                 jiminyFeedbackTimeoutMs,
-		JiminyWarmMaxAgeSec:                     jiminyWarmMaxAgeSec,
+		JiminyDirectiveSynthesisEnabled:           jiminyDirectiveSynthesisEnabled,
+		JiminyDirectiveSynthesisMaxPromptTokens:   jiminyDirectiveSynthesisMaxPromptTokens,
+		JiminyGuidanceConstraintBiasEnabled:       getBool("JIMINY_GUIDANCE_CONSTRAINT_BIAS_ENABLED", false),
+		JiminyGuidanceConstraintIncludeTopK:       jiminyGuidanceConstraintIncludeTopK,
+		JiminyGuidanceConstraintSimFloor:          jiminyGuidanceConstraintSimFloor,
+		JiminyMinConfidence:                       jiminyMinConfidence,
+		JiminySignalStrengthWeight:                jiminySignalStrengthWeight,
+		JiminyConstraintCodeSimThreshold:          jiminyConstraintCodeSimThreshold,
+		JiminyIncludeFrontiers:                    jiminyIncludeFrontiers,
+		JiminyFrontierMinSim:                      jiminyFrontierMinSim,
+		JiminyEffectivenessTTLSec:                 jiminyEffectivenessTTLSec,
+		JiminyWarmEnabled:                         jiminyWarmEnabled,
+		JiminyWarmDebounceSec:                     jiminyWarmDebounceSec,
+		JiminyWarmComputeTimeoutMs:                jiminyWarmComputeTimeoutMs,
+		JiminyReformulateTimeoutMs:                jiminyReformulateTimeoutMs,
+		JiminyFeedbackTimeoutMs:                   jiminyFeedbackTimeoutMs,
+		JiminyWarmMaxAgeSec:                       jiminyWarmMaxAgeSec,
 
 		// Jiminy J7-J12
 		JiminyRetrievalEnabled:         jiminyRetrievalEnabled,
@@ -5316,6 +5329,7 @@ func FromEnv() (Config, error) {
 		JiminyOutcomeLLMEnabled:        jiminyOutcomeLLMEnabled,
 		JiminyOutcomeSimilarityHigh:    jiminyOutcomeSimilarityHigh,
 		JiminyOutcomeSimilarityLow:     jiminyOutcomeSimilarityLow,
+		JiminyOutcomeNotApplicableSim:  jiminyOutcomeNotApplicableSim,
 		JiminyOutcomeLLMMaxTokens:      jiminyOutcomeLLMMaxTokens,
 		JiminyOutcomeCacheSize:         jiminyOutcomeCacheSize,
 		JiminyClassifyCompress:         jiminyClassifyCompress,
@@ -5629,9 +5643,9 @@ func FromEnv() (Config, error) {
 		CoolerTombstoneMaxPerRun:        coolerTombstoneMaxPerRun,
 		CoolerGraduationThreshold:       coolerGradThresh,
 
-		ConstraintDetectionEnabled:     constraintDetectionEnabled,
-		ConstraintMinConfidence:        constraintMinConfidence,
-		ConstraintProtectFromDecay:     constraintProtectFromDecay,
+		ConstraintDetectionEnabled: constraintDetectionEnabled,
+		ConstraintMinConfidence:    constraintMinConfidence,
+		ConstraintProtectFromDecay: constraintProtectFromDecay,
 
 		ConstraintPromotionGateEnabled:    constraintPromotionGateEnabled,
 		ConstraintPromotionDenyObsTypes:   constraintPromotionDenyObsTypes,
@@ -5735,10 +5749,10 @@ func FromEnv() (Config, error) {
 		ScoringBypassArchMult:    scoringBypassArchMult,
 
 		// ANN Optimization: Consolidation
-		L5GroundingMaxEdges:      l5GroundingMaxEdges,
-		L5GroundingMinSim:        l5GroundingMinSim,
-		L5GroundingInitialWeight: l5GroundingInitialWeight,
-		EdgeAttentionGroundedBy:  edgeAttentionGroundedBy,
+		L5GroundingMaxEdges:        l5GroundingMaxEdges,
+		L5GroundingMinSim:          l5GroundingMinSim,
+		L5GroundingInitialWeight:   l5GroundingInitialWeight,
+		EdgeAttentionGroundedBy:    edgeAttentionGroundedBy,
 		EdgeAttentionAnalogousTo:   edgeAttentionAnalogousTo,
 		EdgeAttentionBridges:       edgeAttentionBridges,
 		EdgeAttentionComposesWith:  edgeAttentionComposesWith,
@@ -5876,18 +5890,18 @@ func FromEnv() (Config, error) {
 		LLMConsecutiveFailureThreshold: llmConsecutiveFailureThreshold,
 
 		// Alert Evaluator
-		JobHealthAlertEnabled:        jobHealthAlertEnabled,
-		HookHealthAlertEnabled:       hookHealthAlertEnabled,
-		HookSilentLookbackHours:      hookSilentLookbackHours,
-		HookActivityMinEvents:        hookActivityMinEvents,
-		NullWeightEdgeAlertThreshold: nullWeightEdgeAlertThreshold,
-		OrphanRatioMinNodes:          orphanRatioMinNodes,
-		OrphanRatioThreshold:         orphanRatioThreshold,
-		Neo4jCPUAlertThresholdPercent: neo4jCPUAlertThresholdPercent,
-		OrphanCountThreshold:         orphanCountThreshold,
-		GraphHealthScoreFloor:        graphHealthScoreFloor,
-		FtReadinessStalenessMin:      ftReadinessStalenessMin,
-		ExportRetentionHours:         exportRetentionHours,
+		JobHealthAlertEnabled:               jobHealthAlertEnabled,
+		HookHealthAlertEnabled:              hookHealthAlertEnabled,
+		HookSilentLookbackHours:             hookSilentLookbackHours,
+		HookActivityMinEvents:               hookActivityMinEvents,
+		NullWeightEdgeAlertThreshold:        nullWeightEdgeAlertThreshold,
+		OrphanRatioMinNodes:                 orphanRatioMinNodes,
+		OrphanRatioThreshold:                orphanRatioThreshold,
+		Neo4jCPUAlertThresholdPercent:       neo4jCPUAlertThresholdPercent,
+		OrphanCountThreshold:                orphanCountThreshold,
+		GraphHealthScoreFloor:               graphHealthScoreFloor,
+		FtReadinessStalenessMin:             ftReadinessStalenessMin,
+		ExportRetentionHours:                exportRetentionHours,
 		TrainingReadinessThreshold:          trainingReadinessThreshold,
 		TrainingReadinessThresholdOverrides: trainingReadinessThresholdOverrides,
 		FtLoopEnabled:                       ftLoopEnabled,
@@ -5912,12 +5926,12 @@ func FromEnv() (Config, error) {
 		FtLoopExportSinceDays:               ftLoopExportSinceDays,
 		FtLoopGateTaskFilter:                ftLoopGateTaskFilter,
 		FtLoopGateMinScore:                  ftLoopGateMinScore,
-		MaintLiveAlertEnabled:        maintLiveAlertEnabled,
-		MaintLiveLookbackDays:        maintLiveLookbackDays,
-		JobBackupStalenessHours:      jobBackupStalenessHours,
-		JobFailureLookbackMin:        jobFailureLookbackMin,
-		AlertEvaluatorEnabled:        alertEvaluatorEnabled,
-		AlertEvaluatorIntervalSec:    alertEvaluatorIntervalSec,
+		MaintLiveAlertEnabled:               maintLiveAlertEnabled,
+		MaintLiveLookbackDays:               maintLiveLookbackDays,
+		JobBackupStalenessHours:             jobBackupStalenessHours,
+		JobFailureLookbackMin:               jobFailureLookbackMin,
+		AlertEvaluatorEnabled:               alertEvaluatorEnabled,
+		AlertEvaluatorIntervalSec:           alertEvaluatorIntervalSec,
 
 		// TSDB-CONSUME-001 — retrieve-latency SLO rules + writer flush health
 		AlertRetrieveP95Ms:               alertRetrieveP95Ms,
@@ -6023,6 +6037,16 @@ func (c Config) Validate() (warnings []string, err error) {
 	if c.HybridRetrievalEnabled {
 		checkWeightSum("HybridRetrieval(BM25+Vector)",
 			c.BM25Weight, c.VectorWeight)
+	}
+
+	// JIMINY-CORPUS-001 Epic 4: the not_applicable relevance gate must sit at or
+	// below the LOW threshold — it carves the truly-unrelated tail out of the
+	// sub-LOW band; above LOW it would eat the tier-2 (LOW..HIGH) uncertain band.
+	// The classifier clamps to LOW at runtime; warn so the operator sees it.
+	if c.JiminyOutcomeNotApplicableSim > c.JiminyOutcomeSimilarityLow {
+		warnings = append(warnings, fmt.Sprintf(
+			"JIMINY_OUTCOME_NOT_APPLICABLE_SIMILARITY (%.3f) > JIMINY_OUTCOME_SIMILARITY_LOW (%.3f); classifier clamps the gate to LOW",
+			c.JiminyOutcomeNotApplicableSim, c.JiminyOutcomeSimilarityLow))
 	}
 
 	// DH-005: RSIC overall-health weights. No sum constraint — the formula

@@ -124,19 +124,21 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext, consultant Co
 			classifierBaseURL = cfg.OllamaEndpoint
 		}
 		classifier = NewOutcomeClassifier(embedder, OutcomeClassifierConfig{
-			LLMEnabled:      cfg.JiminyOutcomeLLMEnabled,
-			LLMProvider:     cfg.JiminySynthesisProvider,
-			LLMModel:        cfg.JiminySynthesisModel,
-			LLMAPIKey:       cfg.OpenAIAPIKey,
-			LLMBaseURL:      classifierBaseURL,
-			HighThreshold:   cfg.JiminyOutcomeSimilarityHigh,
-			LowThreshold:    cfg.JiminyOutcomeSimilarityLow,
-			MaxTokens:       cfg.JiminyOutcomeLLMMaxTokens,
-			CacheSize:       cfg.JiminyOutcomeCacheSize,
-			CompressPrompts: cfg.JiminyClassifyCompress,
+			LLMEnabled:             cfg.JiminyOutcomeLLMEnabled,
+			LLMProvider:            cfg.JiminySynthesisProvider,
+			LLMModel:               cfg.JiminySynthesisModel,
+			LLMAPIKey:              cfg.OpenAIAPIKey,
+			LLMBaseURL:             classifierBaseURL,
+			HighThreshold:          cfg.JiminyOutcomeSimilarityHigh,
+			LowThreshold:           cfg.JiminyOutcomeSimilarityLow,
+			NotApplicableThreshold: cfg.JiminyOutcomeNotApplicableSim,
+			MaxTokens:              cfg.JiminyOutcomeLLMMaxTokens,
+			CacheSize:              cfg.JiminyOutcomeCacheSize,
+			CompressPrompts:        cfg.JiminyClassifyCompress,
 		})
 		slog.Info("jiminy: semantic outcome classifier enabled",
 			"high_threshold", cfg.JiminyOutcomeSimilarityHigh, "low_threshold", cfg.JiminyOutcomeSimilarityLow,
+			"not_applicable_threshold", cfg.JiminyOutcomeNotApplicableSim,
 			"llm_enabled", cfg.JiminyOutcomeLLMEnabled, "cache_size", cfg.JiminyOutcomeCacheSize)
 	}
 
