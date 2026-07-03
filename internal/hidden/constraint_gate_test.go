@@ -50,6 +50,16 @@ func TestConstraintPromotionGate_RejectsJunkClasses(t *testing.T) {
 		{"phase_spec_dump", "decision", "PHASE 105 SPEC: Global Meta-Learning — Cross-space promotion of L4/5 concepts."},
 		{"skill_dump", "decision", "SKILL: CMS Self-Improvement — Trigger Conditions"},
 		{"sprint_plan_dump", "learning", "SPRINT PLAN FORMAT v1.0 — 12 SECTIONS (7 required + 5 if-applicable):"},
+		// JIMINY-CORPUS-001 Epic 2 widening (the t8j3 class): completion-status
+		// observations whose completion words are NOT adjacent to the phase/PR
+		// token. Live node t8j3ixoe7uo5uke3kihbe307 (obs_type=decision, 169
+		// surfacings/7d) dodged the adjacent-completion regex.
+		{"phase_completion_nonadjacent_t8j3", "decision", "Phase 9.4 Plugin-Specific Triggers fully implemented, committed (0a7de6b), pushed, PR #66 merged to main, branch re-pushed. Deliverables: 9.4.1 Linear Webhook (pre-existing)."},
+		// Live node xinav070869vupakkxupwj8u (obs_type=learning, 104
+		// surfacings/7d) — same class, caught by the phase-led widened shape.
+		{"phase_status_nonadjacent_forensic", "learning", "Phase 14 Epic 0 forensic complete. Closed Phase 13 Epic 6 wiring gap (V0017 retrieval_audit writer was never instantiated)."},
+		{"pr_number_merged_phrase", "decision", "All green. PR #489 merged after the SHA re-pin."},
+		{"fully_implemented_phrase", "insight", "The eventgraph federation walk is now fully implemented and live."},
 	}
 
 	for _, tc := range cases {
@@ -82,6 +92,15 @@ func TestConstraintPromotionGate_PassesGenuineConstraints(t *testing.T) {
 		// A durable rule that MENTIONS sprints/PRs must not trip the status patterns.
 		{"rule_mentioning_sprint", "constraint", "All sprint development plans MUST follow the standardized 12-section format (v1.0)."},
 		{"rule_mentioning_pr", "constraint", "RULE: ALWAYS add a detailed sprint summary as a PR comment every time a new PR is created."},
+		// JIMINY-CORPUS-001 Epic 2: the 5 known genuine passers pinned with
+		// their LIVE mdemg-dev content — the widened completion-status
+		// patterns must not over-match a rule that merely mentions a phase,
+		// a PR number, or merging.
+		{"live_never_uuid", "constraint", "You must never use UUID v4 in this codebase. Always use CUIDv2."},
+		{"live_never_commit_env", "constraint", "[must] Never commit .env files to git"},
+		{"live_rebase_after_admin_merge", "learning", "After merging a PR to main via --admin, if the dev branch has more work to push, rebase the dev branch onto main (git pull --rebase origin main) BEFORE pushing the next commit. This keeps the branch linear and avoids merge commits that force squash-merging. In PR #172, the GPG fix was admin-merged to main via PR #171, then the docs commit was pushed to reh3376_dev01 without rebasing — git created a merge commit, resulting in 4 commits (3 real + 1 merge) that required squash to keep history clean."},
+		{"live_12_section_format", "constraint", "All sprint development plans MUST follow the standardized 12-section format (v1.0). Required sections: Header & Metadata, Problem Statement, Scope & Constraints, Dependencies & Pre-Conditions, Implementation Plan (sequential epics with gates), Testing Plan (3 tiers: unit + integration + e2e — never cut)."},
+		{"live_never_alter_schema", "constraint", "CONSTRAINT: Never modify production database schemas without a migration file. Always use CREATE TABLE IF NOT EXISTS and index creation with IF NOT EXISTS guards. Direct ALTER TABLE on production is forbidden."},
 	}
 
 	for _, tc := range cases {

@@ -1364,8 +1364,23 @@ func DefaultConstraintPromotionRejectPatterns() []string {
 		`^Build/test succeeded`,                          // pre-HOOKWIRE-001 fabricated tool-status observations
 		`^Bash error`,                                    // hook-captured command failures
 		`(?i)\bapproved\s*(?:&|and)\s*merged\b`,          // PR status notes
-		`(?i)^(?:sprint|phase|pr)\s+[#\w./+-]+\s*(?:is\s+)?(?:fully\s+)?(?:complete|completed|implemented|shipped|merged|executed|done)\b`, // sprint/phase/PR completion status
-		`^\s*#{1,6}\s`,                                   // markdown-heading-led doc/template dumps
+		`(?i)^(?:sprint|phase|pr)\s+[#\w./+-]+\s*(?:is\s+)?(?:fully\s+)?(?:complete|completed|implemented|shipped|merged|executed|done)\b`, // sprint/phase/PR completion status (completion word adjacent to the identifier)
+		// JIMINY-CORPUS-001 Epic 2 widening: the t8j3 class — completion-status
+		// observations whose completion words are NOT adjacent to the phase/PR
+		// token ("Phase 9.4 <name> fully implemented, committed (0a7de6b),
+		// PR #66 merged"). Two shapes:
+		//  (a) completion-status PHRASES anywhere: "fully implemented",
+		//      "PR #66 merged", "committed (<sha>)", "implemented, committed".
+		//      A rule that merely mentions "a PR" or "merging" (no PR number
+		//      immediately followed by "merged") still passes.
+		`(?i)(?:\bfully\s+implemented\b|\bPR\s*#\d+\s+(?:was\s+)?merged\b|\bcommitted\s*\([0-9a-f]{6,40}\)|\bimplemented\s*,\s*committed\b)`,
+		//  (b) sprint/phase/PR-led status where the completion word appears
+		//      later on the first line. The identifier token must carry a
+		//      digit (Phase 9.4, PR #66, Sprint TSDB-CONSUME-001) so genuine
+		//      rules like "Sprint plans must include complete testing tiers"
+		//      are not over-matched.
+		`(?i)^(?:sprint|phase|pr)\s+[#\w./+-]*\d[#\w./+-]*[^\n]*?\b(?:fully\s+)?(?:complete|completed|implemented|shipped|merged|executed|done)\b`,
+		`^\s*#{1,6}\s`, // markdown-heading-led doc/template dumps
 		`(?i)^(?:sprint|phase)\s+[#\w./+-]+\s+spec\b`,    // "PHASE 105 SPEC: …" design-doc dumps
 		`(?i)^skill:`,                                    // skill-registry dumps
 		`(?i)^sprint plan\b`,                             // sprint-plan format/checklist dumps
