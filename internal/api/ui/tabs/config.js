@@ -21,6 +21,7 @@ const BOOLEANS = new Set([
     'jiminy.enabled', 'jiminy.synthesis_enabled',
     'jiminy.evaluate_enabled', 'jiminy.evaluate_llm_enabled',
     'jiminy.outcome_llm_enabled', 'jiminy.j17_enabled',
+    'jiminy.directive_synthesis_enabled',
     'retrieval.graph_typed_edges_enabled',
 ]);
 
