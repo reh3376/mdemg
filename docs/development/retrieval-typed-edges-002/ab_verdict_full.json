@@ -1,0 +1,27 @@
+{
+  "framework": "uvts-ab",
+  "framework_version": "1.0.0",
+  "timestamp": "2026-07-03T03:09:39.015821+00:00",
+  "spec_path": "docs/tests/uvts/specs/lnl_demo_validation.uvts.json",
+  "baseline_grades_path": "/tmp/uvts-clean-off/grades.json",
+  "candidate_grades_path": "/tmp/uvts-clean-on/grades.json",
+  "verdict": {
+    "verdict": "pass",
+    "criterion": "B mean >= A mean AND no per-question regression > threshold",
+    "regression_threshold_per_question": 0.1,
+    "shared_question_count": 120,
+    "mean_gate_passed": true,
+    "baseline_mean": 0.412,
+    "candidate_mean": 0.413,
+    "mean_delta": 0.001,
+    "regressions": [],
+    "regression_count": 0,
+    "improvement_count": 5
+  },
+  "epic3_amplification": {
+    "graph_weight_0.25_mean": 0.409,
+    "graph_weight_0.15_mean": 0.413,
+    "baseline_mean": 0.412,
+    "finding": "raising graph column weight regresses (crowds out embedding/BM25); typed-edge lift is +0.001 at natural weight 0.15, amplification fails"
+  }
+}

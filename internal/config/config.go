@@ -610,7 +610,7 @@ type Config struct {
 	// commit if the merge gate clears (B mean ≥ A mean AND no per-question
 	// regression > 10%).
 	RetrievalColumnVotingEnabled     bool    // RETRIEVAL_COLUMN_VOTING_ENABLED — route to RRF aggregator instead of linear scorer (default: true after Phase 13.1 embedding-heavy preset passed full 120q A/B with mean +0.023, 30 improvements, 2 boundary regressions)
-	RetrievalGraphTypedEdgesEnabled  bool    // RETRIEVAL_GRAPH_TYPED_EDGES_ENABLED — RRF graph column spreads activation through typed semantic edges (ANALOGOUS_TO/BRIDGES/etc.) via SpreadingActivationWithAttention instead of the CO_ACTIVATED_WITH-only basic spreading (RETRIEVAL-TYPED-EDGES-001; default: false until the UVTS A/B passes — the basic filter exists to prevent activation saturation from dense structural connectivity)
+	RetrievalGraphTypedEdgesEnabled  bool    // RETRIEVAL_GRAPH_TYPED_EDGES_ENABLED — RRF graph column spreads activation through typed semantic edges (ANALOGOUS_TO/BRIDGES/etc.) via SpreadingActivationWithAttention instead of the CO_ACTIVATED_WITH-only basic spreading (RETRIEVAL-TYPED-EDGES-001/002; default: true — the clean full-120q UVTS A/B passed on a quiet system: +0.001 mean / +0.009 correct-file, 0 regressions, no latency cost, once the semantic edges were grown by the dynamic_edges vector-index rewrite)
 	RetrievalRRFK                    int     // RETRIEVAL_RRF_K — RRF constant `score = w / (k + rank)` (default: 60 per Cormack et al.)
 	RetrievalColumnTimeoutFrac       float64 // RETRIEVAL_COLUMN_TIMEOUT_FRACTION — fraction of parent ctx remaining each column may consume (default: 0.8)
 	RetrievalStructuralHops          int     // RETRIEVAL_STRUCTURAL_HOPS — max hops walked by the structural column (default: 2; clamp to 1–9)
@@ -3159,7 +3159,7 @@ func FromEnv() (Config, error) {
 	// at exactly -0.10 in business_logic_constraints. See
 	// docs/development/post-ft-lora/phase_13_1_post.md.
 	retrievalColumnVotingEnabled := getBool("RETRIEVAL_COLUMN_VOTING_ENABLED", true)
-	retrievalGraphTypedEdgesEnabled := getBool("RETRIEVAL_GRAPH_TYPED_EDGES_ENABLED", false)
+	retrievalGraphTypedEdgesEnabled := getBool("RETRIEVAL_GRAPH_TYPED_EDGES_ENABLED", true)
 	retrievalRRFK, err := atoi("RETRIEVAL_RRF_K", 60)
 	if err != nil {
 		return Config{}, err
