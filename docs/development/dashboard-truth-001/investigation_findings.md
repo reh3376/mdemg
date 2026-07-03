@@ -1,0 +1,27 @@
+# DASHBOARD-TRUTH-001 — Investigation Findings (2026-07-03)
+
+Three parallel Fable-5 read-only agents reproduced every flagged metric live and classified each **ARTIFACT** vs **REAL-LOW**. This is the evidence base for the sprint.
+
+## RSIC dashboard (`mdemg-rsic`)
+
+**Cycle Success Rate = 0% → ARTIFACT.** Actual: 71 started / 71 completed / 0 error in 6h = **100%**. Panel SQL computes the success ratio *per `time_bucket`* with `COALESCE(…,0)` then reduces with `lastNotNull`; a bucket with a `started` delta but no terminal outcome yet → 0, and the latest bucket is frequently started-only → latches 0. Producer healthy (`internal/ape/cycle.go`: started :163, completed :240/:367). Fix: single windowed aggregate.
+
+**Guidance dim = 33.5% → REAL-LOW (→ Sprint 2).** `scoreGuidance` (`self_assess.go:462`) = 0.5·follow(0.162) + 0.3·constraint_eff(0.283) + 0.2·diversity(0.848) = 0.3355 ✓. Follow rate is the honest 168h `constraint_outcomes` rate (1241 outcomes: 988 ignored/157 followed/95 partial). Confidence gauge = 1.0. Genuine guidance-quality gap.
+
+**Protocol dim = 68.5% → REAL-LOW + one anchor-ARTIFACT.** `scoreProtocol` (`self_assess.go:513`) = 0.35·comprehension(0.838) + 0.05·calibration(0.3, pinned by the false NLI bias alert) + 0.25·compression((1.835−1)/4 = 0.209) + 0.20·coverage(0.914) + 0.15·stability(1.0) ≈ 0.69. Loss breakdown: **compression −0.198** (dominant; hardcoded 5.0 anchor), comprehension −0.057, NLI-bias −0.035. Anchor + NLI-bias are this sprint; comprehension is Sprint 2.
+
+## J17 dashboard (`mdemg-j17`)
+
+**NLI Mean Bias 0.61 + Bias Alert → ARTIFACT (structural), ALERT-TRUTH-001 has NO residual gap.** The scorer is genuinely operational (`IsOperational()`=true; sidecar live on :8100 `nli-MiniLM2`, 37ms). Value is moving (0.638→0.613→0.578→0.513) — fresh samples, not the stale-window phantom ALERT-TRUTH-001 fixed. But the alert is **red by construction**: NLI *comprehension* (contradiction→1.0 "understood but violated", neutral→0.5) vs a *compliance* heuristic (followed→1.0, ignored→0.0); with ~80% ignored, `mean_nli`≈0.68 vs `mean_heuristic`≈0.17 → bias ≫ 0.15 in any <~85%-follow regime, forever. No min-sample floor (fires from a 16-sample in-memory window that resets each restart). Red herring: `mdemg_j17_sidecar_requests=0` counts only the dormant tier-prediction shadow client (`RecordSidecarCall`, `service.go:1133`, gated off) — **NLI calls are counted nowhere**. Config drift: `.env` → :8100 Docker `nli-MiniLM2`; native :8101 `deberta-v3-xsmall` (HOOKSYNC-001-documented) is unused. Fix: like-for-like comparison + min-sample floor + NLI-call observability + canonical-sidecar decision.
+
+**T1 never full → REAL-LOW (→ Sprint 2), working as designed.** `t1_fraction=0`, t2=0.89, t3=0.109; T1 has produced 0 outcomes ever. `selectTier` (`encoder.go:131`) requires `hasCode && trustScore > 0.75`; the `J17_T1_COMPREHENSION_GATE=0.5` is a *demotion* gate needing ≥5 T1 outcomes — never engaged. Blocker is upstream: session trust never clears 0.75. Only actively-fed session sits at 0.30/0.22; EMA converges to the `ignored` anchor 0.2. Chicken-and-egg by design; unblocks when guidance gets followed (Sprint 2).
+
+**Min Trust Score = 22.4% → REAL-LOW (→ Sprint 2) + hygiene ARTIFACT.** The min belongs to the busiest *live* session (2136 feedback, active today) converging toward the `ignored` EMA anchor 0.2 (`trust.go:30`). Real, recoverable. **Adjacent ARTIFACT (this sprint):** the 116 "active" sessions include ~100 stale March/April test sessions; startup hydration rewrites `last_update`=boot-time so the 168h TTL (keyed on LastUpdate) never expires them → they pollute min/avg/count. Fix: preserve `last_update` provenance + significance floor.
+
+## Jiminy dashboard (`mdemg-jiminy`) — the priority
+
+Honest values: Follow 0.162, Constraint-Eff 0.283, Should-Follow 0.094 (0.145 excl n/a), Surfaced-actionable 0.666. Panel artifacts: the Outcome pie + Outcome-Trends stack **lifetime-cumulative multi-credit** Neo4j gauges (`stats.go:33`: "credits a guidance_id to followed if ANY edge is followed" — 0.73 vs honest 0.27) → contradict the real rate ~3×; Should-Follow counts `not_applicable` (35% of rows) as 0.0; "Total Guidance Issued" mislabeled (distinct edge-bearing ids all-time, not issuance); x=14/x=16 gridPos collision; panel-15 leftover overrides.
+
+**Root cause of the low scores (→ Sprint 2):** Lever C (`JIMINY_GUIDANCE_CONSTRAINT_BIAS_ENABLED=true`, `.env:320`) is ON and worked (surfaced-actionable 6.7%→66.6%), but redirected the surface onto a `role_type='constraint'` partition that is **~half junk** — fabricated `Build/test succeeded:…` (pre-HOOKWIRE-001 class), `Bash error…`, PR/sprint-status notes, doc/template nodes, duplicate `CONSTRAINT 1–5` sets (~49+ junk of 140). Worse, **37 distinct nodes → 1,369 surfacings in 7d (~37× each)** regardless of relevance → relevance failure measured as compliance failure. **Lever B (`JIMINY_DIRECTIVE_SYNTHESIS_ENABLED`) is OFF**, against the JIMINY-ACTIONABILITY-001 recommendation. Label quality is no longer the issue (heuristic-label fraction gauge = 0, classifier now `llm`).
+
+**Sprint 2 (JIMINY-CORPUS) plan (ranked):** (1) purge/re-role junk constraint nodes [backup + small-batch + operator sign-off — authorized]; (2) ignored↔not_applicable classifier relevance gate + panel/alert n/a-exclusion [panel part is Sprint 1 E5]; (3) per-node surfacing cooldown / session dedup + effectiveness-as-prior; (4) enable Lever B; (5) HITL curation + close `RetrieveForJiminy` role_type adapter gap.

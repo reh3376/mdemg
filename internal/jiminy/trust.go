@@ -208,7 +208,10 @@ func (ts *TrustScorer) RecordOutcome(sessionID string, outcome GuidanceOutcome) 
 	return score
 }
 
-// SetScore sets the trust score for a session (used for ticket restore and hydration).
+// SetScore sets the trust score for a session (used for ticket restore and
+// live operator overrides — real activity, so stamping now() is correct).
+// Do NOT use for startup hydration: it destroys timestamp provenance (the TTL
+// key) — use RestoreEntry there (DASHBOARD-TRUTH-001 Epic 4).
 func (ts *TrustScorer) SetScore(sessionID string, score float64) {
 	ts.mu.Lock()
 
@@ -228,6 +231,49 @@ func (ts *TrustScorer) SetScore(sessionID string, score float64) {
 	if ts.onDirty != nil {
 		ts.onDirty(sessionID)
 	}
+}
+
+// RestoreEntry rehydrates a persisted trust entry PRESERVING its timestamp
+// provenance (DASHBOARD-TRUTH-001 Epic 4). Unlike SetScore it does NOT stamp
+// time.Now() — stamping boot-time on load made every stale session look
+// freshly active, so the TTL cleanup (keyed on LastUpdate) could never expire
+// it. It also does NOT fire onDirty: hydration is a read-back, not a change —
+// marking hydrated sessions dirty caused the next flush to rewrite the
+// persisted last_update with now(), rotting the stored provenance every boot.
+// A zero lastUpdate (no provenance at all) is preserved as zero, which makes
+// the entry immediately TTL-expired — never fall back to now().
+func (ts *TrustScorer) RestoreEntry(sessionID string, score float64, lastUpdate time.Time) {
+	if score > 1.0 {
+		score = 1.0
+	}
+	if score < 0.0 {
+		score = 0.0
+	}
+
+	ts.mu.Lock()
+	defer ts.mu.Unlock()
+	ts.scores[sessionID] = &trustEntry{
+		Score:      score,
+		LastUpdate: lastUpdate,
+	}
+}
+
+// GetEntry returns the raw score + LastUpdate for a session, without TTL
+// filtering or initial-score fallback. Used by the persistence flush so the
+// stored last_update reflects the entry's real provenance, not flush time.
+func (ts *TrustScorer) GetEntry(sessionID string) (score float64, lastUpdate time.Time, ok bool) {
+	ts.mu.RLock()
+	defer ts.mu.RUnlock()
+	entry, ok := ts.scores[sessionID]
+	if !ok {
+		return 0, time.Time{}, false
+	}
+	return entry.Score, entry.LastUpdate, true
+}
+
+// TTL returns the configured trust-entry expiry window.
+func (ts *TrustScorer) TTL() time.Duration {
+	return ts.ttl
 }
 
 // Initial returns the initial trust score assigned to new sessions.
@@ -267,14 +313,27 @@ func (ts *TrustScorer) SetThresholds(high, low float64) {
 // Returns avg, min, max scores and session count. If no sessions exist, returns
 // the initial trust score for avg/min/max with count=0.
 func (ts *TrustScorer) Aggregates() (avg, min, max float64, count int) {
+	return ts.AggregatesFiltered(nil)
+}
+
+// AggregatesFiltered returns trust aggregates over SIGNIFICANT LIVE sessions
+// only (DASHBOARD-TRUTH-001 Epic 4): sessions within TTL of their last trust
+// update (recency — always applied) AND accepted by the optional significant
+// filter (typically "feedback_count ≥ J17_TRUST_MIN_FEEDBACK_COUNT"). A nil
+// filter applies recency only. This keeps one-shot / stale test sessions from
+// polluting the min/avg/max/count gauges.
+func (ts *TrustScorer) AggregatesFiltered(significant func(sessionID string) bool) (avg, min, max float64, count int) {
 	ts.mu.RLock()
 	defer ts.mu.RUnlock()
 
 	now := time.Now()
 	min = 1.0
 	var sum float64
-	for _, entry := range ts.scores {
+	for id, entry := range ts.scores {
 		if now.Sub(entry.LastUpdate) > ts.ttl {
+			continue
+		}
+		if significant != nil && !significant(id) {
 			continue
 		}
 		count++

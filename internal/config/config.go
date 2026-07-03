@@ -428,7 +428,13 @@ type Config struct {
 	J17TrustDecayPerContradict float64 // J17_TRUST_DECAY_PER_CONTRADICT — trust decrease per contradicted constraint (default: 0.04)
 	J17TrustHighThreshold      float64 // J17_TRUST_HIGH_THRESHOLD — above this → dense encoding (default: 0.75)
 	J17TrustLowThreshold       float64 // J17_TRUST_LOW_THRESHOLD — below this → more explanation (default: 0.35)
-	J17TrustTTLHours           int     // J17_TRUST_TTL_HOURS — trust entry expiry in hours (default: 4)
+	J17TrustTTLHours           int     // J17_TRUST_TTL_HOURS — trust entry expiry in hours (default: 168)
+	// DASHBOARD-TRUTH-001 Epic 4: significance floor for the trust gauges.
+	// A session counts toward mdemg_j17_{min,max,avg}_trust_score and
+	// _trust_session_count only if it is within the TTL of its last trust
+	// update AND has ≥ this many recorded feedback events. ≤0 disables the
+	// feedback floor (recency-only filtering).
+	J17TrustMinFeedbackCount int // J17_TRUST_MIN_FEEDBACK_COUNT — min feedback events for gauge significance (default: 5)
 	// JIMINY-EFFECTIVENESS-001: trust update rule. "ema" tracks recent
 	// effectiveness and RECOVERS (the J17-T1 unblocker); "ratchet" is the legacy
 	// monotonic boost/decay that floors permanently.
@@ -475,7 +481,9 @@ type Config struct {
 	J17TierIneffectiveThreshold    float64 // J17_TIER_INEFFECTIVE_THRESHOLD — comprehension below this = ineffective (default: 0.6)
 	J17TierDriftDetectionEnabled   bool    // J17_TIER_DRIFT_DETECTION_ENABLED — enable j17_tier_ineffective RSIC pattern (default: true)
 	J17NLICalibrationWindowSize    int     // J17_NLI_CALIBRATION_WINDOW_SIZE — ring buffer size for NLI/heuristic comparison (default: 500)
-	J17NLICalibrationBiasThreshold float64 // J17_NLI_CALIBRATION_BIAS_THRESHOLD — max acceptable NLI-vs-heuristic mean bias (default: 0.15)
+	J17NLICalibrationBiasThreshold float64 // J17_NLI_CALIBRATION_BIAS_THRESHOLD — max acceptable NLI-vs-heuristic mean bias over the like-for-like (ignored-excluded) window (default: 0.15; DASHBOARD-TRUTH-001)
+	J17NLICalibrationMinSamples    int     // J17_NLI_CALIBRATION_MIN_SAMPLES — min like-for-like samples before the bias alert can fire; below this the window is "insufficient data" (default: 50, 0 disables the floor; DASHBOARD-TRUTH-001)
+	J17CompressionTargetRatio      float64 // J17_COMPRESSION_TARGET_RATIO — compression ratio scored as "excellent" (sub-score 1.0) by the RSIC Protocol dimension; must be > 1.0 (ratio 1.0 = no compression), else falls back to default with a warning (default: 3.0; DASHBOARD-TRUTH-001 Epic 3)
 
 	// Plugin system settings (V0006)
 	PluginsEnabled  bool   // Feature toggle for plugin system (default: true)
@@ -2790,6 +2798,10 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	j17TrustMinFeedbackCount, err := atoi("J17_TRUST_MIN_FEEDBACK_COUNT", 5)
+	if err != nil {
+		return Config{}, err
+	}
 	j17TrustMode := get("J17_TRUST_MODE", "ema")
 	if j17TrustMode != "ema" && j17TrustMode != "ratchet" {
 		return Config{}, fmt.Errorf("J17_TRUST_MODE must be 'ema' or 'ratchet'")
@@ -2905,6 +2917,28 @@ func FromEnv() (Config, error) {
 	j17NLICalibrationBiasThreshold, err := atof("J17_NLI_CALIBRATION_BIAS_THRESHOLD", 0.15)
 	if err != nil {
 		return Config{}, err
+	}
+	// DASHBOARD-TRUTH-001: min-sample floor for the calibration bias alert —
+	// a tiny (e.g. 16-sample, restart-reset) window must not fire the alert.
+	j17NLICalibrationMinSamples, err := atoi("J17_NLI_CALIBRATION_MIN_SAMPLES", 50)
+	if err != nil {
+		return Config{}, err
+	}
+	if j17NLICalibrationMinSamples < 0 {
+		j17NLICalibrationMinSamples = 0
+	}
+	// DASHBOARD-TRUTH-001 Epic 3: calibration anchor for the RSIC Protocol
+	// compression sub-score (score 1.0 at target, 0.0 at ratio 1.0, linear
+	// between). Must be > 1.0 — a target at or below 1.0 (no compression)
+	// makes the sub-score degenerate.
+	j17CompressionTargetRatio, err := atof("J17_COMPRESSION_TARGET_RATIO", 3.0)
+	if err != nil {
+		return Config{}, err
+	}
+	if j17CompressionTargetRatio <= 1.0 {
+		slog.Warn("J17_COMPRESSION_TARGET_RATIO must be > 1.0, falling back to default",
+			"requested", j17CompressionTargetRatio, "default", 3.0)
+		j17CompressionTargetRatio = 3.0
 	}
 
 	// Startup validation: active mode requires sidecar URL
@@ -5188,6 +5222,7 @@ func FromEnv() (Config, error) {
 		J17TrustHighThreshold:          j17TrustHighThreshold,
 		J17TrustLowThreshold:           j17TrustLowThreshold,
 		J17TrustTTLHours:               j17TrustTTLHours,
+		J17TrustMinFeedbackCount:       j17TrustMinFeedbackCount,
 		J17TrustMode:                   j17TrustMode,
 		J17TrustEMAAlpha:               j17TrustEMAAlpha,
 		J17BootstrapCodification:       j17BootstrapCodification,
@@ -5220,6 +5255,8 @@ func FromEnv() (Config, error) {
 		J17TierDriftDetectionEnabled:   j17TierDriftDetectionEnabled,
 		J17NLICalibrationWindowSize:    j17NLICalibrationWindowSize,
 		J17NLICalibrationBiasThreshold: j17NLICalibrationBiasThreshold,
+		J17NLICalibrationMinSamples:    j17NLICalibrationMinSamples,
+		J17CompressionTargetRatio:      j17CompressionTargetRatio,
 
 		// Dynamic Reclassification
 		ReclassEnabled:       reclassEnabled,

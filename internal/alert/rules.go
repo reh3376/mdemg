@@ -364,6 +364,12 @@ func ReadinessStalenessRule(stalenessMin int) AlertRule {
 //     an idle/fresh-corpus window yields 1.0 (above the floor → no false fire),
 //     never the "no rows in result set" failure that fires rule-health noise.
 //   - Unique Service label "guidance-should-follow" (dispatcher cooldown key).
+//   - DASHBOARD-TRUTH-001: rows whose outcome_type is 'not_applicable' (or
+//     blank/unknown) are excluded from BOTH numerator and denominator via the
+//     outcome_type IN (...) allowlist — n/a rows carry no follow/ignore verdict
+//     (~35% of actionable rows live), and counting them as 0.0 understated the
+//     rate (0.094 vs 0.145 excl n/a) and could false-fire this rule. Keeps the
+//     rule in agreement with the dashboard's Should-Follow Follow Rate panel.
 //
 // rateFloor ≤ 0 disables the rule (returns empty). Certified-gold grounding via
 // HITL-REVIEW-001's review_grades (preferring human verdicts over auto-labels)
@@ -395,7 +401,8 @@ func GuidanceShouldFollowRules(rateFloor float64, lookbackHours int) []AlertRule
 					END), 1.0) AS should_follow_rate
 				FROM guidance_training_rows
 				WHERE time > now() - interval '%d hours'
-				  AND guidance_type IN ('constraint', 'correction')`, lookbackHours),
+				  AND guidance_type IN ('constraint', 'correction')
+				  AND outcome_type IN ('followed', 'partial_compliance', 'ignored', 'contradicted')`, lookbackHours),
 			Threshold: rateFloor,
 			Operator:  "lt",
 			Enabled:   true,

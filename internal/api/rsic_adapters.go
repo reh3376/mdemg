@@ -297,7 +297,15 @@ func (a *rsicProtocolAdapter) GetProtocolStats(ctx context.Context, spaceID stri
 		result.Sidecar = snapshot.Sidecar
 	}
 
-	// NLI calibration: populate from service if available
+	// NLI calibration: populate from service if available.
+	// DASHBOARD-TRUTH-001: gating happens at the SOURCE, so the report is safe
+	// to copy verbatim — GetNLICalibrationReport returns nil when the scorer
+	// isn't operational (ALERT-TRUTH-001), and the tracker's Report() zeroes
+	// MeanBias + forces BiasAlert=false below J17_NLI_CALIBRATION_MIN_SAMPLES
+	// (insufficient data ≠ calibration verdict). One chokepoint covers every
+	// consumer of this adapter: both j17_nli gauge emitters
+	// (ape/live_collectors.go, ape/self_assess.go) and the RSIC drift insight
+	// (ape/self_reflect.go). No per-consumer InsufficientSamples guard needed.
 	if calibReport := a.svc.GetNLICalibrationReport(); calibReport != nil {
 		result.NLIMeanBias = calibReport.MeanBias
 		result.NLIBiasAlert = calibReport.BiasAlert

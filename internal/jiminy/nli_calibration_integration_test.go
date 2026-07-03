@@ -25,7 +25,7 @@ func TestCalibrationFlowsToRSIC(t *testing.T) {
 	defer sidecar.Close()
 
 	// Create calibration tracker with tight bias threshold for testing
-	tracker := NewNLICalibrationTracker(100, 0.10)
+	tracker := NewNLICalibrationTracker(100, 0.10, 10)
 
 	// Create NLI scorer pointing at mock sidecar
 	nliScorer := NewNLIComprehensionScorer(sidecar.URL, 5000, true)
@@ -36,7 +36,7 @@ func TestCalibrationFlowsToRSIC(t *testing.T) {
 		nliScore, _ := nliScorer.ScoreComprehension(context.Background(),
 			"Never force push to main", "I followed the constraint carefully", true)
 		heuristicScore := 1.0 // OutcomeFollowed always maps to 1.0
-		tracker.Track(nliScore, heuristicScore)
+		tracker.Track(nliScore, heuristicScore, OutcomeFollowed)
 	}
 
 	// Get calibration report
@@ -65,14 +65,14 @@ func TestCalibrationFlowsToRSIC(t *testing.T) {
 
 // TestCalibrationNoBiasWhenAligned verifies no alert when NLI and heuristic agree.
 func TestCalibrationNoBiasWhenAligned(t *testing.T) {
-	tracker := NewNLICalibrationTracker(100, 0.15)
+	tracker := NewNLICalibrationTracker(100, 0.15, 0)
 
 	// Track aligned scores: NLI ≈ heuristic
 	for range 30 {
-		tracker.Track(1.0, 1.0) // Both agree on full comprehension
+		tracker.Track(1.0, 1.0, OutcomeFollowed) // Both agree on full comprehension
 	}
 	for range 20 {
-		tracker.Track(0.5, 0.5) // Both agree on partial comprehension
+		tracker.Track(0.5, 0.5, OutcomePartialCompliance) // Both agree on partial comprehension
 	}
 
 	report := tracker.Report()
@@ -93,19 +93,19 @@ func TestCalibrationNoBiasWhenAligned(t *testing.T) {
 // can coexist with protocol metrics in a single snapshot pipeline.
 func TestCalibrationReportWithMetricsSnapshot(t *testing.T) {
 	metrics := NewProtocolMetricsCollector()
-	tracker := NewNLICalibrationTracker(100, 0.15)
+	tracker := NewNLICalibrationTracker(100, 0.15, 0)
 
 	// Simulate mixed feedback:
 	// T1 outcomes with NLI scoring
 	metrics.RecordOutcomeWithTier("no-force-push", 1, 0.85)
-	tracker.Track(0.85, 1.0)
+	tracker.Track(0.85, 1.0, OutcomeFollowed)
 
 	metrics.RecordOutcomeWithTier("no-force-push", 1, 0.90)
-	tracker.Track(0.90, 1.0)
+	tracker.Track(0.90, 1.0, OutcomeFollowed)
 
 	// T2 outcomes
 	metrics.RecordOutcomeWithTier("lint-before-commit", 2, 0.70)
-	tracker.Track(0.70, 1.0)
+	tracker.Track(0.70, 1.0, OutcomeFollowed)
 
 	// Verify metrics snapshot has tier data
 	snapshot := metrics.Snapshot()

@@ -295,8 +295,8 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext, consultant Co
 	// NLI feedback loop: calibration tracker for NLI-vs-heuristic bias detection
 	var calibrationTracker *NLICalibrationTracker
 	if nliScorer != nil && cfg.J17NLICalibrationWindowSize > 0 {
-		calibrationTracker = NewNLICalibrationTracker(cfg.J17NLICalibrationWindowSize, cfg.J17NLICalibrationBiasThreshold)
-		slog.Info("jiminy: NLI calibration tracker enabled", "window", cfg.J17NLICalibrationWindowSize, "bias_threshold", cfg.J17NLICalibrationBiasThreshold)
+		calibrationTracker = NewNLICalibrationTracker(cfg.J17NLICalibrationWindowSize, cfg.J17NLICalibrationBiasThreshold, cfg.J17NLICalibrationMinSamples)
+		slog.Info("jiminy: NLI calibration tracker enabled", "window", cfg.J17NLICalibrationWindowSize, "bias_threshold", cfg.J17NLICalibrationBiasThreshold, "min_samples", cfg.J17NLICalibrationMinSamples)
 	}
 
 	// Gap 7: Warn if J17 is enabled but ticket secret is auto-generated
@@ -382,6 +382,14 @@ func (s *Service) StartTrustPersistence(ctx context.Context) {
 				if err := s.FlushEscalation(context.Background()); err != nil {
 					slog.Warn("j12: escalation persistence flush failed", "error", err)
 				}
+				// DASHBOARD-TRUTH-001 Epic 4: actually run the TTL cleanup.
+				// CleanupExpired previously had no production caller, so even
+				// legitimately-expired entries lingered in memory forever.
+				if s.trustScorer != nil {
+					if removed := s.trustScorer.CleanupExpired(); removed > 0 {
+						slog.Debug("j17: expired trust sessions removed", "count", removed)
+					}
+				}
 			}
 		}
 	}()
@@ -407,11 +415,19 @@ func (s *Service) FlushTrust(ctx context.Context) error {
 
 	snapshots := make([]TrustSnapshot, 0, len(dirtyIDs))
 	for _, sessionID := range dirtyIDs {
-		score := s.trustScorer.GetScore(sessionID)
+		// DASHBOARD-TRUTH-001 Epic 4: persist the entry's REAL LastUpdate, not
+		// flush time — the stored last_update is the TTL provenance that lets
+		// the cleaner decide "has this session gone silent" across restarts.
+		score, lastUpdate, ok := s.trustScorer.GetEntry(sessionID)
+		if !ok {
+			// Entry expired + cleaned between dirty-mark and flush; nothing
+			// meaningful to persist (writing now() would resurrect it).
+			continue
+		}
 		snap := TrustSnapshot{
 			SessionID:  sessionID,
 			Score:      score,
-			LastUpdate: time.Now(),
+			LastUpdate: lastUpdate,
 		}
 
 		// Include feedback counts
@@ -439,24 +455,70 @@ func (s *Service) HydrateTrust(ctx context.Context) error {
 		return err
 	}
 
-	hydrated := 0
+	hydrated, expired := s.hydrateTrustSnapshots(snapshots)
+
+	if hydrated > 0 {
+		slog.Info("j17: trust + feedback state hydrated from Neo4j",
+			"sessions", hydrated, "expired_dropped", expired)
+	}
+	return nil
+}
+
+// hydrateTrustSnapshots applies loaded snapshots to the in-memory trust +
+// feedback state. Extracted from HydrateTrust so the provenance behavior is
+// unit-testable without a Neo4j driver.
+func (s *Service) hydrateTrustSnapshots(snapshots map[string]*TrustSnapshot) (hydrated, expired int) {
 	for sessionID, snap := range snapshots {
-		s.trustScorer.SetScore(sessionID, snap.Score)
-		if snap.FeedbackCount > 0 {
-			s.feedbackMu.Lock()
-			s.feedbackCounts[sessionID] = &sessionFeedback{
-				Count:      snap.FeedbackCount,
-				LastFeedAt: snap.LastFeedAt,
-			}
-			s.feedbackMu.Unlock()
-		}
+		// DASHBOARD-TRUTH-001 Epic 4: restore the persisted timestamp verbatim
+		// (RestoreEntry), never SetScore — SetScore stamps boot-time, which made
+		// every stale session look active forever (the 168h TTL keyed on
+		// LastUpdate could never fire) AND marked it dirty, so the next flush
+		// rewrote the stored last_update with now(), rotting provenance each boot.
+		s.trustScorer.RestoreEntry(sessionID, snap.Score, effectiveHydrationTimestamp(snap))
 		hydrated++
 	}
 
-	if hydrated > 0 {
-		slog.Info("j17: trust + feedback state hydrated from Neo4j", "sessions", hydrated)
+	// The preserved timestamps make stale sessions immediately TTL-eligible:
+	// drop them now so they never pollute the in-memory map or trust gauges.
+	expired = s.trustScorer.CleanupExpired()
+
+	// Restore feedback counts only for sessions that survived the TTL sweep.
+	for sessionID, snap := range snapshots {
+		if snap.FeedbackCount <= 0 {
+			continue
+		}
+		if _, _, ok := s.trustScorer.GetEntry(sessionID); !ok {
+			continue
+		}
+		s.feedbackMu.Lock()
+		s.feedbackCounts[sessionID] = &sessionFeedback{
+			Count:      snap.FeedbackCount,
+			LastFeedAt: snap.LastFeedAt,
+		}
+		s.feedbackMu.Unlock()
 	}
-	return nil
+
+	return hydrated, expired
+}
+
+// effectiveHydrationTimestamp picks the TTL provenance timestamp for a
+// hydrated trust entry. The cleaner's question is "has this session gone
+// silent" — last_feed_at answers it directly (it is only ever written on real
+// feedback), so it is preferred over last_update: historically last_update was
+// boot-stamped on every restart (live: all 116 persisted rows carried the same
+// boot instant while last_feed_at preserved the real March–June activity
+// times), making it untrustworthy for existing rows. Fallback chain:
+// last_feed_at → last_update → the node's own updated_at → zero. NEVER now():
+// a zero result means "no provenance", which correctly reads as expired.
+func effectiveHydrationTimestamp(snap *TrustSnapshot) time.Time {
+	switch {
+	case !snap.LastFeedAt.IsZero():
+		return snap.LastFeedAt
+	case !snap.LastUpdate.IsZero():
+		return snap.LastUpdate
+	default:
+		return snap.NodeUpdatedAt
+	}
 }
 
 // FlushEscalation writes all dirty escalation state to Neo4j.
@@ -1722,7 +1784,29 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 			scoreSource := "heuristic"
 
 			if s.nliScorer != nil {
+				// DASHBOARD-TRUTH-001: real NLI-call observability. The
+				// mdemg_j17_sidecar_* gauges count only the tier-prediction
+				// shadow client (RecordSidecarCall, gated off by default) —
+				// actual NLI comprehension calls were counted nowhere. Count
+				// only genuine call attempts (operational scorer: enabled AND
+				// URL set); a gated-off scorer's synthetic fallback is an
+				// operator choice, not a request.
+				nliOperational := s.nliScorer.IsOperational()
+				var nliStart time.Time
+				if nliOperational {
+					nliStart = time.Now()
+				}
 				nliScore, isFallback := s.nliScorer.ScoreComprehension(ctx, item.Content, req.ActionSummary, followed)
+				if nliOperational {
+					if std := metrics.Metrics(); std != nil {
+						nliResult := "ok"
+						if isFallback {
+							nliResult = "fallback"
+						}
+						std.J17NLIRequests(req.SpaceID, nliResult).Inc()
+						std.J17NLILatencyMs(req.SpaceID).Observe(float64(time.Since(nliStart).Microseconds()) / 1000.0)
+					}
+				}
 
 				if isFallback {
 					// NLI unavailable — do NOT record fallback score into comprehension metrics.
@@ -1769,7 +1853,14 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 						s.protocolMetrics.RecordOutcomeWithTier(item.ConstraintCode, item.Tier, nliScore)
 					}
 
-					// NLI calibration: compare NLI with heuristic for bias detection
+					// NLI calibration: compare NLI with heuristic for bias detection.
+					// DASHBOARD-TRUTH-001: the outcome is threaded through so the
+					// tracker can exclude `ignored` samples — NLI comprehension
+					// (understood-but-violated → high) vs compliance heuristic
+					// (ignored → 0.0) diverge by design there, which pinned
+					// MeanBias ≈ 0.5 permanently in any sub-~85%-follow regime.
+					// Ignored outcomes still reach RecordOutcomeWithTier above,
+					// so no data is lost.
 					if s.calibrationTracker != nil {
 						var heuristicComp float64
 						switch outcome {
@@ -1784,7 +1875,7 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 						default:
 							heuristicComp = 0.5
 						}
-						s.calibrationTracker.Track(nliScore, heuristicComp)
+						s.calibrationTracker.Track(nliScore, heuristicComp, outcome)
 
 						// P2-15: Check for NLI bias alert after tracking
 						if report := s.calibrationTracker.Report(); report != nil && report.BiasAlert {
@@ -2332,7 +2423,25 @@ func (s *Service) GetProtocolMetricsSnapshot() *ProtocolMetrics {
 	}
 	snap := s.protocolMetrics.Snapshot()
 	if s.trustScorer != nil {
-		avg, min, max, count := s.trustScorer.Aggregates()
+		// DASHBOARD-TRUTH-001 Epic 4: the min/avg/max/count trust gauges
+		// reflect only SIGNIFICANT LIVE sessions — within TTL of their last
+		// trust update (enforced inside AggregatesFiltered) AND with at least
+		// J17_TRUST_MIN_FEEDBACK_COUNT recorded feedback events. One-shot test
+		// sessions and long-silent sessions no longer drag the min/count.
+		// A knob value ≤ 0 disables the feedback floor (recency-only).
+		var significant func(sessionID string) bool
+		if minFeed := s.cfg.J17TrustMinFeedbackCount; minFeed > 0 {
+			s.feedbackMu.RLock()
+			sig := make(map[string]bool, len(s.feedbackCounts))
+			for sid, sf := range s.feedbackCounts {
+				if sf != nil && sf.Count >= minFeed {
+					sig[sid] = true
+				}
+			}
+			s.feedbackMu.RUnlock()
+			significant = func(sessionID string) bool { return sig[sessionID] }
+		}
+		avg, min, max, count := s.trustScorer.AggregatesFiltered(significant)
 		snap.AvgTrustScore = avg
 		snap.MinTrustScore = min
 		snap.MaxTrustScore = max
@@ -2428,6 +2537,12 @@ func (s *Service) BuildTierEffectivenessDataset() *TierEffectivenessDataset {
 }
 
 // GetNLICalibrationReport returns the NLI calibration report, or nil if calibration tracking is not active.
+//
+// DASHBOARD-TRUTH-001: this is the single emitter-facing source of the NLI
+// bias verdict. Consumers may copy MeanBias/BiasAlert verbatim: a nil return
+// means no-data (tracker absent or scorer not operational), and a non-nil
+// report is verdict-safe by construction — the tracker's Report() zeroes
+// MeanBias and forces BiasAlert=false below J17_NLI_CALIBRATION_MIN_SAMPLES.
 func (s *Service) GetNLICalibrationReport() *NLICalibrationReport {
 	if s.calibrationTracker == nil {
 		return nil

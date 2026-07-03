@@ -41,6 +41,17 @@ func TestGuidanceShouldFollowRules_SQLContract(t *testing.T) {
 	if !strings.Contains(r.QuerySQL, "'constraint'") || !strings.Contains(r.QuerySQL, "'correction'") {
 		t.Errorf("should-follow denominator must restrict to constraint/correction types")
 	}
+	// DASHBOARD-TRUTH-001: not_applicable (and blank/unknown) rows carry no
+	// follow/ignore verdict and must be excluded from BOTH numerator and
+	// denominator — counting them as 0.0 understated the rate (0.094 vs 0.145
+	// excl n/a live) and desynced the rule from the dashboard panel. Pinned as
+	// an outcome_type allowlist (which excludes 'not_applicable' by omission).
+	if !strings.Contains(r.QuerySQL, "outcome_type IN ('followed', 'partial_compliance', 'ignored', 'contradicted')") {
+		t.Errorf("rule must allowlist verdict-bearing outcome_types (excluding not_applicable/blank/unknown), got: %s", r.QuerySQL)
+	}
+	if strings.Contains(r.QuerySQL, "'not_applicable'") {
+		t.Errorf("not_applicable must not appear in the rule SQL (excluded by allowlist omission): %s", r.QuerySQL)
+	}
 	if r.Operator != "lt" {
 		t.Errorf("Operator = %q, want lt (fires when rate drops below floor)", r.Operator)
 	}

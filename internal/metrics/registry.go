@@ -196,8 +196,18 @@ type Histogram struct {
 	count       int64
 }
 
-// NewHistogram creates and registers a new histogram.
+// NewHistogram creates and registers a new histogram using the registry-wide
+// (seconds-scale) bucket boundaries.
 func (r *Registry) NewHistogram(name, help string, labels map[string]string) *Histogram {
+	return r.NewHistogramWithBuckets(name, help, labels, nil)
+}
+
+// NewHistogramWithBuckets creates and registers a histogram with explicit
+// bucket boundaries, for metrics whose unit/scale differs from the shared
+// seconds-scale cfg.HistogramBuckets. ALERT-TRUTH-001 lesson: buckets MUST
+// cover the path they measure or every percentile clamps at the top bucket.
+// A nil/empty buckets slice falls back to the registry-wide default.
+func (r *Registry) NewHistogramWithBuckets(name, help string, labels map[string]string, buckets []float64) *Histogram {
 	key := makeKey(name, labels)
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -206,12 +216,15 @@ func (r *Registry) NewHistogram(name, help string, labels map[string]string) *Hi
 		return h
 	}
 
+	if len(buckets) == 0 {
+		buckets = r.cfg.HistogramBuckets
+	}
 	h := &Histogram{
 		name:         r.cfg.Namespace + "_" + name,
 		help:         help,
 		labels:       labels,
-		buckets:      r.cfg.HistogramBuckets,
-		bucketCounts: make([]int64, len(r.cfg.HistogramBuckets)),
+		buckets:      buckets,
+		bucketCounts: make([]int64, len(buckets)),
 	}
 	r.hists[key] = h
 	return h

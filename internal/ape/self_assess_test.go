@@ -449,7 +449,7 @@ func TestScoreProtocol_Perfect(t *testing.T) {
 	stats := ProtocolStatsResult{
 		AvgComprehension:         1.0,
 		NLIBiasAlert:             false, // calibration = 1.0
-		CompressionRatio:         5.0,   // (5.0-1.0)/4.0 = 1.0
+		CompressionRatio:         5.0,   // >= target 3.0 → clamped 1.0
 		CodeCoverage:             1.0,
 		TicketRestoreSuccessRate: 1.0,
 		ReplayFrequencyPerHour:   0.0, // penalty = 0, stability = 0.5*1.0 + 0.5*1.0 = 1.0
@@ -464,7 +464,7 @@ func TestScoreProtocol_Zero(t *testing.T) {
 	stats := ProtocolStatsResult{
 		AvgComprehension:         0.0,
 		NLIBiasAlert:             false, // calibration = 1.0 (not zero)
-		CompressionRatio:         1.0,   // (1.0-1.0)/4.0 = 0.0
+		CompressionRatio:         1.0,   // (1.0-1.0)/(3.0-1.0) = 0.0
 		CodeCoverage:             0.0,
 		TicketRestoreSuccessRate: 0.0,
 		ReplayFrequencyPerHour:   0.0, // stability = 0.5*0.0 + 0.5*1.0 = 0.5
@@ -494,7 +494,7 @@ func TestScoreProtocol_CompressionBelow1(t *testing.T) {
 	stats := ProtocolStatsResult{
 		AvgComprehension:         0.8,
 		NLIBiasAlert:             false,
-		CompressionRatio:         0.5, // (0.5-1.0)/4.0 = -0.125 → clamped to 0
+		CompressionRatio:         0.5, // (0.5-1.0)/(3.0-1.0) = -0.25 → clamped to 0
 		CodeCoverage:             0.8,
 		TicketRestoreSuccessRate: 0.9,
 		ReplayFrequencyPerHour:   2.0, // penalty = 2.0/10.0 = 0.2, stability = 0.5*0.9 + 0.5*0.8 = 0.85
@@ -510,15 +510,54 @@ func TestScoreProtocol_HighReplayFrequency(t *testing.T) {
 	stats := ProtocolStatsResult{
 		AvgComprehension:         1.0,
 		NLIBiasAlert:             false,
-		CompressionRatio:         3.0, // (3.0-1.0)/4.0 = 0.5
+		CompressionRatio:         3.0, // (3.0-1.0)/(3.0-1.0) = 1.0 (at target)
 		CodeCoverage:             1.0,
 		TicketRestoreSuccessRate: 1.0,
 		ReplayFrequencyPerHour:   20.0, // penalty = 20/10 = 2.0 → clamped to 1.0, stability = 0.5*1.0 + 0.5*0.0 = 0.5
 	}
 	got, _ := a.scoreProtocol(stats)
-	// 0.35*1.0 + 0.05*1.0 + 0.25*0.5 + 0.20*1.0 + 0.15*0.5
-	// = 0.35 + 0.05 + 0.125 + 0.20 + 0.075 = 0.8
-	assertClose(t, got, 0.8, 0.001, "scoreProtocol high replay frequency")
+	// 0.35*1.0 + 0.05*1.0 + 0.25*1.0 + 0.20*1.0 + 0.15*0.5
+	// = 0.35 + 0.05 + 0.25 + 0.20 + 0.075 = 0.925
+	assertClose(t, got, 0.925, 0.001, "scoreProtocol high replay frequency")
+}
+
+// TestScoreProtocol_CompressionAnchor pins the config-driven compression
+// calibration anchor (DASHBOARD-TRUTH-001 Epic 3): sub-score =
+// clamp((ratio-1)/(target-1), 0, 1). All other components are held at their
+// perfect values so the total isolates the 0.25-weighted compression term:
+// total = 0.75 + 0.25*compressionScore.
+func TestScoreProtocol_CompressionAnchor(t *testing.T) {
+	cases := []struct {
+		name   string
+		target float64 // 0 = unset → defensive fallback to default 3.0
+		ratio  float64
+		want   float64 // expected compression sub-score
+	}{
+		{"ratio at target scores 1.0", 3.0, 3.0, 1.0},
+		{"ratio 1.0 (no compression) scores 0.0", 3.0, 1.0, 0.0},
+		{"linear between: midpoint", 3.0, 2.0, 0.5},
+		{"live typical 1.681 under default", 3.0, 1.681, 0.3405},
+		{"above target clamps to 1.0", 3.0, 5.0, 1.0},
+		{"custom target 2.0: ratio 1.5 scores 0.5", 2.0, 1.5, 0.5},
+		{"unset target falls back to default 3.0", 0, 2.0, 0.5},
+		{"misconfigured target <= 1.0 falls back to default 3.0", 1.0, 3.0, 1.0},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			a := &Assessor{cfg: config.Config{J17CompressionTargetRatio: tc.target}}
+			stats := ProtocolStatsResult{
+				AvgComprehension:         1.0,
+				NLIBiasAlert:             false,
+				CompressionRatio:         tc.ratio,
+				CodeCoverage:             1.0,
+				TicketRestoreSuccessRate: 1.0,
+				ReplayFrequencyPerHour:   0.0,
+			}
+			got, _ := a.scoreProtocol(stats)
+			want := 0.75 + 0.25*tc.want
+			assertClose(t, got, want, 0.001, "scoreProtocol compression anchor: "+tc.name)
+		})
+	}
 }
 
 func TestScoreProtocol_WeightsSumToOne(t *testing.T) {
@@ -538,16 +577,16 @@ func TestScoreProtocol_NoTicketRestoreData(t *testing.T) {
 	stats := ProtocolStatsResult{
 		AvgComprehension:         0.9,
 		NLIBiasAlert:             false, // calibration = 1.0
-		CompressionRatio:         3.0,   // (3.0-1.0)/4.0 = 0.5
+		CompressionRatio:         3.0,   // (3.0-1.0)/(3.0-1.0) = 1.0 (at target)
 		CodeCoverage:             1.0,
 		TicketRestoreSuccessRate: 1.0, // null-tolerant default (set by collector when total==0)
 		TicketRestoreTotal:       0,
 		ReplayFrequencyPerHour:   0.0, // no replays — stability = 0.5*1.0 + 0.5*1.0 = 1.0
 	}
 	got, _ := a.scoreProtocol(stats)
-	// 0.35*0.9 + 0.05*1.0 + 0.25*0.5 + 0.20*1.0 + 0.15*1.0
-	// = 0.315 + 0.05 + 0.125 + 0.20 + 0.15 = 0.84
-	assertClose(t, got, 0.84, 0.001, "scoreProtocol with no ticket restore data")
+	// 0.35*0.9 + 0.05*1.0 + 0.25*1.0 + 0.20*1.0 + 0.15*1.0
+	// = 0.315 + 0.05 + 0.25 + 0.20 + 0.15 = 0.965
+	assertClose(t, got, 0.965, 0.001, "scoreProtocol with no ticket restore data")
 	if got < 0.75 {
 		t.Errorf("protocolScore = %f, want >= 0.75 (null-tolerant stability lift)", got)
 	}

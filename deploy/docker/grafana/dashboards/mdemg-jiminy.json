@@ -35,7 +35,7 @@
       "type": "stat",
       "gridPos": {
         "h": 4,
-        "w": 4,
+        "w": 3,
         "x": 0,
         "y": 1
       },
@@ -90,8 +90,8 @@
       "type": "stat",
       "gridPos": {
         "h": 4,
-        "w": 4,
-        "x": 4,
+        "w": 3,
+        "x": 3,
         "y": 1
       },
       "datasource": {
@@ -147,7 +147,7 @@
       "gridPos": {
         "h": 4,
         "w": 3,
-        "x": 8,
+        "x": 6,
         "y": 1
       },
       "datasource": {
@@ -203,7 +203,7 @@
       "gridPos": {
         "h": 4,
         "w": 3,
-        "x": 11,
+        "x": 9,
         "y": 1
       },
       "datasource": {
@@ -254,12 +254,12 @@
     },
     {
       "title": "Should-Follow Follow Rate",
-      "description": "JIMINY-RELEVANCE-001: follow rate on guidance that SHOULD have been followed \u2014 restricted to the ACTIONABLE guidance types (constraint/correction), excluding correctly-ignored advisory abstractions (pattern/learning/concept). This is what the >90% operator goal actually means (the naive follow rate counts correctly-ignored advisory as failures). Computed from guidance_training_rows within the dashboard time range (followed=1.0, partial_compliance=0.5). Certified-gold grounding via HITL-REVIEW-001 review_grades is a documented follow-up. Green \u22650.9 = the goal; red <0.5 = the alert floor.",
+      "description": "JIMINY-RELEVANCE-001: follow rate on guidance that SHOULD have been followed \u2014 restricted to the ACTIONABLE guidance types (constraint/correction), excluding correctly-ignored advisory abstractions (pattern/learning/concept). This is what the >90% operator goal actually means (the naive follow rate counts correctly-ignored advisory as failures). DASHBOARD-TRUTH-001: rows with outcome_type='not_applicable' (or blank/unknown) are excluded from BOTH numerator and denominator \u2014 they carry no follow/ignore verdict, and counting them as 0.0 understated the rate (~0.09 vs ~0.14 honest). Matches the guidance_should_follow_rate_low alert rule. Computed from guidance_training_rows within the dashboard time range (followed=1.0, partial_compliance=0.5). Certified-gold grounding via HITL-REVIEW-001 review_grades is a documented follow-up. Green \u22650.9 = the goal; red <0.5 = the alert floor.",
       "type": "stat",
       "gridPos": {
         "h": 4,
         "w": 3,
-        "x": 14,
+        "x": 12,
         "y": 1
       },
       "datasource": {
@@ -269,7 +269,7 @@
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT now() AS time, AVG(CASE outcome_type WHEN 'followed' THEN 1.0 WHEN 'partial_compliance' THEN 0.5 ELSE 0.0 END) AS value FROM guidance_training_rows WHERE space_id = '$space_id' AND $__timeFilter(time) AND guidance_type IN ('constraint', 'correction')",
+          "rawSql": "SELECT now() AS time, AVG(CASE outcome_type WHEN 'followed' THEN 1.0 WHEN 'partial_compliance' THEN 0.5 ELSE 0.0 END) AS value FROM guidance_training_rows WHERE space_id = '$space_id' AND $__timeFilter(time) AND guidance_type IN ('constraint', 'correction') AND outcome_type IN ('followed', 'partial_compliance', 'ignored', 'contradicted')",
           "format": "time_series"
         }
       ],
@@ -313,8 +313,8 @@
       "type": "stat",
       "gridPos": {
         "h": 4,
-        "w": 4,
-        "x": 14,
+        "w": 3,
+        "x": 15,
         "y": 1
       },
       "datasource": {
@@ -368,8 +368,8 @@
       "type": "stat",
       "gridPos": {
         "h": 4,
-        "w": 4,
-        "x": 16,
+        "w": 3,
+        "x": 18,
         "y": 1
       },
       "datasource": {
@@ -421,8 +421,8 @@
       "type": "text",
       "gridPos": {
         "h": 4,
-        "w": 4,
-        "x": 20,
+        "w": 3,
+        "x": 21,
         "y": 1
       },
       "datasource": {
@@ -447,7 +447,8 @@
       "panels": []
     },
     {
-      "title": "Total Guidance Issued",
+      "title": "Guidance Items With Recorded Outcomes (all-time)",
+      "description": "DASHBOARD-TRUTH-001: this is NOT issuance volume. mdemg_jiminy_guidance_total counts DISTINCT guidance_ids that have at least one GUIDANCE_OUTCOME edge in Neo4j, cumulative over all time (internal/jiminy/stats.go). Guidance issued but never fed back through /v1/jiminy/feedback is invisible here.",
       "type": "timeseries",
       "gridPos": {
         "h": 8,
@@ -468,12 +469,13 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "displayName": "Guidance Issued"
+          "displayName": "Guidance With Recorded Outcomes (all-time)"
         }
       }
     },
     {
       "title": "Outcome Distribution",
+      "description": "DASHBOARD-TRUTH-001: honest WINDOWED outcome counts from constraint_outcomes over the dashboard time range. Previously read the mdemg_jiminy_*_total Neo4j gauges, which are lifetime-cumulative AND multi-credit (stats.go: a guidance_id is credited to 'followed' if ANY of its edges is followed) — they showed ~0.73 followed while the honest windowed follow rate was ~0.16.",
       "type": "piechart",
       "gridPos": {
         "h": 8,
@@ -488,22 +490,22 @@
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_jiminy_followed_total' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "rawSql": "SELECT now() AS time, COALESCE(COUNT(*) FILTER (WHERE outcome_type = 'followed'), 0)::float AS value FROM constraint_outcomes WHERE space_id = '$space_id' AND $__timeFilter(time)",
           "format": "time_series"
         },
         {
           "refId": "B",
-          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_jiminy_partial_compliance_total' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "rawSql": "SELECT now() AS time, COALESCE(COUNT(*) FILTER (WHERE outcome_type = 'partial_compliance'), 0)::float AS value FROM constraint_outcomes WHERE space_id = '$space_id' AND $__timeFilter(time)",
           "format": "time_series"
         },
         {
           "refId": "C",
-          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_jiminy_ignored_total' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "rawSql": "SELECT now() AS time, COALESCE(COUNT(*) FILTER (WHERE outcome_type = 'ignored'), 0)::float AS value FROM constraint_outcomes WHERE space_id = '$space_id' AND $__timeFilter(time)",
           "format": "time_series"
         },
         {
           "refId": "D",
-          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_jiminy_contradicted_total' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "rawSql": "SELECT now() AS time, COALESCE(COUNT(*) FILTER (WHERE outcome_type = 'contradicted'), 0)::float AS value FROM constraint_outcomes WHERE space_id = '$space_id' AND $__timeFilter(time)",
           "format": "time_series"
         }
       ],
@@ -511,7 +513,7 @@
         "pieType": "donut",
         "reduceOptions": {
           "calcs": [
-            "mean"
+            "lastNotNull"
           ]
         },
         "legend": {
@@ -728,6 +730,7 @@
     },
     {
       "title": "Outcome Trends",
+      "description": "DASHBOARD-TRUTH-001: per-hour WINDOWED outcome counts from constraint_outcomes (time_bucket over the dashboard range). Previously stacked the mdemg_jiminy_*_total Neo4j gauges — lifetime-cumulative multi-credit counters (stats.go), not a trend of outcomes in the interval.",
       "type": "timeseries",
       "gridPos": {
         "h": 8,
@@ -742,22 +745,22 @@
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_jiminy_followed_total' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "rawSql": "SELECT time_bucket('1 hour', time) AS time, COUNT(*)::float AS value FROM constraint_outcomes WHERE space_id = '$space_id' AND $__timeFilter(time) AND outcome_type = 'followed' GROUP BY 1 ORDER BY 1",
           "format": "time_series"
         },
         {
           "refId": "B",
-          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_jiminy_partial_compliance_total' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "rawSql": "SELECT time_bucket('1 hour', time) AS time, COUNT(*)::float AS value FROM constraint_outcomes WHERE space_id = '$space_id' AND $__timeFilter(time) AND outcome_type = 'partial_compliance' GROUP BY 1 ORDER BY 1",
           "format": "time_series"
         },
         {
           "refId": "C",
-          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_jiminy_ignored_total' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "rawSql": "SELECT time_bucket('1 hour', time) AS time, COUNT(*)::float AS value FROM constraint_outcomes WHERE space_id = '$space_id' AND $__timeFilter(time) AND outcome_type = 'ignored' GROUP BY 1 ORDER BY 1",
           "format": "time_series"
         },
         {
           "refId": "D",
-          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_jiminy_contradicted_total' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "rawSql": "SELECT time_bucket('1 hour', time) AS time, COUNT(*)::float AS value FROM constraint_outcomes WHERE space_id = '$space_id' AND $__timeFilter(time) AND outcome_type = 'contradicted' GROUP BY 1 ORDER BY 1",
           "format": "time_series"
         }
       ],
@@ -1025,37 +1028,25 @@
         "overrides": [
           {
             "matcher": {
-              "id": "byName",
-              "options": "mdemg_jiminy_follow_rate"
+              "id": "byFrameRefID",
+              "options": "A"
             },
             "properties": [
               {
                 "id": "displayName",
-                "value": "Follow Rate"
+                "value": "Actionable Fraction"
               }
             ]
           },
           {
             "matcher": {
-              "id": "byName",
-              "options": "mdemg_jiminy_constraint_effectiveness"
+              "id": "byFrameRefID",
+              "options": "B"
             },
             "properties": [
               {
                 "id": "displayName",
-                "value": "Constraint Effectiveness"
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "mdemg_jiminy_source_diversity"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Source Diversity"
+                "value": "Abstraction Fraction"
               }
             ]
           }

@@ -1266,7 +1266,7 @@
       }
     },
     {
-      "title": "Sidecar",
+      "title": "Sidecar & NLI",
       "type": "row",
       "collapsed": true,
       "gridPos": {
@@ -1277,7 +1277,8 @@
       },
       "panels": [
         {
-          "title": "Sidecar Requests",
+          "title": "Tier-Prediction Sidecar Requests",
+          "description": "DASHBOARD-TRUTH-001: mdemg_j17_sidecar_requests counts ONLY the tier-prediction shadow client (RecordSidecarCall, gated off by default) — NOT NLI comprehension calls. See the NLI Requests panel for real NLI-call volume.",
           "type": "timeseries",
           "gridPos": {
             "h": 8,
@@ -1298,7 +1299,7 @@
           ],
           "fieldConfig": {
             "defaults": {
-              "displayName": "Sidecar Requests",
+              "displayName": "Tier-Prediction Sidecar Requests",
               "noValue": "N/A"
             }
           }
@@ -1457,6 +1458,130 @@
               "unit": "ms",
               "noValue": "N/A"
             }
+          }
+        },
+        {
+          "title": "NLI Requests (comprehension calls)",
+          "description": "DASHBOARD-TRUTH-001: real NLI comprehension call attempts (mdemg_j17_nli_requests_total, counter deltas per flush). Fallback = call attempted but the score fell back to the heuristic (error/timeout/low confidence).",
+          "type": "timeseries",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 37
+          },
+          "datasource": {
+            "type": "postgres",
+            "uid": "timescaledb"
+          },
+          "targets": [
+            {
+              "rawSql": "SELECT time, SUM(value) AS value FROM metric_samples WHERE metric_name = 'mdemg_j17_nli_requests_total' AND metric_type = 'counter' AND space_id = '$space_id' AND $__timeFilter(time) GROUP BY time ORDER BY time",
+              "format": "time_series",
+              "refId": "A"
+            },
+            {
+              "rawSql": "SELECT time, SUM(value) AS value FROM metric_samples WHERE metric_name = 'mdemg_j17_nli_requests_total' AND metric_type = 'counter' AND labels->>'result' = 'fallback' AND space_id = '$space_id' AND $__timeFilter(time) GROUP BY time ORDER BY time",
+              "format": "time_series",
+              "refId": "B"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "noValue": "N/A"
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byFrameRefID",
+                  "options": "A"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "NLI Requests"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byFrameRefID",
+                  "options": "B"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "Fallbacks"
+                  },
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "red"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "title": "NLI Latency",
+          "description": "DASHBOARD-TRUTH-001: windowed p95/p99 of mdemg_j17_nli_latency_ms (real NLI comprehension call wall time). Gaps = idle windows (honest, no samples).",
+          "type": "timeseries",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 37
+          },
+          "datasource": {
+            "type": "postgres",
+            "uid": "timescaledb"
+          },
+          "targets": [
+            {
+              "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_j17_nli_latency_ms_p95' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+              "format": "time_series",
+              "refId": "A"
+            },
+            {
+              "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_j17_nli_latency_ms_p99' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+              "format": "time_series",
+              "refId": "B"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ms",
+              "noValue": "N/A"
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byFrameRefID",
+                  "options": "A"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "p95"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byFrameRefID",
+                  "options": "B"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "p99"
+                  }
+                ]
+              }
+            ]
           }
         }
       ]
