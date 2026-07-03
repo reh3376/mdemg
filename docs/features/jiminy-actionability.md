@@ -47,3 +47,13 @@ Lever C addresses the Epic-4 finding directly: when `JIMINY_GUIDANCE_CONSTRAINT_
 
 ## Shipping
 All three levers ship **default-off**. **Operator recommendation: enable Lever C** (the actionable-composition mover) and Lever B (imperative phrasing). Lever A's quota/cap then shapes the now-actionable-rich pool. See `docs/development/jiminy-actionability-001/`.
+
+## Follow-up — corpus cleanup + repetition control (JIMINY-CORPUS-001, 2026-07-03)
+Enabling Lever C exposed that the `role_type='constraint'` partition it surfaces from was ~half junk and over-repeated. JIMINY-CORPUS-001 addressed the corpus itself:
+- **Promotion gate** (`internal/hidden/constraint_gate.go`) stops junk observations (build/test status, bash errors, PR/sprint/phase-completion notes, doc dumps) from becoming constraint nodes — provenance obs_type deny-set + content patterns, config-driven, default-on.
+- **Purge:** 140→61 live constraint nodes (tombstone-only, reversible), removing ~58% of the constraint surfacing noise.
+- **Repetition control** (`internal/jiminy/surface_cooldown.go`): per-session cooldown on repeatedly-ignored nodes + an effectiveness-prior soft re-rank (both default-on, RRF-SCALE-001-safe).
+- **Relevance gate** (`internal/jiminy/outcome_classifier.go`): a precise 4-band classifier so unrelated-domain surfacings are `not_applicable`, near-LOW real ignores are `ignored`.
+- **Lever B enabled** (`JIMINY_DIRECTIVE_SYNTHESIS_ENABLED`) + exposed in compose + the UI config tab.
+
+Follow-rate lift is forward-looking (baseline 0.165; re-measure ~1 week out). See `docs/development/jiminy-corpus-001/`.
