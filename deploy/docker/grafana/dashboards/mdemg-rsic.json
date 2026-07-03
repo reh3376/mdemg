@@ -702,8 +702,8 @@
       },
       "targets": [
         {
-          "rawSql": "SELECT time_bucket('$__interval', time) AS time, COALESCE(SUM(CASE WHEN labels->>'outcome' IN ('completed', 'dry_run') THEN value ELSE 0 END) / NULLIF(SUM(CASE WHEN labels->>'outcome' IN ('completed', 'dry_run', 'error', 'low_confidence') THEN value ELSE 0 END), 0) * 100, 0) AS value FROM metric_samples WHERE metric_name = 'mdemg_rsic_cycle_total' AND metric_type = 'counter' AND space_id = '$space_id' AND $__timeFilter(time) GROUP BY 1 ORDER BY 1",
-          "format": "time_series",
+          "rawSql": "SELECT SUM(CASE WHEN labels->>'outcome' IN ('completed', 'dry_run') THEN value ELSE 0 END) / NULLIF(SUM(CASE WHEN labels->>'outcome' IN ('completed', 'dry_run', 'error', 'low_confidence') THEN value ELSE 0 END), 0) * 100 AS value FROM metric_samples WHERE metric_name = 'mdemg_rsic_cycle_total' AND metric_type = 'counter' AND space_id = '$space_id' AND $__timeFilter(time)",
+          "format": "table",
           "refId": "A"
         }
       ],
@@ -714,7 +714,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "percent",
-          "noValue": "0",
+          "noValue": "N/A",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -1658,7 +1658,7 @@
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT 'recall' AS stage, CASE WHEN COUNT(*) > 0 THEN (COUNT(*) FILTER (WHERE recall_node_ids IS NOT NULL AND array_length(recall_node_ids, 1) > 0))::float / COUNT(*)::float * 100 ELSE 0 END AS rate_pct FROM retrieval_events WHERE space_id = '$space_id' AND $__timeFilter(time) UNION ALL SELECT 'bm25', CASE WHEN COUNT(*) > 0 THEN (COUNT(*) FILTER (WHERE bm25_node_ids IS NOT NULL AND array_length(bm25_node_ids, 1) > 0))::float / COUNT(*)::float * 100 ELSE 0 END FROM retrieval_events WHERE space_id = '$space_id' AND $__timeFilter(time) UNION ALL SELECT 'rerank', CASE WHEN COUNT(*) > 0 THEN (COUNT(*) FILTER (WHERE rerank_node_ids IS NOT NULL AND array_length(rerank_node_ids, 1) > 0))::float / COUNT(*)::float * 100 ELSE 0 END FROM retrieval_events WHERE space_id = '$space_id' AND $__timeFilter(time)",
+          "rawSql": "SELECT 'recall' AS stage, (COUNT(*) FILTER (WHERE recall_node_ids IS NOT NULL AND array_length(recall_node_ids, 1) > 0))::float / NULLIF(COUNT(*), 0)::float * 100 AS rate_pct FROM retrieval_events WHERE space_id = '$space_id' AND $__timeFilter(time) UNION ALL SELECT 'bm25', (COUNT(*) FILTER (WHERE bm25_node_ids IS NOT NULL AND array_length(bm25_node_ids, 1) > 0))::float / NULLIF(COUNT(*), 0)::float * 100 FROM retrieval_events WHERE space_id = '$space_id' AND $__timeFilter(time) UNION ALL SELECT 'rerank', (COUNT(*) FILTER (WHERE rerank_node_ids IS NOT NULL AND array_length(rerank_node_ids, 1) > 0))::float / NULLIF(COUNT(*), 0)::float * 100 FROM retrieval_events WHERE space_id = '$space_id' AND $__timeFilter(time)",
           "format": "table"
         }
       ],
@@ -1667,6 +1667,7 @@
           "unit": "percent",
           "min": 0,
           "max": 100,
+          "noValue": "N/A",
           "thresholds": {
             "mode": "absolute",
             "steps": [
