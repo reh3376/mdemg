@@ -295,8 +295,8 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext, consultant Co
 	// NLI feedback loop: calibration tracker for NLI-vs-heuristic bias detection
 	var calibrationTracker *NLICalibrationTracker
 	if nliScorer != nil && cfg.J17NLICalibrationWindowSize > 0 {
-		calibrationTracker = NewNLICalibrationTracker(cfg.J17NLICalibrationWindowSize, cfg.J17NLICalibrationBiasThreshold)
-		slog.Info("jiminy: NLI calibration tracker enabled", "window", cfg.J17NLICalibrationWindowSize, "bias_threshold", cfg.J17NLICalibrationBiasThreshold)
+		calibrationTracker = NewNLICalibrationTracker(cfg.J17NLICalibrationWindowSize, cfg.J17NLICalibrationBiasThreshold, cfg.J17NLICalibrationMinSamples)
+		slog.Info("jiminy: NLI calibration tracker enabled", "window", cfg.J17NLICalibrationWindowSize, "bias_threshold", cfg.J17NLICalibrationBiasThreshold, "min_samples", cfg.J17NLICalibrationMinSamples)
 	}
 
 	// Gap 7: Warn if J17 is enabled but ticket secret is auto-generated
@@ -1722,7 +1722,29 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 			scoreSource := "heuristic"
 
 			if s.nliScorer != nil {
+				// DASHBOARD-TRUTH-001: real NLI-call observability. The
+				// mdemg_j17_sidecar_* gauges count only the tier-prediction
+				// shadow client (RecordSidecarCall, gated off by default) —
+				// actual NLI comprehension calls were counted nowhere. Count
+				// only genuine call attempts (operational scorer: enabled AND
+				// URL set); a gated-off scorer's synthetic fallback is an
+				// operator choice, not a request.
+				nliOperational := s.nliScorer.IsOperational()
+				var nliStart time.Time
+				if nliOperational {
+					nliStart = time.Now()
+				}
 				nliScore, isFallback := s.nliScorer.ScoreComprehension(ctx, item.Content, req.ActionSummary, followed)
+				if nliOperational {
+					if std := metrics.Metrics(); std != nil {
+						nliResult := "ok"
+						if isFallback {
+							nliResult = "fallback"
+						}
+						std.J17NLIRequests(req.SpaceID, nliResult).Inc()
+						std.J17NLILatencyMs(req.SpaceID).Observe(float64(time.Since(nliStart).Microseconds()) / 1000.0)
+					}
+				}
 
 				if isFallback {
 					// NLI unavailable — do NOT record fallback score into comprehension metrics.
@@ -1769,7 +1791,14 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 						s.protocolMetrics.RecordOutcomeWithTier(item.ConstraintCode, item.Tier, nliScore)
 					}
 
-					// NLI calibration: compare NLI with heuristic for bias detection
+					// NLI calibration: compare NLI with heuristic for bias detection.
+					// DASHBOARD-TRUTH-001: the outcome is threaded through so the
+					// tracker can exclude `ignored` samples — NLI comprehension
+					// (understood-but-violated → high) vs compliance heuristic
+					// (ignored → 0.0) diverge by design there, which pinned
+					// MeanBias ≈ 0.5 permanently in any sub-~85%-follow regime.
+					// Ignored outcomes still reach RecordOutcomeWithTier above,
+					// so no data is lost.
 					if s.calibrationTracker != nil {
 						var heuristicComp float64
 						switch outcome {
@@ -1784,7 +1813,7 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 						default:
 							heuristicComp = 0.5
 						}
-						s.calibrationTracker.Track(nliScore, heuristicComp)
+						s.calibrationTracker.Track(nliScore, heuristicComp, outcome)
 
 						// P2-15: Check for NLI bias alert after tracking
 						if report := s.calibrationTracker.Report(); report != nil && report.BiasAlert {

@@ -231,13 +231,21 @@ type StandardMetrics struct {
 	J17MaxTrustScore     func(spaceID string) *Gauge
 	J17TrustSessionCount func(spaceID string) *Gauge
 
-	// J17 sidecar metrics
+	// J17 sidecar metrics — these count ONLY the tier-prediction shadow client
+	// (RecordSidecarCall), which is gated off by default. They do NOT count NLI
+	// comprehension calls.
 	J17SidecarRequests      func(spaceID string) *Gauge
 	J17SidecarErrors        func(spaceID string) *Gauge
 	J17SidecarTimeouts      func(spaceID string) *Gauge
 	J17SidecarAgreementRate func(spaceID string) *Gauge
 	J17SidecarOverrideRate  func(spaceID string) *Gauge
 	J17SidecarLatency       func(spaceID string) *Gauge
+
+	// DASHBOARD-TRUTH-001 — real NLI comprehension call observability. Before
+	// this, actual NLI sidecar calls (the nli_comprehension scoring path in
+	// jiminy feedback) were counted nowhere.
+	J17NLIRequests  func(spaceID, result string) *Counter // mdemg_j17_nli_requests_total{space_id,result} — result: ok|fallback
+	J17NLILatencyMs func(spaceID string) *Histogram       // mdemg_j17_nli_latency_ms{space_id} — wall time of each NLI comprehension call attempt
 
 	// Jiminy guidance metrics (published after each assessment)
 	JiminyFollowRate              func(spaceID string) *Gauge
@@ -306,6 +314,14 @@ type StandardMetrics struct {
 func (m *StandardMetrics) Registry() *Registry {
 	return m.registry
 }
+
+// nliLatencyMsBuckets are millisecond-scale buckets for mdemg_j17_nli_latency_ms.
+// The shared registry buckets are seconds-scale (5ms…120s) — reused for a
+// millisecond-valued metric they would top out at 120ms and clamp every
+// percentile (the ALERT-TRUTH-001 bucket-coverage class). This set covers the
+// J17_SIDECAR_TIMEOUT_MS default (1000ms, 100ms floor) with headroom for
+// operator overrides.
+var nliLatencyMsBuckets = []float64{1, 2.5, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000}
 
 // NewStandardMetrics creates and registers all standard MDEMG metrics.
 func NewStandardMetrics(r *Registry) *StandardMetrics {
@@ -722,6 +738,18 @@ func NewStandardMetrics(r *Registry) *StandardMetrics {
 	m.J17SidecarLatency = func(spaceID string) *Gauge {
 		return r.NewGauge("j17_sidecar_avg_latency_ms", "Sidecar average latency (ms)",
 			map[string]string{"space_id": spaceID})
+	}
+
+	// DASHBOARD-TRUTH-001 — NLI comprehension call observability
+	m.J17NLIRequests = func(spaceID, result string) *Counter {
+		return r.NewCounter("j17_nli_requests_total",
+			"NLI comprehension call attempts against the J17 sidecar (result: ok|fallback). Distinct from j17_sidecar_requests, which counts only the tier-prediction shadow client.",
+			map[string]string{"space_id": spaceID, "result": result})
+	}
+	m.J17NLILatencyMs = func(spaceID string) *Histogram {
+		return r.NewHistogramWithBuckets("j17_nli_latency_ms",
+			"Wall time (ms) of each NLI comprehension call attempt",
+			map[string]string{"space_id": spaceID}, nliLatencyMsBuckets)
 	}
 
 	// Jiminy guidance metrics

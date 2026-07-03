@@ -475,7 +475,8 @@ type Config struct {
 	J17TierIneffectiveThreshold    float64 // J17_TIER_INEFFECTIVE_THRESHOLD — comprehension below this = ineffective (default: 0.6)
 	J17TierDriftDetectionEnabled   bool    // J17_TIER_DRIFT_DETECTION_ENABLED — enable j17_tier_ineffective RSIC pattern (default: true)
 	J17NLICalibrationWindowSize    int     // J17_NLI_CALIBRATION_WINDOW_SIZE — ring buffer size for NLI/heuristic comparison (default: 500)
-	J17NLICalibrationBiasThreshold float64 // J17_NLI_CALIBRATION_BIAS_THRESHOLD — max acceptable NLI-vs-heuristic mean bias (default: 0.15)
+	J17NLICalibrationBiasThreshold float64 // J17_NLI_CALIBRATION_BIAS_THRESHOLD — max acceptable NLI-vs-heuristic mean bias over the like-for-like (ignored-excluded) window (default: 0.15; DASHBOARD-TRUTH-001)
+	J17NLICalibrationMinSamples    int     // J17_NLI_CALIBRATION_MIN_SAMPLES — min like-for-like samples before the bias alert can fire; below this the window is "insufficient data" (default: 50, 0 disables the floor; DASHBOARD-TRUTH-001)
 
 	// Plugin system settings (V0006)
 	PluginsEnabled  bool   // Feature toggle for plugin system (default: true)
@@ -2906,6 +2907,15 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	// DASHBOARD-TRUTH-001: min-sample floor for the calibration bias alert —
+	// a tiny (e.g. 16-sample, restart-reset) window must not fire the alert.
+	j17NLICalibrationMinSamples, err := atoi("J17_NLI_CALIBRATION_MIN_SAMPLES", 50)
+	if err != nil {
+		return Config{}, err
+	}
+	if j17NLICalibrationMinSamples < 0 {
+		j17NLICalibrationMinSamples = 0
+	}
 
 	// Startup validation: active mode requires sidecar URL
 	if j17SidecarMode == "active" && j17SidecarURL == "" {
@@ -5220,6 +5230,7 @@ func FromEnv() (Config, error) {
 		J17TierDriftDetectionEnabled:   j17TierDriftDetectionEnabled,
 		J17NLICalibrationWindowSize:    j17NLICalibrationWindowSize,
 		J17NLICalibrationBiasThreshold: j17NLICalibrationBiasThreshold,
+		J17NLICalibrationMinSamples:    j17NLICalibrationMinSamples,
 
 		// Dynamic Reclassification
 		ReclassEnabled:       reclassEnabled,

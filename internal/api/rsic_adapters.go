@@ -297,8 +297,12 @@ func (a *rsicProtocolAdapter) GetProtocolStats(ctx context.Context, spaceID stri
 		result.Sidecar = snapshot.Sidecar
 	}
 
-	// NLI calibration: populate from service if available
-	if calibReport := a.svc.GetNLICalibrationReport(); calibReport != nil {
+	// NLI calibration: populate from service if available.
+	// DASHBOARD-TRUTH-001: a window below J17_NLI_CALIBRATION_MIN_SAMPLES is
+	// "insufficient data", not a calibration verdict — leave the zero-value so
+	// the j17_nli_mean_bias gauge emitters and the RSIC drift insight see
+	// no-data rather than a sub-floor phantom bias.
+	if calibReport := a.svc.GetNLICalibrationReport(); calibReport != nil && !calibReport.InsufficientSamples {
 		result.NLIMeanBias = calibReport.MeanBias
 		result.NLIBiasAlert = calibReport.BiasAlert
 	}

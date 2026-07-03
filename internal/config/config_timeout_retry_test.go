@@ -168,6 +168,49 @@ func TestJ17SidecarTimeoutMs_FloorEnforced(t *testing.T) {
 	}
 }
 
+// DASHBOARD-TRUTH-001: min-sample floor for the NLI calibration bias alert.
+func TestJ17NLICalibrationMinSamples_Default(t *testing.T) {
+	setMinimalEnv(t)
+	clearLLMEnv(t)
+	t.Setenv("J17_NLI_CALIBRATION_MIN_SAMPLES", "")
+
+	cfg, err := FromEnv()
+	if err != nil {
+		t.Fatalf("FromEnv() error: %v", err)
+	}
+	if cfg.J17NLICalibrationMinSamples != 50 {
+		t.Errorf("J17NLICalibrationMinSamples = %d, want 50", cfg.J17NLICalibrationMinSamples)
+	}
+}
+
+func TestJ17NLICalibrationMinSamples_EnvOverride(t *testing.T) {
+	setMinimalEnv(t)
+	clearLLMEnv(t)
+	t.Setenv("J17_NLI_CALIBRATION_MIN_SAMPLES", "100")
+
+	cfg, err := FromEnv()
+	if err != nil {
+		t.Fatalf("FromEnv() error: %v", err)
+	}
+	if cfg.J17NLICalibrationMinSamples != 100 {
+		t.Errorf("J17NLICalibrationMinSamples = %d, want 100", cfg.J17NLICalibrationMinSamples)
+	}
+}
+
+func TestJ17NLICalibrationMinSamples_NegativeClampedToZero(t *testing.T) {
+	setMinimalEnv(t)
+	clearLLMEnv(t)
+	t.Setenv("J17_NLI_CALIBRATION_MIN_SAMPLES", "-5")
+
+	cfg, err := FromEnv()
+	if err != nil {
+		t.Fatalf("FromEnv() error: %v", err)
+	}
+	if cfg.J17NLICalibrationMinSamples != 0 {
+		t.Errorf("J17NLICalibrationMinSamples = %d, want 0 (negative clamps to disabled)", cfg.J17NLICalibrationMinSamples)
+	}
+}
+
 func TestJ17SidecarTimeoutMs_FloorBoundaryValuesAllowed(t *testing.T) {
 	setMinimalEnv(t)
 	clearLLMEnv(t)
