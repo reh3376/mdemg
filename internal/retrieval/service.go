@@ -1062,9 +1062,16 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 		}
 	}
 
-	// Store in query cache (skip for Jiminy-enabled and temporal requests)
+	// Store in query cache (skip for Jiminy-enabled and temporal requests).
+	// ⚠️ NEVER cache an empty or context-canceled result: a transient 0 (from
+	// load-induced column cancellation, a client timeout, or an upstream hiccup)
+	// would otherwise be cached for the whole TTL and served as a fast 8ms "0
+	// results" on every subsequent identical query — cache poisoning. Genuine
+	// no-match queries also skip the cache (cheap to recompute, and they might
+	// match after new ingestion). Only cache a real, non-empty, uncancelled result.
 	if s.cfg.QueryCacheEnabled && !req.JiminyEnabled &&
-		hints.TemporalIntent.Mode == TemporalModeNone && s.queryCache != nil {
+		hints.TemporalIntent.Mode == TemporalModeNone && s.queryCache != nil &&
+		len(resp.Results) > 0 && ctx.Err() == nil {
 		s.queryCache.Put(cacheReq, scorerVersion, resp)
 		slog.Info("query cache PUT", "space", req.SpaceID, "query", req.QueryText[:min(50, len(req.QueryText))], "cache_size", s.queryCache.Len())
 	}
