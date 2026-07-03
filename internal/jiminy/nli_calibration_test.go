@@ -204,6 +204,16 @@ func TestCalibrationTracker_BelowMinSamples_NoAlert(t *testing.T) {
 	if report.BiasAlert {
 		t.Errorf("bias alert fired below the min-sample floor (window=%d, bias=%f)", report.WindowSize, report.MeanBias)
 	}
+	// Source-level gate: the verdict field itself must be zeroed sub-floor so
+	// consumers copying it verbatim (the gauge emitters) show no-data, not a
+	// sub-floor phantom bias.
+	if report.MeanBias != 0 {
+		t.Errorf("sub-floor MeanBias = %f, want 0 (zeroed at the source)", report.MeanBias)
+	}
+	// The informational window stats stay real.
+	if report.MeanNLI != 1.0 || report.MeanHeuristic != 0.0 {
+		t.Errorf("informational stats gutted: mean_nli=%f mean_heuristic=%f, want 1.0/0.0", report.MeanNLI, report.MeanHeuristic)
+	}
 
 	// Crossing the floor with the same divergence → alert becomes eligible.
 	for range 34 {
@@ -215,6 +225,69 @@ func TestCalibrationTracker_BelowMinSamples_NoAlert(t *testing.T) {
 	}
 	if !report.BiasAlert {
 		t.Errorf("bias alert should fire once the floor is reached (bias=%f)", report.MeanBias)
+	}
+	if report.MeanBias != 1.0 {
+		t.Errorf("at-floor MeanBias = %f, want 1.0 (real verdict once sufficient)", report.MeanBias)
+	}
+}
+
+// DASHBOARD-TRUTH-001 regression (live-smoke after Epic 2): a nil or
+// insufficient report must yield NO alert and NO bias value THROUGH the
+// emitter-facing method — Service.GetNLICalibrationReport is what
+// rsicProtocolAdapter.GetProtocolStats copies verbatim into the
+// ProtocolStatsResult that feeds BOTH j17_nli gauge emitters
+// (ape/live_collectors.go publishProtocolGauges, ape/self_assess.go
+// publishProtocolMetrics) and the ape/self_reflect.go drift insight. The
+// guard must hold at this source, not per-consumer.
+func TestGetNLICalibrationReport_InsufficientWindow_NoVerdict(t *testing.T) {
+	// Floor of 50 (the config default), 16 maximally-divergent samples — the
+	// post-restart-window shape that produced the live false alert.
+	tracker := NewNLICalibrationTracker(500, 0.15, 50)
+	for range 16 {
+		tracker.Track(1.0, 0.0, OutcomeFollowed)
+	}
+
+	// Operational scorer (enabled + sidecar URL) so the report flows through.
+	svc := &Service{
+		calibrationTracker: tracker,
+		nliScorer:          &NLIComprehensionScorer{enabled: true, sidecarURL: "http://127.0.0.1:8101"},
+	}
+
+	rep := svc.GetNLICalibrationReport()
+	if rep == nil {
+		t.Fatalf("operational scorer → want a report, got nil")
+	}
+	if !rep.InsufficientSamples {
+		t.Errorf("16 < floor 50 → want InsufficientSamples=true")
+	}
+	if rep.BiasAlert {
+		t.Errorf("emitter-facing BiasAlert = true on an insufficient window (bias=%f)", rep.MeanBias)
+	}
+	if rep.MeanBias != 0 {
+		t.Errorf("emitter-facing MeanBias = %f on an insufficient window, want 0", rep.MeanBias)
+	}
+
+	// Empty window (fresh restart) → same no-verdict contract.
+	svc.calibrationTracker = NewNLICalibrationTracker(500, 0.15, 50)
+	rep = svc.GetNLICalibrationReport()
+	if rep == nil {
+		t.Fatalf("empty window → want an insufficient report, got nil")
+	}
+	if !rep.InsufficientSamples || rep.BiasAlert || rep.MeanBias != 0 {
+		t.Errorf("empty window: insufficient=%v alert=%v bias=%f, want true/false/0",
+			rep.InsufficientSamples, rep.BiasAlert, rep.MeanBias)
+	}
+
+	// Anti-over-correction: a genuine ≥floor ignored-excluded divergence must
+	// still surface the real verdict through the same method.
+	full := NewNLICalibrationTracker(500, 0.15, 50)
+	for range 50 {
+		full.Track(1.0, 0.0, OutcomeFollowed)
+	}
+	svc.calibrationTracker = full
+	rep = svc.GetNLICalibrationReport()
+	if rep == nil || rep.InsufficientSamples || !rep.BiasAlert || rep.MeanBias != 1.0 {
+		t.Errorf("genuine divergence at floor: want alert=true bias=1.0, got %+v", rep)
 	}
 }
 

@@ -45,9 +45,10 @@ type NLICalibrationReport struct {
 	WindowSize    int     `json:"window_size"`
 	BiasAlert     bool    `json:"bias_alert"`
 	// DASHBOARD-TRUTH-001: min-sample floor. When the like-for-like window holds
-	// fewer than MinSamples entries the report is "insufficient data" — BiasAlert
-	// is forced false and consumers (gauge emitters, the RSIC drift insight) must
-	// NOT treat the means as a calibration verdict. Prevents a 16-sample window
+	// fewer than MinSamples entries the report is "insufficient data" — the
+	// verdict fields are zeroed AT THE SOURCE (BiasAlert forced false, MeanBias
+	// forced 0), so consumers (gauge emitters, the RSIC drift insight) see
+	// no-data without needing their own guard. Prevents a 16-sample window
 	// that resets on every restart from firing a bias alarm.
 	InsufficientSamples bool `json:"insufficient_samples"`
 	MinSamples          int  `json:"min_samples"`
@@ -96,9 +97,20 @@ func (t *NLICalibrationTracker) Track(nliScore, heuristicScore float64, outcome 
 }
 
 // Report computes calibration statistics over the current window.
-// Below the min-sample floor the means are still computed (informational) but
-// BiasAlert is forced false and InsufficientSamples is set — sub-floor windows
-// are "insufficient data", not a calibration verdict.
+//
+// DASHBOARD-TRUTH-001 (source-level gate): below the min-sample floor the
+// window is "insufficient data", not a calibration verdict — the VERDICT
+// fields (MeanBias, BiasAlert) are zeroed HERE, at the single chokepoint
+// every consumer reads through (Service.GetNLICalibrationReport →
+// rsicProtocolAdapter → both j17_nli gauge emitters (ape/live_collectors.go,
+// ape/self_assess.go) AND the RSIC calibration-drift insight
+// (ape/self_reflect.go), plus the j17 status handler). No consumer needs its
+// own InsufficientSamples guard. The window STATS (MeanNLI, MeanHeuristic,
+// StdDevNLI, WindowSize) stay informational; InsufficientSamples marks why
+// the verdict fields are zero. A genuine ≥minSamples ignored-excluded
+// divergence still reports the real MeanBias and alerts (threshold is
+// J17_NLI_CALIBRATION_BIAS_THRESHOLD; floor is
+// J17_NLI_CALIBRATION_MIN_SAMPLES, 0 disables — both config-driven).
 func (t *NLICalibrationTracker) Report() *NLICalibrationReport {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -131,10 +143,18 @@ func (t *NLICalibrationTracker) Report() *NLICalibrationReport {
 
 	insufficient := t.count < t.minSamples
 
+	// Sub-floor windows must not surface a bias VERDICT anywhere: zero
+	// MeanBias so a consumer that copies it verbatim (the gauge emitters)
+	// shows no-data, not a sub-floor phantom bias.
+	reportedBias := meanBias
+	if insufficient {
+		reportedBias = 0
+	}
+
 	return &NLICalibrationReport{
 		MeanNLI:             meanNLI,
 		MeanHeuristic:       meanHeuristic,
-		MeanBias:            meanBias,
+		MeanBias:            reportedBias,
 		StdDevNLI:           stdDevNLI,
 		WindowSize:          t.count,
 		InsufficientSamples: insufficient,

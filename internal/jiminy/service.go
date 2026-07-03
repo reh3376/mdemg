@@ -2537,6 +2537,12 @@ func (s *Service) BuildTierEffectivenessDataset() *TierEffectivenessDataset {
 }
 
 // GetNLICalibrationReport returns the NLI calibration report, or nil if calibration tracking is not active.
+//
+// DASHBOARD-TRUTH-001: this is the single emitter-facing source of the NLI
+// bias verdict. Consumers may copy MeanBias/BiasAlert verbatim: a nil return
+// means no-data (tracker absent or scorer not operational), and a non-nil
+// report is verdict-safe by construction — the tracker's Report() zeroes
+// MeanBias and forces BiasAlert=false below J17_NLI_CALIBRATION_MIN_SAMPLES.
 func (s *Service) GetNLICalibrationReport() *NLICalibrationReport {
 	if s.calibrationTracker == nil {
 		return nil
