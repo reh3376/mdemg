@@ -17,6 +17,11 @@ type TrustSnapshot struct {
 	LastUpdate    time.Time `json:"last_update"`
 	FeedbackCount int       `json:"feedback_count"`
 	LastFeedAt    time.Time `json:"last_feed_at"`
+
+	// NodeUpdatedAt is the Neo4j node's own updated_at property — a hydration
+	// fallback for older rows whose JSON snapshot lacks a usable timestamp.
+	// Populated by LoadAll only; never serialized into the data payload.
+	NodeUpdatedAt time.Time `json:"-"`
 }
 
 // TrustStore provides write-behind persistence for J17 trust state using Neo4j.
@@ -121,7 +126,7 @@ func (ts *TrustStore) LoadAll(ctx context.Context) (map[string]*TrustSnapshot, e
 	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 		res, err := tx.Run(ctx, `
 			MATCH (s:MemoryNode:J17TrustState)
-			RETURN s.session_id AS session_id, s.data AS data
+			RETURN s.session_id AS session_id, s.data AS data, s.updated_at AS updated_at
 		`, nil)
 		if err != nil {
 			return nil, err
@@ -132,6 +137,7 @@ func (ts *TrustStore) LoadAll(ctx context.Context) (map[string]*TrustSnapshot, e
 			record := res.Record()
 			sessionID, _ := record.Get("session_id")
 			dataStr, _ := record.Get("data")
+			updatedAt, _ := record.Get("updated_at")
 
 			sid, ok := sessionID.(string)
 			if !ok || sid == "" {
@@ -146,6 +152,9 @@ func (ts *TrustStore) LoadAll(ctx context.Context) (map[string]*TrustSnapshot, e
 			if err := json.Unmarshal([]byte(ds), &snap); err != nil {
 				slog.Warn("j17: failed to unmarshal trust snapshot", "session_id", sid, "error", err)
 				continue
+			}
+			if t, ok := updatedAt.(time.Time); ok {
+				snap.NodeUpdatedAt = t
 			}
 			snapshots[sid] = &snap
 		}

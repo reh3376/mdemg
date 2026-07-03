@@ -382,6 +382,14 @@ func (s *Service) StartTrustPersistence(ctx context.Context) {
 				if err := s.FlushEscalation(context.Background()); err != nil {
 					slog.Warn("j12: escalation persistence flush failed", "error", err)
 				}
+				// DASHBOARD-TRUTH-001 Epic 4: actually run the TTL cleanup.
+				// CleanupExpired previously had no production caller, so even
+				// legitimately-expired entries lingered in memory forever.
+				if s.trustScorer != nil {
+					if removed := s.trustScorer.CleanupExpired(); removed > 0 {
+						slog.Debug("j17: expired trust sessions removed", "count", removed)
+					}
+				}
 			}
 		}
 	}()
@@ -407,11 +415,19 @@ func (s *Service) FlushTrust(ctx context.Context) error {
 
 	snapshots := make([]TrustSnapshot, 0, len(dirtyIDs))
 	for _, sessionID := range dirtyIDs {
-		score := s.trustScorer.GetScore(sessionID)
+		// DASHBOARD-TRUTH-001 Epic 4: persist the entry's REAL LastUpdate, not
+		// flush time — the stored last_update is the TTL provenance that lets
+		// the cleaner decide "has this session gone silent" across restarts.
+		score, lastUpdate, ok := s.trustScorer.GetEntry(sessionID)
+		if !ok {
+			// Entry expired + cleaned between dirty-mark and flush; nothing
+			// meaningful to persist (writing now() would resurrect it).
+			continue
+		}
 		snap := TrustSnapshot{
 			SessionID:  sessionID,
 			Score:      score,
-			LastUpdate: time.Now(),
+			LastUpdate: lastUpdate,
 		}
 
 		// Include feedback counts
@@ -439,24 +455,70 @@ func (s *Service) HydrateTrust(ctx context.Context) error {
 		return err
 	}
 
-	hydrated := 0
+	hydrated, expired := s.hydrateTrustSnapshots(snapshots)
+
+	if hydrated > 0 {
+		slog.Info("j17: trust + feedback state hydrated from Neo4j",
+			"sessions", hydrated, "expired_dropped", expired)
+	}
+	return nil
+}
+
+// hydrateTrustSnapshots applies loaded snapshots to the in-memory trust +
+// feedback state. Extracted from HydrateTrust so the provenance behavior is
+// unit-testable without a Neo4j driver.
+func (s *Service) hydrateTrustSnapshots(snapshots map[string]*TrustSnapshot) (hydrated, expired int) {
 	for sessionID, snap := range snapshots {
-		s.trustScorer.SetScore(sessionID, snap.Score)
-		if snap.FeedbackCount > 0 {
-			s.feedbackMu.Lock()
-			s.feedbackCounts[sessionID] = &sessionFeedback{
-				Count:      snap.FeedbackCount,
-				LastFeedAt: snap.LastFeedAt,
-			}
-			s.feedbackMu.Unlock()
-		}
+		// DASHBOARD-TRUTH-001 Epic 4: restore the persisted timestamp verbatim
+		// (RestoreEntry), never SetScore — SetScore stamps boot-time, which made
+		// every stale session look active forever (the 168h TTL keyed on
+		// LastUpdate could never fire) AND marked it dirty, so the next flush
+		// rewrote the stored last_update with now(), rotting provenance each boot.
+		s.trustScorer.RestoreEntry(sessionID, snap.Score, effectiveHydrationTimestamp(snap))
 		hydrated++
 	}
 
-	if hydrated > 0 {
-		slog.Info("j17: trust + feedback state hydrated from Neo4j", "sessions", hydrated)
+	// The preserved timestamps make stale sessions immediately TTL-eligible:
+	// drop them now so they never pollute the in-memory map or trust gauges.
+	expired = s.trustScorer.CleanupExpired()
+
+	// Restore feedback counts only for sessions that survived the TTL sweep.
+	for sessionID, snap := range snapshots {
+		if snap.FeedbackCount <= 0 {
+			continue
+		}
+		if _, _, ok := s.trustScorer.GetEntry(sessionID); !ok {
+			continue
+		}
+		s.feedbackMu.Lock()
+		s.feedbackCounts[sessionID] = &sessionFeedback{
+			Count:      snap.FeedbackCount,
+			LastFeedAt: snap.LastFeedAt,
+		}
+		s.feedbackMu.Unlock()
 	}
-	return nil
+
+	return hydrated, expired
+}
+
+// effectiveHydrationTimestamp picks the TTL provenance timestamp for a
+// hydrated trust entry. The cleaner's question is "has this session gone
+// silent" — last_feed_at answers it directly (it is only ever written on real
+// feedback), so it is preferred over last_update: historically last_update was
+// boot-stamped on every restart (live: all 116 persisted rows carried the same
+// boot instant while last_feed_at preserved the real March–June activity
+// times), making it untrustworthy for existing rows. Fallback chain:
+// last_feed_at → last_update → the node's own updated_at → zero. NEVER now():
+// a zero result means "no provenance", which correctly reads as expired.
+func effectiveHydrationTimestamp(snap *TrustSnapshot) time.Time {
+	switch {
+	case !snap.LastFeedAt.IsZero():
+		return snap.LastFeedAt
+	case !snap.LastUpdate.IsZero():
+		return snap.LastUpdate
+	default:
+		return snap.NodeUpdatedAt
+	}
 }
 
 // FlushEscalation writes all dirty escalation state to Neo4j.
@@ -2361,7 +2423,25 @@ func (s *Service) GetProtocolMetricsSnapshot() *ProtocolMetrics {
 	}
 	snap := s.protocolMetrics.Snapshot()
 	if s.trustScorer != nil {
-		avg, min, max, count := s.trustScorer.Aggregates()
+		// DASHBOARD-TRUTH-001 Epic 4: the min/avg/max/count trust gauges
+		// reflect only SIGNIFICANT LIVE sessions — within TTL of their last
+		// trust update (enforced inside AggregatesFiltered) AND with at least
+		// J17_TRUST_MIN_FEEDBACK_COUNT recorded feedback events. One-shot test
+		// sessions and long-silent sessions no longer drag the min/count.
+		// A knob value ≤ 0 disables the feedback floor (recency-only).
+		var significant func(sessionID string) bool
+		if minFeed := s.cfg.J17TrustMinFeedbackCount; minFeed > 0 {
+			s.feedbackMu.RLock()
+			sig := make(map[string]bool, len(s.feedbackCounts))
+			for sid, sf := range s.feedbackCounts {
+				if sf != nil && sf.Count >= minFeed {
+					sig[sid] = true
+				}
+			}
+			s.feedbackMu.RUnlock()
+			significant = func(sessionID string) bool { return sig[sessionID] }
+		}
+		avg, min, max, count := s.trustScorer.AggregatesFiltered(significant)
 		snap.AvgTrustScore = avg
 		snap.MinTrustScore = min
 		snap.MaxTrustScore = max

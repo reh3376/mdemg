@@ -428,7 +428,13 @@ type Config struct {
 	J17TrustDecayPerContradict float64 // J17_TRUST_DECAY_PER_CONTRADICT — trust decrease per contradicted constraint (default: 0.04)
 	J17TrustHighThreshold      float64 // J17_TRUST_HIGH_THRESHOLD — above this → dense encoding (default: 0.75)
 	J17TrustLowThreshold       float64 // J17_TRUST_LOW_THRESHOLD — below this → more explanation (default: 0.35)
-	J17TrustTTLHours           int     // J17_TRUST_TTL_HOURS — trust entry expiry in hours (default: 4)
+	J17TrustTTLHours           int     // J17_TRUST_TTL_HOURS — trust entry expiry in hours (default: 168)
+	// DASHBOARD-TRUTH-001 Epic 4: significance floor for the trust gauges.
+	// A session counts toward mdemg_j17_{min,max,avg}_trust_score and
+	// _trust_session_count only if it is within the TTL of its last trust
+	// update AND has ≥ this many recorded feedback events. ≤0 disables the
+	// feedback floor (recency-only filtering).
+	J17TrustMinFeedbackCount int // J17_TRUST_MIN_FEEDBACK_COUNT — min feedback events for gauge significance (default: 5)
 	// JIMINY-EFFECTIVENESS-001: trust update rule. "ema" tracks recent
 	// effectiveness and RECOVERS (the J17-T1 unblocker); "ratchet" is the legacy
 	// monotonic boost/decay that floors permanently.
@@ -2789,6 +2795,10 @@ func FromEnv() (Config, error) {
 		return Config{}, err
 	}
 	j17TrustTTLHours, err := atoi("J17_TRUST_TTL_HOURS", 168)
+	if err != nil {
+		return Config{}, err
+	}
+	j17TrustMinFeedbackCount, err := atoi("J17_TRUST_MIN_FEEDBACK_COUNT", 5)
 	if err != nil {
 		return Config{}, err
 	}
@@ -5212,6 +5222,7 @@ func FromEnv() (Config, error) {
 		J17TrustHighThreshold:          j17TrustHighThreshold,
 		J17TrustLowThreshold:           j17TrustLowThreshold,
 		J17TrustTTLHours:               j17TrustTTLHours,
+		J17TrustMinFeedbackCount:       j17TrustMinFeedbackCount,
 		J17TrustMode:                   j17TrustMode,
 		J17TrustEMAAlpha:               j17TrustEMAAlpha,
 		J17BootstrapCodification:       j17BootstrapCodification,
