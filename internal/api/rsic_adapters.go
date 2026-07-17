@@ -392,23 +392,26 @@ func (a *jiminyRetrievalAdapter) RetrieveForJiminy(ctx context.Context, spaceID,
 	if err != nil {
 		return nil, err
 	}
+	return mapRetrieveResultsToJiminyResults(resp.Results), nil
+}
 
-	results := make([]jiminy.RetrievalResult, 0, len(resp.Results))
-	for _, r := range resp.Results {
-		results = append(results, jiminy.RetrievalResult{
+// mapRetrieveResultsToJiminyResults copies models.RetrieveResult rows to the
+// simpler jiminy.RetrievalResult shape. Extracted for testability — pins the
+// role_type / obs_type propagation that JIMINY-ROLETYPE-ADAPTER-001 restores.
+func mapRetrieveResultsToJiminyResults(in []models.RetrieveResult) []jiminy.RetrievalResult {
+	out := make([]jiminy.RetrievalResult, 0, len(in))
+	for _, r := range in {
+		out = append(out, jiminy.RetrievalResult{
 			NodeID:   r.NodeID,
 			Name:     r.Name,
 			Summary:  r.Summary,
 			Layer:    r.Layer,
 			Score:    r.Score,
-			// JIMINY-ROLETYPE-ADAPTER-001: role_type + obs_type feed
-			// classifyRetrievalItem — dropping them here mis-typed 100% of
-			// retrieval-sourced guidance as GuidanceLearning.
 			RoleType: r.RoleType,
 			ObsType:  r.ObsType,
 		})
 	}
-	return results, nil
+	return out
 }
 
 // rsicFreshnessAdapter adapts retrieval.Service to ape.FreshnessProvider (Phase 47.2).
