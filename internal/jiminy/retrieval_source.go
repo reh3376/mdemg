@@ -76,8 +76,24 @@ func mapRetrievalToGuidance(results []RetrievalResult, sigmoidMidpoint, sigmoidS
 	return items
 }
 
-// classifyRetrievalItem maps a RetrievalResult to a GuidanceType based on obs_type and layer.
+// classifyRetrievalItem maps a RetrievalResult to a GuidanceType based on
+// role_type first, then obs_type + layer. role_type precedence closes the
+// JIMINY-CORPUS-001 disclosed follow-up: before JIMINY-ROLETYPE-ADAPTER-001
+// the adapter dropped role_type and every retrieval-sourced constraint node
+// defaulted to GuidanceLearning (see docs/features/jiminy-actionability.md
+// §Follow-up).
 func classifyRetrievalItem(r RetrievalResult) GuidanceType {
+	// Precedence: an explicit role_type on the node beats layer + obs_type
+	// heuristic. Constraint / correction MemoryNodes are Layer 1 in mdemg-dev,
+	// so without this prefix they hit the ObsType switch (empty for role-based
+	// nodes) → default GuidanceLearning.
+	switch r.RoleType {
+	case "constraint":
+		return GuidanceConstraint
+	case "correction":
+		return GuidanceCorrection
+	}
+
 	// Higher-layer nodes are concepts
 	if r.Layer >= 2 {
 		return GuidanceConcept
