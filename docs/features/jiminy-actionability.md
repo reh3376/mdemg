@@ -39,7 +39,7 @@ Levers off vs on, same 6 contexts against mdemg-dev (`docs/development/jiminy-ac
 
 ## Lever C — constraint-inclusion (Epic 5; the lever that works)
 
-Lever C addresses the Epic-4 finding directly: when `JIMINY_GUIDANCE_CONSTRAINT_BIAS_ENABLED=true`, `Guide()` runs a targeted query (`fetchActionableCandidates`) for the top-K `constraint`/`correction` nodes by **embedding cosine similarity** to the context (`vector.similarity.cosine` over the role-filtered set — *not* the RRF score; RRF-SCALE-001-safe) and merges them (dedup by node_id) into the candidate pool. The merged nodes are already correctly typed (the query filters role_type), sidestepping a discovered classification gap: the retrieval adapter drops role_type, so retrieval-sourced items were *all* mis-typed `learning`.
+Lever C addresses the Epic-4 finding directly: when `JIMINY_GUIDANCE_CONSTRAINT_BIAS_ENABLED=true`, `Guide()` runs a targeted query (`fetchActionableCandidates`) for the top-K `constraint`/`correction` nodes by **embedding cosine similarity** to the context (`vector.similarity.cosine` over the role-filtered set — *not* the RRF score; RRF-SCALE-001-safe) and merges them (dedup by node_id) into the candidate pool. The merged nodes are already correctly typed (the query filters role_type). The disclosed "adapter drops role_type" classification gap is **closed by JIMINY-ROLETYPE-ADAPTER-001** (2026-07-17); Lever C's role-filtered fetch and the general retrieval path now BOTH yield correctly-typed items.
 
 **Config:** `JIMINY_GUIDANCE_CONSTRAINT_BIAS_ENABLED` (false), `JIMINY_GUIDANCE_CONSTRAINT_INCLUDE_TOPK` (5), `JIMINY_GUIDANCE_CONSTRAINT_SIM_FLOOR` (0.30 cosine — raise for tighter relevance).
 
@@ -57,3 +57,7 @@ Enabling Lever C exposed that the `role_type='constraint'` partition it surfaces
 - **Lever B enabled** (`JIMINY_DIRECTIVE_SYNTHESIS_ENABLED`) + exposed in compose + the UI config tab.
 
 Follow-rate lift is forward-looking (baseline 0.165; re-measure ~1 week out). See `docs/development/jiminy-corpus-001/`.
+
+
+## Follow-up — role_type adapter gap closed (JIMINY-ROLETYPE-ADAPTER-001, 2026-07-17)
+The disclosed follow-up ("retrieval adapter drops role_type → retrieval-sourced items typed `learning`") is **shipped and live-verified**. Additive `RoleType`/`ObsType` fields flow from Neo4j `role_type`/`obs_type` through `retrieval.Candidate` → `models.RetrieveResult` → `jiminy.RetrievalResult`; `classifyRetrievalItem` prefers `role_type` before the Layer≥2 concept short-circuit and the `ObsType` switch. Live smoke on `mdemg-dev`: the L1 UxTS constraint node surfaced with `role_type='constraint'`, Jiminy `latest` returned **4/5 items typed `constraint`** (all 5 would have been `learning` pre-fix), and `constraint_outcomes` now carries `guidance_type='constraint'` rows with matched `constraint_code`. The BM25 sink also picked up `role_type` at source (BM25 runs its own Cypher, not a virtual view over `cands`), and the reasoning-module rerank preserves ontology labels through the proto boundary via the existing `originalByID` restore hook. See `docs/development/jiminy-roletype-adapter-001/`.
