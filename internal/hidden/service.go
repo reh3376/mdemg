@@ -314,6 +314,7 @@ func (s *Service) buildPipeline() *Pipeline {
 	p.Register(&temporalStep{svc: s})         // phase 20
 	p.Register(&uiStep{svc: s})               // phase 20
 	p.Register(&constraintStep{svc: s})       // phase 20
+	p.Register(&correctionStep{svc: s})       // phase 20 — JIMINY-CORRECTION-PRODUCER-001
 	p.Register(&dynamicEmergenceStep{svc: s}) // phase 22 — LLM-driven concept naming (Phase 103)
 	p.Register(&dynamicEdgesStep{svc: s})     // phase 25 — dynamic edges (after clustering)
 	p.Register(&clusterSummaryStep{svc: s})   // phase 28 — LLM summary enhancement (L1-L4)
