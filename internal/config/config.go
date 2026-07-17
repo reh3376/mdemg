@@ -803,6 +803,14 @@ type Config struct {
 	ConstraintPromotionGateEnabled    bool     // CONSTRAINT_PROMOTION_GATE_ENABLED — enable the promotion gate (default: true)
 	ConstraintPromotionDenyObsTypes   []string // CONSTRAINT_PROMOTION_DENY_OBS_TYPES — comma-separated obs_types that are NEVER promoted (transient provenance; default: "progress,error,task,context")
 	ConstraintPromotionRejectPatterns []string // CONSTRAINT_PROMOTION_REJECT_PATTERNS — JSON array of Go regexes; observation content matching ANY is never promoted (default: built-in junk-class set; "[]" disables the pattern layer)
+
+	// JIMINY-CORRECTION-PRODUCER-001 — L0 obs → correction node promotion gate.
+	// The predicate itself already filters by obs_type='correction' (unlike the
+	// constraint side where tag-based promotion needs a provenance deny-set), so
+	// this gate is a defensive backstop against pathological content shapes only.
+	CorrectionPromotionEnabled        bool     // CORRECTION_PROMOTION_ENABLED — enable the promotion gate (default: true)
+	CorrectionPromotionMinContentLen  int      // CORRECTION_PROMOTION_MIN_CONTENT_LEN — reject obs shorter than this (default: 20)
+	CorrectionPromotionRejectPatterns []string // CORRECTION_PROMOTION_REJECT_PATTERNS — JSON array of Go regexes; observation content matching ANY is never promoted (default: same junk-class set as the constraint gate)
 	// COOLER-001 — decay-rate multiplier for CO_ACTIVATED_WITH edges incident
 	// to a GRADUATED (volatile=false) node: this is what "graduated" means to
 	// retrieval — stable memory's associations resist time decay. 1.0 = no
@@ -3836,6 +3844,26 @@ func FromEnv() (Config, error) {
 		}
 	}
 
+	// JIMINY-CORRECTION-PRODUCER-001: L0 obs → correction promotion gate.
+	correctionPromotionEnabled := getBool("CORRECTION_PROMOTION_ENABLED", true)
+	correctionPromotionMinContentLen, err := atoi("CORRECTION_PROMOTION_MIN_CONTENT_LEN", 20)
+	if err != nil {
+		return Config{}, err
+	}
+	correctionPromotionRejectPatterns := DefaultConstraintPromotionRejectPatterns() // reuse the same junk-class defaults
+	if raw := strings.TrimSpace(os.Getenv("CORRECTION_PROMOTION_REJECT_PATTERNS")); raw != "" {
+		var parsed []string
+		if err := json.Unmarshal([]byte(raw), &parsed); err != nil {
+			return Config{}, fmt.Errorf("CORRECTION_PROMOTION_REJECT_PATTERNS must be a valid JSON string array: %w", err)
+		}
+		correctionPromotionRejectPatterns = parsed
+	}
+	for _, p := range correctionPromotionRejectPatterns {
+		if _, err := regexp.Compile(p); err != nil {
+			return Config{}, fmt.Errorf("CORRECTION_PROMOTION_REJECT_PATTERNS: invalid regexp %q: %w", p, err)
+		}
+	}
+
 	graduatedDecayProtectionFactor, err := atof("GRADUATED_DECAY_PROTECTION_FACTOR", 0.5)
 	if err != nil {
 		return Config{}, err
@@ -5650,6 +5678,9 @@ func FromEnv() (Config, error) {
 		ConstraintPromotionGateEnabled:    constraintPromotionGateEnabled,
 		ConstraintPromotionDenyObsTypes:   constraintPromotionDenyObsTypes,
 		ConstraintPromotionRejectPatterns: constraintPromotionRejectPatterns,
+		CorrectionPromotionEnabled:        correctionPromotionEnabled,
+		CorrectionPromotionMinContentLen:  correctionPromotionMinContentLen,
+		CorrectionPromotionRejectPatterns: correctionPromotionRejectPatterns,
 
 		GraduatedDecayProtectionFactor: graduatedDecayProtectionFactor,
 
