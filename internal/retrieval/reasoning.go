@@ -140,9 +140,13 @@ func (p *PluginReasoningProvider) Process(ctx context.Context, req ReasoningRequ
 			VectorSim:  float64(r.VectorSim),
 			Activation: float64(r.Activation),
 		}
-		// Restore fields not carried through proto
+		// Restore fields not carried through proto — JIMINY-ROLETYPE-ADAPTER-001
+		// added RoleType + ObsType to the restore set so reasoning-module reranks
+		// (e.g. keyword-booster) do not silently clobber the ontology labels.
 		if orig, ok := originalByID[r.NodeId]; ok {
 			results[i].Layer = orig.Layer
+			results[i].RoleType = orig.RoleType
+			results[i].ObsType = orig.ObsType
 		}
 	}
 

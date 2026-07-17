@@ -145,6 +145,8 @@ func (s *Service) ScoreAndRankRRF(
 			Path:       c.Path,
 			Name:       c.Name,
 			Summary:    c.Summary,
+			RoleType:   c.RoleType,
+			ObsType:    c.ObsType,
 			Layer:      c.Layer,
 			Score:      c.RRFScore, // RRF score becomes the ranking signal
 			VectorSim:  c.VectorSim,

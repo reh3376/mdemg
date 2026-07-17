@@ -15,9 +15,10 @@ import (
 
 // ConstraintNodeResult tracks what happened during constraint node creation.
 type ConstraintNodeResult struct {
-	Created int `json:"created"`
-	Updated int `json:"updated"`
-	Linked  int `json:"linked"`
+	Created  int `json:"created"`
+	Updated  int `json:"updated"`
+	Linked   int `json:"linked"`
+	Rejected int `json:"rejected"` // JIMINY-CORPUS-001: observations blocked by the promotion gate
 }
 
 // CreateConstraintNodes promotes constraint-tagged observations to first-class
@@ -38,6 +39,7 @@ func (s *Service) CreateConstraintNodes(ctx context.Context, spaceID string) (*C
 			RETURN obs.node_id AS nodeId,
 			       obs.name AS name,
 			       obs.content AS content,
+			       obs.obs_type AS obsType,
 			       obs.tags AS tags,
 			       obs.embedding AS embedding,
 			       obs.structured_data AS structuredData,
@@ -53,6 +55,7 @@ func (s *Service) CreateConstraintNodes(ctx context.Context, spaceID string) (*C
 			nodeID              string
 			name                string
 			content             string
+			obsType             string // observation provenance (JIMINY-CORPUS-001 gate input)
 			constraintCode      string // J17 constraint code from observation
 			tags                []string
 			embedding           []float64
@@ -78,6 +81,11 @@ func (s *Service) CreateConstraintNodes(ctx context.Context, spaceID string) (*C
 			}
 			if content != nil {
 				obs.content = fmt.Sprintf("%v", content)
+			}
+			if obsTypeRaw, _ := rec.Get("obsType"); obsTypeRaw != nil {
+				if ot, ok := obsTypeRaw.(string); ok {
+					obs.obsType = ot
+				}
 			}
 
 			// Extract tags
@@ -142,6 +150,18 @@ func (s *Service) CreateConstraintNodes(ctx context.Context, spaceID string) (*C
 
 		// Step 2: Group by constraint type, then create/update constraint nodes
 		for _, obs := range observations {
+			// JIMINY-CORPUS-001: promotion gate. Rejected observations are
+			// skipped entirely (no create, no reinforcement of an existing
+			// node, no IMPLEMENTS_CONSTRAINT link) so transient/status junk
+			// never becomes — or strengthens — a constraint node. Per-node
+			// at Debug (rejected observations are re-scanned every cycle);
+			// one Info summary below keeps it observable without spam.
+			if reason, rejected := s.constraintGate.Reject(obs.obsType, obs.content); rejected {
+				res.Rejected++
+				slog.Debug("constraint promotion gate: rejected observation",
+					"obs_id", obs.nodeID, "obs_type", obs.obsType, "reason", reason)
+				continue
+			}
 			for _, cType := range obs.cTypes {
 				// Extract constraint name
 				cName := obs.name
@@ -300,6 +320,11 @@ func (s *Service) CreateConstraintNodes(ctx context.Context, spaceID string) (*C
 				}
 				res.Linked++
 			}
+		}
+
+		if res.Rejected > 0 {
+			slog.Info("constraint promotion gate: rejected non-constraint observations",
+				"space_id", spaceID, "rejected", res.Rejected, "promoted", res.Created+res.Updated)
 		}
 
 		return res, nil

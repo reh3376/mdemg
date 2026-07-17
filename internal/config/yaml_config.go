@@ -77,9 +77,9 @@ type RetrievalYAML struct {
 
 // LearningYAML holds Hebbian learning settings.
 type LearningYAML struct {
-	Eta           float64 `yaml:"eta,omitempty"`
-	DecayPerDay   float64 `yaml:"decay_per_day,omitempty"`
-	MaxEdgesPerNode int   `yaml:"max_edges_per_node,omitempty"`
+	Eta             float64 `yaml:"eta,omitempty"`
+	DecayPerDay     float64 `yaml:"decay_per_day,omitempty"`
+	MaxEdgesPerNode int     `yaml:"max_edges_per_node,omitempty"`
 }
 
 // PluginsYAML holds plugin system settings.
@@ -95,21 +95,21 @@ type SchemaYAML struct {
 
 // JiminyYAML holds Jiminy inner-voice guidance settings.
 type JiminyYAML struct {
-	Enabled             *bool  `yaml:"enabled,omitempty"`               // Enable Jiminy guidance (default: true; nil = defer to env/default)
-	SynthesisEnabled    bool   `yaml:"synthesis_enabled,omitempty"`     // Enable LLM synthesis (default: true)
-	SynthesisProvider   string `yaml:"synthesis_provider,omitempty"`    // LLM provider for synthesis (inherits llm.provider)
-	SynthesisModel      string `yaml:"synthesis_model,omitempty"`       // LLM model for synthesis (inherits llm.model)
-	EvaluateEnabled     bool   `yaml:"evaluate_enabled,omitempty"`      // Enable agent output evaluation (default: true)
-	EvaluateLLMEnabled  bool   `yaml:"evaluate_llm_enabled,omitempty"`  // Enable LLM Tier 2 evaluation (default: false)
-	EvaluateLLMProvider string `yaml:"evaluate_llm_provider,omitempty"` // LLM provider for evaluation (inherits llm.provider)
-	EvaluateLLMModel    string `yaml:"evaluate_llm_model,omitempty"`    // LLM model for evaluation (inherits llm.model)
-	OutcomeLLMEnabled          bool `yaml:"outcome_llm_enabled,omitempty"`            // Enable LLM outcome classification (default: false)
-	GuidanceContextMaxChars    int  `yaml:"guidance_context_max_chars,omitempty"`     // J16: max chars for agent context in guidance (default: 200000)
-	GuidanceOutputMaxChars     int  `yaml:"guidance_output_max_chars,omitempty"`      // J16: max chars for agent output in guidance (default: 200000)
-	EvaluateOutputMaxChars     int  `yaml:"evaluate_output_max_chars,omitempty"`      // J16: max chars for agent output in eval (default: 200000)
-	EvaluateItemMaxChars       int  `yaml:"evaluate_item_max_chars,omitempty"`        // J16: max chars per constraint/correction in eval (default: 0 = unlimited)
-	J17Enabled                 bool `yaml:"j17_enabled,omitempty"`                    // J17: enable AI-to-AI protocol (default: false)
-	J17TicketTTLHours          int  `yaml:"j17_ticket_ttl_hours,omitempty"`           // J17: session ticket TTL in hours (default: 4)
+	Enabled                 *bool  `yaml:"enabled,omitempty"`                    // Enable Jiminy guidance (default: true; nil = defer to env/default)
+	SynthesisEnabled        bool   `yaml:"synthesis_enabled,omitempty"`          // Enable LLM synthesis (default: true)
+	SynthesisProvider       string `yaml:"synthesis_provider,omitempty"`         // LLM provider for synthesis (inherits llm.provider)
+	SynthesisModel          string `yaml:"synthesis_model,omitempty"`            // LLM model for synthesis (inherits llm.model)
+	EvaluateEnabled         bool   `yaml:"evaluate_enabled,omitempty"`           // Enable agent output evaluation (default: true)
+	EvaluateLLMEnabled      bool   `yaml:"evaluate_llm_enabled,omitempty"`       // Enable LLM Tier 2 evaluation (default: false)
+	EvaluateLLMProvider     string `yaml:"evaluate_llm_provider,omitempty"`      // LLM provider for evaluation (inherits llm.provider)
+	EvaluateLLMModel        string `yaml:"evaluate_llm_model,omitempty"`         // LLM model for evaluation (inherits llm.model)
+	OutcomeLLMEnabled       bool   `yaml:"outcome_llm_enabled,omitempty"`        // Enable LLM outcome classification (default: false)
+	GuidanceContextMaxChars int    `yaml:"guidance_context_max_chars,omitempty"` // J16: max chars for agent context in guidance (default: 200000)
+	GuidanceOutputMaxChars  int    `yaml:"guidance_output_max_chars,omitempty"`  // J16: max chars for agent output in guidance (default: 200000)
+	EvaluateOutputMaxChars  int    `yaml:"evaluate_output_max_chars,omitempty"`  // J16: max chars for agent output in eval (default: 200000)
+	EvaluateItemMaxChars    int    `yaml:"evaluate_item_max_chars,omitempty"`    // J16: max chars per constraint/correction in eval (default: 0 = unlimited)
+	J17Enabled              bool   `yaml:"j17_enabled,omitempty"`                // J17: enable AI-to-AI protocol (default: false)
+	J17TicketTTLHours       int    `yaml:"j17_ticket_ttl_hours,omitempty"`       // J17: session ticket TTL in hours (default: 4)
 }
 
 // yamlEnvMapping defines the mapping from YAML dot-path to environment variable.
@@ -165,6 +165,9 @@ var yamlEnvMapping = []struct {
 	{"jiminy.guidance_output_max_chars", "JIMINY_GUIDANCE_OUTPUT_MAX_CHARS", nil},
 	{"jiminy.evaluate_output_max_chars", "JIMINY_EVALUATE_OUTPUT_MAX_CHARS", nil},
 	{"jiminy.evaluate_item_max_chars", "JIMINY_EVALUATE_ITEM_MAX_CHARS", nil},
+	// Jiminy directive synthesis (JIMINY-ACTIONABILITY-001 Lever B; exposed JIMINY-CORPUS-001 E5)
+	{"jiminy.directive_synthesis_enabled", "JIMINY_DIRECTIVE_SYNTHESIS_ENABLED", nil},
+	{"jiminy.directive_synthesis_max_prompt_tokens", "JIMINY_DIRECTIVE_SYNTHESIS_MAX_PROMPT_TOKENS", nil},
 	// J17: AI-to-AI Communication Protocol
 	{"jiminy.j17_enabled", "J17_ENABLED", nil},
 	{"jiminy.j17_ticket_ttl_hours", "J17_TICKET_TTL_HOURS", nil},
@@ -400,7 +403,7 @@ func UpdateNeo4jURI(configPath, uri string) error {
 
 // sensitiveKeys are YAML paths whose values should never be set via the UI.
 var sensitiveKeys = map[string]bool{
-	"neo4j.password":     true,
+	"neo4j.password":       true,
 	"embedding.openai_key": true,
 }
 
@@ -943,9 +946,9 @@ func FindIgnoreFile(startDir string) string {
 
 // IgnorePattern represents a single pattern from .mdemgignore.
 type IgnorePattern struct {
-	Pattern  string // the raw pattern (without leading !)
-	Negated  bool   // true if the line started with !
-	DirOnly  bool   // true if the pattern ends with /
+	Pattern string // the raw pattern (without leading !)
+	Negated bool   // true if the line started with !
+	DirOnly bool   // true if the pattern ends with /
 }
 
 // ParseIgnoreFile reads a .mdemgignore file and returns the parsed patterns.
@@ -1069,20 +1072,23 @@ type ConfigSource struct {
 // defaultValues maps YAML config keys to their built-in defaults so the
 // Config tab can display what the server actually uses when nothing is set.
 var defaultValues = map[string]string{
-	"llm.model":                        "mdemg-llm-v1",
-	"embedding.model":                  "text-embedding-3-large",
-	"embedding.endpoint":               "https://api.openai.com/v1",
-	"learning.eta":                     "0.02",
-	"learning.decay_per_day":           "0.05",
-	"plugins.dir":                      "./plugins",
-	"backup.interval_hours":            "24",
-	"backup.retention_count":           "4",
-	"jiminy.synthesis_model":           "mdemg-llm-v1",
-	"jiminy.evaluate_llm_model":        "mdemg-llm-v1",
+	"llm.model":                         "mdemg-llm-v1",
+	"embedding.model":                   "text-embedding-3-large",
+	"embedding.endpoint":                "https://api.openai.com/v1",
+	"learning.eta":                      "0.02",
+	"learning.decay_per_day":            "0.05",
+	"plugins.dir":                       "./plugins",
+	"backup.interval_hours":             "24",
+	"backup.retention_count":            "4",
+	"jiminy.synthesis_model":            "mdemg-llm-v1",
+	"jiminy.evaluate_llm_model":         "mdemg-llm-v1",
 	"jiminy.guidance_context_max_chars": "200000",
 	"jiminy.guidance_output_max_chars":  "200000",
 	"jiminy.evaluate_output_max_chars":  "200000",
 	"jiminy.evaluate_item_max_chars":    "0",
+	// Jiminy directive synthesis (JIMINY-ACTIONABILITY-001 Lever B; exposed JIMINY-CORPUS-001 E5)
+	"jiminy.directive_synthesis_enabled":           "false",
+	"jiminy.directive_synthesis_max_prompt_tokens": "3500",
 	// Retrieval: typed semantic edges (RETRIEVAL-TYPED-EDGES-001)
 	"retrieval.graph_typed_edges_enabled":     "true",
 	"retrieval.edge_attention_analogous_to":   "0.55",

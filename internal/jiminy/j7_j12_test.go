@@ -51,13 +51,25 @@ func TestClassifyRetrievalItem(t *testing.T) {
 		result   RetrievalResult
 		expected GuidanceType
 	}{
+		// Existing obs_type + layer table (unchanged).
 		{"L3 concept", RetrievalResult{Layer: 3}, GuidanceConcept},
 		{"L5 concept", RetrievalResult{Layer: 5}, GuidanceConcept},
-		{"correction", RetrievalResult{Layer: 0, ObsType: "correction"}, GuidanceCorrection},
-		{"constraint", RetrievalResult{Layer: 0, ObsType: "constraint"}, GuidanceConstraint},
+		{"correction obs", RetrievalResult{Layer: 0, ObsType: "correction"}, GuidanceCorrection},
+		{"constraint obs", RetrievalResult{Layer: 0, ObsType: "constraint"}, GuidanceConstraint},
 		{"error", RetrievalResult{Layer: 0, ObsType: "error"}, GuidanceRisk},
 		{"preference", RetrievalResult{Layer: 0, ObsType: "preference"}, GuidancePreference},
 		{"unknown obs_type", RetrievalResult{Layer: 0, ObsType: "custom"}, GuidanceLearning},
+
+		// JIMINY-ROLETYPE-ADAPTER-001: role_type precedence. Constraint /
+		// correction MemoryNodes are Layer 1 in mdemg-dev, so without this
+		// prefix they defaulted to GuidanceLearning.
+		{"L1 role=constraint", RetrievalResult{Layer: 1, RoleType: "constraint"}, GuidanceConstraint},
+		{"L1 role=correction", RetrievalResult{Layer: 1, RoleType: "correction"}, GuidanceCorrection},
+		{"role beats obs (constraint vs learning)", RetrievalResult{Layer: 1, RoleType: "constraint", ObsType: "learning"}, GuidanceConstraint},
+		{"role beats L>=2 concept short-circuit", RetrievalResult{Layer: 2, RoleType: "constraint"}, GuidanceConstraint},
+		{"L0 default preserved", RetrievalResult{Layer: 0}, GuidanceLearning},
+		{"L1 obs=learning still learning when no role", RetrievalResult{Layer: 1, ObsType: "learning"}, GuidanceLearning},
+		{"unknown role_type ignored (falls through)", RetrievalResult{Layer: 0, RoleType: "banana"}, GuidanceLearning},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

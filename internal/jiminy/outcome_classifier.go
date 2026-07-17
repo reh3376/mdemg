@@ -77,7 +77,8 @@ type OutcomeClassifier struct {
 	llmProvider     string  // provider name for conditional behavior (e.g., "ollama" vs "openai")
 	compressPrompts bool    // J17-PC: compress classification prompts
 	highThreshold   float64 // above this similarity = followed (default: 0.7)
-	lowThreshold    float64 // below this similarity = not_applicable (default: 0.2)
+	lowThreshold    float64 // below this similarity = sub-LOW band (ignored / not_applicable, see naThreshold) (default: 0.2)
+	naThreshold     float64 // JIMINY-CORPUS-001 Epic 4 relevance gate: below this = not_applicable; [this, low) = ignored. ≤0 disables (whole sub-LOW tail is not_applicable)
 	maxTokens       int     // J14: max tokens for LLM classification
 
 	// G8: circuit breaker for LLM calls
@@ -92,16 +93,17 @@ type OutcomeClassifier struct {
 
 // OutcomeClassifierConfig configures the semantic outcome classifier.
 type OutcomeClassifierConfig struct {
-	LLMEnabled      bool
-	LLMProvider     string
-	LLMModel        string
-	LLMAPIKey       string
-	LLMBaseURL      string
-	HighThreshold   float64
-	LowThreshold    float64
-	MaxTokens       int  // J14: max tokens (default: 100)
-	CacheSize       int  // J14: LRU cache capacity (default: 256)
-	CompressPrompts bool // J17-PC: compress classification prompts to reduce tokens
+	LLMEnabled             bool
+	LLMProvider            string
+	LLMModel               string
+	LLMAPIKey              string
+	LLMBaseURL             string
+	HighThreshold          float64
+	LowThreshold           float64
+	NotApplicableThreshold float64 // relevance gate; ≤0 disables (sub-LOW tail = not_applicable)
+	MaxTokens              int     // J14: max tokens (default: 100)
+	CacheSize              int     // J14: LRU cache capacity (default: 256)
+	CompressPrompts        bool    // J17-PC: compress classification prompts to reduce tokens
 }
 
 // classifyCacheEntry holds a cached classification result.
@@ -128,6 +130,19 @@ func NewOutcomeClassifier(embedder embeddings.Embedder, cfg OutcomeClassifierCon
 	}
 	if oc.lowThreshold <= 0 {
 		oc.lowThreshold = 0.20
+	}
+	// JIMINY-CORPUS-001 Epic 4: relevance gate. Unlike high/low, ≤0 means
+	// DISABLED, not "use default" — the production default flows in from
+	// config (JIMINY_OUTCOME_NOT_APPLICABLE_SIMILARITY, 0.10), and an
+	// explicit 0 must keep the pre-gate behavior byte-identical.
+	oc.naThreshold = cfg.NotApplicableThreshold
+	if oc.naThreshold < 0 {
+		oc.naThreshold = 0
+	}
+	if oc.naThreshold > oc.lowThreshold {
+		slog.Warn("jiminy classifier: not_applicable threshold above low threshold — clamping to low",
+			"not_applicable_threshold", cfg.NotApplicableThreshold, "low_threshold", oc.lowThreshold)
+		oc.naThreshold = oc.lowThreshold
 	}
 	if oc.maxTokens <= 0 {
 		oc.maxTokens = 500
@@ -197,8 +212,21 @@ func (oc *OutcomeClassifier) Classify(ctx context.Context, item GuidanceItem, ac
 	actionLower := strings.ToLower(actionSummary)
 	hasNegation, matchedPattern := detectNegation(actionLower)
 
-	// Low similarity = not applicable (topics don't overlap — guidance wasn't relevant to this action)
+	// Sub-LOW band. JIMINY-CORPUS-001 Epic 4 relevance gate: only the clearly-
+	// unrelated tail (< naThreshold) is not_applicable — the guidance did not
+	// apply to this action. The [naThreshold, lowThreshold) band shares enough
+	// topical signal that the guidance plausibly applied and was not followed —
+	// a real ignore, not irrelevance. Gate disabled (naThreshold ≤ 0): the whole
+	// sub-LOW tail is not_applicable (the JIMINY-OUTCOME-002 behavior).
+	//
+	// This is a tier-1 verdict only: the tier-2 LLM never runs below LOW, so
+	// the gate can never override an LLM relevance verdict — LLM verdicts
+	// (Source "llm", which may themselves say ignored/not_applicable) are
+	// always returned as-is further down.
 	if similarity < oc.lowThreshold {
+		if oc.naThreshold > 0 && similarity >= oc.naThreshold {
+			return ClassificationResult{Outcome: OutcomeIgnored, Confidence: similarity, Source: "tier1"}
+		}
 		return ClassificationResult{Outcome: OutcomeNotApplicable, Confidence: similarity, Source: "tier1"}
 	}
 

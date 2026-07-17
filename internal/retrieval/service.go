@@ -1198,6 +1198,8 @@ type Candidate struct {
 	Path          string
 	Name          string
 	Summary       string
+	RoleType      string   // JIMINY-ROLETYPE-ADAPTER-001: node.role_type (constraint/correction/etc.)
+	ObsType       string   // JIMINY-ROLETYPE-ADAPTER-001: L0 node.obs_type (learning/decision/etc.)
 	UpdatedAt     time.Time
 	CanonicalTime time.Time // Phase 2: content-relevant time (zero = use UpdatedAt)
 	Confidence    float64
@@ -1259,6 +1261,8 @@ RETURN node.node_id AS node_id,
        coalesce(node.tags, []) AS tags,
        coalesce(node.context_fingerprint_active, []) AS context_fingerprint_active,
        coalesce(node.context_fingerprint_version, 0) AS context_fingerprint_version,
+       coalesce(node.role_type,'') AS role_type,
+       coalesce(node.obs_type,'') AS obs_type,
        score AS score
 ORDER BY score DESC`
 
@@ -1282,6 +1286,8 @@ ORDER BY score DESC`
 			tagsAny, _ := rec.Get("tags")
 			fpAny, _ := rec.Get("context_fingerprint_active")
 			fpVerAny, _ := rec.Get("context_fingerprint_version")
+			roleAny, _ := rec.Get("role_type")
+			obsAny, _ := rec.Get("obs_type")
 			sc, _ := rec.Get("score")
 
 			ct := Candidate{
@@ -1289,6 +1295,8 @@ ORDER BY score DESC`
 				Path:                      fmt.Sprint(path),
 				Name:                      fmt.Sprint(name),
 				Summary:                   fmt.Sprint(sum),
+				RoleType:                  fmt.Sprint(roleAny),
+				ObsType:                   fmt.Sprint(obsAny),
 				Confidence:                toFloat64(conf, 0.6),
 				VectorSim:                 toFloat64(sc, 0),
 				Layer:                     toInt(layer, 0),
