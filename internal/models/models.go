@@ -86,6 +86,12 @@ type RetrieveResult struct {
 	Layer   int     `json:"layer"`
 	Score   float64 `json:"score"`
 
+	// JIMINY-ROLETYPE-ADAPTER-001: role_type + obs_type propagate through
+	// retrieval so downstream classifiers (jiminy classifyRetrievalItem)
+	// distinguish constraint/correction from generic learning items.
+	RoleType string `json:"role_type,omitempty"`
+	ObsType  string `json:"obs_type,omitempty"`
+
 	// Normalized confidence metrics (immune to learning edge density)
 	NormalizedConfidence float64 `json:"normalized_confidence,omitempty"` // Percentile rank 0-100
 	ConfidenceLevel      string  `json:"confidence_level,omitempty"`      // HIGH/MEDIUM/LOW based on percentile

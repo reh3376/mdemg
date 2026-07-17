@@ -201,7 +201,10 @@ type RetrievalResult struct {
 	Summary string  `json:"summary"`
 	Layer   int     `json:"layer"`
 	Score   float64 `json:"score"`
-	ObsType string  `json:"obs_type,omitempty"` // observation type if L0
+	// JIMINY-ROLETYPE-ADAPTER-001: role_type takes precedence over ObsType in
+	// classifyRetrievalItem — populated by jiminyRetrievalAdapter.RetrieveForJiminy.
+	RoleType string `json:"role_type,omitempty"`
+	ObsType  string `json:"obs_type,omitempty"` // observation type if L0
 }
 
 // --- J9: Evaluate types ---

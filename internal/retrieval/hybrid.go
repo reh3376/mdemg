@@ -28,6 +28,10 @@ type BM25Result struct {
 	Confidence float64
 	Layer      int
 	Tags       []string
+	// JIMINY-ROLETYPE-ADAPTER-001: BM25 is its own sink — nodes vector
+	// missed can still land here, so RoleType/ObsType are fetched at source.
+	RoleType   string
+	ObsType    string
 }
 
 // BM25Search performs full-text search using Neo4j's Lucene-based fulltext index.
@@ -76,6 +80,8 @@ RETURN node.node_id AS node_id,
        coalesce(node.updated_at, datetime()) AS updated_at,
        coalesce(node.layer, 0) AS layer,
        coalesce(node.tags, []) AS tags,
+       coalesce(node.role_type,'') AS role_type,
+       coalesce(node.obs_type,'') AS obs_type,
        score
 ORDER BY score DESC
 LIMIT $topK`
@@ -96,6 +102,8 @@ LIMIT $topK`
 			upd, _ := rec.Get("updated_at")
 			layer, _ := rec.Get("layer")
 			tagsAny, _ := rec.Get("tags")
+			roleAny, _ := rec.Get("role_type")
+			obsAny, _ := rec.Get("obs_type")
 			sc, _ := rec.Get("score")
 
 			r := BM25Result{
@@ -107,6 +115,8 @@ LIMIT $topK`
 				Confidence: toFloat64(conf, 0.6),
 				Layer:      toInt(layer, 0),
 				Tags:       toStringSlice(tagsAny),
+				RoleType:   fmt.Sprint(roleAny),
+				ObsType:    fmt.Sprint(obsAny),
 			}
 
 			switch v := upd.(type) {
@@ -192,6 +202,9 @@ type FusedCandidate struct {
 	BM25Rank   int     // Rank in BM25 results (0 if not present)
 	Layer      int
 	Tags       []string
+	// JIMINY-ROLETYPE-ADAPTER-001: propagate through the vector/BM25 fuse.
+	RoleType   string
+	ObsType    string
 }
 
 // ReciprocalRankFusion combines results from vector and BM25 search using RRF.
@@ -223,6 +236,8 @@ func ReciprocalRankFusion(vectorResults []Candidate, bm25Results []BM25Result, v
 				Path:       c.Path,
 				Name:       c.Name,
 				Summary:    c.Summary,
+				RoleType:   c.RoleType,
+				ObsType:    c.ObsType,
 				UpdatedAt:  c.UpdatedAt,
 				Confidence: c.Confidence,
 				VectorSim:  c.VectorSim,
@@ -242,12 +257,21 @@ func ReciprocalRankFusion(vectorResults []Candidate, bm25Results []BM25Result, v
 			existing.RRFScore += rrfContrib
 			existing.BM25Rank = rank + 1
 			existing.BM25Score = r.Score
+			// Prefer non-empty ontology labels from either fetcher.
+			if existing.RoleType == "" {
+				existing.RoleType = r.RoleType
+			}
+			if existing.ObsType == "" {
+				existing.ObsType = r.ObsType
+			}
 		} else {
 			candidateMap[r.NodeID] = &FusedCandidate{
 				NodeID:     r.NodeID,
 				Path:       r.Path,
 				Name:       r.Name,
 				Summary:    r.Summary,
+				RoleType:   r.RoleType,
+				ObsType:    r.ObsType,
 				UpdatedAt:  r.UpdatedAt,
 				Confidence: r.Confidence,
 				BM25Score:  r.Score,
@@ -305,6 +329,8 @@ func ConvertFusedToCandidates(fused []FusedCandidate) []Candidate {
 			Path:       f.Path,
 			Name:       f.Name,
 			Summary:    f.Summary,
+			RoleType:   f.RoleType,
+			ObsType:    f.ObsType,
 			UpdatedAt:  f.UpdatedAt,
 			Confidence: f.Confidence,
 			VectorSim:  f.VectorSim, // Real value, 0.0 for BM25-only

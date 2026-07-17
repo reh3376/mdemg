@@ -396,11 +396,16 @@ func (a *jiminyRetrievalAdapter) RetrieveForJiminy(ctx context.Context, spaceID,
 	results := make([]jiminy.RetrievalResult, 0, len(resp.Results))
 	for _, r := range resp.Results {
 		results = append(results, jiminy.RetrievalResult{
-			NodeID:  r.NodeID,
-			Name:    r.Name,
-			Summary: r.Summary,
-			Layer:   r.Layer,
-			Score:   r.Score,
+			NodeID:   r.NodeID,
+			Name:     r.Name,
+			Summary:  r.Summary,
+			Layer:    r.Layer,
+			Score:    r.Score,
+			// JIMINY-ROLETYPE-ADAPTER-001: role_type + obs_type feed
+			// classifyRetrievalItem — dropping them here mis-typed 100% of
+			// retrieval-sourced guidance as GuidanceLearning.
+			RoleType: r.RoleType,
+			ObsType:  r.ObsType,
 		})
 	}
 	return results, nil

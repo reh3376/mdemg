@@ -57,6 +57,8 @@ func (c *BM25Column) Run(ctx context.Context, q ColumnQuery) ColumnResult {
 			Path:       r.Path,
 			Name:       r.Name,
 			Summary:    r.Summary,
+			RoleType:   r.RoleType,
+			ObsType:    r.ObsType,
 			UpdatedAt:  r.UpdatedAt,
 			Confidence: r.Confidence,
 			BM25Score:  r.Score,
