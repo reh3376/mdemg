@@ -143,6 +143,26 @@ A follow-up to ALERT-TRUTH-001, fixing 6 measurement artifacts that made healthy
 
 New config knobs: `J17_NLI_CALIBRATION_MIN_SAMPLES` (50), `J17_COMPRESSION_TARGET_RATIO` (3.0, >1.0), `J17_TRUST_MIN_FEEDBACK_COUNT` (5). Sprint: `docs/development/dashboard-truth-001/`.
 
+## Filter contract: LLM error-rate panels (GRAFANA-PANEL-FILTER-001, 2026-07-20)
+
+Any Grafana panel that reads `llm_interactions.error` in an aggregate (`SUM/CASE/WHERE` on the `error` column, not display-only `SELECT error FROM …`) MUST filter caller-cancellation using the same clause the alert rule uses:
+
+```sql
+WHEN error IS NOT NULL AND error != '' AND error NOT LIKE 'caller_canceled:%'
+```
+
+**Why.** LLM-HEALTH-INVESTIGATION-001 E1 (`internal/llmclient/client.go`) tags `context.Canceled` / `context.DeadlineExceeded` cases with the `caller_canceled:` prefix. These represent the caller giving up (typically `retrieval.rerank_cross` when the retrieve deadline expires); the LLM was healthy, rerank fails-open, user impact is zero. Counting these as errors misclassifies fails-open recovery as failure. The filter source-of-truth is `internal/tsdb/dataset_builder.go::LLMPerformance` (which feeds the RSIC `llm_error_rate_spike` rule).
+
+**Whitelist.** A panel may opt out with an inline SQL comment: `-- GRAFANA-PANEL-FILTER-001: intentionally unfiltered` — for forensic/debug panels that want to see everything.
+
+**Enforcement.** `internal/grafanapin/dashboards_test.go` (`TestGrafanaPanel_LLMInteractionsErrorFilter`) walks every checked-in dashboard JSON, matches every panel target reading `llm_interactions` AND doing `error` aggregate math, and fails the build if any lacks the required filter (unless whitelisted). Runs under `go test ./...`. A contract-liveness assertion fails the test if ZERO panels match the pattern — prevents the test from becoming a silent no-op.
+
+**Extending.** When the recorder in `internal/llmclient/client.go` starts emitting a new noise-class prefix (e.g. `sidecar_unhealthy:`), extend both:
+1. `internal/grafanapin/dashboards_test.go::requiredExclusions[]` (the enforcement)
+2. `internal/tsdb/dataset_builder.go::LLMPerformance` (the alert-rule filter — source of truth)
+
+in the same PR — the two are the enforcement pair.
+
 ## References
 
 - Sprint plan: `docs/development/grafana-audit-001/sprint_plan_grafana_audit_001.md`

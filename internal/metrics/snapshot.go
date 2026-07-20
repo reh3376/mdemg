@@ -5,11 +5,11 @@ import "time"
 // MetricSnapshot is the JSON-serializable snapshot of all registered metrics.
 // Served by the /v1/metrics/snapshot endpoint (wired in A2).
 type MetricSnapshot struct {
-	Timestamp  time.Time                      `json:"timestamp"`
-	Counters   map[string]int64               `json:"counters"`
-	Gauges     map[string]float64             `json:"gauges"`
-	Histograms map[string]HistogramSnapshot   `json:"histograms"`
-	Writer     WriterHealthSnapshot           `json:"writer_health"`
+	Timestamp  time.Time                    `json:"timestamp"`
+	Counters   map[string]int64             `json:"counters"`
+	Gauges     map[string]float64           `json:"gauges"`
+	Histograms map[string]HistogramSnapshot `json:"histograms"`
+	Writer     WriterHealthSnapshot         `json:"writer_health"`
 }
 
 // HistogramSnapshot holds a point-in-time view of a single histogram.

@@ -57,4 +57,3 @@ func (w *statusResponseWriter) Write(b []byte) (int, error) {
 	}
 	return w.ResponseWriter.Write(b)
 }
-

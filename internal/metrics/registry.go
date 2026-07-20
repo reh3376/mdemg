@@ -190,10 +190,10 @@ type Histogram struct {
 	labels  map[string]string
 	buckets []float64
 
-	mu          sync.Mutex
+	mu           sync.Mutex
 	bucketCounts []int64
-	sum         float64
-	count       int64
+	sum          float64
+	count        int64
 }
 
 // NewHistogram creates and registers a new histogram using the registry-wide

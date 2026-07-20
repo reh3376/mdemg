@@ -47,17 +47,17 @@ type goldenExpected struct {
 //
 // Test Graph Structure:
 //
-//	     A (v=0.90)     B (v=0.80)
-//	         \           /  |
-//	      0.60\     0.30/   |0.25 (CONTRADICTS)
-//	           \     /      |
-//	            v   v       v
-//	           C (v=0.40)
-//	           /      \
-//	       0.50/    0.20\
-//	         v          v
-//	    D (v=0.20) ---> E (v=0.10)
-//	              0.40
+//	 A (v=0.90)     B (v=0.80)
+//	     \           /  |
+//	  0.60\     0.30/   |0.25 (CONTRADICTS)
+//	       \     /      |
+//	        v   v       v
+//	       C (v=0.40)
+//	       /      \
+//	   0.50/    0.20\
+//	     v          v
+//	D (v=0.20) ---> E (v=0.10)
+//	          0.40
 //
 // Scoring formula: S = 0.55*V + 0.30*A + 0.10*R + 0.05*C - 0.08*log(1+deg) - 0.12*d
 func TestScoringGolden(t *testing.T) {
@@ -545,13 +545,13 @@ func createWeightedEdge(t *testing.T, driver neo4j.DriverWithContext, spaceID,
 
 	_, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 		res, err := tx.Run(ctx, cypher, map[string]any{
-			"spaceId":          spaceID,
-			"srcNodeId":        srcNodeID,
-			"dstNodeId":        dstNodeID,
-			"weight":           weight,
-			"dimSemantic":      dimSemantic,
-			"dimTemporal":      dimTemporal,
-			"dimCoactivation":  dimCoactivation,
+			"spaceId":         spaceID,
+			"srcNodeId":       srcNodeID,
+			"dstNodeId":       dstNodeID,
+			"weight":          weight,
+			"dimSemantic":     dimSemantic,
+			"dimTemporal":     dimTemporal,
+			"dimCoactivation": dimCoactivation,
 		})
 		if err != nil {
 			return nil, err
@@ -622,4 +622,3 @@ func verifyRankingOrder(t *testing.T, results []RetrieveResult, nodeIDs map[stri
 		}
 	}
 }
-
