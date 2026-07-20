@@ -384,7 +384,7 @@
       "id": 15,
       "type": "timeseries",
       "title": "LLM endpoint state (0=up, 1=degraded, 2=down)",
-      "description": "Watchdog state machine over time. Each row in llm_endpoint_health_events records a state transition; the line shows the active state between transitions.",
+      "description": "Continuous watchdog state gauge. DASHBOARD-TRUTH-002 E9 (2026-07-20): now reads mdemg_mlx_health_state from metric_samples (continuous, emitted every 5s by the supervised watchdog) instead of the transition-log llm_endpoint_health_events (which returned zero rows during steady-state UP → panel read 'No data' for 15+ days on a healthy endpoint). Transition events are now overlaid as annotations, so you see both the continuous state AND transition markers.",
       "datasource": {
         "type": "postgres",
         "uid": "timescaledb"
@@ -398,7 +398,7 @@
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT recorded_at AS time, state_numeric AS value, endpoint_url AS metric FROM llm_endpoint_health_events WHERE event_kind IN ('state_transition', 'probe_recovery') AND $__timeFilter(recorded_at) ORDER BY recorded_at",
+          "rawSql": "-- DASHBOARD-TRUTH-002 E9: continuous gauge (not transition log) — panel is 'No data'-free in steady-state UP.\nSELECT time,\n       value,\n       COALESCE(labels->>'endpoint_url', 'llm-endpoint') AS metric\nFROM metric_samples\nWHERE metric_name = 'mdemg_mlx_health_state'\n  AND metric_type = 'gauge'\n  AND $__timeFilter(time)\nORDER BY time",
           "format": "time_series"
         }
       ],
@@ -547,8 +547,8 @@
     {
       "id": 18,
       "type": "table",
-      "title": "Recent watchdog events (last 30 in window)",
-      "description": "Forensic view: when did each transition happen, what error triggered it, what was the state machine doing. probe_recovery rows mark down\u2192up healing events; fast_fail_burst rows mark llmclient short-circuit windows.",
+      "title": "Recent watchdog events (last 30)",
+      "description": "Forensic view: when did each transition happen, what error triggered it, what was the state machine doing. probe_recovery rows mark down\u2192up healing events; fast_fail_burst rows mark llmclient short-circuit windows. DASHBOARD-TRUTH-002 E10 (2026-07-20): dropped the $__timeFilter \u2014 this is a RARE-event stream (12 lifetime events on mdemg-dev, newest ~15 days ago) so a narrow dashboard time range showed 'No data'. Now always shows the last 30 events regardless of range.",
       "datasource": {
         "type": "postgres",
         "uid": "timescaledb"
@@ -562,7 +562,7 @@
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT recorded_at AS \"time\", endpoint_url, event_kind, from_state, to_state, state_numeric, consecutive_failures, burst_short_circuits, LEFT(COALESCE(error_message, ''), 120) AS error FROM llm_endpoint_health_events WHERE $__timeFilter(recorded_at) ORDER BY recorded_at DESC LIMIT 30",
+          "rawSql": "-- DASHBOARD-TRUTH-002 E10: no time-window filter (rare-event stream; newest event may be >30d ago).\nSELECT recorded_at AS \"time\", endpoint_url, event_kind, from_state, to_state, state_numeric, consecutive_failures, burst_short_circuits, LEFT(COALESCE(error_message, ''), 120) AS error FROM llm_endpoint_health_events ORDER BY recorded_at DESC LIMIT 30",
           "format": "table"
         }
       ]
