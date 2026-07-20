@@ -19,7 +19,7 @@ import (
 
 // contradictedDraftsDataset implements review.ReviewableDataset.
 type contradictedDraftsDataset struct {
-	writer        *tsdb.ContradictedDraftsWriter
+	writer        contradictedDraftsWriterIface
 	rubricVersion string
 	sink          contradictedDraftsSink
 }
@@ -94,6 +94,7 @@ func contradictedDraftItem(r tsdb.ContradictedDraftRow) review.ReviewItem {
 			"action_hash":      r.ActionHash,
 			"status":           r.Status,
 			"applied_obs_id":   r.AppliedObsID,
+			"applied_node_id":  r.AppliedNodeID,
 			"recorded_at":      r.Time.Format("2006-01-02 15:04"),
 		},
 	}
@@ -105,6 +106,17 @@ type CorrectService interface {
 	Correct(ctx context.Context, req conversation.CorrectRequest) (*conversation.ObserveResponse, error)
 }
 
+// contradictedDraftsWriterIface is the subset of *tsdb.ContradictedDraftsWriter
+// methods the sink calls, extracted so tests can inject a capturing mock.
+// *tsdb.ContradictedDraftsWriter satisfies this by shape.
+type contradictedDraftsWriterIface interface {
+	MarkApproved(ctx context.Context, id, appliedObsID, appliedNodeID string) error
+	MarkDismissed(ctx context.Context, id string) error
+	ResetToPending(ctx context.Context, id string) error
+	FetchPendingBySpace(ctx context.Context, spaceID string, limit int) ([]tsdb.ContradictedDraftRow, error)
+	FetchByID(ctx context.Context, id string) (*tsdb.ContradictedDraftRow, error)
+}
+
 // contradictedDraftsSink applies a certified draft grade: on approve it hands
 // the draft's Incorrect/Correct pair to conversation.Service.Correct (mints an
 // L0 correction obs); on dismiss it marks the draft dismissed. Reverse flips
@@ -112,7 +124,7 @@ type CorrectService interface {
 // be tombstoned separately if the operator wants full undo.
 type contradictedDraftsSink struct {
 	svc    CorrectService
-	writer *tsdb.ContradictedDraftsWriter
+	writer contradictedDraftsWriterIface
 }
 
 func (contradictedDraftsSink) SinkID() string { return "contradicted_drafts" }
@@ -185,13 +197,14 @@ func (s contradictedDraftsSink) Apply(ctx context.Context, g review.Grade) (revi
 		if err != nil {
 			return d, fmt.Errorf("contradicted_drafts sink: conversation.Correct: %w", err)
 		}
-		var obsID string
+		var obsID, nodeID string
 		if resp != nil {
 			obsID = resp.ObsID
+			nodeID = resp.NodeID
 			d.Applied["obs_id"] = resp.ObsID
 			d.Applied["node_id"] = resp.NodeID
 		}
-		if err := s.writer.MarkApproved(ctx, g.ItemID, obsID); err != nil {
+		if err := s.writer.MarkApproved(ctx, g.ItemID, obsID, nodeID); err != nil {
 			// The L0 obs is already created; the status flip failing is
 			// non-fatal (a subsequent grade retry will re-mark; DB uniqueness
 			// isn't broken because MarkApproved is UPDATE, not INSERT). Log

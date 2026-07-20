@@ -52,6 +52,11 @@ type ContradictedDraftRow struct {
 	InstanceID      string
 	AppliedAt       *time.Time // set on approve
 	AppliedObsID    string     // set on approve
+	// CONTRADICTED-BRIDGE-APPLIED-NODE-ID-001: the Neo4j MemoryNode.node_id
+	// of the L0 correction obs the sink minted. ObsID and NodeID differ on
+	// ObserveResponse; NodeID is the graph-side join key. Set alongside
+	// AppliedObsID on approve.
+	AppliedNodeID   string
 }
 
 // ContradictedDraftsWriter buffers draft rows and flushes via CopyFrom.
@@ -172,6 +177,7 @@ func (w *ContradictedDraftsWriter) Flush(ctx context.Context) error {
 			r.Similarity, r.ActionHash, r.DraftIncorrect, r.DraftCorrect,
 			r.Status, r.SessionID, appliedAt,
 			nullableString(r.AppliedObsID), nullableString(r.InstanceID),
+			nullableString(r.AppliedNodeID),
 		})
 	}
 	_, err := w.pool.CopyFrom(ctx,
@@ -182,6 +188,7 @@ func (w *ContradictedDraftsWriter) Flush(ctx context.Context) error {
 			"similarity", "action_hash", "draft_incorrect", "draft_correct",
 			"status", "session_id", "applied_at",
 			"applied_obs_id", "instance_id",
+			"applied_node_id",
 		},
 		pgx.CopyFromRows(rows),
 	)
@@ -211,7 +218,8 @@ func (w *ContradictedDraftsWriter) FetchPendingBySpace(ctx context.Context, spac
 		       source_node_id, guidance_content, action_summary,
 		       similarity, action_hash, draft_incorrect, draft_correct,
 		       status, session_id, applied_at,
-		       COALESCE(applied_obs_id, ''), COALESCE(instance_id, '')
+		       COALESCE(applied_obs_id, ''), COALESCE(instance_id, ''),
+		       COALESCE(applied_node_id, '')
 		FROM contradicted_correction_drafts
 		WHERE space_id = $1 AND status = 'pending'
 		ORDER BY time DESC LIMIT $2`, spaceID, limit)
@@ -227,7 +235,7 @@ func (w *ContradictedDraftsWriter) FetchPendingBySpace(ctx context.Context, spac
 			&r.SourceNodeID, &r.GuidanceContent, &r.ActionSummary,
 			&r.Similarity, &r.ActionHash, &r.DraftIncorrect, &r.DraftCorrect,
 			&r.Status, &r.SessionID, &appliedAt,
-			&r.AppliedObsID, &r.InstanceID); err != nil {
+			&r.AppliedObsID, &r.InstanceID, &r.AppliedNodeID); err != nil {
 			return nil, err
 		}
 		r.AppliedAt = appliedAt
@@ -247,7 +255,8 @@ func (w *ContradictedDraftsWriter) FetchByID(ctx context.Context, id string) (*C
 		       source_node_id, guidance_content, action_summary,
 		       similarity, action_hash, draft_incorrect, draft_correct,
 		       status, session_id, applied_at,
-		       COALESCE(applied_obs_id, ''), COALESCE(instance_id, '')
+		       COALESCE(applied_obs_id, ''), COALESCE(instance_id, ''),
+		       COALESCE(applied_node_id, '')
 		FROM contradicted_correction_drafts
 		WHERE id = $1
 		ORDER BY time DESC LIMIT 1`, id)
@@ -257,7 +266,7 @@ func (w *ContradictedDraftsWriter) FetchByID(ctx context.Context, id string) (*C
 		&r.SourceNodeID, &r.GuidanceContent, &r.ActionSummary,
 		&r.Similarity, &r.ActionHash, &r.DraftIncorrect, &r.DraftCorrect,
 		&r.Status, &r.SessionID, &appliedAt,
-		&r.AppliedObsID, &r.InstanceID)
+		&r.AppliedObsID, &r.InstanceID, &r.AppliedNodeID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
@@ -293,16 +302,19 @@ func (w *ContradictedDraftsWriter) DedupExists(ctx context.Context, guidanceID, 
 	return exists, nil
 }
 
-// MarkApproved transitions a draft to status='approved' and records the L0
-// obs id the sink created. Idempotent.
-func (w *ContradictedDraftsWriter) MarkApproved(ctx context.Context, id string, appliedObsID string) error {
+// MarkApproved transitions a draft to status='approved' and records BOTH
+// the L0 obs id (applied_obs_id, JIMINY-CONTRADICTED-BRIDGE-001) AND the
+// Neo4j graph node id (applied_node_id, CONTRADICTED-BRIDGE-APPLIED-NODE-ID-001)
+// the sink minted via conversation.Service.Correct. Idempotent.
+func (w *ContradictedDraftsWriter) MarkApproved(ctx context.Context, id string, appliedObsID string, appliedNodeID string) error {
 	if err := w.Flush(ctx); err != nil {
 		return err
 	}
 	_, err := w.pool.Exec(ctx, `
 		UPDATE contradicted_correction_drafts
-		SET status = 'approved', applied_at = NOW(), applied_obs_id = $2
-		WHERE id = $1`, id, appliedObsID)
+		SET status = 'approved', applied_at = NOW(),
+		    applied_obs_id = $2, applied_node_id = $3
+		WHERE id = $1`, id, appliedObsID, appliedNodeID)
 	return err
 }
 
