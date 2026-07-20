@@ -9,7 +9,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.9.2
 	github.com/joho/godotenv v1.5.1
-	github.com/mark3labs/mcp-go v0.54.0
+	github.com/mark3labs/mcp-go v0.56.0
 	github.com/neo4j/neo4j-go-driver/v5 v5.28.4
 	github.com/nrednav/cuid2 v1.1.0
 	github.com/smacker/go-tree-sitter v0.0.0-20240827094217-dd81d9e9be82
