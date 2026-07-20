@@ -1159,7 +1159,7 @@ type Config struct {
 	GuidanceCorpusWriterBufferSize       int  // GUIDANCE_CORPUS_WRITER_BUFFER_SIZE — max rows held before FIFO eviction (default: 1000, 0 = unlimited)
 
 	// JIMINY-CONTRADICTED-BRIDGE-001: contradicted-outcome → correction draft bridge.
-	JiminyContradictedBridgeEnabled                bool // JIMINY_CONTRADICTED_BRIDGE_ENABLED — emit draft rows on OutcomeContradicted (default: false)
+	JiminyContradictedBridgeEnabled                bool // JIMINY_CONTRADICTED_BRIDGE_ENABLED — emit draft rows on OutcomeContradicted (default: true post-JIMINY-CONTRADICTED-BRIDGE-001 E5 live smoke)
 	JiminyContradictedBridgeWriterFlushIntervalSec int  // JIMINY_CONTRADICTED_BRIDGE_WRITER_FLUSH_INTERVAL_SEC — buffered writer flush cadence (default: 30, floor: 5)
 	JiminyContradictedBridgeWriterBufferSize       int  // JIMINY_CONTRADICTED_BRIDGE_WRITER_BUFFER_SIZE — max rows held before FIFO eviction (default: 1000, 0 = unlimited)
 	JiminyContradictedBridgeMaxContentLen          int  // JIMINY_CONTRADICTED_BRIDGE_MAX_CONTENT_LEN — cap draft_incorrect/draft_correct at this many chars (default: 400)
@@ -3417,7 +3417,7 @@ func FromEnv() (Config, error) {
 	}
 
 	// JIMINY-CONTRADICTED-BRIDGE-001
-	jiminyContradictedBridgeEnabled := getBool("JIMINY_CONTRADICTED_BRIDGE_ENABLED", false)
+	jiminyContradictedBridgeEnabled := getBool("JIMINY_CONTRADICTED_BRIDGE_ENABLED", true)
 	jiminyContradictedBridgeWriterFlushIntervalSec, err := atoi("JIMINY_CONTRADICTED_BRIDGE_WRITER_FLUSH_INTERVAL_SEC", 30)
 	if err != nil {
 		return Config{}, err
