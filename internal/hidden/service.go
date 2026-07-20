@@ -33,6 +33,11 @@ type Service struct {
 	// CreateConstraintNodes. nil (e.g. hand-built Service in tests) = pass.
 	constraintGate *ConstraintPromotionGate
 
+	// JIMINY-CORRECTION-PRODUCER-001: gates L0 obs → role_type='correction'
+	// promotion in CreateCorrectionNodes. nil (e.g. hand-built Service in
+	// tests) = pass.
+	correctionGate *CorrectionPromotionGate
+
 	// Per-space consolidation lock: prevents concurrent consolidation on the same space
 	consolidateLocks sync.Map // map[string]*sync.Mutex
 }
@@ -42,6 +47,7 @@ type Service struct {
 func NewService(cfg config.Config, driver neo4j.DriverWithContext, cbRegistry *circuitbreaker.Registry) *Service {
 	s := &Service{cfg: cfg, driver: driver, cbRegistry: cbRegistry}
 	s.constraintGate = NewConstraintPromotionGate(cfg)
+	s.correctionGate = NewCorrectionPromotionGate(cfg)
 	s.pipeline = s.buildPipeline()
 	return s
 }
@@ -308,6 +314,7 @@ func (s *Service) buildPipeline() *Pipeline {
 	p.Register(&temporalStep{svc: s})         // phase 20
 	p.Register(&uiStep{svc: s})               // phase 20
 	p.Register(&constraintStep{svc: s})       // phase 20
+	p.Register(&correctionStep{svc: s})       // phase 20 — JIMINY-CORRECTION-PRODUCER-001
 	p.Register(&dynamicEmergenceStep{svc: s}) // phase 22 — LLM-driven concept naming (Phase 103)
 	p.Register(&dynamicEdgesStep{svc: s})     // phase 25 — dynamic edges (after clustering)
 	p.Register(&clusterSummaryStep{svc: s})   // phase 28 — LLM summary enhancement (L1-L4)
