@@ -1144,7 +1144,7 @@ type Config struct {
 	TSDBFlushIntervalSec      int    // TSDB_FLUSH_INTERVAL_SEC — metric writer flush interval in seconds (default: 60)
 	TSDBRawRetentionDays      int    // TSDB_RAW_RETENTION_DAYS — raw sample retention in days (default: 90)
 	TSDBHourlyRetentionDays   int    // TSDB_HOURLY_RETENTION_DAYS — hourly aggregate retention in days (default: 365)
-	TSDBRequiredSchemaVersion int    // TSDB_REQUIRED_SCHEMA_VERSION — minimum required TSDB schema version (default: 29 post-HITL-REVIEW-001 V0029 review_grades.suggested_guidance)
+	TSDBRequiredSchemaVersion int    // TSDB_REQUIRED_SCHEMA_VERSION — minimum required TSDB schema version (default: 30 post-JIMINY-CONTRADICTED-BRIDGE-001 V0030 contradicted_correction_drafts)
 	TSDBOptional              bool   // TSDB_OPTIONAL — if true, TSDB failure is non-fatal on startup (default: true)
 	InstanceID                string // MDEMG_INSTANCE_ID — identifies this node for multi-instance coordination (default: "{hostname}-{space_id}")
 	LLMInteractionLogging     bool   // LLM_INTERACTION_LOGGING — log all LLM calls to llm_interactions table (default: true)
@@ -1157,6 +1157,12 @@ type Config struct {
 	GuidanceCorpusEnabled                bool // GUIDANCE_CORPUS_ENABLED — persist guidance training evidence to guidance_training_rows (default: true)
 	GuidanceCorpusWriterFlushIntervalSec int  // GUIDANCE_CORPUS_WRITER_FLUSH_INTERVAL_SEC — buffered writer flush cadence in seconds (default: 30, floor: 5)
 	GuidanceCorpusWriterBufferSize       int  // GUIDANCE_CORPUS_WRITER_BUFFER_SIZE — max rows held before FIFO eviction (default: 1000, 0 = unlimited)
+
+	// JIMINY-CONTRADICTED-BRIDGE-001: contradicted-outcome → correction draft bridge.
+	JiminyContradictedBridgeEnabled                bool // JIMINY_CONTRADICTED_BRIDGE_ENABLED — emit draft rows on OutcomeContradicted (default: true post-JIMINY-CONTRADICTED-BRIDGE-001 E5 live smoke)
+	JiminyContradictedBridgeWriterFlushIntervalSec int  // JIMINY_CONTRADICTED_BRIDGE_WRITER_FLUSH_INTERVAL_SEC — buffered writer flush cadence (default: 30, floor: 5)
+	JiminyContradictedBridgeWriterBufferSize       int  // JIMINY_CONTRADICTED_BRIDGE_WRITER_BUFFER_SIZE — max rows held before FIFO eviction (default: 1000, 0 = unlimited)
+	JiminyContradictedBridgeMaxContentLen          int  // JIMINY_CONTRADICTED_BRIDGE_MAX_CONTENT_LEN — cap draft_incorrect/draft_correct at this many chars (default: 400)
 	GuidanceCorpusMaxContentBytes        int  // GUIDANCE_CORPUS_MAX_CONTENT_BYTES — truncate guidance/action snapshots to this many bytes (default: 8192, floor: 256)
 	GuidanceCorpusSourceLookupTimeoutMs  int  // GUIDANCE_CORPUS_SOURCE_LOOKUP_TIMEOUT_MS — bounded best-effort Neo4j lookup of source-node role_type/layer at emit (default: 300, 0 = disable; never blocks the hot path beyond this)
 
@@ -1187,6 +1193,7 @@ type Config struct {
 	ReviewGuidanceSinkEnabled     bool    // REVIEW_GUIDANCE_SINK_ENABLED — enable the guidance live-reinforcement sink (default: true)
 	ReviewGuidanceConfidenceNudge float64 // REVIEW_GUIDANCE_CONFIDENCE_NUDGE — node-confidence delta the guidance sink applies (default: 0.05)
 	ReviewLLMDatasetsEnabled      bool    // REVIEW_LLM_DATASETS_ENABLED — register the 16 MDEMG LLM call sites as reviewable datasets (gold-only review of llm_interactions) (default: true)
+	ReviewContradictedDatasetEnabled bool // REVIEW_CONTRADICTED_DATASET_ENABLED — register the JIMINY-CONTRADICTED-BRIDGE-001 correction-drafts dataset (default: true)
 
 	// EVENTGRAPH-001 — TSDB reinforcement_events + federation API (Pattern Y1)
 	EventGraphEnabled                        bool // EVENTGRAPH_ENABLED — record per-pair Hebbian telemetry into reinforcement_events + expose federation API (default: true)
@@ -3408,6 +3415,30 @@ func FromEnv() (Config, error) {
 	if guidanceCorpusWriterBufferSize < 0 {
 		guidanceCorpusWriterBufferSize = 0 // 0 = unlimited (disabled cap)
 	}
+
+	// JIMINY-CONTRADICTED-BRIDGE-001
+	jiminyContradictedBridgeEnabled := getBool("JIMINY_CONTRADICTED_BRIDGE_ENABLED", true)
+	jiminyContradictedBridgeWriterFlushIntervalSec, err := atoi("JIMINY_CONTRADICTED_BRIDGE_WRITER_FLUSH_INTERVAL_SEC", 30)
+	if err != nil {
+		return Config{}, err
+	}
+	if jiminyContradictedBridgeWriterFlushIntervalSec < 5 {
+		jiminyContradictedBridgeWriterFlushIntervalSec = 5
+	}
+	jiminyContradictedBridgeWriterBufferSize, err := atoi("JIMINY_CONTRADICTED_BRIDGE_WRITER_BUFFER_SIZE", 1000)
+	if err != nil {
+		return Config{}, err
+	}
+	if jiminyContradictedBridgeWriterBufferSize < 0 {
+		jiminyContradictedBridgeWriterBufferSize = 0
+	}
+	jiminyContradictedBridgeMaxContentLen, err := atoi("JIMINY_CONTRADICTED_BRIDGE_MAX_CONTENT_LEN", 400)
+	if err != nil {
+		return Config{}, err
+	}
+	if jiminyContradictedBridgeMaxContentLen < 50 {
+		jiminyContradictedBridgeMaxContentLen = 50
+	}
 	guidanceCorpusMaxContentBytes, err := atoi("GUIDANCE_CORPUS_MAX_CONTENT_BYTES", 8192)
 	if err != nil {
 		return Config{}, err
@@ -3498,6 +3529,7 @@ func FromEnv() (Config, error) {
 	reviewReinforceDefault := getBool("REVIEW_REINFORCE_DEFAULT", false)
 	reviewGuidanceSinkEnabled := getBool("REVIEW_GUIDANCE_SINK_ENABLED", true)
 	reviewLLMDatasetsEnabled := getBool("REVIEW_LLM_DATASETS_ENABLED", true)
+	reviewContradictedDatasetEnabled := getBool("REVIEW_CONTRADICTED_DATASET_ENABLED", true)
 	reviewGuidanceConfidenceNudge, err := atof("REVIEW_GUIDANCE_CONFIDENCE_NUDGE", 0.05)
 	if err != nil {
 		return Config{}, err
@@ -4736,7 +4768,7 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	tsdbRequiredSchemaVersion, err := atoi("TSDB_REQUIRED_SCHEMA_VERSION", 29)
+	tsdbRequiredSchemaVersion, err := atoi("TSDB_REQUIRED_SCHEMA_VERSION", 30)
 	if err != nil {
 		return Config{}, err
 	}
@@ -5586,6 +5618,10 @@ func FromEnv() (Config, error) {
 
 		// EVENTGRAPH-001 — TSDB reinforcement_events + federation API
 		GuidanceCorpusEnabled:                guidanceCorpusEnabled,
+		JiminyContradictedBridgeEnabled:                jiminyContradictedBridgeEnabled,
+		JiminyContradictedBridgeWriterFlushIntervalSec: jiminyContradictedBridgeWriterFlushIntervalSec,
+		JiminyContradictedBridgeWriterBufferSize:       jiminyContradictedBridgeWriterBufferSize,
+		JiminyContradictedBridgeMaxContentLen:          jiminyContradictedBridgeMaxContentLen,
 		GuidanceCorpusWriterFlushIntervalSec: guidanceCorpusWriterFlushIntervalSec,
 		GuidanceCorpusWriterBufferSize:       guidanceCorpusWriterBufferSize,
 		GuidanceCorpusMaxContentBytes:        guidanceCorpusMaxContentBytes,
@@ -5606,6 +5642,7 @@ func FromEnv() (Config, error) {
 		ReviewReinforceDefault:               reviewReinforceDefault,
 		ReviewGuidanceSinkEnabled:            reviewGuidanceSinkEnabled,
 		ReviewLLMDatasetsEnabled:             reviewLLMDatasetsEnabled,
+		ReviewContradictedDatasetEnabled:     reviewContradictedDatasetEnabled,
 		ReviewGuidanceConfidenceNudge:        reviewGuidanceConfidenceNudge,
 
 		EventGraphEnabled:                        eventGraphEnabled,

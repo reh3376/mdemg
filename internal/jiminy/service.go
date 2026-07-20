@@ -70,6 +70,8 @@ type Service struct {
 	codeComprehensionTracker *CodeComprehensionTracker     // P1-15: code comprehension feedback loop
 	outcomeWriter            OutcomeWriter                 // TSDB writer for constraint outcomes
 	guidanceTrainingWriter   GuidanceTrainingWriter        // JIMINY-RELEVANCE-001: TSDB writer for the guidance training-evidence corpus
+	contradictedDraftWriter  ContradictedDraftWriter       // JIMINY-CONTRADICTED-BRIDGE-001: TSDB writer for contradicted-outcome correction drafts
+	contradictedDraftCache   *contradictedBridgeCache      // JIMINY-CONTRADICTED-BRIDGE-001: dedup LRU
 	surfaceCooldown          *SurfaceCooldownTracker       // JIMINY-CORPUS-001 Lever A: per-session surfacing cooldown
 
 	// JIMINY-CORPUS-001 Lever B: per-space effectiveness-prior cache (TTL-bounded;
@@ -1770,6 +1772,29 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 			)
 		}
 
+		// JIMINY-CONTRADICTED-BRIDGE-001: on a contradicted verdict, mint a
+		// correction draft for HITL review. Async writer; the hot path is
+		// never blocked. Dedup via in-process LRU on (guidance_id, action_hash)
+		// so a repeat-violation burst doesn't spawn duplicates.
+		if outcome == OutcomeContradicted && s.contradictedDraftWriter != nil &&
+			s.cfg.JiminyContradictedBridgeEnabled {
+			actionHash := hashAction(req.GuidanceID, req.ActionSummary)
+			if s.contradictedDraftCache == nil || !s.contradictedDraftCache.TrySeen(req.GuidanceID, actionHash) {
+				srcID := ""
+				if len(item.SourceNodes) > 0 {
+					srcID = item.SourceNodes[0]
+				}
+				maxLen := s.cfg.JiminyContradictedBridgeMaxContentLen
+				incorrect, correct := buildContradictedDraft(req.ActionSummary, item.Content, maxLen)
+				s.contradictedDraftWriter.RecordDraft(
+					newDraftID(), req.SpaceID, req.GuidanceID, string(item.Type), srcID,
+					clipContent(item.Content, maxLen), clipContent(req.ActionSummary, maxLen),
+					actionHash, incorrect, correct, feedbackSessionID,
+					cr.Confidence,
+				)
+			}
+		}
+
 		// JIMINY-RELEVANCE-001 Epic 1: persist the training EVIDENCE that was
 		// previously discarded — the guidance text, source-node role/layer, the
 		// agent-action text, and the audited verdict. Captures every non-Unknown
@@ -2285,6 +2310,18 @@ func (s *Service) SetOutcomeWriter(w OutcomeWriter) {
 // evidence corpus (JIMINY-RELEVANCE-001 Epic 1).
 func (s *Service) SetGuidanceTrainingWriter(w GuidanceTrainingWriter) {
 	s.guidanceTrainingWriter = w
+}
+
+// SetContradictedDraftWriter sets the TSDB writer for the contradicted-outcome
+// correction-draft bridge (JIMINY-CONTRADICTED-BRIDGE-001). Also (re-)initializes
+// the in-process dedup LRU sized to the writer's buffer cap (min 1024).
+func (s *Service) SetContradictedDraftWriter(w ContradictedDraftWriter) {
+	s.contradictedDraftWriter = w
+	cacheMax := s.cfg.JiminyContradictedBridgeWriterBufferSize
+	if cacheMax < 1024 {
+		cacheMax = 1024
+	}
+	s.contradictedDraftCache = newContradictedBridgeCache(cacheMax)
 }
 
 // resolveSourceMeta does a bounded, best-effort Neo4j lookup of a source node's

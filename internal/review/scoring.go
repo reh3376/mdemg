@@ -156,3 +156,35 @@ func GuidanceRubric(version string) Rubric {
 		},
 	}
 }
+
+// ContradictedDraftsRubric is the rated shape for the
+// JIMINY-CONTRADICTED-BRIDGE-001 correction-draft dataset. The operator's
+// primary decision is durable_rule >= 3 → approve (mint an L0 correction
+// obs); <= 1 → dismiss; ==2 → no-op (defer). phrasing_quality carries the
+// operator's phrasing signal for a later synthesis-tuning sprint but does
+// not gate the approve/dismiss action.
+func ContradictedDraftsRubric(version string) Rubric {
+	if version == "" {
+		version = "cd-v1"
+	}
+	return Rubric{
+		Version: version,
+		Kind:    RubricRated,
+		Dimensions: []RubricDimension{
+			{Key: "durable_rule", Anchors: [5]string{
+				"session-noise — not a rule at all",
+				"one-off — situational, not a rule",
+				"unclear — could be a rule with more context",
+				"probable rule — worth remembering",
+				"permanent rule — codify this immediately",
+			}},
+			{Key: "phrasing_quality", Anchors: [5]string{
+				"needs full rewrite — cannot be used as-is",
+				"heavy edits needed",
+				"minor edits needed",
+				"good phrasing — small tweaks welcome",
+				"publication-ready as-is",
+			}},
+		},
+	}
+}

@@ -257,6 +257,17 @@ type OutcomeWriter interface {
 	RecordOutcome(spaceID, constraintID, constraintCode, guidanceID, sessionID, outcomeType, guidanceType, instanceID, classifierSource string, similarity float64)
 }
 
+// ContradictedDraftWriter is the tsdb bridge for
+// JIMINY-CONTRADICTED-BRIDGE-001. On OutcomeContradicted, the jiminy service
+// invokes RecordDraft (async, buffered) with a draft correction ready for
+// HITL review. Defined here so tsdb can satisfy it without an import cycle.
+type ContradictedDraftWriter interface {
+	RecordDraft(id, spaceID, guidanceID, guidanceType, sourceNodeID,
+		guidanceContent, actionSummary, actionHash,
+		draftIncorrect, draftCorrect, sessionID string,
+		similarity float64)
+}
+
 // GuidanceTrainingWriter persists the per-item training EVIDENCE
 // (JIMINY-RELEVANCE-001 Epic 1): the surfaced guidance text, its source-node
 // role_type/layer, the agent-action text, and the audited verdict + classifier

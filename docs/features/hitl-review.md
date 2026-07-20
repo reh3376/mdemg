@@ -152,3 +152,35 @@ and persistence work for it with no further changes.
   multi-grader consensus.
 - The corrective `suggested_guidance` corpus feeds **`jiminy-actionability-001`**
   (better guidance synthesis) and the recursive-retraining loop.
+
+## Dataset: contradicted_drafts (Sprint JIMINY-CONTRADICTED-BRIDGE-001, 2026-07-20)
+
+**Purpose.** When Jiminy classifies an agent action as `contradicted` (the highest-signal lesson signal in the guidance loop — "the action directly opposes the guidance intent"), the bridge auto-generates a **correction draft** and surfaces it in HITL for operator review. On approve, the sink hands the draft's `Incorrect`/`Correct` pair to `conversation.Service.Correct` — an L0 correction observation is created, and the next consolidation cycle promotes it to an L1 `role_type='correction'` node via `CreateCorrectionNodes` (JIMINY-CORRECTION-PRODUCER-001).
+
+**Rubric (`cd-v1`).** Two 0-4 dimensions:
+- `durable_rule`: session-noise (0) / one-off (1) / unclear (2) / probable rule (3) / permanent rule (4). **The sink's decision:** ≥3 approve, ≤1 dismiss, 2 defer (draft stays pending).
+- `phrasing_quality`: needs full rewrite (0) → publication-ready (4). Advisory signal for a later synthesis-tuning sprint; does NOT gate the approve/dismiss action.
+
+**How to use.**
+1. `GET /v1/review/datasets?space_id=<id>` — verify `contradicted_drafts` is registered (candidate_count > 0 means pending review awaits).
+2. `GET /v1/review/next?dataset_id=contradicted_drafts&space_id=<id>` — pull the sampled item + rubric.
+3. `POST /v1/review/grade` with `{"dataset_id":"contradicted_drafts","item_id":"<draft_id>","space_id":"<id>","grader_id":"you","dimensions":{"durable_rule":4,"phrasing_quality":3},"reinforce":true}`.
+4. On approve: L0 obs created + draft marked `approved` with `applied_obs_id` captured. Next consolidation promotes to L1.
+5. On dismiss: draft marked `dismissed`; no substrate mutation.
+
+**Sink semantics.**
+- `Preview` (dry-run): describes the exact `conversation.Correct` call that would fire, or the status transition for dismiss/defer. No mutation.
+- `Apply`: idempotent per grade_id (endpoint-layer enforces). Mutates the substrate ONLY on approve.
+- `Reverse`: resets draft to `pending`. **Deliberately leaves the L0 obs in place** — a reversal is a re-review invitation, not a substrate rollback. Full undo requires `mdemg concepts tombstone` on the L0 obs.
+
+**Config.**
+
+| Env | Default | Purpose |
+|---|---|---|
+| `JIMINY_CONTRADICTED_BRIDGE_ENABLED` | `true` (post-E5 flip) | Emit draft rows on `OutcomeContradicted` |
+| `JIMINY_CONTRADICTED_BRIDGE_WRITER_FLUSH_INTERVAL_SEC` | 30 (floor 5) | Buffered writer flush cadence |
+| `JIMINY_CONTRADICTED_BRIDGE_WRITER_BUFFER_SIZE` | 1000 (0=unlimited) | Max buffered rows before FIFO eviction |
+| `JIMINY_CONTRADICTED_BRIDGE_MAX_CONTENT_LEN` | 400 | Cap for `draft_incorrect`/`draft_correct` |
+| `REVIEW_CONTRADICTED_DATASET_ENABLED` | `true` | Register the HITL dataset (independent of the bridge flag — drafts already in TSDB remain reviewable) |
+
+**Live evidence (E5, 2026-07-20).** End-to-end verified on `mdemg-dev`: real contradicted verdict → draft `c8jvgnmkl8zlmr4m58nl7rj3` → HITL surfaced → approve grade → real L0 obs `po2zahas8mh10ahwe0iimmoz` → consolidation → real L1 correction `ymehdkihmj2yiu7t3bywsgxc` (count 32 → 33). See `docs/development/jiminy-contradicted-bridge-001/live_verification.md`.
