@@ -72,12 +72,12 @@
     {
       "title": "LLM error rate % by task_name (selected range)",
       "type": "table",
-      "description": "Percentage of llm_interactions with non-null error per task_name. Spikes indicate timeout pressure, breaker trips, or model failure modes.",
+      "description": "Percentage of llm_interactions with a REAL non-null error per task_name (excludes caller-cancellation, which fails-open and is not a real error). Spikes indicate timeout pressure, breaker trips, or model failure modes. Filter contract mirrors internal/tsdb/dataset_builder.go::LLMPerformance (LLM-HEALTH-INVESTIGATION-001 E3 → GRAFANA-PANEL-FILTER-001 E2).",
       "gridPos": { "h": 10, "w": 12, "x": 0, "y": 20 },
       "datasource": { "type": "postgres", "uid": "timescaledb" },
       "targets": [
         {
-          "rawSql": "SELECT task_name, COUNT(*) AS calls, SUM(CASE WHEN error IS NOT NULL AND length(error) > 0 THEN 1 ELSE 0 END) AS errors, ROUND(100.0 * SUM(CASE WHEN error IS NOT NULL AND length(error) > 0 THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0), 2) AS error_pct FROM llm_interactions WHERE $__timeFilter(time) AND ('$space_id' = '' OR space_id = '$space_id') GROUP BY 1 ORDER BY error_pct DESC NULLS LAST, calls DESC",
+          "rawSql": "-- GRAFANA-PANEL-FILTER-001: mirror dataset_builder.go::LLMPerformance — exclude caller-cancellation from error rate (fails-open, not a real error).\nSELECT task_name, COUNT(*) AS calls, SUM(CASE WHEN error IS NOT NULL AND error != '' AND error NOT LIKE 'caller_canceled:%' THEN 1 ELSE 0 END) AS errors, ROUND(100.0 * SUM(CASE WHEN error IS NOT NULL AND error != '' AND error NOT LIKE 'caller_canceled:%' THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0), 2) AS error_pct FROM llm_interactions WHERE $__timeFilter(time) AND ('$space_id' = '' OR space_id = '$space_id') GROUP BY 1 ORDER BY error_pct DESC NULLS LAST, calls DESC",
           "format": "table",
           "refId": "A"
         }
