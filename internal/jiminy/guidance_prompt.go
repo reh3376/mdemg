@@ -48,6 +48,10 @@ const directiveSynthesisInstruction = `DIRECTIVE MODE (override the narrative st
 - Convert each abstraction into the one concrete action it implies here. If a principle
   implies no concrete action for this task, omit it rather than restating it as prose.
 - Constraints and corrections are already imperative — keep them verbatim in force.
+- CORRECTIONS in the "Do X — not Y" form (JIMINY-STRUCTURED-CORRECTION-001) are
+  authored by an operator or the substrate itself; preserve BOTH sides of the
+  contrast verbatim: never drop the "— not Y" anti-pattern half, since the
+  contrast is what teaches.
 - Still cite every claim as (Node: <node_id>) and invent nothing beyond the evidence.`
 
 // ollamaSynthesisSchema is the JSON schema for Ollama structured synthesis output.
@@ -122,6 +126,19 @@ func buildGuidancePrompt(items []GuidanceItem, context, agentOutput string, cont
 				} else {
 					fmt.Fprintf(&sb, "- [conf: %.2f] %s%s\n", item.Confidence, item.Content, nodeRef)
 				}
+			} else if gType == GuidanceCorrection && item.CorrectionCorrect != "" {
+				// JIMINY-STRUCTURED-CORRECTION-001: use the structured pair for a
+				// crisp "Do <correct> — not <incorrect>" imperative when present.
+				// Downstream synthesis's directive-mode instruction (Lever B) knows
+				// to preserve this shape verbatim.
+				rendered := "Do " + item.CorrectionCorrect
+				if item.CorrectionIncorrect != "" {
+					rendered += " — not " + item.CorrectionIncorrect
+				}
+				if item.CorrectionContext != "" {
+					rendered += ". (Context: " + item.CorrectionContext + ")"
+				}
+				fmt.Fprintf(&sb, "- [conf: %.2f] %s%s\n", item.Confidence, rendered, nodeRef)
 			} else {
 				fmt.Fprintf(&sb, "- [conf: %.2f] %s%s\n", item.Confidence, item.Content, nodeRef)
 			}
