@@ -384,15 +384,25 @@ const (
 )
 
 // defaultCompressionTargetRatio mirrors the J17_COMPRESSION_TARGET_RATIO
-// config default (DASHBOARD-TRUTH-001 Epic 3) — used as a defensive fallback
-// when the Assessor is built with a Config literal (target unset / <= 1.0).
-const defaultCompressionTargetRatio = 3.0
+// config default (DASHBOARD-TRUTH-001 Epic 3, recalibrated 3.0→2.0 by
+// DASHBOARD-TRUTH-002 E3) — used as a defensive fallback when the Assessor
+// is built with a Config literal (target unset / <= 1.0). Keep in sync
+// with FromEnv's default in internal/config/config.go.
+const defaultCompressionTargetRatio = 2.0
 
 // scoreRetrieval returns (score, confidence). Confidence is derived from
 // LearningPhase maturity: warm/saturated phases reflect enough edge history
 // to trust the retrieval signal; cold reflects minimal data.
+//
+// DASHBOARD-TRUTH-002 E1 (2026-07-20): the old "saturated=0.7" was a
+// wrong-anchor artifact — saturation is not degradation, and warm=0.9 >
+// saturated=0.7 read as "the more mature the graph, the worse the
+// retrieval". Fixed: saturated=0.9 (equal to warm; sub-1.0 acknowledges
+// no real quality signal is being measured — this function is still a
+// maturity gauge, not a quality gauge). A full rewrite that reads
+// retrieval_events rerank fill-rate + uvts_runs recent mean is deferred
+// to a follow-up sprint; this ships the minimum artifact-close.
 func (a *Assessor) scoreRetrieval(r *SelfAssessmentReport) (float64, float64) {
-	// Based on learning phase: cold=0.3, learning=0.6, warm=0.9, saturated=0.7
 	switch r.LearningPhase {
 	case "cold":
 		return 0.3, 0.4
@@ -401,7 +411,7 @@ func (a *Assessor) scoreRetrieval(r *SelfAssessmentReport) (float64, float64) {
 	case "warm":
 		return 0.9, 1.0
 	case "saturated":
-		return 0.7, 1.0
+		return 0.9, 1.0
 	default:
 		return 0.5, 0.1
 	}
@@ -438,7 +448,16 @@ func (a *Assessor) scoreEdge(r *SelfAssessmentReport) (float64, float64) {
 			score -= 0.3
 		}
 	}
-	if r.EdgeWeightEntropy < 0.5 {
+	// DASHBOARD-TRUTH-002 E2 (2026-07-20): the old hardcoded 0.5 floor
+	// permanently fired on any mature Hebbian graph. computeEdgeWeightEntropy
+	// is binary entropy over `strong_edges / total` where strong = evidence_count>=5.
+	// A mature substrate accumulates many single-touch co-activations that
+	// never re-trigger (long-tail); live mdemg-dev shows p≈0.047 → entropy≈0.27,
+	// well below the old 0.5 floor. Config-tunable now (RSIC_EDGE_ENTROPY_FLOOR
+	// default 0.2, calibrated below the observed healthy value). Set to 0 to
+	// disable the penalty entirely.
+	floor := a.cfg.RSICEdgeEntropyFloor
+	if floor > 0 && r.EdgeWeightEntropy < floor {
 		score -= 0.2
 	}
 	if score < 0 {
@@ -544,9 +563,20 @@ func (a *Assessor) scoreProtocol(stats ProtocolStatsResult) (float64, float64) {
 	// 20% coverage (do all constraints have codes?)
 	coverageScore := clamp(stats.CodeCoverage, 0, 1)
 
-	// 15% stability (ticket restores + low replay frequency)
+	// 15% stability (ticket restores + low replay frequency).
+	// DASHBOARD-TRUTH-002 E3 (2026-07-20): apply the DH-004 "no data =
+	// neutral" gate to restoreScore. When TicketRestoreTotal==0 (no
+	// restore attempts happened in the window), the rate field is 0.0 by
+	// default — but 0.0 means "no data", NOT "0% success rate". Same
+	// pattern DH-004 shipped for J17 Protocol Health's own view of this
+	// field. Without the gate, an idle-ish substrate had its Protocol
+	// dimension permanently dragged by 0.075 (0.15 stability × 0.5
+	// restoreScore weight × 1.0 mis-scored delta).
 	replayPenalty := clamp(stats.ReplayFrequencyPerHour/10.0, 0, 1)
-	restoreScore := clamp(stats.TicketRestoreSuccessRate, 0, 1)
+	restoreScore := 1.0
+	if stats.TicketRestoreTotal > 0 {
+		restoreScore = clamp(stats.TicketRestoreSuccessRate, 0, 1)
+	}
 	stabilityScore := 0.5*restoreScore + 0.5*(1.0-replayPenalty)
 
 	score := 0.35*comprehensionScore + 0.05*calibrationScore + 0.25*compressionScore +

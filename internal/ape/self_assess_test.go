@@ -20,6 +20,10 @@ func newTestAssessor() *Assessor {
 	return &Assessor{cfg: config.Config{
 		SynergyTargetClaudeLines: 100,
 		SynergyTargetMemoryLines: 80,
+		// DASHBOARD-TRUTH-002 E2: mirror production default 0.2. Tests that
+		// exercise the entropy penalty pass a report.EdgeWeightEntropy < 0.2.
+		// Tests that want to disable the penalty pass EdgeWeightEntropy >= 0.2.
+		RSICEdgeEntropyFloor: 0.2,
 	}}
 }
 
@@ -56,7 +60,7 @@ func TestScoreRetrieval_AllPhases(t *testing.T) {
 		{"cold", 0.3},
 		{"learning", 0.6},
 		{"warm", 0.9},
-		{"saturated", 0.7},
+		{"saturated", 0.9}, // DASHBOARD-TRUTH-002 E1: was 0.7 (wrong-anchor penalising maturity); now equal to warm.
 		{"", 0.5},
 		{"unknown", 0.5},
 	}
@@ -185,22 +189,22 @@ func TestScoreEdge_HighBelowRatio(t *testing.T) {
 }
 
 func TestScoreEdge_LowEntropy(t *testing.T) {
-	a := newTestAssessor()
+	a := newTestAssessor() // RSICEdgeEntropyFloor=0.2 (production default)
 	r := &SelfAssessmentReport{
 		EdgeCount:           100,
 		EdgesBelowThreshold: 10,  // 10% < 30%, no penalty
-		EdgeWeightEntropy:   0.3, // < 0.5 → -0.2
+		EdgeWeightEntropy:   0.1, // < 0.2 → -0.2
 	}
 	got, _ := a.scoreEdge(r)
 	assertClose(t, got, 0.8, 0.001, "scoreEdge low entropy")
 }
 
 func TestScoreEdge_BothPenalties(t *testing.T) {
-	a := newTestAssessor()
+	a := newTestAssessor() // RSICEdgeEntropyFloor=0.2 (production default)
 	r := &SelfAssessmentReport{
 		EdgeCount:           100,
 		EdgesBelowThreshold: 50,  // 50% > 30% → -0.3
-		EdgeWeightEntropy:   0.2, // < 0.5 → -0.2
+		EdgeWeightEntropy:   0.1, // < 0.2 → -0.2
 	}
 	got, _ := a.scoreEdge(r)
 	// 1.0 - 0.3 - 0.2 = 0.5
@@ -462,11 +466,16 @@ func TestScoreProtocol_Perfect(t *testing.T) {
 func TestScoreProtocol_Zero(t *testing.T) {
 	a := newTestAssessor()
 	stats := ProtocolStatsResult{
-		AvgComprehension:         0.0,
-		NLIBiasAlert:             false, // calibration = 1.0 (not zero)
-		CompressionRatio:         1.0,   // (1.0-1.0)/(3.0-1.0) = 0.0
-		CodeCoverage:             0.0,
+		AvgComprehension: 0.0,
+		NLIBiasAlert:     false, // calibration = 1.0 (not zero)
+		CompressionRatio: 1.0,   // (1.0-1.0)/(target-1.0) = 0.0
+		CodeCoverage:     0.0,
+		// DASHBOARD-TRUTH-002 E3: TicketRestoreTotal>0 says "we HAVE
+		// data, it happens to be 0.0" so restoreScore is 0.0 (not the
+		// new no-data-neutral 1.0). This test preserves its original
+		// intent of exercising "everything is zero".
 		TicketRestoreSuccessRate: 0.0,
+		TicketRestoreTotal:       1,
 		ReplayFrequencyPerHour:   0.0, // stability = 0.5*0.0 + 0.5*1.0 = 0.5
 	}
 	got, _ := a.scoreProtocol(stats)
@@ -494,9 +503,10 @@ func TestScoreProtocol_CompressionBelow1(t *testing.T) {
 	stats := ProtocolStatsResult{
 		AvgComprehension:         0.8,
 		NLIBiasAlert:             false,
-		CompressionRatio:         0.5, // (0.5-1.0)/(3.0-1.0) = -0.25 → clamped to 0
+		CompressionRatio:         0.5, // clamped to 0 regardless of target (below-1 → negative)
 		CodeCoverage:             0.8,
 		TicketRestoreSuccessRate: 0.9,
+		TicketRestoreTotal:       1,   // DASHBOARD-TRUTH-002 E3: signal real data at 0.9
 		ReplayFrequencyPerHour:   2.0, // penalty = 2.0/10.0 = 0.2, stability = 0.5*0.9 + 0.5*0.8 = 0.85
 	}
 	got, _ := a.scoreProtocol(stats)
@@ -529,7 +539,7 @@ func TestScoreProtocol_HighReplayFrequency(t *testing.T) {
 func TestScoreProtocol_CompressionAnchor(t *testing.T) {
 	cases := []struct {
 		name   string
-		target float64 // 0 = unset → defensive fallback to default 3.0
+		target float64 // 0 = unset → defensive fallback to defaultCompressionTargetRatio (2.0 post DASHBOARD-TRUTH-002 E3)
 		ratio  float64
 		want   float64 // expected compression sub-score
 	}{
@@ -539,8 +549,9 @@ func TestScoreProtocol_CompressionAnchor(t *testing.T) {
 		{"live typical 1.681 under default", 3.0, 1.681, 0.3405},
 		{"above target clamps to 1.0", 3.0, 5.0, 1.0},
 		{"custom target 2.0: ratio 1.5 scores 0.5", 2.0, 1.5, 0.5},
-		{"unset target falls back to default 3.0", 0, 2.0, 0.5},
-		{"misconfigured target <= 1.0 falls back to default 3.0", 1.0, 3.0, 1.0},
+		// DASHBOARD-TRUTH-002 E3: defensive fallback default is now 2.0.
+		{"unset target falls back to default 2.0", 0, 2.0, 1.0},          // ratio 2.0 == target 2.0 → 1.0
+		{"misconfigured target <= 1.0 falls back to default 2.0", 1.0, 2.0, 1.0}, // ratio 2.0 == target 2.0 → 1.0
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -872,6 +883,7 @@ func TestScoreProtocol_StabilityWeighting(t *testing.T) {
 		CompressionRatio:         1.0,  // compression = 0.0
 		CodeCoverage:             0.0,
 		TicketRestoreSuccessRate: 0.6,
+		TicketRestoreTotal:       1,   // DASHBOARD-TRUTH-002 E3: signal real data at 0.6
 		ReplayFrequencyPerHour:   5.0, // penalty = 0.5, stability = 0.5*0.6 + 0.5*0.5 = 0.55
 	}
 	got, _ := a.scoreProtocol(stats)

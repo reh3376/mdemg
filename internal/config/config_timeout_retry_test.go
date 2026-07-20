@@ -222,8 +222,9 @@ func TestJ17CompressionTargetRatio_Default(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FromEnv() error: %v", err)
 	}
-	if cfg.J17CompressionTargetRatio != 3.0 {
-		t.Errorf("J17CompressionTargetRatio = %f, want 3.0", cfg.J17CompressionTargetRatio)
+	// DASHBOARD-TRUTH-002 E3 recalibrated the default 3.0 → 2.0.
+	if cfg.J17CompressionTargetRatio != 2.0 {
+		t.Errorf("J17CompressionTargetRatio = %f, want 2.0", cfg.J17CompressionTargetRatio)
 	}
 }
 
@@ -252,8 +253,11 @@ func TestJ17CompressionTargetRatio_AtOrBelowOneFallsBack(t *testing.T) {
 			if err != nil {
 				t.Fatalf("FromEnv() error: %v", err)
 			}
-			if cfg.J17CompressionTargetRatio != 3.0 {
-				t.Errorf("J17CompressionTargetRatio = %f, want 3.0 (fallback for <= 1.0)", cfg.J17CompressionTargetRatio)
+			// DASHBOARD-TRUTH-002 E3 recalibrated the default 3.0 → 2.0
+			// (live 30d p95 is 2.0; 3.0 was defensively-excellent but
+			// unreachable). Fallback default follows suit.
+			if cfg.J17CompressionTargetRatio != 2.0 {
+				t.Errorf("J17CompressionTargetRatio = %f, want 2.0 (fallback for <= 1.0)", cfg.J17CompressionTargetRatio)
 			}
 		})
 	}
