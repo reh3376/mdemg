@@ -1,0 +1,65 @@
+{
+  "baseline_provider": "openai",
+  "candidate_provider": "neural",
+  "summary": {
+    "total_questions": 120,
+    "baseline_mean": 0.415,
+    "candidate_mean": 0.413,
+    "mean_delta": -0.002,
+    "baseline_correct_file_rate": 0.642,
+    "candidate_correct_file_rate": 0.617,
+    "baseline_std": 0.048,
+    "candidate_std": 0.049,
+    "delta_within_noise": true
+  },
+  "by_category": {
+    "architecture_structure": {
+      "count": 20,
+      "baseline_mean": 0.431,
+      "candidate_mean": 0.421,
+      "delta": -0.01
+    },
+    "business_logic_constraints": {
+      "count": 20,
+      "baseline_mean": 0.392,
+      "candidate_mean": 0.392,
+      "delta": 0.0
+    },
+    "computed_value": {
+      "count": 6,
+      "baseline_mean": 0.383,
+      "candidate_mean": 0.367,
+      "delta": -0.016
+    },
+    "cross_cutting_concerns": {
+      "count": 20,
+      "baseline_mean": 0.442,
+      "candidate_mean": 0.437,
+      "delta": -0.005
+    },
+    "data_flow_integration": {
+      "count": 20,
+      "baseline_mean": 0.392,
+      "candidate_mean": 0.387,
+      "delta": -0.005
+    },
+    "disambiguation": {
+      "count": 8,
+      "baseline_mean": 0.412,
+      "candidate_mean": 0.425,
+      "delta": 0.013
+    },
+    "relationship": {
+      "count": 6,
+      "baseline_mean": 0.417,
+      "candidate_mean": 0.417,
+      "delta": 0.0
+    },
+    "service_relationships": {
+      "count": 20,
+      "baseline_mean": 0.431,
+      "candidate_mean": 0.436,
+      "delta": 0.005
+    }
+  }
+}
