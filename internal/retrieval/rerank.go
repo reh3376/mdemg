@@ -64,21 +64,28 @@ func (s *Service) Rerank(ctx context.Context, req RerankRequest) (*RerankResult,
 		returnK = len(req.Candidates)
 	}
 
-	// LLM-HEALTH-INVESTIGATION-001 E2: pre-check the CALLER'S deadline before
-	// dispatching. rerank_cross p95=~11s on production; if the caller has less
-	// than RerankMinBudgetMs (default 12000 = p99 + 300ms margin) remaining,
-	// the LLM call is guaranteed to be canceled — skip it and return the
-	// pre-rerank RRF order (fail-open, same as an error return, but without
-	// wasting a llama-server slot AND without a caller_canceled row landing in
-	// llm_interactions). Deadline-absent callers (CLI direct calls, tests)
-	// bypass the check — no caller cancellation to guard against.
-	if s.cfg.RerankMinBudgetMs > 0 {
+	// LLM-HEALTH-INVESTIGATION-001 E2 + NEURAL-RERANK-PRECHECK-001: pre-check
+	// the CALLER'S deadline before dispatching. If remaining < min budget the
+	// call is guaranteed to be canceled — skip and return pre-rerank RRF order
+	// (fail-open). Deadline-absent callers (CLI, tests) bypass the check.
+	//
+	// Budget is provider-aware: rerank_cross via LLM (openai/ollama) has
+	// p99=~11.7s → RerankMinBudgetMs default 12000; neural sidecar has
+	// default timeout 1000ms → NeuralRerankMinBudgetMs default 1500. Applying
+	// the LLM budget to a neural call would over-skip callers that had plenty
+	// of budget for neural.
+	minBudgetMs := s.cfg.RerankMinBudgetMs
+	if s.cfg.RerankProvider == "neural" {
+		minBudgetMs = s.cfg.NeuralRerankMinBudgetMs
+	}
+	if minBudgetMs > 0 {
 		if deadline, ok := ctx.Deadline(); ok {
 			remaining := time.Until(deadline)
-			if remaining < time.Duration(s.cfg.RerankMinBudgetMs)*time.Millisecond {
+			if remaining < time.Duration(minBudgetMs)*time.Millisecond {
 				slog.Warn("rerank skipped: insufficient budget",
 					"remaining_ms", remaining.Milliseconds(),
-					"min_budget_ms", s.cfg.RerankMinBudgetMs,
+					"min_budget_ms", minBudgetMs,
+					"provider", s.cfg.RerankProvider,
 					"space_id", req.SpaceID,
 					"candidates", len(req.Candidates))
 				return &RerankResult{
