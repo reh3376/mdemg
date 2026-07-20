@@ -73,3 +73,15 @@ JIMINY-CORRECTION-PRODUCER-001 mints the missing L1 layer:
 - **Live Tier-3:** 32 L1 correction nodes minted; `/v1/memory/retrieve` returns `role_type='correction'` on relevant queries; Jiminy `latest` surfaces `type='correction'`; `constraint_outcomes.guidance_type='correction'` gains its first ever row for `mdemg-dev` (`followed`).
 
 New config: `CORRECTION_PROMOTION_ENABLED` (default true), `CORRECTION_PROMOTION_MIN_CONTENT_LEN` (default 20), `CORRECTION_PROMOTION_REJECT_PATTERNS` (JSON regex array; defaults reuse the constraint gate's junk-class set). Rollback tombstone-only via `is_archived=true`. See `docs/development/jiminy-correction-producer-001/`.
+
+## Follow-up — structured correction propagation (JIMINY-STRUCTURED-CORRECTION-001, 2026-07-20)
+The `Incorrect`/`Correct`/`Context` triple that `POST /v1/conversation/correct` receives no longer dead-ends in the free-text join. It now flows end-to-end:
+- **L0 obs**: `structured_data.correction = {incorrect, correct, context}` — additive to any constraint-detector fields already present.
+- **L1 correction node**: `correction_incorrect` / `correction_correct` / `correction_context` as top-level graph properties (populated by `CreateCorrectionNodes` from L0 structured_data).
+- **GuidanceItem** (via Lever C fetch): three optional fields carried through to the synthesizer.
+- **Lever B synthesis prompt**: renders "Do <correct> — not <incorrect>. (Context: <ctx>)" when structured; falls back to raw `Content` when not. `directiveSynthesisInstruction` preserves both sides of the contrast — never drops the anti-pattern half, since the contrast is what teaches.
+- **Backfill**: `mdemg corrections rehydrate-structured --space-id <id> [--dry-run] [--batch-size 100]` walks L0 corrections missing structured, parses the joined content via the template regex, merges (preserves other keys), and propagates to linked L1 via IMPLEMENTS_CORRECTION. Idempotent. WARN-skips unparseable free-form corrections (~97% of mdemg-dev's L0 corrections — they were captured via `/v1/conversation/observe` and never followed the template shape). This is by design: downstream prefers structured when present, falls back to Content otherwise.
+
+**Retired dead code:** the `metadata_*` param flatten in `createObservationNode` was never referenced by the CREATE cypher — no `metadata_incorrect` / `metadata_correct` property has ever landed on any MemoryNode (verified live). Removed with a comment explaining prior intent; if a future feature needs graph-persisted Metadata it must add BOTH the flatten AND matching cypher SET clauses.
+
+See `docs/development/jiminy-structured-correction-001/`.
