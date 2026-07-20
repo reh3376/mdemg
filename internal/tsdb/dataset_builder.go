@@ -160,7 +160,13 @@ func (b *DatasetBuilder) LLMPerformance(ctx context.Context, spaceID string, win
 		SELECT
 			task_name,
 			COUNT(*)::int AS total_calls,
-			COUNT(*) FILTER (WHERE error IS NOT NULL AND error != '')::int AS error_count,
+			-- LLM-HEALTH-INVESTIGATION-001 E3: exclude caller-cancellation from
+			-- the error count. Cancellations from the caller's context deadline
+			-- (e.g., rerank starting with insufficient budget) aren't LLM health
+			-- events — they're prefixed 'caller_canceled: ' by the recorder
+			-- (llmclient/client.go E1). Same filter on last_error_at so the
+			-- SUPERVISOR-002 recency gate doesn't latch on a cancellation burst.
+			COUNT(*) FILTER (WHERE error IS NOT NULL AND error != '' AND error NOT LIKE 'caller_canceled:%')::int AS error_count,
 			COALESCE(percentile_cont(0.5) WITHIN GROUP (ORDER BY latency_ms) FILTER (WHERE latency_ms IS NOT NULL), 0) AS latency_p50,
 			COALESCE(percentile_cont(0.95) WITHIN GROUP (ORDER BY latency_ms) FILTER (WHERE latency_ms IS NOT NULL), 0) AS latency_p95,
 			COALESCE(AVG(tokens_in)::float8, 0) AS avg_tokens_in,
@@ -168,7 +174,7 @@ func (b *DatasetBuilder) LLMPerformance(ctx context.Context, spaceID string, win
 			COUNT(DISTINCT model_name)::int AS distinct_models,
 			COUNT(*) FILTER (WHERE system_prompt IS NOT NULL AND system_prompt != '')::int AS has_sys_prompt_count,
 			COUNT(*) FILTER (WHERE retrieval_node_ids IS NOT NULL AND array_length(retrieval_node_ids, 1) > 0)::int AS has_raft_count,
-			MAX(time) FILTER (WHERE error IS NOT NULL AND error != '') AS last_error_at
+			MAX(time) FILTER (WHERE error IS NOT NULL AND error != '' AND error NOT LIKE 'caller_canceled:%') AS last_error_at
 		FROM llm_interactions
 		WHERE space_id = $1 AND time >= $2
 		GROUP BY task_name
