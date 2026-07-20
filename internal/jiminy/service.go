@@ -2932,7 +2932,11 @@ func (s *Service) fetchActionableCandidates(ctx context.Context, spaceID string,
 	WITH c, vector.similarity.cosine(c.embedding, $embedding) AS sim
 	WHERE sim >= $simFloor
 	RETURN c.node_id AS nodeId, coalesce(c.name, '') AS name,
-	       coalesce(c.summary, '') AS summary, c.role_type AS roleType, sim
+	       coalesce(c.summary, '') AS summary, c.role_type AS roleType,
+	       coalesce(c.correction_incorrect, '') AS corrIncorrect,
+	       coalesce(c.correction_correct, '')   AS corrCorrect,
+	       coalesce(c.correction_context, '')   AS corrContext,
+	       sim
 	ORDER BY sim DESC LIMIT $topK`
 
 	out, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
@@ -2974,12 +2978,20 @@ func (s *Service) fetchActionableCandidates(ctx context.Context, spaceID string,
 			if conf > maxConfidence {
 				conf = maxConfidence
 			}
+			// JIMINY-STRUCTURED-CORRECTION-001: propagate structured
+			// correction fields when present on the L1 node.
+			corrIncorrect := getStr("corrIncorrect")
+			corrCorrect := getStr("corrCorrect")
+			corrContext := getStr("corrContext")
 			items = append(items, GuidanceItem{
-				Type:        gType,
-				Priority:    "high",
-				Content:     content,
-				Confidence:  conf,
-				SourceNodes: []string{nodeID},
+				Type:                 gType,
+				Priority:             "high",
+				Content:              content,
+				Confidence:           conf,
+				SourceNodes:          []string{nodeID},
+				CorrectionIncorrect: corrIncorrect,
+				CorrectionCorrect:   corrCorrect,
+				CorrectionContext:   corrContext,
 			})
 		}
 		return items, res.Err()

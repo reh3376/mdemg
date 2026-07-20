@@ -64,6 +64,17 @@ type GuidanceItem struct {
 	ConstraintCode  string            `json:"constraint_code,omitempty"`  // J17: mnemonic code for T1 encoding
 	Tier            int               `json:"tier,omitempty"`             // J17: encoding tier used (1=coded, 2=telegraphic, 3=full NL)
 	Annotations     map[string]string `json:"annotations,omitempty"`      // J17: inline annotations for T1 disambiguation (alt:, scope:, ctx:, neg:)
+
+	// JIMINY-STRUCTURED-CORRECTION-001: structured fields propagated from the
+	// L1 correction node's correction_incorrect / correction_correct /
+	// correction_context properties. Populated for GuidanceCorrection items
+	// when the L1 node was authored via /v1/conversation/correct after v0.11.4
+	// or backfilled via `mdemg corrections rehydrate-structured`. Downstream
+	// synthesis (Lever B directive mode) prefers these over regex-parsing
+	// Content when present.
+	CorrectionIncorrect string `json:"correction_incorrect,omitempty"`
+	CorrectionCorrect   string `json:"correction_correct,omitempty"`
+	CorrectionContext   string `json:"correction_context,omitempty"`
 }
 
 // SourceCounts tracks how many items came from each source.

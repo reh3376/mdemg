@@ -526,28 +526,8 @@ func (s *Service) Observe(ctx context.Context, req ObserveRequest) (*ObserveResp
 
 // Correct captures an explicit correction (sets high surprise)
 func (s *Service) Correct(ctx context.Context, req CorrectRequest) (*ObserveResponse, error) {
-	// Build content string
-	content := fmt.Sprintf("CORRECTION: Incorrect: %s | Correct: %s", req.Incorrect, req.Correct)
-	if req.Context != "" {
-		content += fmt.Sprintf(" | Context: %s", req.Context)
-	}
+	obsReq := buildCorrectionObserveRequest(req)
 
-	// Create observation with correction type
-	obsReq := ObserveRequest{
-		SpaceID:   req.SpaceID,
-		SessionID: req.SessionID,
-		Content:   content,
-		ObsType:   string(ObsTypeCorrection),
-		Tags:      []string{"correction"},
-		Metadata: map[string]any{
-			"incorrect": req.Incorrect,
-			"correct":   req.Correct,
-			"context":   req.Context,
-		},
-		UserID:     req.UserID,
-		Visibility: req.Visibility,
-		RefersTo:   req.RefersTo,
-	}
 
 	resp, err := s.Observe(ctx, obsReq)
 	if err != nil {
@@ -565,6 +545,47 @@ func (s *Service) Correct(ctx context.Context, req CorrectRequest) (*ObserveResp
 	}
 
 	return resp, nil
+}
+
+// buildCorrectionObserveRequest builds the internal ObserveRequest for a
+// correction. Extracted for testability — the JIMINY-STRUCTURED-CORRECTION-001
+// contract is that the returned request carries both:
+//   - a joined `content` string ("CORRECTION: Incorrect: X | Correct: Y | Context: Z")
+//     for backward compatibility with consumers that regex-parse content
+//   - a `StructuredData["correction"]` sub-object with the three fields as
+//     first-class keys, so the L1 producer + Lever B synthesis can read
+//     structured fields without parsing
+//
+// Metadata is kept for audit/logging surfaces; it is NOT graph-persisted
+// (see the retired metadata_* dead-code note in Observe's CREATE path).
+func buildCorrectionObserveRequest(req CorrectRequest) ObserveRequest {
+	content := fmt.Sprintf("CORRECTION: Incorrect: %s | Correct: %s", req.Incorrect, req.Correct)
+	if req.Context != "" {
+		content += fmt.Sprintf(" | Context: %s", req.Context)
+	}
+	return ObserveRequest{
+		SpaceID:   req.SpaceID,
+		SessionID: req.SessionID,
+		Content:   content,
+		ObsType:   string(ObsTypeCorrection),
+		Tags:      []string{"correction"},
+		Metadata: map[string]any{
+			"incorrect": req.Incorrect,
+			"correct":   req.Correct,
+			"context":   req.Context,
+		},
+		StructuredData: map[string]any{
+			"correction": map[string]any{
+				"incorrect": req.Incorrect,
+				"correct":   req.Correct,
+				"context":   req.Context,
+			},
+		},
+		UserID:     req.UserID,
+		Visibility: req.Visibility,
+		RefersTo:   req.RefersTo,
+		AgentID:    req.AgentID,
+	}
 }
 
 // createObservationNode creates a MemoryNode with role_type="conversation_observation"
@@ -667,12 +688,15 @@ func (s *Service) createObservationNode(ctx context.Context, nodeID string, obs 
 			"createdAt":                 obs.CreatedAt.Format(time.RFC3339),
 		}
 
-		// Add metadata as properties if present
-		if obs.Metadata != nil && len(obs.Metadata) > 0 {
-			for k, v := range obs.Metadata {
-				params["metadata_"+k] = v
-			}
-		}
+		// NB (JIMINY-STRUCTURED-CORRECTION-001, 2026-07-20): a prior version
+		// of this loop flattened obs.Metadata into params["metadata_<key>"] with
+		// the intent of persisting them as node properties, but the CREATE
+		// cypher above never referenced those params — so the flatten was dead
+		// code and no metadata_ property has ever landed on a MemoryNode. The
+		// audit/logging surface still gets obs.Metadata via other paths; a
+		// future feature that needs graph-persisted metadata must add BOTH the
+		// flatten AND matching cypher SET clauses. Removed to avoid the
+		// misleading appearance of persistence.
 
 		result, err := tx.Run(ctx, cypher, params)
 		if err != nil {

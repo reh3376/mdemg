@@ -132,9 +132,11 @@ Use "mdemg <command> --help" for more information about a command.`,
 
 	graphCmd := newGraphCmd()
 	conceptsCmd := newConceptsCmd()
+	correctionsCmd := newCorrectionsCmd()
 	graphCmd.GroupID = "database"
 	rootCmd.AddCommand(graphCmd)
 	rootCmd.AddCommand(conceptsCmd)
+	rootCmd.AddCommand(correctionsCmd)
 
 	// Memory & Ingestion
 	ingestCmd := newIngestCmd()
