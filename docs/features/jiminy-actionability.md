@@ -61,3 +61,15 @@ Follow-rate lift is forward-looking (baseline 0.165; re-measure ~1 week out). Se
 
 ## Follow-up — role_type adapter gap closed (JIMINY-ROLETYPE-ADAPTER-001, 2026-07-17)
 The disclosed follow-up ("retrieval adapter drops role_type → retrieval-sourced items typed `learning`") is **shipped and live-verified**. Additive `RoleType`/`ObsType` fields flow from Neo4j `role_type`/`obs_type` through `retrieval.Candidate` → `models.RetrieveResult` → `jiminy.RetrievalResult`; `classifyRetrievalItem` prefers `role_type` before the Layer≥2 concept short-circuit and the `ObsType` switch. Live smoke on `mdemg-dev`: the L1 UxTS constraint node surfaced with `role_type='constraint'`, Jiminy `latest` returned **4/5 items typed `constraint`** (all 5 would have been `learning` pre-fix), and `constraint_outcomes` now carries `guidance_type='constraint'` rows with matched `constraint_code`. The BM25 sink also picked up `role_type` at source (BM25 runs its own Cypher, not a virtual view over `cands`), and the reasoning-module rerank preserves ontology labels through the proto boundary via the existing `originalByID` restore hook. See `docs/development/jiminy-roletype-adapter-001/`.
+
+
+## Follow-up — L1 correction producer (JIMINY-CORRECTION-PRODUCER-001, 2026-07-20)
+JIMINY-ROLETYPE-ADAPTER-001 wired retrieval + classifier to carry `role_type='correction'` end-to-end, but the correction slot in `constraint_outcomes` still read zero because **no L1 correction nodes existed anywhere**. `CreateConstraintNodes` had a producer since inception; the correction side had none — 32 L0 `obs_type='correction'` observations sat in `mdemg-dev` unpromoted.
+
+JIMINY-CORRECTION-PRODUCER-001 mints the missing L1 layer:
+- **`internal/hidden/correction_nodes.go::CreateCorrectionNodes`** mirrors the constraint producer, keyed by `obs_type='correction'` (semantic label, 1:1 with the obs — no type-grouping); idempotent via the `IMPLEMENTS_CORRECTION` guard.
+- **`internal/hidden/correction_gate.go::CorrectionPromotionGate`** — content-length + config-driven regex deny-set (reuses the JIMINY-CORPUS-001 junk-class defaults). No obs_type deny-set (the predicate already gates on `obs_type='correction'`).
+- Wired as `correctionStep` in the consolidation pipeline (phase 20) alongside `constraintStep`.
+- **Live Tier-3:** 32 L1 correction nodes minted; `/v1/memory/retrieve` returns `role_type='correction'` on relevant queries; Jiminy `latest` surfaces `type='correction'`; `constraint_outcomes.guidance_type='correction'` gains its first ever row for `mdemg-dev` (`followed`).
+
+New config: `CORRECTION_PROMOTION_ENABLED` (default true), `CORRECTION_PROMOTION_MIN_CONTENT_LEN` (default 20), `CORRECTION_PROMOTION_REJECT_PATTERNS` (JSON regex array; defaults reuse the constraint gate's junk-class set). Rollback tombstone-only via `is_archived=true`. See `docs/development/jiminy-correction-producer-001/`.
