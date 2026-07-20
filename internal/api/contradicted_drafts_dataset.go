@@ -94,6 +94,7 @@ func contradictedDraftItem(r tsdb.ContradictedDraftRow) review.ReviewItem {
 			"action_hash":      r.ActionHash,
 			"status":           r.Status,
 			"applied_obs_id":   r.AppliedObsID,
+			"applied_node_id":  r.AppliedNodeID,
 			"recorded_at":      r.Time.Format("2006-01-02 15:04"),
 		},
 	}
@@ -185,13 +186,14 @@ func (s contradictedDraftsSink) Apply(ctx context.Context, g review.Grade) (revi
 		if err != nil {
 			return d, fmt.Errorf("contradicted_drafts sink: conversation.Correct: %w", err)
 		}
-		var obsID string
+		var obsID, nodeID string
 		if resp != nil {
 			obsID = resp.ObsID
+			nodeID = resp.NodeID
 			d.Applied["obs_id"] = resp.ObsID
 			d.Applied["node_id"] = resp.NodeID
 		}
-		if err := s.writer.MarkApproved(ctx, g.ItemID, obsID); err != nil {
+		if err := s.writer.MarkApproved(ctx, g.ItemID, obsID, nodeID); err != nil {
 			// The L0 obs is already created; the status flip failing is
 			// non-fatal (a subsequent grade retry will re-mark; DB uniqueness
 			// isn't broken because MarkApproved is UPDATE, not INSERT). Log
