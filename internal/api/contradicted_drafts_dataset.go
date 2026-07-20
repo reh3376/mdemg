@@ -19,7 +19,7 @@ import (
 
 // contradictedDraftsDataset implements review.ReviewableDataset.
 type contradictedDraftsDataset struct {
-	writer        *tsdb.ContradictedDraftsWriter
+	writer        contradictedDraftsWriterIface
 	rubricVersion string
 	sink          contradictedDraftsSink
 }
@@ -106,6 +106,17 @@ type CorrectService interface {
 	Correct(ctx context.Context, req conversation.CorrectRequest) (*conversation.ObserveResponse, error)
 }
 
+// contradictedDraftsWriterIface is the subset of *tsdb.ContradictedDraftsWriter
+// methods the sink calls, extracted so tests can inject a capturing mock.
+// *tsdb.ContradictedDraftsWriter satisfies this by shape.
+type contradictedDraftsWriterIface interface {
+	MarkApproved(ctx context.Context, id, appliedObsID, appliedNodeID string) error
+	MarkDismissed(ctx context.Context, id string) error
+	ResetToPending(ctx context.Context, id string) error
+	FetchPendingBySpace(ctx context.Context, spaceID string, limit int) ([]tsdb.ContradictedDraftRow, error)
+	FetchByID(ctx context.Context, id string) (*tsdb.ContradictedDraftRow, error)
+}
+
 // contradictedDraftsSink applies a certified draft grade: on approve it hands
 // the draft's Incorrect/Correct pair to conversation.Service.Correct (mints an
 // L0 correction obs); on dismiss it marks the draft dismissed. Reverse flips
@@ -113,7 +124,7 @@ type CorrectService interface {
 // be tombstoned separately if the operator wants full undo.
 type contradictedDraftsSink struct {
 	svc    CorrectService
-	writer *tsdb.ContradictedDraftsWriter
+	writer contradictedDraftsWriterIface
 }
 
 func (contradictedDraftsSink) SinkID() string { return "contradicted_drafts" }

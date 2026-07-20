@@ -176,3 +176,82 @@ func TestContradictedDraftsSink_Apply_Unclear_NoSvcCall(t *testing.T) {
 func nonNilWriter() *tsdb.ContradictedDraftsWriter {
 	return &tsdb.ContradictedDraftsWriter{}
 }
+
+
+// mockWriter captures MarkApproved args so E3 can pin the sink passes both
+// obsID AND nodeID (CONTRADICTED-BRIDGE-APPLIED-NODE-ID-001).
+type mockWriter struct {
+	approvedCalls []struct {
+		id            string
+		appliedObsID  string
+		appliedNodeID string
+	}
+}
+
+func (m *mockWriter) MarkApproved(_ context.Context, id, appliedObsID, appliedNodeID string) error {
+	m.approvedCalls = append(m.approvedCalls, struct {
+		id            string
+		appliedObsID  string
+		appliedNodeID string
+	}{id, appliedObsID, appliedNodeID})
+	return nil
+}
+func (m *mockWriter) MarkDismissed(_ context.Context, _ string) error   { return nil }
+func (m *mockWriter) ResetToPending(_ context.Context, _ string) error  { return nil }
+func (m *mockWriter) FetchPendingBySpace(_ context.Context, _ string, _ int) ([]tsdb.ContradictedDraftRow, error) {
+	return nil, nil
+}
+func (m *mockWriter) FetchByID(_ context.Context, _ string) (*tsdb.ContradictedDraftRow, error) {
+	return nil, nil
+}
+
+// TestContradictedDraftsSink_Apply_ApprovePassesBothIdentifiers pins the
+// CONTRADICTED-BRIDGE-APPLIED-NODE-ID-001 contract: the sink must pass BOTH
+// resp.ObsID AND resp.NodeID to MarkApproved on approve. Prior to this
+// sprint MarkApproved took only obsID; the two IDs can differ (see PR #508
+// E5 live evidence: draft applied_obs_id=oqqi9…, actual node_id=po2za…).
+func TestContradictedDraftsSink_Apply_ApprovePassesBothIdentifiers(t *testing.T) {
+	svc := &mockCorrectService{
+		resp: &conversation.ObserveResponse{
+			ObsID:  "obs-1234",
+			NodeID: "node-5678",
+		},
+	}
+	mw := &mockWriter{}
+	s := contradictedDraftsSink{svc: svc, writer: mw}
+	g := review.Grade{
+		GradeID: "g1", ItemID: "d1",
+		GoldDimensions: map[string]any{"durable_rule": 4},
+		Item: review.ReviewItem{Meta: map[string]string{
+			"draft_incorrect": "wrong", "draft_correct": "right",
+		}},
+	}
+	d, err := s.Apply(context.Background(), g)
+	if err != nil {
+		t.Fatalf("Apply: %v", err)
+	}
+	if d.Verb != "correction_draft:approve" {
+		t.Errorf("Verb = %q, want correction_draft:approve", d.Verb)
+	}
+	if len(mw.approvedCalls) != 1 {
+		t.Fatalf("MarkApproved called %d times, want 1", len(mw.approvedCalls))
+	}
+	c := mw.approvedCalls[0]
+	if c.id != "d1" {
+		t.Errorf("MarkApproved id = %q, want d1", c.id)
+	}
+	if c.appliedObsID != "obs-1234" {
+		t.Errorf("MarkApproved obsID = %q, want obs-1234", c.appliedObsID)
+	}
+	if c.appliedNodeID != "node-5678" {
+		t.Errorf("MarkApproved nodeID = %q, want node-5678 — the whole point of the sprint", c.appliedNodeID)
+	}
+	// Also verify the reinforcement_detail Applied map carries both
+	// under the existing keys (unchanged from JIMINY-CONTRADICTED-BRIDGE-001).
+	if d.Applied["obs_id"] != "obs-1234" {
+		t.Errorf("d.Applied[obs_id] = %v, want obs-1234", d.Applied["obs_id"])
+	}
+	if d.Applied["node_id"] != "node-5678" {
+		t.Errorf("d.Applied[node_id] = %v, want node-5678", d.Applied["node_id"])
+	}
+}
