@@ -17,6 +17,7 @@ package hidden
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -55,7 +56,8 @@ func (s *Service) CreateCorrectionNodes(ctx context.Context, spaceID string) (*C
 			       obs.content AS content,
 			       obs.embedding AS embedding,
 			       obs.tags AS tags,
-			       obs.surprise_score AS surpriseScore
+			       obs.surprise_score AS surpriseScore,
+			       obs.structured_data AS structuredData
 		`
 		findRes, err := tx.Run(ctx, findCypher, map[string]any{"spaceId": spaceID})
 		if err != nil {
@@ -69,6 +71,10 @@ func (s *Service) CreateCorrectionNodes(ctx context.Context, spaceID string) (*C
 			tags          []string
 			embedding     []float64
 			surpriseScore float64
+			// JIMINY-STRUCTURED-CORRECTION-001: parsed from structured_data.correction
+			corrIncorrect string
+			corrCorrect   string
+			corrContext   string
 		}
 
 		var observations []correctionObs
@@ -102,6 +108,29 @@ func (s *Service) CreateCorrectionNodes(ctx context.Context, spaceID string) (*C
 			surpriseRaw, _ := rec.Get("surpriseScore")
 			if sv, ok := surpriseRaw.(float64); ok {
 				obs.surpriseScore = sv
+			}
+
+			// JIMINY-STRUCTURED-CORRECTION-001: parse structured_data.correction
+			// (present on obs authored via conversation.Correct after v0.11.4;
+			// absent on older obs — those L1s get empty structured fields and
+			// can be repaired via `mdemg corrections rehydrate-structured`).
+			if sdRaw, _ := rec.Get("structuredData"); sdRaw != nil {
+				if sdStr, ok := sdRaw.(string); ok && sdStr != "" {
+					var sd map[string]any
+					if json.Unmarshal([]byte(sdStr), &sd) == nil {
+						if corr, ok := sd["correction"].(map[string]any); ok {
+							if v, _ := corr["incorrect"].(string); v != "" {
+								obs.corrIncorrect = v
+							}
+							if v, _ := corr["correct"].(string); v != "" {
+								obs.corrCorrect = v
+							}
+							if v, _ := corr["context"].(string); v != "" {
+								obs.corrContext = v
+							}
+						}
+					}
+				}
 			}
 
 			observations = append(observations, obs)
@@ -197,6 +226,9 @@ func (s *Service) CreateCorrectionNodes(ctx context.Context, spaceID string) (*C
 						layer: 1,
 						confidence: $confidence,
 						tags: $tags,
+						correction_incorrect: $corrIncorrect,
+						correction_correct:   $corrCorrect,
+						correction_context:   $corrContext,
 						created_at: datetime($now),
 						updated_at: datetime($now),
 						volatile: false,
@@ -204,13 +236,16 @@ func (s *Service) CreateCorrectionNodes(ctx context.Context, spaceID string) (*C
 					})
 				`
 				params := map[string]any{
-					"spaceId":    spaceID,
-					"nodeId":     correctionNodeID,
-					"name":       cName,
-					"content":    obs.content,
-					"confidence": promotionConfidence,
-					"tags":       []string{"correction"},
-					"now":        now,
+					"spaceId":       spaceID,
+					"nodeId":        correctionNodeID,
+					"name":          cName,
+					"content":       obs.content,
+					"confidence":    promotionConfidence,
+					"tags":          []string{"correction"},
+					"now":           now,
+					"corrIncorrect": obs.corrIncorrect,
+					"corrCorrect":   obs.corrCorrect,
+					"corrContext":   obs.corrContext,
 				}
 
 				if len(obs.embedding) > 0 {
@@ -225,6 +260,9 @@ func (s *Service) CreateCorrectionNodes(ctx context.Context, spaceID string) (*C
 							confidence: $confidence,
 							tags: $tags,
 							embedding: $embedding,
+							correction_incorrect: $corrIncorrect,
+							correction_correct:   $corrCorrect,
+							correction_context:   $corrContext,
 							created_at: datetime($now),
 							updated_at: datetime($now),
 							volatile: false,
