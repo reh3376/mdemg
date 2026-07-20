@@ -183,4 +183,6 @@ and persistence work for it with no further changes.
 | `JIMINY_CONTRADICTED_BRIDGE_MAX_CONTENT_LEN` | 400 | Cap for `draft_incorrect`/`draft_correct` |
 | `REVIEW_CONTRADICTED_DATASET_ENABLED` | `true` | Register the HITL dataset (independent of the bridge flag — drafts already in TSDB remain reviewable) |
 
+**Applied identifiers (Sprint CONTRADICTED-BRIDGE-APPLIED-NODE-ID-001, 2026-07-20).** On approve, the sink now records BOTH the L0 observation ID and the MemoryNode ID that carries it: draft rows expose `applied_obs_id` (`obs_id` on the observation record) AND `applied_node_id` (Neo4j `MemoryNode.node_id`). These are distinct CUIDv2s. Pre-sprint code that only had `applied_obs_id` had to re-query Neo4j to walk the *node* (verify L1 promotion, join to graph telemetry); `applied_node_id` is now a direct pointer. HITL response Meta and the underlying V0031-migrated hypertable both carry both fields. Historical rows approved before this sprint keep `applied_node_id=NULL`.
+
 **Live evidence (E5, 2026-07-20).** End-to-end verified on `mdemg-dev`: real contradicted verdict → draft `c8jvgnmkl8zlmr4m58nl7rj3` → HITL surfaced → approve grade → real L0 obs `po2zahas8mh10ahwe0iimmoz` → consolidation → real L1 correction `ymehdkihmj2yiu7t3bywsgxc` (count 32 → 33). See `docs/development/jiminy-contradicted-bridge-001/live_verification.md`.
