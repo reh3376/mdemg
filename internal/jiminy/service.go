@@ -70,6 +70,7 @@ type Service struct {
 	codeComprehensionTracker *CodeComprehensionTracker     // P1-15: code comprehension feedback loop
 	outcomeWriter            OutcomeWriter                 // TSDB writer for constraint outcomes
 	guidanceTrainingWriter   GuidanceTrainingWriter        // JIMINY-RELEVANCE-001: TSDB writer for the guidance training-evidence corpus
+	contradictedDraftWriter  ContradictedDraftWriter       // JIMINY-CONTRADICTED-BRIDGE-001: TSDB writer for contradicted-outcome correction drafts
 	surfaceCooldown          *SurfaceCooldownTracker       // JIMINY-CORPUS-001 Lever A: per-session surfacing cooldown
 
 	// JIMINY-CORPUS-001 Lever B: per-space effectiveness-prior cache (TTL-bounded;
@@ -2285,6 +2286,12 @@ func (s *Service) SetOutcomeWriter(w OutcomeWriter) {
 // evidence corpus (JIMINY-RELEVANCE-001 Epic 1).
 func (s *Service) SetGuidanceTrainingWriter(w GuidanceTrainingWriter) {
 	s.guidanceTrainingWriter = w
+}
+
+// SetContradictedDraftWriter sets the TSDB writer for the contradicted-outcome
+// correction-draft bridge (JIMINY-CONTRADICTED-BRIDGE-001).
+func (s *Service) SetContradictedDraftWriter(w ContradictedDraftWriter) {
+	s.contradictedDraftWriter = w
 }
 
 // resolveSourceMeta does a bounded, best-effort Neo4j lookup of a source node's

@@ -176,6 +176,7 @@ type Server struct {
 	constraintOutcomesWriter *tsdb.ConstraintOutcomesWriter
 	guidanceTrainingWriter   *tsdb.GuidanceTrainingRowsWriter
 	reviewWriter             *tsdb.ReviewGradesWriter
+	contradictedDraftWriter  *tsdb.ContradictedDraftsWriter // JIMINY-CONTRADICTED-BRIDGE-001
 	reviewRegistry           *review.Registry
 	llmEndpointHealthWriter  *tsdb.LLMEndpointHealthWriter
 
@@ -1415,6 +1416,22 @@ func (s *Server) SetTSDBClient(client *tsdb.Client) {
 		}
 		slog.Info("tsdb: constraint outcomes logger attached")
 
+		// JIMINY-CONTRADICTED-BRIDGE-001 Epic 1 — V0030 contradicted_correction_drafts
+		// writer. Always-attached (HITL dataset needs it for reads even when the
+		// bridge hook is off); the write side is separately gated on
+		// JIMINY_CONTRADICTED_BRIDGE_ENABLED at the RecordOutcome call site.
+		s.contradictedDraftWriter = tsdb.NewContradictedDraftsWriter(
+			client.Pool(),
+			time.Duration(s.cfg.JiminyContradictedBridgeWriterFlushIntervalSec)*time.Second,
+			s.cfg.JiminyContradictedBridgeWriterBufferSize,
+		)
+		if s.jiminySvc != nil {
+			s.jiminySvc.SetContradictedDraftWriter(s.contradictedDraftWriter)
+		}
+		slog.Info("tsdb: contradicted_drafts writer attached",
+			"flush_interval_sec", s.cfg.JiminyContradictedBridgeWriterFlushIntervalSec,
+			"bridge_enabled", s.cfg.JiminyContradictedBridgeEnabled)
+
 		// JIMINY-RELEVANCE-001 Epic 1 — V0027 guidance_training_rows writer.
 		// Persists the training EVIDENCE (guidance text + action text + source
 		// role/layer + verdict) discarded until now. Gated by
@@ -1849,6 +1866,9 @@ func (s *Server) Shutdown() {
 	}
 	if s.reviewWriter != nil {
 		s.reviewWriter.Close()
+	}
+	if s.contradictedDraftWriter != nil {
+		s.contradictedDraftWriter.Close()
 	}
 	if s.llmEndpointHealthWriter != nil {
 		s.llmEndpointHealthWriter.Close()
