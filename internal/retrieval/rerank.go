@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"sort"
 	"strings"
@@ -61,6 +62,31 @@ func (s *Service) Rerank(ctx context.Context, req RerankRequest) (*RerankResult,
 	returnK := req.ReturnK
 	if returnK <= 0 {
 		returnK = len(req.Candidates)
+	}
+
+	// LLM-HEALTH-INVESTIGATION-001 E2: pre-check the CALLER'S deadline before
+	// dispatching. rerank_cross p95=~11s on production; if the caller has less
+	// than RerankMinBudgetMs (default 12000 = p99 + 300ms margin) remaining,
+	// the LLM call is guaranteed to be canceled — skip it and return the
+	// pre-rerank RRF order (fail-open, same as an error return, but without
+	// wasting a llama-server slot AND without a caller_canceled row landing in
+	// llm_interactions). Deadline-absent callers (CLI direct calls, tests)
+	// bypass the check — no caller cancellation to guard against.
+	if s.cfg.RerankMinBudgetMs > 0 {
+		if deadline, ok := ctx.Deadline(); ok {
+			remaining := time.Until(deadline)
+			if remaining < time.Duration(s.cfg.RerankMinBudgetMs)*time.Millisecond {
+				slog.Warn("rerank skipped: insufficient budget",
+					"remaining_ms", remaining.Milliseconds(),
+					"min_budget_ms", s.cfg.RerankMinBudgetMs,
+					"space_id", req.SpaceID,
+					"candidates", len(req.Candidates))
+				return &RerankResult{
+					Results:   req.Candidates,
+					LatencyMs: 0,
+				}, nil
+			}
+		}
 	}
 
 	// Create timeout context

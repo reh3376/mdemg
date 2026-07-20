@@ -261,7 +261,7 @@ MDEMG provides long-term memory for AI agents, enabling them to:
 - **Jiminy Inner Voice**: Proactive guidance service injected into every prompt — surfaces constraints, prior corrections, contradictions, and frontier exploration opportunities from the knowledge graph via 4-source parallel fan-out under a config-derived guidance budget
 - **J17 AI-to-AI Communication Protocol**: Three-tier encoding protocol (T1 coded ~15 tokens, T2 telegraphic, T3 full NL) for compact agent-to-agent communication. LLM-generated constraint codes, per-session trust scoring, signed session tickets for state persistence across context resets, RSIC-driven protocol evolution, and ML-powered tier prediction via neural sidecar
 - **Never-silent operations**: a goroutine supervisor with panic recovery over every background loop, scheduled-job health that alerts on "failed OR never ran," hook-channel self-monitoring, restore-tested backups, and a server-native alert evaluator — engineered so a dead seam self-reports instead of failing quietly
-- **Closed guidance→feedback→outcome loop**: Jiminy guidance is scored against what the agent actually did — per-constraint effectiveness rates feed RSIC calibration. The `jiminy-governance` Claude Code skill makes Jiminy a deterministic source of context and constraints over J17, with a fail-closed bash guard and graduated `/strict`-mode enforcement on edits
+- **Closed guidance→feedback→outcome→correction loop**: Jiminy guidance is scored against what the agent actually did — per-constraint effectiveness rates feed RSIC calibration. When the classifier fires a `contradicted` verdict, the JIMINY-CONTRADICTED-BRIDGE-001 sink emits a correction draft for HITL review; approved drafts flow through `/v1/conversation/correct` → L0 obs → JIMINY-CORRECTION-PRODUCER-001 promotion → L1 `role_type=correction` node → back into retrieval, closing the autonomous-learning loop end-to-end. `Incorrect`/`Correct`/`Context` fields propagate as structured properties (JIMINY-STRUCTURED-CORRECTION-001); Lever B synthesis renders `Do <correct> — not <incorrect>` from the structured pair. The `jiminy-governance` Claude Code skill makes Jiminy a deterministic source of context and constraints over J17, with a fail-closed bash guard and graduated `/strict`-mode enforcement on edits
 - **Event-graph federation**: `mdemg eventgraph` surfaces reinforcement and guidance-outcome events in a node's graph neighborhood by federating TimescaleDB event streams with Neo4j traversal — events stay in TSDB, never reified into the graph
 - **Space Transfer & DevSpace**: Export/import space graphs as `.mdemg` files or via gRPC; optional DevSpace hub for agent registration, publish/pull exports, and inter-agent messaging (see `cmd/space-transfer/README.md` and `docs/specs/development-space-collaboration.md`)
 
@@ -602,6 +602,27 @@ Returns a JSON metrics snapshot including counters, gauges, and histograms from 
 ## Development Roadmap
 
 ### Recently Completed
+
+**2026 Guidance-Quality Arc + Substrate Honesty (post-Phase-105):**
+
+| Sprint | Name | Status |
+|--------|------|--------|
+| LLM-HEALTH-INVESTIGATION-001 | RSIC alert honesty — recorder tags caller-cancellation, rerank pre-check skips insufficient-budget calls, alert-rule filter excludes caller_canceled from LLM error rate | ✅ Complete (2026-07-20) |
+| JIMINY-STRUCTURED-CORRECTION-001 | Propagate `Incorrect`/`Correct`/`Context` triple from `POST /v1/conversation/correct` through L0 → L1 → GuidanceItem → Lever B synthesis; `mdemg corrections rehydrate-structured` backfill CLI | ✅ Complete (2026-07-20) |
+| JIMINY-CONTRADICTED-BRIDGE-001 | Bridge Jiminy `contradicted` verdicts into V0030 `contradicted_correction_drafts` for HITL review; on approve, sink calls `conversation.Correct` → L0 → L1 correction via the shipped producer | ✅ Complete (2026-07-20) |
+| JIMINY-CORRECTION-PRODUCER-001 | `CreateCorrectionNodes` promotes L0 `obs_type='correction'` observations to L1 `role_type='correction'` nodes via `IMPLEMENTS_CORRECTION` edges; `CorrectionPromotionGate` mirrors constraint gate | ✅ Complete (2026-07-20) |
+| JIMINY-ROLETYPE-ADAPTER-001 | Propagate `role_type`/`obs_type` end-to-end through `models.RetrieveResult` → `Candidate` → `FusedCandidate` → `BM25Result` → `jiminy.RetrievalResult`; classifier prefers `role_type` before `ObsType` switch — retrieval-sourced guidance no longer defaults to `learning` | ✅ Complete (2026-07-17) |
+| JIMINY-CORPUS-001 | Constraint corpus cleanup — `ConstraintPromotionGate` blocks non-durable observations at promotion; 140→61 live constraint nodes via operator-authorized purge; per-session cooldown + effectiveness-prior re-rank; precise 4-band relevance gate | ✅ Complete (2026-07-03) |
+| DASHBOARD-TRUTH-001 | Made RSIC/J17/Jiminy dashboards honest — 6/8 alarming metrics were LIMIT-1/COALESCE-to-0/stale-gauge/wrong-anchor artifacts; hardened at source | ✅ Complete (2026-07-03) |
+| HITL-REVIEW-001 | General-purpose Human-in-the-Loop review + live reinforcement platform (`ReviewableDataset` interface, `Sink` semantics, reversible substrate mutation, 17 registered datasets) | ✅ Complete (2026-06-24) |
+| JIMINY-ACTIONABILITY-001 | Guidance surface bias + directive synthesis — Levers A/B/C to raise the actionable-guidance fraction; Lever C actionable-composition wins the A/B (11.1%→47.7% actionable fraction) | ✅ Complete (2026-06-24) |
+| JIMINY-RELEVANCE-001 | Guidance training corpus — V0027 `guidance_training_rows` captures per-item evidence; auto-relabel job; should-follow rate over actionable types | ✅ Complete (2026-06-24) |
+| RETRIEVAL-TYPED-EDGES-002 | Grew semantic edges (`dynamic_edges` vector-index rewrite, O(n²)→O(n·logn), 4415 edges) + flipped default-ON — clean A/B +0.001 mean, 0 regressions | ✅ Complete (2026-07-03) |
+| SUPERVISOR-002 | Extended goroutine supervisor from 3 to 15 background loops with sliding-window restart budget + rule-health meta-alert + RSIC recency gate | ✅ Complete (2026-06-11) |
+| ALERT-TRUTH-001 / TSDB-CONSUME-001 / NOSILENT-001 | Alert-rule SQL contract (idle-safe aggregate + COALESCE, no `ORDER BY … LIMIT 1`); scheduled-job health with `jobhealth.Report`; alert cooldown key = `(Service, Severity)` requires distinct Service per rule | ✅ Complete (2026-06) |
+| MODEL-DIST-001/002 | `mdemg model pull` distributes `mdemg-llm-v1` via Ollama Library (3 fused GGUF quants + adapter-only path); RAM-tier auto-selection; 11 config-driven knobs, zero hardcoded values | ✅ Complete (2026-05) |
+
+**Historical phase registry:**
 
 | Phase | Name | Status |
 |-------|------|--------|

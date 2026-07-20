@@ -458,7 +458,10 @@ func exportTable(ctx context.Context, pool *pgxpool.Pool, cfg ExportConfig, tabl
 func computeLLMQuality(ctx context.Context, pool *pgxpool.Pool, cfg ExportConfig) (errCount, emptyPrompt, emptyResp int, err error) {
 	row := pool.QueryRow(ctx,
 		`SELECT
-			COALESCE(SUM(CASE WHEN error IS NOT NULL AND error != '' THEN 1 ELSE 0 END), 0),
+			-- LLM-HEALTH-INVESTIGATION-001 E3: exclude caller_canceled from the
+			-- error count (see llmclient/client.go recorder tagging + dataset_builder
+			-- LLMPerformance). Export manifests carry the same honest signal.
+			COALESCE(SUM(CASE WHEN error IS NOT NULL AND error != '' AND error NOT LIKE 'caller_canceled:%' THEN 1 ELSE 0 END), 0),
 			COALESCE(SUM(CASE WHEN system_prompt IS NULL OR system_prompt = '' THEN 1 ELSE 0 END), 0),
 			COALESCE(SUM(CASE WHEN response IS NULL OR response = '' THEN 1 ELSE 0 END), 0)
 		FROM llm_interactions

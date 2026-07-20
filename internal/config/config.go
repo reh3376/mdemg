@@ -207,6 +207,7 @@ type Config struct {
 	RerankTopN      int     // Candidates to re-rank (default: 30)
 	RerankWeight    float64 // Weight of rerank score in final (default: 0.4)
 	RerankTimeoutMs int     // Timeout for rerank call in ms (default: 3000)
+	RerankMinBudgetMs int  // RERANK_MIN_BUDGET_MS — LLM-HEALTH-INVESTIGATION-001: skip rerank when caller ctx has less than this remaining (default: 12000; 0 = disabled; floor 3000)
 	RerankCompress  bool    // RERANK_COMPRESS — compress rerank candidate prompts (default: true)
 	RerankJinaKey   string  // RERANK_JINA_API_KEY — Jina API key for cross-encoder reranking
 	RerankJinaModel string  // RERANK_JINA_MODEL — Jina reranker model (default: jina-reranker-v2-base-multilingual)
@@ -2230,6 +2231,13 @@ func FromEnv() (Config, error) {
 	}
 	if rerankTimeoutMs < 100 {
 		return Config{}, errors.New("RERANK_TIMEOUT_MS must be >= 100")
+	}
+	rerankMinBudgetMs, err := atoi("RERANK_MIN_BUDGET_MS", 12000)
+	if err != nil {
+		return Config{}, err
+	}
+	if rerankMinBudgetMs > 0 && rerankMinBudgetMs < 3000 {
+		rerankMinBudgetMs = 3000
 	}
 	rerankJinaKey := get("RERANK_JINA_API_KEY", "")
 	rerankJinaModel := get("RERANK_JINA_MODEL", "jina-reranker-v2-base-multilingual")
@@ -5251,6 +5259,7 @@ func FromEnv() (Config, error) {
 		RerankTopN:                     rerankTopN,
 		RerankWeight:                   rerankWeight,
 		RerankTimeoutMs:                rerankTimeoutMs,
+		RerankMinBudgetMs:              rerankMinBudgetMs,
 		RerankJinaKey:                  rerankJinaKey,
 		RerankJinaModel:                rerankJinaModel,
 		RerankJinaURL:                  rerankJinaURL,
