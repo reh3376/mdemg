@@ -1485,6 +1485,27 @@ func (s *Server) SetTSDBClient(client *tsdb.Client) {
 					slog.Info("review: guidance dataset + live-reinforcement sink registered")
 				}
 			}
+
+			// JIMINY-CONTRADICTED-BRIDGE-001 Epic 3 — contradicted-outcome
+			// correction-draft dataset + sink. Registers even when the bridge
+			// hook itself is off, so any existing pending drafts remain reviewable
+			// under a flag-flip rollback. Gated by REVIEW_CONTRADICTED_DATASET_ENABLED
+			// (default true) and needs the conversation service (Correct sink).
+			if s.cfg.ReviewContradictedDatasetEnabled && s.contradictedDraftWriter != nil && s.conversationSvc != nil {
+				cds := &contradictedDraftsDataset{
+					writer:        s.contradictedDraftWriter,
+					rubricVersion: s.cfg.ReviewRubricVersion,
+					sink: contradictedDraftsSink{
+						svc:    s.conversationSvc,
+						writer: s.contradictedDraftWriter,
+					},
+				}
+				if err := s.reviewRegistry.Register(cds); err != nil {
+					slog.Warn("review: contradicted_drafts dataset registration failed", "error", err)
+				} else {
+					slog.Info("review: contradicted_drafts dataset + Correct sink registered")
+				}
+			}
 			// HITL-REVIEW-001 — the 16 MDEMG LLM call sites as reviewable
 			// datasets (gold-only review of llm_interactions outputs → SFT/quality
 			// training data). Gated by REVIEW_LLM_DATASETS_ENABLED.

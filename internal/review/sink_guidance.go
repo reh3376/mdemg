@@ -173,7 +173,11 @@ func invertOutcome(s string) string {
 	}
 }
 
-func dimInt(m map[string]any, key string) (int, bool) {
+// DimInt reads a rubric-dimension integer score out of a Grade's
+// GoldDimensions map. Exported so out-of-package sinks (e.g. the
+// contradicted-drafts sink in internal/api) can share the same numeric-
+// coercion semantics without re-inventing them.
+func DimInt(m map[string]any, key string) (int, bool) {
 	v, ok := m[key]
 	if !ok {
 		return 0, false
@@ -189,6 +193,9 @@ func dimInt(m map[string]any, key string) (int, bool) {
 		return 0, false
 	}
 }
+
+// dimInt is kept as a lowercase alias for existing internal-package callers.
+func dimInt(m map[string]any, key string) (int, bool) { return DimInt(m, key) }
 
 func floatFrom(v any) (float64, bool) {
 	switch n := v.(type) {

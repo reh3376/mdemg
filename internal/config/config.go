@@ -1193,6 +1193,7 @@ type Config struct {
 	ReviewGuidanceSinkEnabled     bool    // REVIEW_GUIDANCE_SINK_ENABLED — enable the guidance live-reinforcement sink (default: true)
 	ReviewGuidanceConfidenceNudge float64 // REVIEW_GUIDANCE_CONFIDENCE_NUDGE — node-confidence delta the guidance sink applies (default: 0.05)
 	ReviewLLMDatasetsEnabled      bool    // REVIEW_LLM_DATASETS_ENABLED — register the 16 MDEMG LLM call sites as reviewable datasets (gold-only review of llm_interactions) (default: true)
+	ReviewContradictedDatasetEnabled bool // REVIEW_CONTRADICTED_DATASET_ENABLED — register the JIMINY-CONTRADICTED-BRIDGE-001 correction-drafts dataset (default: true)
 
 	// EVENTGRAPH-001 — TSDB reinforcement_events + federation API (Pattern Y1)
 	EventGraphEnabled                        bool // EVENTGRAPH_ENABLED — record per-pair Hebbian telemetry into reinforcement_events + expose federation API (default: true)
@@ -3528,6 +3529,7 @@ func FromEnv() (Config, error) {
 	reviewReinforceDefault := getBool("REVIEW_REINFORCE_DEFAULT", false)
 	reviewGuidanceSinkEnabled := getBool("REVIEW_GUIDANCE_SINK_ENABLED", true)
 	reviewLLMDatasetsEnabled := getBool("REVIEW_LLM_DATASETS_ENABLED", true)
+	reviewContradictedDatasetEnabled := getBool("REVIEW_CONTRADICTED_DATASET_ENABLED", true)
 	reviewGuidanceConfidenceNudge, err := atof("REVIEW_GUIDANCE_CONFIDENCE_NUDGE", 0.05)
 	if err != nil {
 		return Config{}, err
@@ -5640,6 +5642,7 @@ func FromEnv() (Config, error) {
 		ReviewReinforceDefault:               reviewReinforceDefault,
 		ReviewGuidanceSinkEnabled:            reviewGuidanceSinkEnabled,
 		ReviewLLMDatasetsEnabled:             reviewLLMDatasetsEnabled,
+		ReviewContradictedDatasetEnabled:     reviewContradictedDatasetEnabled,
 		ReviewGuidanceConfidenceNudge:        reviewGuidanceConfidenceNudge,
 
 		EventGraphEnabled:                        eventGraphEnabled,
