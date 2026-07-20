@@ -350,7 +350,18 @@ func (c *Client) recordInteraction(ctx context.Context, messages []Message, resp
 		Provider:     c.provider,
 	}
 	if callErr != nil {
-		rec.Error = callErr.Error()
+		// LLM-HEALTH-INVESTIGATION-001 E1: distinguish caller-cancellation from
+		// real errors. When the caller's context is canceled or its deadline
+		// expires mid-request, the row records "caller_canceled: <raw>" — the
+		// RSIC alert rule filters this prefix out of the error rate, since a
+		// cancellation is not an LLM health event. Real HTTP-500s / provider
+		// timeouts / parse errors are neither Canceled nor DeadlineExceeded, so
+		// they land in the error rate as before.
+		if errors.Is(callErr, context.Canceled) || errors.Is(callErr, context.DeadlineExceeded) {
+			rec.Error = "caller_canceled: " + callErr.Error()
+		} else {
+			rec.Error = callErr.Error()
+		}
 	}
 	if system != "" {
 		rec.SystemPromptHash = fmt.Sprintf("%x", sha256.Sum256([]byte(system)))
