@@ -211,7 +211,6 @@ func TestHTTPMiddleware(t *testing.T) {
 	}
 }
 
-
 func TestStandardMetrics(t *testing.T) {
 	r := NewRegistry(DefaultConfig())
 	m := NewStandardMetrics(r)
@@ -348,7 +347,6 @@ func TestGlobalRegistry(t *testing.T) {
 		t.Error("Global() should return the set registry")
 	}
 }
-
 
 func TestHTTPMiddleware_Write(t *testing.T) {
 	r := NewRegistry(DefaultConfig())

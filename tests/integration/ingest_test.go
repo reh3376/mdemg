@@ -31,11 +31,11 @@ type IngestRequest struct {
 
 // IngestResponse mirrors the API response structure for tests.
 type IngestResponse struct {
-	SpaceID       string           `json:"space_id"`
-	NodeID        string           `json:"node_id"`
-	ObsID         string           `json:"obs_id"`
-	EmbeddingDims int              `json:"embedding_dims,omitempty"`
-	Anomalies     []IngestAnomaly  `json:"anomalies,omitempty"`
+	SpaceID       string          `json:"space_id"`
+	NodeID        string          `json:"node_id"`
+	ObsID         string          `json:"obs_id"`
+	EmbeddingDims int             `json:"embedding_dims,omitempty"`
+	Anomalies     []IngestAnomaly `json:"anomalies,omitempty"`
 }
 
 // IngestAnomaly mirrors the Anomaly struct for tests.

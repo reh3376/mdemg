@@ -301,10 +301,10 @@ func TestGraphExpansion(t *testing.T) {
 	// These nodes have embeddings that are dissimilar to the query,
 	// so they should only be found via graph expansion, not vector recall
 	type relatedNode struct {
-		name     string
-		path     string
-		seed     float32 // Different seed values produce dissimilar embeddings
-		nodeID   string
+		name   string
+		path   string
+		seed   float32 // Different seed values produce dissimilar embeddings
+		nodeID string
 	}
 
 	relatedNodes := []relatedNode{
@@ -526,7 +526,9 @@ func createAssociatedWithEdges(t *testing.T, driver neo4j.DriverWithContext, spa
 // TestScoringDeterminism verifies that identical queries produce identical scores across multiple runs.
 // This test ensures the retrieval pipeline (vector recall, spreading activation, scoring) is deterministic.
 // According to doc 12_Retrieval_Scoring_Worked_Examples.md, scoring is computed as:
-//   S_i = α*v_i + β*a_i + γ*r_i + δ*c_i - φ*h_i - κ*d_i
+//
+//	S_i = α*v_i + β*a_i + γ*r_i + δ*c_i - φ*h_i - κ*d_i
+//
 // All these factors should produce identical results for identical inputs.
 func TestScoringDeterminism(t *testing.T) {
 	// Setup: ensure service is ready and create Neo4j driver for verification

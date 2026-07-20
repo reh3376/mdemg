@@ -500,4 +500,3 @@ func estimatePercentile(h *Histogram, q float64) float64 {
 	}
 	return 0
 }
-

@@ -320,7 +320,6 @@ func TestEstimatePercentile_MultipleObservations(t *testing.T) {
 	}
 }
 
-
 func TestGauge_DirtyFlag(t *testing.T) {
 	r := NewRegistry(DefaultConfig())
 	g := r.NewGauge("test_dirty", "dirty flag test", nil)

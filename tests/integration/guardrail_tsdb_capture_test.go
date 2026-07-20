@@ -48,7 +48,7 @@ func TestGuardrailValidate_CapturesInteractionInTSDB(t *testing.T) {
 	body := map[string]any{
 		"space_id":      spaceID,
 		"files_changed": []string{"main.go"},
-		"diff": "--- a/main.go\n+++ b/main.go\n@@\n+password := \"hunter2\"\n",
+		"diff":          "--- a/main.go\n+++ b/main.go\n@@\n+password := \"hunter2\"\n",
 	}
 	buf, _ := json.Marshal(body)
 
@@ -143,4 +143,3 @@ func latestGuardrailRow(t *testing.T, pool *pgxpool.Pool, spaceID, taskName stri
 	}
 	return r
 }
-

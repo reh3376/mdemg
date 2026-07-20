@@ -10,7 +10,7 @@ import (
 // DeterminismScore represents the behavioral determinism metrics for a space.
 type DeterminismScore struct {
 	SpaceID         string  `json:"space_id"`
-	Score           float64 `json:"score"`           // D-score: (informed/total) * compliance * coverage
+	Score           float64 `json:"score"`            // D-score: (informed/total) * compliance * coverage
 	InformedActions int     `json:"informed_actions"` // actions with guidance available
 	TotalActions    int     `json:"total_actions"`    // total observed actions
 	ComplianceRate  float64 `json:"compliance_rate"`  // followed / (followed + ignored + contradicted)

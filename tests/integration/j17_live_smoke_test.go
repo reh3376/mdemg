@@ -51,12 +51,12 @@ func TestJ17_ProtocolStatusEndpoint(t *testing.T) {
 
 	var statusBody struct {
 		Data struct {
-			SessionID     string   `json:"session_id"`
-			TrustScore    float64  `json:"trust_score"`
-			Tier          string   `json:"tier"`
-			FeedbackCount int      `json:"feedback_count"`
-			Enabled       bool     `json:"enabled"`
-			LastFeedback  *string  `json:"last_feedback_at"`
+			SessionID     string  `json:"session_id"`
+			TrustScore    float64 `json:"trust_score"`
+			Tier          string  `json:"tier"`
+			FeedbackCount int     `json:"feedback_count"`
+			Enabled       bool    `json:"enabled"`
+			LastFeedback  *string `json:"last_feedback_at"`
 		} `json:"data"`
 	}
 	if err := json.NewDecoder(resp2.Body).Decode(&statusBody); err != nil {
