@@ -208,6 +208,7 @@ type Config struct {
 	RerankWeight    float64 // Weight of rerank score in final (default: 0.4)
 	RerankTimeoutMs int     // Timeout for rerank call in ms (default: 3000)
 	RerankMinBudgetMs int  // RERANK_MIN_BUDGET_MS — LLM-HEALTH-INVESTIGATION-001: skip rerank when caller ctx has less than this remaining (default: 12000; 0 = disabled; floor 3000)
+	NeuralRerankMinBudgetMs int  // NEURAL_RERANK_MIN_BUDGET_MS — NEURAL-RERANK-PRECHECK-001: same pre-check for provider=neural (default: 1500 = neural timeout 1000ms + 500ms margin; 0 = disabled; floor 500)
 	RerankCompress  bool    // RERANK_COMPRESS — compress rerank candidate prompts (default: true)
 	RerankJinaKey   string  // RERANK_JINA_API_KEY — Jina API key for cross-encoder reranking
 	RerankJinaModel string  // RERANK_JINA_MODEL — Jina reranker model (default: jina-reranker-v2-base-multilingual)
@@ -2238,6 +2239,13 @@ func FromEnv() (Config, error) {
 	}
 	if rerankMinBudgetMs > 0 && rerankMinBudgetMs < 3000 {
 		rerankMinBudgetMs = 3000
+	}
+	neuralRerankMinBudgetMs, err := atoi("NEURAL_RERANK_MIN_BUDGET_MS", 1500)
+	if err != nil {
+		return Config{}, err
+	}
+	if neuralRerankMinBudgetMs > 0 && neuralRerankMinBudgetMs < 500 {
+		neuralRerankMinBudgetMs = 500
 	}
 	rerankJinaKey := get("RERANK_JINA_API_KEY", "")
 	rerankJinaModel := get("RERANK_JINA_MODEL", "jina-reranker-v2-base-multilingual")
@@ -5260,6 +5268,7 @@ func FromEnv() (Config, error) {
 		RerankWeight:                   rerankWeight,
 		RerankTimeoutMs:                rerankTimeoutMs,
 		RerankMinBudgetMs:              rerankMinBudgetMs,
+		NeuralRerankMinBudgetMs:        neuralRerankMinBudgetMs,
 		RerankJinaKey:                  rerankJinaKey,
 		RerankJinaModel:                rerankJinaModel,
 		RerankJinaURL:                  rerankJinaURL,
