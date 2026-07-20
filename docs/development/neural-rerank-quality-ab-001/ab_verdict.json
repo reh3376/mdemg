@@ -1,0 +1,21 @@
+{
+  "framework": "uvts-ab",
+  "framework_version": "1.0.0",
+  "timestamp": "2026-07-20T18:05:25.858001+00:00",
+  "spec_path": "/Users/reh3376/mdemg/docs/tests/uvts/specs/lnl_demo_validation.uvts.json",
+  "baseline_grades_path": "/tmp/uvts-ab/baseline-openai/grades.json",
+  "candidate_grades_path": "/tmp/uvts-ab/candidate-neural/grades.json",
+  "verdict": {
+    "verdict": "fail",
+    "criterion": "B mean >= A mean AND no per-question regression > threshold",
+    "regression_threshold_per_question": 0.1,
+    "shared_question_count": 120,
+    "mean_gate_passed": false,
+    "baseline_mean": 0.415,
+    "candidate_mean": 0.413,
+    "mean_delta": -0.002,
+    "regressions": [],
+    "regression_count": 0,
+    "improvement_count": 6
+  }
+}
