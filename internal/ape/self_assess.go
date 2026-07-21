@@ -742,24 +742,30 @@ func computeEdgeWeightEntropy(stats map[string]any) float64 {
 func (a *Assessor) publishProtocolMetrics(spaceID string, stats ProtocolStatsResult) {
 	m := metrics.Metrics()
 
-	// Tier distribution
-	m.J17TierT1Fraction(spaceID).Set(stats.TierDistribution[0])
-	m.J17TierT2Fraction(spaceID).Set(stats.TierDistribution[1])
-	m.J17TierT3Fraction(spaceID).Set(stats.TierDistribution[2])
+	// Event-derived gauges: only meaningful when events exist this process
+	// (shared gate with live_collectors — see j17EventGaugesMeaningful).
+	if j17EventGaugesMeaningful(stats) {
+		// Tier distribution
+		m.J17TierT1Fraction(spaceID).Set(stats.TierDistribution[0])
+		m.J17TierT2Fraction(spaceID).Set(stats.TierDistribution[1])
+		m.J17TierT3Fraction(spaceID).Set(stats.TierDistribution[2])
 
-	// Core metrics
-	m.J17CompressionRatio(spaceID).Set(stats.CompressionRatio)
-	m.J17AvgComprehension(spaceID).Set(stats.AvgComprehension)
-	m.J17AvgTokensPerGuidance(spaceID).Set(stats.AvgTokensPerGuidance)
+		// Core event-derived metrics
+		m.J17CompressionRatio(spaceID).Set(stats.CompressionRatio)
+		m.J17AvgComprehension(spaceID).Set(stats.AvgComprehension)
+		m.J17AvgTokensPerGuidance(spaceID).Set(stats.AvgTokensPerGuidance)
+
+		// Per-tier comprehension
+		m.J17TierT1Comprehension(spaceID).Set(stats.TierComprehension[0])
+		m.J17TierT2Comprehension(spaceID).Set(stats.TierComprehension[1])
+		m.J17TierT3Comprehension(spaceID).Set(stats.TierComprehension[2])
+	}
+
+	// Honest-at-zero / own-no-data-semantics gauges: always publish.
 	m.J17ReplayFrequency(spaceID).Set(stats.ReplayFrequencyPerHour)
 	m.J17TicketRestoreRate(spaceID).Set(stats.TicketRestoreSuccessRate)
 	m.J17CodeCoverage(spaceID).Set(stats.CodeCoverage)
 	m.J17EventsTotal(spaceID).Set(float64(stats.TotalEvents))
-
-	// Per-tier comprehension
-	m.J17TierT1Comprehension(spaceID).Set(stats.TierComprehension[0])
-	m.J17TierT2Comprehension(spaceID).Set(stats.TierComprehension[1])
-	m.J17TierT3Comprehension(spaceID).Set(stats.TierComprehension[2])
 
 	// Per-tier outcome counts (sample size context)
 	m.J17TierT1OutcomeCount(spaceID).Set(float64(stats.TierOutcomeCount[0]))

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"mdemg/internal/config"
+	"mdemg/internal/metrics"
 )
 
 // assertClose checks that got is within epsilon of want.
@@ -890,4 +891,64 @@ func TestScoreProtocol_StabilityWeighting(t *testing.T) {
 	// 0.35*0.0 + 0.05*0.3 + 0.25*0.0 + 0.20*0.0 + 0.15*0.55
 	// = 0.0 + 0.015 + 0.0 + 0.0 + 0.0825 = 0.0975
 	assertClose(t, got, 0.0975, 0.001, "scoreProtocol stability weighting")
+}
+
+
+// ─── J17 event-gauge no-data gate (fix during J17 dashboard investigation, 2026-07-21) ───
+
+// The in-memory protocol stats reset to zero on every server restart;
+// publishing 0.0 tier-fractions / compression from a zero-event window is the
+// no-data-as-zero artifact class (DASHBOARD-TRUTH-002 rule #3) that diluted
+// the "Average Compression" panel across restart-heavy days.
+func TestJ17EventGaugesMeaningful(t *testing.T) {
+	if j17EventGaugesMeaningful(ProtocolStatsResult{TotalEvents: 0}) {
+		t.Error("zero events must NOT be meaningful (no-data-as-zero gate)")
+	}
+	if !j17EventGaugesMeaningful(ProtocolStatsResult{TotalEvents: 1}) {
+		t.Error("nonzero events must be meaningful")
+	}
+}
+
+func TestPublishProtocolMetrics_ZeroEvents_SkipsEventDerivedGauges(t *testing.T) {
+	const sid = "uats-j17-gauge-gate-test"
+	m := metrics.Metrics()
+
+	// Seed a sentinel pre-restart value, then publish a zero-event window.
+	m.J17CompressionRatio(sid).Set(1.77)
+	m.J17TierT2Fraction(sid).Set(0.76)
+
+	a := &Assessor{}
+	a.publishProtocolMetrics(sid, ProtocolStatsResult{
+		TotalEvents:      0,
+		CompressionRatio: 0,   // in-memory reset value — a lie if published
+		TierDistribution: [3]float64{0, 0, 0},
+		CodeCoverage:     1.0, // null-tolerant default — honest, always published
+	})
+
+	if got := m.J17CompressionRatio(sid).Value(); got != 1.77 {
+		t.Errorf("zero-event publish overwrote compression sentinel: got %v, want 1.77 (Set must be skipped)", got)
+	}
+	if got := m.J17TierT2Fraction(sid).Value(); got != 0.76 {
+		t.Errorf("zero-event publish overwrote tier-fraction sentinel: got %v, want 0.76", got)
+	}
+	if got := m.J17EventsTotal(sid).Value(); got != 0 {
+		t.Errorf("EventsTotal is honest-at-zero and must still publish: got %v, want 0", got)
+	}
+	if got := m.J17CodeCoverage(sid).Value(); got != 1.0 {
+		t.Errorf("CodeCoverage must still publish: got %v, want 1.0", got)
+	}
+
+	// A real window updates everything.
+	a.publishProtocolMetrics(sid, ProtocolStatsResult{
+		TotalEvents:      5,
+		CompressionRatio: 1.9,
+		TierDistribution: [3]float64{0, 0.8, 0.2},
+		CodeCoverage:     1.0,
+	})
+	if got := m.J17CompressionRatio(sid).Value(); got != 1.9 {
+		t.Errorf("nonzero-event publish must update compression: got %v, want 1.9", got)
+	}
+	if got := m.J17TierT2Fraction(sid).Value(); got != 0.8 {
+		t.Errorf("nonzero-event publish must update tier fraction: got %v, want 0.8", got)
+	}
 }

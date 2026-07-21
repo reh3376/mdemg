@@ -183,29 +183,48 @@ func (lc *LiveCollectors) CollectHealthMetrics() {
 
 // ─── Private helpers ───
 
+// j17EventGaugesMeaningful reports whether the event-derived J17 protocol
+// gauges (tier fractions, compression ratio, comprehension, tokens/guidance)
+// carry real signal. The protocol stats live IN MEMORY and reset to zero on
+// every server restart — publishing 0.0 tier-fractions / compression from a
+// zero-event window is the no-data-as-zero artifact class (DASHBOARD-TRUTH-002
+// pinned rule #3): it dilutes windowed panel averages and latches lastNotNull
+// panels to a lie until real events accumulate. Skipping the Set leaves the
+// gauge absent from the flush, so panels hold the last real pre-restart value.
+// Shared by BOTH publishers (live_collectors + self_assess) — gate at the
+// source, one chokepoint (the DASHBOARD-TRUTH-001 lesson).
+func j17EventGaugesMeaningful(stats ProtocolStatsResult) bool {
+	return stats.TotalEvents > 0
+}
+
 // publishProtocolGauges sets all J17 protocol Prometheus gauges from stats.
 func (lc *LiveCollectors) publishProtocolGauges(stats ProtocolStatsResult) {
 	m := metrics.Metrics()
 	sid := lc.spaceID
 
-	// Tier distribution
-	m.J17TierT1Fraction(sid).Set(stats.TierDistribution[0])
-	m.J17TierT2Fraction(sid).Set(stats.TierDistribution[1])
-	m.J17TierT3Fraction(sid).Set(stats.TierDistribution[2])
+	// Event-derived gauges: only meaningful when events exist this process.
+	if j17EventGaugesMeaningful(stats) {
+		// Tier distribution
+		m.J17TierT1Fraction(sid).Set(stats.TierDistribution[0])
+		m.J17TierT2Fraction(sid).Set(stats.TierDistribution[1])
+		m.J17TierT3Fraction(sid).Set(stats.TierDistribution[2])
 
-	// Core metrics
-	m.J17CompressionRatio(sid).Set(stats.CompressionRatio)
-	m.J17AvgComprehension(sid).Set(stats.AvgComprehension)
-	m.J17AvgTokensPerGuidance(sid).Set(stats.AvgTokensPerGuidance)
+		// Core event-derived metrics
+		m.J17CompressionRatio(sid).Set(stats.CompressionRatio)
+		m.J17AvgComprehension(sid).Set(stats.AvgComprehension)
+		m.J17AvgTokensPerGuidance(sid).Set(stats.AvgTokensPerGuidance)
+
+		// Per-tier comprehension
+		m.J17TierT1Comprehension(sid).Set(stats.TierComprehension[0])
+		m.J17TierT2Comprehension(sid).Set(stats.TierComprehension[1])
+		m.J17TierT3Comprehension(sid).Set(stats.TierComprehension[2])
+	}
+
+	// Honest-at-zero / own-no-data-semantics gauges: always publish.
 	m.J17ReplayFrequency(sid).Set(stats.ReplayFrequencyPerHour)
 	m.J17TicketRestoreRate(sid).Set(stats.TicketRestoreSuccessRate)
 	m.J17CodeCoverage(sid).Set(stats.CodeCoverage)
 	m.J17EventsTotal(sid).Set(float64(stats.TotalEvents))
-
-	// Per-tier comprehension
-	m.J17TierT1Comprehension(sid).Set(stats.TierComprehension[0])
-	m.J17TierT2Comprehension(sid).Set(stats.TierComprehension[1])
-	m.J17TierT3Comprehension(sid).Set(stats.TierComprehension[2])
 
 	// Per-tier outcome counts
 	m.J17TierT1OutcomeCount(sid).Set(float64(stats.TierOutcomeCount[0]))
