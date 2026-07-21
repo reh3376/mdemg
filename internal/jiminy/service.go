@@ -137,6 +137,7 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext, consultant Co
 			MaxTokens:              cfg.JiminyOutcomeLLMMaxTokens,
 			CacheSize:              cfg.JiminyOutcomeCacheSize,
 			CompressPrompts:        cfg.JiminyClassifyCompress,
+			NonViolationCredit:     cfg.JiminyNonViolationCreditEnabled,
 		})
 		slog.Info("jiminy: semantic outcome classifier enabled",
 			"high_threshold", cfg.JiminyOutcomeSimilarityHigh, "low_threshold", cfg.JiminyOutcomeSimilarityLow,

@@ -316,3 +316,74 @@ func TestBuildClassifyPrompt_WithoutNegation(t *testing.T) {
 		t.Error("prompt should NOT contain negation section when no negation found")
 	}
 }
+
+
+// JIMINY-ACTIONABILITY-COMPLIANCE-CREDIT-001: E3 pin tests
+
+// TestResolveClassifySystemPrompt_DefaultOff_ByteIdentical proves the
+// default-off render is byte-identical to the historical classifySystemPrompt
+// constant — so the ULTS system_prompt_hash pin STAYS unchanged and the
+// ULTS-CI-001 drift check passes without a hash update.
+func TestResolveClassifySystemPrompt_DefaultOff_ByteIdentical(t *testing.T) {
+	oc := &OutcomeClassifier{compressPrompts: false, nonViolationCredit: false}
+	if got := oc.resolveClassifySystemPrompt(); got != classifySystemPrompt {
+		t.Errorf("default-off render is NOT byte-identical to classifySystemPrompt const — ULTS hash pin would break.\ngot len=%d, want len=%d", len(got), len(classifySystemPrompt))
+	}
+	oc2 := &OutcomeClassifier{compressPrompts: true, nonViolationCredit: false}
+	if got := oc2.resolveClassifySystemPrompt(); got != classifySystemPromptCompact {
+		t.Errorf("default-off + compressed render is NOT byte-identical to classifySystemPromptCompact")
+	}
+}
+
+// TestResolveClassifySystemPrompt_Enabled_ExtendedWithClause proves the
+// flag-on render appends the nonViolationCreditClause to whichever base
+// prompt is selected by compressPrompts.
+func TestResolveClassifySystemPrompt_Enabled_ExtendedWithClause(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		compress bool
+		base     string
+	}{
+		{"full", false, classifySystemPrompt},
+		{"compact", true, classifySystemPromptCompact},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			oc := &OutcomeClassifier{compressPrompts: tc.compress, nonViolationCredit: true}
+			got := oc.resolveClassifySystemPrompt()
+			want := tc.base + nonViolationCreditClause
+			if got != want {
+				t.Errorf("flag-on render doesn't match base + clause; got len=%d want len=%d", len(got), len(want))
+			}
+			// Content-level assertions on the extension clause.
+			if !strings.Contains(got, "NON-VIOLATION CREDIT for must_not") {
+				t.Error("extended prompt missing the must_not credit header")
+			}
+			if !strings.Contains(got, "\"not_applicable\", NOT \"ignored\"") {
+				t.Error("extended prompt missing the not_applicable-not-ignored routing directive")
+			}
+			// The extension must include the concrete examples so the LLM has
+			// anchors — an abstract rule alone under-transfers.
+			if !strings.Contains(got, "never commit to main") {
+				t.Error("extended prompt missing the concrete never-commit-to-main example")
+			}
+		})
+	}
+}
+
+// TestNewOutcomeClassifier_NonViolationCredit_Propagates verifies the
+// OutcomeClassifierConfig.NonViolationCredit field flows through
+// NewOutcomeClassifier to the internal field the render checks.
+func TestNewOutcomeClassifier_NonViolationCredit_Propagates(t *testing.T) {
+	off := NewOutcomeClassifier(nil, OutcomeClassifierConfig{NonViolationCredit: false})
+	if off.nonViolationCredit {
+		t.Error("NonViolationCredit=false should not propagate to true")
+	}
+	on := NewOutcomeClassifier(nil, OutcomeClassifierConfig{NonViolationCredit: true})
+	if !on.nonViolationCredit {
+		t.Error("NonViolationCredit=true should propagate")
+	}
+	// And the render differs accordingly.
+	if off.resolveClassifySystemPrompt() == on.resolveClassifySystemPrompt() {
+		t.Error("flag on/off renders should differ")
+	}
+}
