@@ -117,8 +117,7 @@ The evaluator (`internal/alert/evaluator.go`) queries TSDB on a periodic schedul
 | `high_orphan_count` | orphans > 50 | 15m | warning |
 | `high_orphan_ratio` | ratio > 10% | 15m | warning |
 | `neo4j_high_memory` | mem > 80% | 5m | warning |
-| `neo4j_high_cpu` | CPU > 80% | 5m | warning |
-| `neo4j_pool_exhausted` | waiting > 5 | 2m | critical |
+| `neo4j_high_cpu` | 5-min windowed AVG CPU > `NEO4J_CPU_ALERT_THRESHOLD_PERCENT` (default 500; docker-stats % is per-single-core) | 5m | warning |
 | `graph_node_drop` | drop > 100/1h | 5m | critical |
 | `rate_limiting_active` | rejects > 10/s | 2m | info |
 | `low_cache_hit_ratio` | ratio < 0.5 | 10m | info |

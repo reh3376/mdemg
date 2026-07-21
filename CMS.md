@@ -523,9 +523,9 @@ RSIC_ROLLBACK_WINDOW=3600               # seconds to keep rollback snapshots
 RSIC_WATCHDOG_ENABLED=true
 RSIC_WATCHDOG_CHECK_SEC=300             # seconds between checks
 RSIC_WATCHDOG_DECAY_RATE=0.1            # decay-score increase per hour without a cycle
-RSIC_WATCHDOG_NUDGE_THRESHOLD=0.3
-RSIC_WATCHDOG_WARN_THRESHOLD=0.6
-RSIC_WATCHDOG_FORCE_THRESHOLD=0.9
+RSIC_NUDGE_THRESHOLD=0.3
+RSIC_WARN_THRESHOLD=0.6
+RSIC_FORCE_THRESHOLD=0.9
 
 # RSIC — Calibration
 RSIC_CALIBRATION_DAYS=30                # days of history for calibration

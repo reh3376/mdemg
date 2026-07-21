@@ -72,7 +72,7 @@ TSDB_ENABLED=true
   │     │
   │     ├── TSDB_AUTO_MIGRATE=true → run schema migrations on startup
   │     │
-  │     └── TSDB_REQUIRED_SCHEMA_VERSION=8 → refuse to start if schema is behind
+  │     └── TSDB_REQUIRED_SCHEMA_VERSION=31 → refuse to start if schema is behind
   │
   ├── metric_samples writer (always active when TSDB connected)
   │     └── TSDB_FLUSH_INTERVAL_SEC=60 → batch flush cadence
@@ -116,7 +116,7 @@ Migrations live in `internal/tsdb/migrations/` and are applied in order:
 | `008_instance_id.sql` | 8 | `instance_id TEXT NOT NULL DEFAULT ''` on all 3 training tables + composite indexes |
 | `009_backfill_space_id.sql` | — | Data fix: backfills empty `space_id` to `'mdemg-dev'` (no schema version bump) |
 
-Current required version: **8** (`TSDB_REQUIRED_SCHEMA_VERSION`).
+Current required version: **31** (`TSDB_REQUIRED_SCHEMA_VERSION`). Migrations `010`–`031` (V0010–V0031) landed after this table was written — 31 files total in `internal/tsdb/migrations/`.
 
 ## Privacy and Scrubbing
 
@@ -155,7 +155,7 @@ uv run python tsdb_data_review.py --format both --verbose
 | C: llm_interactions | Task coverage, error rate, column population, latency percentiles, token usage, privacy scrub verification |
 | D: embedding_events | Call_site regression check, cache hit rate, model consistency, scrub asymmetry |
 | E: retrieval_events | Pipeline stage completeness, hard-negative mining viability, latency breakdown |
-| F: ft_* tables | All 4 expected empty (FT pipeline not yet built) |
+| F: ft_* tables | All 4 expected empty at audit time (superseded — the FT recursive-retraining loop has shipped: FT-RECURSIVE-001/002, `ft_training_cycles` now has a writer) |
 | G: Cross-cutting | Growth rates, flush gap detection, temporal coverage, config flag check via HTTP |
 
 **Privacy verification**: Mirrors 5 regex patterns from `internal/llmclient/scrubber.go` exactly. Checks that `llm_interactions` fields are scrubbed and that `embedding_events.query_text` is NOT scrubbed (required for contrastive training).
@@ -270,7 +270,7 @@ PYTHONPATH=. python3 -m training.dataset_versioner --input-dir /tmp/filtered/ --
 - `internal/tsdb/llm_writer.go` — LLM interaction logger
 - `internal/tsdb/embedding_writer.go` — Embedding event logger
 - `internal/tsdb/retrieval_writer.go` — Retrieval event logger
-- `internal/tsdb/migrations/` — Schema migration SQL files (001-009)
+- `internal/tsdb/migrations/` — Schema migration SQL files (001-031)
 - `internal/llmclient/scrubber.go` — Privacy scrubber patterns
 - `internal/api/server.go` — TSDB client wiring (SetTSDBClient)
 - `docker-compose.yml` — Docker TSDB environment overrides

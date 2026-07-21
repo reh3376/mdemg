@@ -50,7 +50,7 @@ Both hypertables use a 7-day chunk interval. The `embedding_events` table carrie
 
 ### Context Propagation (WithEmbeddingMeta)
 
-`embeddings.WithEmbeddingMeta(ctx, meta)` attaches parser metadata to the Go context. The `CachedEmbedder` reads this metadata when recording events. Wired at 9 call sites:
+`embeddings.WithEmbeddingMeta(ctx, meta)` attaches parser metadata to the Go context. The `CachedEmbedder` reads this metadata when recording events. Originally wired at the 9 call sites below; the wired set has since grown (~20 post EMBED-CALLSITE-001, which closed the last metaless sites) — see `docs/features/embedding-attribution.md` for the current contract and audit query. Original 9:
 
 | # | File | CallSite | Key Metadata |
 |---|------|----------|--------------|

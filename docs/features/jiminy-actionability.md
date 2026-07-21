@@ -26,7 +26,7 @@ A surfaced-composition gauge (`mdemg_jiminy_surfaced_actionable_fraction` / `_ab
 | `JIMINY_SURFACE_MIN_ACTIONABLE` | 0 | Absolute min actionable items reserved |
 | `JIMINY_SURFACE_MIN_ACTIONABLE_FRACTION` | 0.0 | Min actionable as a fraction of `max_items` |
 | `JIMINY_SURFACE_MAX_ABSTRACTION_FRACTION` | 1.0 (no cap) | Max abstraction items as a fraction of `max_items` |
-| `JIMINY_DIRECTIVE_SYNTHESIS_ENABLED` | false | Render abstractions as imperative directives |
+| `JIMINY_DIRECTIVE_SYNTHESIS_ENABLED` | false (code; set `true` in the production `.env` since JIMINY-CORPUS-001 E5) | Render abstractions as imperative directives |
 | `JIMINY_DIRECTIVE_SYNTHESIS_MAX_PROMPT_TOKENS` | 3500 | Directive-mode prompt token bound |
 
 ## Live A/B result (Epic 4)
@@ -46,7 +46,7 @@ Lever C addresses the Epic-4 finding directly: when `JIMINY_GUIDANCE_CONSTRAINT_
 **Live A/B (controlled, `ab_results.md`):** surfaced **actionable fraction 11.1% → 47.7%** (4.3×), abstraction **88.9% → 52.3%** — **clears the ≤60%-abstraction milestone** Lever A couldn't move. Surfaced constraints are query-relevant. ⚠️ A live-smoke fix was needed mid-sprint: the initial index-scan query (top-50 then role-filter) returned 0 because actionables are ~0.1% of nodes; the role-filtered cosine query fixed it.
 
 ## Shipping
-All three levers ship **default-off**. **Operator recommendation: enable Lever C** (the actionable-composition mover) and Lever B (imperative phrasing). Lever A's quota/cap then shapes the now-actionable-rich pool. See `docs/development/jiminy-actionability-001/`.
+All three levers ship **default-off in code**; operationally the production `.env` enables Lever B and Lever C (plus Lever A quota/weight settings), and the JIMINY-CORPUS-001 surface cooldown is default-on in code. **Operator recommendation: enable Lever C** (the actionable-composition mover) and Lever B (imperative phrasing). Lever A's quota/cap then shapes the now-actionable-rich pool. See `docs/development/jiminy-actionability-001/`.
 
 ## Follow-up — corpus cleanup + repetition control (JIMINY-CORPUS-001, 2026-07-03)
 Enabling Lever C exposed that the `role_type='constraint'` partition it surfaces from was ~half junk and over-repeated. JIMINY-CORPUS-001 addressed the corpus itself:

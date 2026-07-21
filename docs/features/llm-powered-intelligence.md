@@ -147,7 +147,7 @@ The improved keyword matcher checks in this order (longest match first):
 3. `must`, `required`, `always`, `mandatory` → `must`
 4. `should`, `recommended`, `prefer` → `should`
 
-Additionally, nodes must have `Score >= 0.5` to be considered constraint candidates.
+Additionally, nodes must clear the config-driven score floor `CONSULTING_CONSTRAINT_SCORE_FLOOR` (default `0.45`, RRF-calibrated — RRF-SCALE-001) to be considered constraint candidates.
 
 ### Configuration
 
@@ -199,9 +199,9 @@ This ensures that a "code + architecture" query gets the deeper traversal of arc
 
 | Parameter | Default | Env Var | Description |
 |-----------|---------|---------|-------------|
-| RetrievalLLMClassifyEnabled | `false` | `RETRIEVAL_LLM_CLASSIFY_ENABLED` | Enable LLM query classification |
-| RetrievalLLMClassifyProvider | (from EMERGENCE_PROVIDER) | `RETRIEVAL_LLM_CLASSIFY_PROVIDER` | `openai` or `ollama` |
-| RetrievalLLMClassifyModel | (from EMERGENCE_MODEL) | `RETRIEVAL_LLM_CLASSIFY_MODEL` | LLM model name |
+| QueryClassifyEnabled | `false` | `QUERY_CLASSIFY_ENABLED` | Enable LLM query classification (compose default: `true`) |
+| QueryClassifyProvider | (from LLM_PROVIDER) | `QUERY_CLASSIFY_PROVIDER` | `openai` or `ollama` |
+| QueryClassifyModel | (from LLM_MODEL) | `QUERY_CLASSIFY_MODEL` | LLM model name |
 
 ## Enabling All Three
 
@@ -211,11 +211,11 @@ To enable all LLM intelligence features:
 # In .env or environment
 RSIC_LLM_REFLECT_ENABLED=true
 CONSULTING_LLM_CONSTRAINTS_ENABLED=true
-RETRIEVAL_LLM_CLASSIFY_ENABLED=true
+QUERY_CLASSIFY_ENABLED=true
 
 # Provider defaults from emergence config (or override per-feature)
 EMERGENCE_PROVIDER=openai
-EMERGENCE_MODEL=gpt-4o-mini
+EMERGENCE_MODEL=mdemg-llm-v1   # optional — defaults to LLM_MODEL (mdemg-llm-v1)
 OPENAI_API_KEY=sk-...
 ```
 
@@ -224,7 +224,7 @@ Or with Ollama:
 ```bash
 EMERGENCE_PROVIDER=ollama
 EMERGENCE_MODEL=llama3.2:3b
-OLLAMA_URL=http://localhost:11434
+OLLAMA_ENDPOINT=http://localhost:11434
 ```
 
 ## Key Files

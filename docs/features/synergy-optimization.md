@@ -67,7 +67,7 @@ mdemg synergy check [--auto] [--space-id]      # Cron-compatible health check
 
 ### RSIC Monitoring (Epic 3)
 
-**New Assessment Dimension**: `SynergyHealth` added as 7th RSIC dimension (10% weight).
+**New Assessment Dimension**: `SynergyHealth` added as 7th RSIC dimension (weight `0.05` — `RSIC_HEALTH_WEIGHT_SYNERGY`, DH-005 default).
 
 Scoring factors:
 - Jiminy health (unhealthy → 0.0 score)

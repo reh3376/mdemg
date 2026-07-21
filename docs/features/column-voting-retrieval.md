@@ -12,7 +12,7 @@ phase: phase 13 + phase 13.1
 ## Summary
 
 **Feature**: `column-voting-retrieval`
-**Summary**: Reciprocal Rank Fusion (RRF) aggregator that runs four retrieval columns in parallel (Embedding + BM25 + Graph + Structural), fuses their per-column rankings into a single ranked list, and emits a `consensus_strength` per-call signal alongside the candidate set. Replaces the legacy linear scorer at the call site behind a feature flag (`RETRIEVAL_COLUMN_VOTING_ENABLED`, default `true` since Phase 13.1). Cache namespace isolated per weight preset via a hash-based scorer-version key. Retrieval audit rows persist to TSDB V0017.
+**Summary**: Reciprocal Rank Fusion (RRF) aggregator that runs four retrieval columns in parallel (Embedding + BM25 + Graph + Structural; a 5th Context column joined in Phase 14.2, default-on since 14.2.3 — see `context-fingerprinting.md`), fuses their per-column rankings into a single ranked list, and emits a `consensus_strength` per-call signal alongside the candidate set. Replaces the legacy linear scorer at the call site behind a feature flag (`RETRIEVAL_COLUMN_VOTING_ENABLED`, default `true` since Phase 13.1). Cache namespace isolated per weight preset via a hash-based scorer-version key. Retrieval audit rows persist to TSDB V0017.
 
 ## Vision & Goals
 
@@ -38,11 +38,11 @@ Phase 13 adopted the HTM-aligned column-voting pattern: each column produces its
 | Structural column | `internal/retrieval/columns/structural.go` | Cypher walk over `contains` / `defined_in` edges, configurable hop depth |
 | RRF aggregator | `internal/retrieval/consensus.go` | Parallel column execution via `errgroup` with per-column timeout, RRF formula, `consensus_strength` |
 | Scorer fork | `internal/retrieval/service.go:644-682` | At `service.Retrieve`: chooses linear scorer vs RRF based on `cfg.RetrievalColumnVotingEnabled` |
-| Cache namespace | `internal/retrieval/service.go::scorerVersion()` | Returns `"v0-linear"` or `"v1-rrf4|e=0.500|b=0.200|g=0.150|s=0.150|hops=2|emb=true|bm=true|gr=true|st=true"` — weight/hop/enable changes flip cache namespace automatically |
+| Cache namespace | `internal/retrieval/service.go::scorerVersion()` | Returns `"v0-linear"` or `"v2-rrf5|e=0.500|b=0.200|g=0.150|s=0.150|c=0.100|hops=2|emb=true|bm=true|gr=true|st=true|ctx=true|strict=0.250|catmaps=<hash>|tge=on|…"` — weight/hop/enable/typed-edges changes flip cache namespace automatically |
 | Retrieval audit | `internal/retrieval/retrieval_audit.go` + `internal/tsdb/retrieval_audit_writer.go` | V0017 hypertable; one row per retrieve call when `RETRIEVAL_AUDIT_ENABLED=true` |
 | Ablation runner | `scripts/phase13_1_ablation_runner.py` | Sweeps weight presets; restarts mdemg per preset; runs UVTS A/B; produces verdict matrix |
 
-The two columns originally specified for Phase 13 (`Temporal` and `RoleScoped`) were **deferred per Epic 0 data audit**: `whk-wms` MemoryNodes had >5% null `last_activated_at` and 0 distinct `role` properties. Shipping those columns without populated data would produce noise. The 4-column variant ships in production.
+The two columns originally specified for Phase 13 (`Temporal` and `RoleScoped`) were **deferred per Epic 0 data audit**: `whk-wms` MemoryNodes had >5% null `last_activated_at` and 0 distinct `role` properties. Shipping those columns without populated data would produce noise. The 4-column variant shipped in production (the Context column later made it 5 — Phase 14.2.3).
 
 ### Workflow
 
@@ -82,7 +82,7 @@ The default flipped to embedding-heavy in the same Phase 13.1 commit (`6ed411e`,
 | `RETRIEVAL_COLUMN_BM25_ENABLED` | `true` | Per-column suppression knob |
 | `RETRIEVAL_COLUMN_GRAPH_ENABLED` | `true` | Per-column suppression knob |
 | `RETRIEVAL_COLUMN_STRUCTURAL_ENABLED` | `true` | Per-column suppression knob |
-| `RETRIEVAL_AUDIT_ENABLED` | `false` | Write V0017 row per retrieve call (operator opt-in for observation windows) |
+| `RETRIEVAL_AUDIT_ENABLED` | `true` | Write V0017 row per retrieve call (default `true` since TSDB-CONSUME-001 — feeds the scorer-drift tripwires) |
 
 ## Choices that were made
 

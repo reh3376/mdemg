@@ -47,7 +47,7 @@ Three independent failures prevented tier graduation:
 The entire server-side pipeline was already correct:
 
 - `RecordOutcome()` (`service.go`) — processes feedback, updates trust, records protocol metrics
-- `TrustScorer` (`trust.go`) — initial=0.5, boost +0.05/follow, decay -0.03/ignore, -0.05/contradict
+- `TrustScorer` (`trust.go`) — initial=0.65, boost +0.05/follow, decay -0.02/ignore, -0.04/contradict (current defaults)
 - `selectTier()` (`encoder.go`) — trust-based tier selection with code/annotation requirements
 - `CodifyConstraint()` (`protocol_evolution.go`) — LLM + hash fallback code generation
 - RSIC `j17_cold_start_codification` insight (`self_reflect.go`) — detects codification opportunity
@@ -170,13 +170,12 @@ With the feedback loop closed, tier graduation follows this progression:
 
 | Session | Trust Score | Tier | Encoding |
 |---------|-------------|------|----------|
-| 1 (start) | 0.50 | T3 | Full natural language (~80 tokens/item) |
-| 1 (after 2 feedbacks) | 0.60 | T3 | Still T3 (trust < 0.65 for T2) |
-| 2 (after 4 feedbacks) | 0.70 | T2 | Telegraphic (~50 tokens/item) |
-| 3 (after 6 feedbacks) | 0.80 | T1 eligible | Coded (~15 tokens/item) if codes exist |
-| 3+ (codes generated) | 0.80+ | T1 | Full compression active |
+| 1 (start) | 0.65 | T3 (T2 if codes exist) | Full natural language (~80 tokens/item) |
+| 1 (after 1 feedback) | 0.70 | T2 (with codes) | Telegraphic (~50 tokens/item) |
+| 1 (after 2 feedbacks) | 0.75 | T1 eligible | Coded (~15 tokens/item) if codes exist |
+| 1+ (codes generated) | 0.75+ | T1 | Full compression active |
 
-**Math**: `(0.8 - 0.5) / 0.05 = 6` consecutive positive feedbacks to reach T1 trust threshold.
+**Math**: `(0.75 - 0.65) / 0.05 = 2` consecutive positive feedbacks to reach the T1 trust threshold (current defaults: initial 0.65, boost +0.05, `J17_TRUST_HIGH_THRESHOLD` 0.75; this is the legacy ratchet arithmetic — under the default EMA trust mode the exact count varies).
 
 Trust is per-session and in-memory (4-hour TTL), so graduation happens within a session, not across sessions. The signed session ticket mechanism (`ticket.go`) persists trust across context compactions within a session. Additionally, trust now persists durably to Neo4j via `TrustStore`, so the ticket-based checkpoint/resume is supplemented by durable persistence — trust can survive full session restarts, not just compactions.
 
@@ -188,9 +187,9 @@ No new configuration variables. The fix uses existing config:
 
 | Parameter | Value | Source |
 |-----------|-------|--------|
-| `J17_TRUST_INITIAL` | 0.5 | Trust starting point |
+| `J17_TRUST_INITIAL` | 0.65 | Trust starting point |
 | `J17_TRUST_BOOST_PER_FOLLOW` | 0.05 | Per-feedback trust increase |
-| `J17_TRUST_HIGH_THRESHOLD` | 0.8 | T1 eligibility threshold |
+| `J17_TRUST_HIGH_THRESHOLD` | 0.75 | T1 eligibility threshold |
 | `JIMINY_EFFECTIVENESS_TTL_SEC` | 7200 | State file max age (2 hours) |
 | `GET /v1/jiminy/ready` | `features.j17` | Bootstrap codification gate (replaces `J17_ENABLED` env var) |
 

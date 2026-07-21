@@ -15,9 +15,9 @@ Request → Fail (429/503) → Wait (backoff) → Retry → Fail → Wait (longe
 | Env Var | Default | Description |
 |---------|---------|-------------|
 | `LLM_RETRY_ENABLED` | `true` | Enable/disable retry logic |
-| `LLM_RETRY_MAX_ATTEMPTS` | `3` | Maximum retry attempts (0 = no retries) |
+| `LLM_RETRY_MAX_ATTEMPTS` | `5` | Maximum retry attempts (0 = no retries) |
 | `LLM_RETRY_BASE_DELAY_MS` | `500` | Base delay before first retry |
-| `LLM_RETRY_MAX_DELAY_MS` | `10000` | Maximum backoff delay cap |
+| `LLM_RETRY_MAX_DELAY_MS` | `60000` | Maximum backoff delay cap |
 | `LLM_RETRY_DEADLINE_ENABLED` | `true` | Retry once on `context.DeadlineExceeded` when remaining context budget > 2× base delay (DH-004) |
 
 Set `LLM_RETRY_ENABLED=false` to restore single-attempt behaviour.
@@ -27,6 +27,7 @@ Set `LLM_RETRY_ENABLED=false` to restore single-attempt behaviour.
 | Error | Retryable | Reason |
 |-------|-----------|--------|
 | HTTP 429 (Too Many Requests) | Yes | Rate limit — transient |
+| HTTP 502 (Bad Gateway) | Yes | Transient gateway/upstream failure |
 | HTTP 503 (Service Unavailable) | Yes | Temporary outage |
 | Network timeout / connection refused | Yes | Transient infrastructure |
 | HTTP 400 (Bad Request) | No | Client error — won't change on retry |

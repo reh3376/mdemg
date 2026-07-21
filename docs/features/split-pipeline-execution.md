@@ -25,14 +25,15 @@ The consolidation pipeline creates hidden nodes, enriches them, clusters into co
 | Phase | Category | Steps | When |
 |-------|----------|-------|------|
 | 10 | Core | `hidden` | Pre-clustering |
-| 20 | Enrichment | `concern`, `config`, `comparison`, `temporal`, `ui`, `constraint` | Pre-clustering |
+| 20 | Enrichment | `concern`, `config`, `comparison`, `temporal`, `ui`, `constraint`, `correction` | Pre-clustering |
+| 22 | Emergence | `dynamic_emergence` | Pre-clustering (skipped when emergence disabled) |
 | 25 | Dynamic edges | `dynamic_edges` | Post-clustering |
 | 30 | Post-processing | `emergent_l5` | Post-clustering |
 
 ### Workflow
 
 ```
-1. RunPhaseRange(10, 20)    -> Core + enrichment steps
+1. RunPhaseRange(10, 22)    -> Core + enrichment steps
 2. Multi-layer clustering   -> L2-L5 concept clustering with interleaved forward passes
 3. RunPhaseRange(25, 30)    -> Dynamic edges + L5 emergent nodes
 4. Backward pass + summaries
@@ -49,7 +50,7 @@ The method iterates all registered steps, skips those outside `[minPhase, maxPha
 **Handler Integration** — the consolidation handler calls the pipeline twice:
 
 ```go
-preResult, err := hiddenSvc.RunNodeCreationPipeline(ctx, spaceID)   // phases 10-20
+preResult, err := hiddenSvc.RunNodeCreationPipeline(ctx, spaceID)   // phases 10-22
 // ... multi-layer clustering happens here ...
 postResult, err := hiddenSvc.RunPostClusteringPipeline(ctx, spaceID) // phases 25-30
 ```
@@ -60,7 +61,7 @@ Results from both calls are merged into the single `steps` map in the API respon
 
 No additional configuration. Phase ranges are hardcoded in the service methods:
 
-- `RunNodeCreationPipeline()` -> `RunPhaseRange(ctx, spaceID, nil, 10, 20)`
+- `RunNodeCreationPipeline()` -> `RunPhaseRange(ctx, spaceID, skip, 10, 22)`
 - `RunPostClusteringPipeline()` -> `RunPhaseRange(ctx, spaceID, nil, 25, 30)`
 
 ## Notes

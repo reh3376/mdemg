@@ -12,18 +12,18 @@ phase: "FT-INFRA-C"
 ## Summary
 
 **Feature**: ULTS Framework
-**Summary**: Universal LLM Task Specifications — machine-readable JSON contracts for all 16 LLM tasks, enabling automated quality benchmarking and regression gating.
+**Summary**: Universal LLM Task Specifications — machine-readable JSON contracts for all 17 LLM tasks, enabling automated quality benchmarking and regression gating.
 
 
 ## Overview
 
-ULTS is the 13th UxTS framework type in MDEMG. It provides machine-readable contracts for all 16 LLM tasks, defining system prompt hashes, output schemas, quality metrics, think mode requirements, and training configuration. Each task gets a `.ults.json` spec file; the runner validates the full set for completeness, structural correctness, and (optionally) prompt hash integrity against Go source code.
+ULTS is the 13th UxTS framework type in MDEMG. It provides machine-readable contracts for all 17 LLM tasks, defining system prompt hashes, output schemas, quality metrics, think mode requirements, and training configuration. Each task gets a `.ults.json` spec file; the runner validates the full set for completeness, structural correctness, and (optionally) prompt hash integrity against Go source code.
 
 ULTS was introduced in Phase C of the FT Infrastructure Sprint.
 
 ## Problem
 
-16 LLM tasks have implicit contracts encoded in Go source code — system prompts, expected output formats, and quality thresholds. Without machine-readable specs:
+17 LLM tasks have implicit contracts encoded in Go source code — system prompts, expected output formats, and quality thresholds. Without machine-readable specs:
 
 - Training data cannot be automatically validated against expected output schemas
 - Prompt version changes cannot be detected (stale training data goes unnoticed)
@@ -126,7 +126,7 @@ Hash type "static" means `system_prompt_hash` is a 64-character SHA-256 hex stri
 
 ### Validations performed
 
-1. **Completeness check** — all 16 expected task names have a corresponding spec file
+1. **Completeness check** — all 17 expected task names have a corresponding spec file
 2. **Required fields** — `ults_version`, `task`, `metadata` (and their sub-fields) present
 3. **Parity check** — no unknown top-level or prompt-section fields
 4. **Version format** — `ults_version` matches semver pattern `^\d+\.\d+\.\d+$`
@@ -178,7 +178,7 @@ ULTS specs are the authoritative task registry. The runtime task registry in Pha
 |------|---------|
 | `docs/tests/ults/schema/ults.schema.json` | JSON Schema (draft/2020-12) for all `.ults.json` files |
 | `docs/tests/ults/runners/ults_runner.py` | Validation runner |
-| `docs/tests/ults/specs/*.ults.json` | 16 task spec files |
+| `docs/tests/ults/specs/*.ults.json` | 17 task spec files |
 
 ## Documents Accessed
 

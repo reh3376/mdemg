@@ -9,9 +9,11 @@ sprint: "UI-AUDIT-2026-04-09"
 
 ## Summary
 
-The browser dashboard at `/ui/` exposes 48 API wrappers (in `api.js`) out of 125 server routes registered in `server.go` — **38% coverage**.
+The browser dashboard at `/ui/` exposed 48 API wrappers (in `api.js`) out of 125 server routes registered in `server.go` at the 2026-04-09 audit — **38% coverage** then. `server.go` has since grown to **187 route registrations** (167 `mux.HandleFunc` + 20 `mux.Handle`).
 
 This document catalogs which API endpoints have UI representation and which do not, to inform future UI development.
+
+> **Post-audit additions still absent from the UI** (no `api.js` wrapper): `/v1/admin/breakers` (+`/reset`), `/v1/jiminy/strict` / `reformulate` / `classify`, `/v1/eventgraph/*` federation, `/v1/metrics/snapshot`. The `/v1/review/*` surface shipped with its own Review tab (covered).
 
 ## Well-Covered Areas (100%)
 

@@ -12,7 +12,7 @@ phase: "UAITS-2026-04-10"
 ## Summary
 
 **Feature**: UAITS Framework
-**Summary**: Spec-driven training data curation with 4 paradigms (SFT, DPO, RAFT, curriculum) — the 10th UxTS framework in MDEMG, enabling governed multi-paradigm training data collection across applications.
+**Summary**: Spec-driven training data curation with 4 paradigms (SFT, DPO, RAFT, curriculum) — the 15th of 16 UxTS frameworks in MDEMG, enabling governed multi-paradigm training data collection across applications.
 
 ---
 
@@ -42,10 +42,10 @@ With three new data types available, the pipeline needed a governance contract d
 
 ### Relationship to UxTS
 
-UxTS (Universal-x Test Specification) is a template pattern for building specification frameworks — it is not an actual spec itself. UAITS is the concrete framework built using the UxTS pattern, following the same four-layer architecture (schema, specs, runner, pipeline) used by all 15 UxTS frameworks in MDEMG.
+UxTS (Universal-x Test Specification) is a template pattern for building specification frameworks — it is not an actual spec itself. UAITS is the concrete framework built using the UxTS pattern, following the same four-layer architecture (schema, specs, runner, pipeline) used by all 16 UxTS frameworks in MDEMG.
 
 UAITS complements two closely related frameworks:
-- **ULTS** (Universal LLM Task Specification) — governs the 16 LLM task contracts (prompts, output schemas, quality metrics, training config)
+- **ULTS** (Universal LLM Task Specification) — governs the 17 LLM task contracts (prompts, output schemas, quality metrics, training config)
 - **UTDS** (Universal Training Data Specification) — governs export manifests, privacy gates, and archive integrity
 
 Together, ULTS defines what tasks produce data, UTDS governs how that data is exported, and UAITS governs how it is curated into training datasets.

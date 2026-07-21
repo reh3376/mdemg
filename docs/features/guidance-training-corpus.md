@@ -148,7 +148,7 @@ the threshold observable.
 
 ### Watch the corpus fill and the labels clean up
 - Grafana `mdemg-jiminy`: the **"Should-Follow Follow Rate"** panel (green ≥0.9 =
-  the goal, red <0.5 = the alert floor).
+  the goal, red <0.05 = the alert floor).
 - Gauges: `mdemg_guidance_corpus_rows_enqueued_total`,
   `mdemg_guidance_corpus_heuristic_label_fraction` (should trend to ~0 as the
   auto-relabel job runs), `mdemg_tsdb_writer_*{writer="guidance_training_rows"}`.
@@ -184,7 +184,7 @@ Outputs land in `training_data/guidance_corpus/<version>/` (`corpus.jsonl` +
 | `GUIDANCE_AUDIT_INTERVAL_HOURS` | `24` (floor 1) | relabel cadence |
 | `GUIDANCE_AUDIT_SAMPLE_SIZE` | `50` (floor 1) | rows relabelled per run |
 | `GUIDANCE_AUDIT_INITIAL_DELAY_SEC` | `60` (0=skip) | delay before the first relabel run |
-| `GUIDANCE_SHOULD_FOLLOW_RATE_FLOOR` | `0.5` (0=disable) | should-follow alert floor |
+| `GUIDANCE_SHOULD_FOLLOW_RATE_FLOOR` | `0.05` (0=disable) | should-follow alert floor (lowered from 0.5 — must sit below the ~0.10-0.14 by-design steady state) |
 | `GUIDANCE_SHOULD_FOLLOW_LOOKBACK_HOURS` | `168` (floor 1) | should-follow window |
 
 ### Rollback

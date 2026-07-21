@@ -38,8 +38,9 @@ Two gaps the JIMINY-RELEVANCE-001 diagnostic exposed:
   there; a separate service would re-establish all of it. (Operator-decided.)
 - **Generic `ReviewableDataset` + `ReinforcementSink` interfaces.** The platform
   (sampling, endpoints, persistence) is written once; a new dataset is an
-  interface implementation, not a refactor. Proven by registering 17 datasets
-  (guidance + 16 LLM call sites) with no platform changes.
+  interface implementation, not a refactor. Proven by registering 18 datasets
+  (guidance + 16 LLM call sites + `contradicted_drafts` from
+  JIMINY-CONTRADICTED-BRIDGE-001) with no platform changes.
 - **A dedicated `review_grades` table, not gold columns on each source.** Source
   datasets vary; the audit/reversal record is uniform. `review_grades.item_id`
   joins back to a source row (e.g. `guidance_training_rows.row_id`, or an

@@ -88,12 +88,11 @@ See Configuration Reference table below.
 
 ### Known Limitations
 
-- SignalLearner state is in-memory only — lost on server restart (see assessment P1-1)
 - Effectiveness requires minimum 3 surfaces before meaningful
 
 ### Risks & Gaps
 
-- Opt-C (persist SignalLearner to Neo4j) not implemented — requires measured evidence that restarts cause health drops >0.1
+- Opt-C (persist SignalLearner to Neo4j) — shipped: state persists to Neo4j (V0024) with a 30s background flush loop
 
 ### Future Improvements
 
@@ -101,7 +100,7 @@ See Configuration Reference table below.
 
 - **Opt-A**: Suppress chronically ignored items (follow rate <10% after 10+ surfaces)
 - **Opt-B**: Auto-tune `JIMINY_MIN_CONFIDENCE` (health stays <0.6 after 100+ cycles)
-- **Opt-C**: Persist SignalLearner state to Neo4j (restarts cause health drop >0.1)
+- **Opt-C**: Persist SignalLearner state to Neo4j (shipped — see Risks & Gaps above)
 - **Opt-D**: Per-source-type effectiveness analysis (SourceDiversity <0.5)
 
 ## API Endpoints

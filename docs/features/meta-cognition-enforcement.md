@@ -58,16 +58,14 @@ See Configuration Reference table below.
 
 ### Known Limitations
 
-- SignalLearner state is in-memory only — lost on server restart (see P1-1 in assessment report)
 - Staleness thresholds are hardcoded in hooks
 
 ### Risks & Gaps
 
-- No persistence for SignalLearner (identified in codebase assessment as P1-1)
+- SignalLearner persistence (P1-1) — resolved: state persists to Neo4j (V0024) with a 30s background flush loop
 
 ### Future Improvements
 
-- Persistent signal learner backed by Neo4j
 - Configurable anomaly thresholds via env vars
 
 ## API Endpoints

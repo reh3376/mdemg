@@ -12,7 +12,7 @@ phase: "93"
 ## Summary
 
 **Feature**: Unified CLI
-**Summary**: Single mdemg binary merging 12 separate tools into a unified command structure with 30+ subcommands across 6 command groups.
+**Summary**: Single mdemg binary merging 12 separate tools into a unified command structure with 39 top-level commands across 6 command groups.
 
 
 Phase 93 merges 12 separate Go binaries into a single `mdemg` command using Cobra. Instead of building and managing individual tools (`mdemg-server`, `mdemg-ingest`, `mdemg-decay`, etc.), everything is accessible through one binary with subcommands.
@@ -756,6 +756,12 @@ Only removes hooks installed by MDEMG (identified by the `# MDEMG` marker). Non-
 mdemg hooks list                         # Show hook status
 ```
 
+### Doctor
+
+```bash
+mdemg hooks doctor                       # Diagnose the Claude Code hook channel
+```
+
 See [docs/features/ide-repo-integration.md](ide-repo-integration.md) for full details.
 
 ### Sidecar Hook Generation
@@ -785,6 +791,12 @@ Update the `mdemg` binary to the latest release from GitHub:
 
 # Force upgrade even if already on latest version
 ./bin/mdemg upgrade --force
+
+# Update Docker instances only (used by brew post-install)
+./bin/mdemg upgrade --docker-only
+
+# Update binary only, skip Docker instances
+./bin/mdemg upgrade --no-docker
 ```
 
 The upgrade command checks GitHub Releases for the latest version, downloads the appropriate binary for your platform, verifies the SHA256 checksum, and replaces the current binary using a backup-and-replace strategy. The previous binary is preserved as a backup in case rollback is needed.
@@ -826,6 +838,27 @@ Start both the HTTP API and MCP server in one process:
 ```
 
 The MCP subprocess receives the correct `MDEMG_ENDPOINT` automatically. Both are shut down gracefully together.
+
+---
+
+## Other Command Groups
+
+Command groups added after this doc was written, not documented in full above (see `mdemg <group> --help`):
+
+| Group | Description |
+|-------|-------------|
+| `data` | UTDS training-data export, curation, validation, cleaning (`export`, `export-auto`, `check`, `curate`, `curate-guidance`, `validate`, `clean`, `status`) |
+| `model` | Local LLM model distribution (`pull`, `list`, `verify`, `remove`, `where`) |
+| `graph` | Graph health repair (`repair`, `backfill-weights`) |
+| `concepts` | Concept grounding maintenance (`repair`, `trace`, `recluster`) |
+| `corrections` | Correction-node maintenance (`rehydrate-structured`) |
+| `eventgraph` | Graph↔TSDB federation queries (`reinforcement-neighborhood`, `guidance-outcome-neighborhood`) |
+| `ft-loop` | Recursive-retraining loop stage reporting + promotion (`report-stage`, `promote`) |
+| `tsdb` | TimescaleDB status + schema migrations (`status`, `migrate`) |
+| `watchdog` | LLM endpoint watchdog inspection (`status [--json]`) |
+| `maintenance` | Combined decay + prune cycle (schedulable) |
+| `synergy` | Claude Code ↔ MDEMG synergy health (`status`, `check`, `migrate`) |
+| `embeddings` | Embedding backfill on MemoryNodes (`backfill`) |
 
 ---
 

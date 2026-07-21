@@ -60,7 +60,7 @@ These EMPTYs are **not panel bugs** — they reflect server-side emission regres
 
 ### Category (c) — emission regression (4 metrics, last seen ~2026-05-07/08)
 
-These metrics were emitted historically (158K + 6.7K + 26K + 23 rows respectively over March/April) but stopped between 2026-05-07 and 2026-05-08. Current codebase grep finds zero references to the metric names — emission code was removed or the metric was renamed without dashboard updates.
+These metrics were emitted historically (158K + 6.7K + 26K + 23 rows respectively over March/April) but stopped between 2026-05-07 and 2026-05-08. Update: all four are registered again in `internal/metrics/collectors.go` (`rsic_*` collectors) — emission is live.
 
 | Metric | Last row | Total rows | Affected panel(s) |
 |---|---|---|---|
@@ -69,7 +69,7 @@ These metrics were emitted historically (158K + 6.7K + 26K + 23 rows respectivel
 | `mdemg_rsic_trigger_rejected_total` | 2026-05-07 | 26,503 | mdemg-rsic :: Trigger Rejection Rate, Trigger Rejections by Reason |
 | `mdemg_rsic_safety_blocked_total` | 2026-04-20 | 23 | mdemg-rsic :: Safety Blocks |
 
-**Operator action**: investigate which commit removed the emission. Either restore the emission (preferable — these are observability-load-bearing) or remove the panels.
+**Operator action**: resolved — emission restored (all four registered in `internal/metrics/collectors.go`).
 
 ### Category (c) — never-emitted metrics (2 metrics)
 
@@ -137,7 +137,7 @@ A follow-up to ALERT-TRUTH-001, fixing 6 measurement artifacts that made healthy
 
 - **RSIC "Cycle Success Rate"** is a *single windowed aggregate* over `mdemg_rsic_cycle_total` (completed+dry_run ÷ all terminal), NOT a per-`time_bucket` ratio. A per-bucket ratio reduced by `lastNotNull` latches 0 on a started-only bucket — the defect that showed 0% while RSIC was at 100%. **Any stat panel showing a rate must aggregate over the whole window, never bucket-then-`lastNotNull`.** A genuinely empty window shows `N/A`.
 - **J17 "NLI Mean Bias" / Bias Alert** compares NLI *comprehension* vs a *compliance* heuristic — these diverge by design on `ignored` outcomes, so `ignored` samples are excluded and the alert only fires above a min-sample floor (`J17_NLI_CALIBRATION_MIN_SAMPLES`, default 50). Below the floor the gauge reads 0 / no-alert (insufficient data), gated at the source (`nli_calibration.Report()`) so every consumer agrees. **"Sidecar Requests" counts the tier-prediction shadow client only** — real NLI-call volume/latency is `mdemg_j17_nli_requests_total` / `mdemg_j17_nli_latency_ms`.
-- **J17 "Protocol" health** anchors its compression sub-score to `J17_COMPRESSION_TARGET_RATIO` (default 3.0 = "excellent"), calibrated above the 30d p95 (~2.0). A freshly-restarted server reads low Protocol until its in-memory J17 window warms (cold-start transient; DH-005 confidence down-weights it).
+- **J17 "Protocol" health** anchors its compression sub-score to `J17_COMPRESSION_TARGET_RATIO` (default 2.0 = "excellent"; recalibrated from 3.0 to the 30d live p95 by DASHBOARD-TRUTH-002). A freshly-restarted server reads low Protocol until its in-memory J17 window warms (cold-start transient; DH-005 confidence down-weights it).
 - **J17 "Min/Avg/Max/Count Trust"** count only *significant live* sessions — within the TTL of last update AND ≥ `J17_TRUST_MIN_FEEDBACK_COUNT` (default 5) feedback events. Stale test sessions expire (TTL cleanup now actually runs; hydration preserves `last_feed_at` provenance).
 - **Jiminy "Outcome Distribution" / "Outcome Trends"** read *windowed* `constraint_outcomes` counts, NOT the lifetime-cumulative multi-credit gauges (which credit a guidance_id as followed if ANY edge followed → inflated ~3× vs the honest follow rate). **"Should-Follow Follow Rate"** excludes `not_applicable` from the denominator. **"Guidance Items With Recorded Outcomes"** (formerly "Total Guidance Issued") counts distinct guidance_ids with ≥1 outcome edge, all-time — not issuance volume.
 

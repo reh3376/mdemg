@@ -23,7 +23,7 @@ J17's purpose is token-efficient inter-model communication (T1 ≈ 5.2× compres
 
 - **Restart behavior**: protocol stats are in-memory; after a restart T1 re-locks until ~an hour of real feedback traffic rebuilds comprehension ≥ floor. Expected, by design.
 - **Boundary flap**: steady-state comprehension (~0.61-0.73) sits near the 0.6 floor. Lower the floor to 0.5 if T1/T2 flapping is observed; the demotion gate protects against genuine incomprehension either way.
-- **Compression follow-on**: expect `mdemg_j17_compression_ratio` to climb from ~1.7 toward 3-5× as T1-encoded guidance accumulates in new protocol events.
+- **Compression follow-on**: expect `mdemg_j17_compression_ratio` to climb from ~1.7 toward the `J17_COMPRESSION_TARGET_RATIO` (default 2.0; real achievable J17 compression is ~1.8-3×, per DASHBOARD-TRUTH-001) as T1-encoded guidance accumulates in new protocol events.
 
 ## Rollback
 

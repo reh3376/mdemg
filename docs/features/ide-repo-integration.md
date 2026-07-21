@@ -228,7 +228,7 @@ mdemg hooks install
 
 ## Hook Template Sync
 
-Active hooks in `.claude/hooks/` are the source of truth. Templates in `internal/cli/hook_templates/` are parameterized copies used by `mdemg hooks install --type claude`. All 5 hooks are registered via `claudeHookFiles()` in `hooks.go`:
+Templates in `internal/cli/hook_templates/` are the single source of truth (HOOKSYNC-001); active hooks in `.claude/hooks/` must byte-match them modulo placeholder substitution (CI-gated). `mdemg hooks install --type claude` installs them. All 6 hooks are registered via `claudeHookFiles()` in `hooks.go`:
 
 | Template | Event | Matcher | Timeout |
 |----------|-------|---------|---------|
@@ -237,5 +237,6 @@ Active hooks in `.claude/hooks/` are the source of truth. Templates in `internal
 | `post-tool-observe.py` | PostToolUse | `Bash\|Write\|Edit` | 10s |
 | `pre-compact.sh` | PreCompact | (none) | 10s |
 | `pre-bash-check.py` | PreToolUse | `Bash` | 5s |
+| `pre-write-check.py` | PreToolUse | `Write\|Edit` | 8s |
 
-Templates use `{{SPACE_ID}}` and `{{MDEMG_URL}}` placeholders, substituted at install time. When modifying active hooks, sync changes back to templates and verify with `diff .claude/hooks/<file> internal/cli/hook_templates/<file>` — only placeholder differences should remain.
+Templates use `{{SPACE_ID}}` and `{{MDEMG_URL}}` placeholders, substituted at install time. When modifying hooks, edit the template and regenerate the live copy in the same commit (HOOKSYNC-001 CI parity gate); verify with `diff .claude/hooks/<file> internal/cli/hook_templates/<file>` — only placeholder differences should remain.

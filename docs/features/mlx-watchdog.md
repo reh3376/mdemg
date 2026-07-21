@@ -43,9 +43,9 @@ Three components:
 
 State machine:
 
-- **Up**: probe succeeded ≥ N consecutive times (where N defaults to 1 — recovery is fast)
+- **Up**: probe succeeded ≥ N consecutive times (where N defaults to 2 — hysteresis requires two consecutive successes to recover)
 - **Degraded**: probe failed but not enough consecutive failures to declare `Down`. LLM calls still attempted; observability flag for operators.
-- **Down**: probe failed ≥ `MLX_MAX_CONSECUTIVE_FAILURES` (default 3) times in a row. Fast-fail gate active.
+- **Down**: probe failed ≥ the failure threshold (3 — hardcoded in `internal/mlxprobe/probe.go`, no env override) times in a row. Fast-fail gate active.
 
 Hysteresis prevents flap: the machine doesn't transition `Up → Down` until the failure count crosses the threshold; doesn't transition `Down → Up` until a probe succeeds. Single transient failures stay in `Degraded` and don't trip the gate.
 
@@ -123,12 +123,12 @@ Phase 13.5's cutover to llama.cpp didn't change the watchdog contract — same p
 
 ## API Endpoints
 
-The watchdog exposes state via the existing `/healthz` endpoint (in the `checks` map under key `llm_endpoint`) and via Prometheus metrics. There is no dedicated HTTP endpoint.
+The watchdog exposes state via the existing `/healthz` endpoint (in the `checks` map under key `llm_endpoint`) and via internal metrics recorded to TSDB `metric_samples`. There is no dedicated HTTP endpoint.
 
 | Method | Endpoint | Description | UATS Spec |
 |---|---|---|---|
 | GET | `/healthz` | Includes watchdog state in `checks.llm_endpoint`: `up`, `degraded`, or `down` | — |
-| GET | `/metrics` | Exposes `mdemg_mlx_watchdog_state` (numeric: 0=up, 1=degraded, 2=down), `mdemg_mlx_watchdog_transitions_total{from,to}`, `mdemg_mlx_fast_fail_total` | — |
+| GET | `/v1/metrics/snapshot` | Includes `mdemg_mlx_watchdog_state` (numeric: 0=up, 1=degraded, 2=down), `mdemg_mlx_watchdog_transitions_total{from,to}`, `mdemg_mlx_fast_fail_total` (also persisted to TSDB `metric_samples`; `/metrics` is removed — 410 Gone) | — |
 
 ## CLI Commands
 

@@ -28,7 +28,7 @@ Claude Code's context window is finite. Every token spent on static memory files
 - Auto-memory files reduced 14 -> 3
 - 8 files ingested to CMS, 2 obsolete moved to archive
 
-**SynergyHealth RSIC Dimension** — 7th RSIC dimension at 10% weight. `scoreSynergy()` scorer evaluates file counts, line counts, CMS node totals, overlap ratio.
+**SynergyHealth RSIC Dimension** — 7th RSIC dimension, weight `RSIC_HEALTH_WEIGHT_SYNERGY` (default 0.05 since DH-005). `scoreSynergy()` scorer evaluates file counts, line counts, CMS node totals, overlap ratio.
 
 **RSIC Reflection Patterns #17-19:**
 
@@ -59,7 +59,7 @@ Claude Code's context window is finite. Every token spent on static memory files
 ### Known Limitations
 
 - Migration script must be run manually for existing installations
-- Synergy health scoring uses fixed 10% weight in RSIC
+- Synergy health weight is config-driven (`RSIC_HEALTH_WEIGHT_SYNERGY`, default 0.05 per DH-005 — LOW reliability, file-size proxy)
 
 ### Risks & Gaps
 

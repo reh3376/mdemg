@@ -37,7 +37,7 @@ WHERE metric_name='mdemg_consolidation_phase_duration_seconds' AND space_id='mde
 ORDER BY value DESC;
 ```
 
-### The `dynamic_edges` circuit-breaker
+### The `dynamic_edges` fix (circuit-breaker → vector-index top-K)
 
 The instrumentation showed `post_clustering` was ~29 min — entirely the
 `dynamic_edges` step. `CreateDynamicEdges` finds pairs of upper-layer concepts to
@@ -49,18 +49,11 @@ WHERE a.layer >= $minLayer AND b.layer >= $minLayer AND a.node_id < b.node_id ..
 ```
 
 At 8,705 L3+ nodes that is ~75.8M pairs materialized before the `LIMIT 50` — for a
-total yield of a few hundred edges. `CreateDynamicEdges` now counts L≥minLayer
-nodes first (via the existing `memorynode_layer_idx`) and **skips the cross-join
-loudly** when the count exceeds `DYNAMIC_EDGES_MAX_NODES`:
-
-```
-WARN dynamic_edges: SKIPPED — upper-layer node count exceeds the O(n²) cross-join
-     ceiling; awaiting the vector-index rewrite  count=8705 ceiling=2000 min_layer=3
-```
-
-Small graphs (below the ceiling) keep full behavior. Large graphs skip until the
-Sprint-B vector-index rewrite (`db.index.vector.queryNodes`, top-K per node →
-O(n·logn)) lets the guard lift.
+total yield of a few hundred edges. Sprint A shipped an interim circuit-breaker
+(`DYNAMIC_EDGES_MAX_NODES`, default 2000) that skipped the cross-join loudly on
+large graphs. **Superseded (RETRIEVAL-TYPED-EDGES-002, 2026-07-03):** the breaker
+is removed — `CreateDynamicEdges` now runs a per-node top-K query over the
+`memNodeEmbedding` vector index (O(n·logn)), so it runs on graphs of any size.
 
 ### Result (live)
 
@@ -76,9 +69,11 @@ threshold.
 
 ## How to use
 
-- **Operators:** nothing to do — the guard is on by default. Tunables:
-  - `DYNAMIC_EDGES_MAX_NODES` (default 2000) — the L≥minLayer ceiling above which
-    `dynamic_edges` skips. `0` disables the guard (restores the O(n²) behavior).
+- **Operators:** nothing to do — the vector-index path is on by default. Tunables:
+  - `DYNAMIC_EDGE_MIN_LAYER` (default 1), `DYNAMIC_EDGE_TOPK` (default 10),
+    `DYNAMIC_EDGE_SIM_THRESHOLD` (default 0.30), `DYNAMIC_EDGE_OVERSAMPLE`
+    (default 8) — the vector-index top-K knobs (RETRIEVAL-TYPED-EDGES-002;
+    `DYNAMIC_EDGES_MAX_NODES` is removed).
   - `CONSOLIDATE_TIMEOUT_MS` (default 60 min) — server-side cycle deadline for the
     manual path.
 - **Watch the breakdown:** the `mdemg_consolidation_phase_duration_seconds` gauge
@@ -87,8 +82,9 @@ threshold.
 
 ## What's next (Sprint B)
 
-- **`dynamic_edges` vector-index rewrite** — restore the edges at O(n·logn) so the
-  guard can lift on large graphs.
+- **`dynamic_edges` vector-index rewrite** — SHIPPED 2026-07-03
+  (RETRIEVAL-TYPED-EDGES-002): per-node top-K over the `memNodeEmbedding` vector
+  index; the circuit-breaker guard is removed.
 - **Incremental ForwardPass/BackwardPass** — `forward_initial` + `backward` (~27s)
   full-scan all L1 nodes every cycle; the `last_forward_pass`/`last_backward_pass`
   properties + indexes already exist to gate them to changed patterns only.

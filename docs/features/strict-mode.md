@@ -150,11 +150,12 @@ Escalation decays after 60 minutes of inactivity (configurable via `JIMINY_ESCAL
 | `JIMINY_ESCALATION_PERSIST_ENABLED` | `true` | Persist escalation state to Neo4j |
 | `JIMINY_STRICT_STATE_PATH` | `~/.mdemg/.jiminy-strict-mode` | Path to strict mode state file |
 | `J17_T1_COMPREHENSION_GATE` | `0.5` | Minimum T1 follow rate before downgrading to T2 |
+| `J17_TIER_GATE_MODE` | `trust` | Tier-gate axis: `trust` (legacy compliance-EMA) or `comprehension` (T1 promotion keyed on measured comprehension) |
 | `JIMINY_ESCALATION_WARN_AFTER` | `2` | Ignore count to trigger WARNED |
 | `JIMINY_ESCALATION_ESCALATE_AFTER` | `4` | Ignore count to trigger ESCALATED |
 | `JIMINY_ESCALATION_BLOCK_AFTER` | `6` | Ignore count to trigger BLOCKED |
 | `JIMINY_ESCALATION_DECAY_MINUTES` | `60` | TTL before escalation state resets |
-| `JIMINY_ESCALATION_BLOCK_ENABLED` | `true` | Whether BLOCKED level is reachable |
+| `JIMINY_ESCALATION_BLOCK_ENABLED` | `false` | Whether BLOCKED level is reachable |
 
 ## Usage
 
@@ -260,7 +261,7 @@ When the PreToolUse hook denies a Write/Edit:
 | `JIMINY_ESCALATION_ESCALATE_AFTER` | `4` | Ignores before ESCALATED level |
 | `JIMINY_ESCALATION_BLOCK_AFTER` | `6` | Ignores before BLOCKED level |
 | `JIMINY_ESCALATION_DECAY_MINUTES` | `60` | Escalation state TTL (minutes) |
-| `JIMINY_ESCALATION_BLOCK_ENABLED` | `true` | Enable BLOCKED level (if false, max is ESCALATED) |
+| `JIMINY_ESCALATION_BLOCK_ENABLED` | `false` | Enable BLOCKED level (if false, max is ESCALATED) |
 
 ## Dependencies
 
