@@ -254,7 +254,7 @@
     },
     {
       "title": "Actionable Compliance Rate",
-      "description": "Compliance rate on ACTIONABLE guidance types (constraint/correction), excluding correctly-ignored advisory abstractions (pattern/learning/concept). JIMINY-ACTIONABILITY-INVERSION-001 discovered this rate reads LOWER than raw follow rate (10% vs 15%) under current architecture \u2014 an emergent effect of (constraint semantics \u00d7 Lever C over-surfacing \u00d7 correct must/should classifier calibration), NOT a defect. The >90% goal ISN'T the right frame \u2014 real actionable rate under Lever C's aggressive constraint-partition biasing has an expected floor around 10-25% (higher once JIMINY-ACTIONABILITY-COMPLIANCE-CREDIT-001's non-violation-credit prompt is enabled \u2014 routes unrelated-context ignored verdicts to not_applicable, predicted lift ~+10pp). WATCH THE TREND OVER 14-DAY WINDOWS, not the absolute value. DASHBOARD-TRUTH-001: not_applicable / blank / unknown excluded from BOTH numerator and denominator. Matches the guidance_should_follow_rate_low alert. Computed from guidance_training_rows in the dashboard time range (followed=1.0, partial_compliance=0.5). Green \u22650.5 = healthy for actionable class (was 0.9 pre-INVERSION-001; recalibrated downward per verdict); red <0.15 = the alert floor.",
+      "description": "Compliance rate on ACTIONABLE guidance types (constraint/correction), excluding correctly-ignored advisory abstractions (pattern/learning/concept). JIMINY-ACTIONABILITY-INVERSION-001 discovered this rate reads LOWER than raw follow rate (10% vs 15%) under current architecture \u2014 an emergent effect of (constraint semantics \u00d7 Lever C over-surfacing \u00d7 correct must/should classifier calibration), NOT a defect. The >90% goal ISN'T the right frame \u2014 real actionable rate under Lever C's aggressive constraint-partition biasing has an expected floor around 10-25% (higher once JIMINY-ACTIONABILITY-COMPLIANCE-CREDIT-001's non-violation-credit prompt is enabled \u2014 routes unrelated-context ignored verdicts to not_applicable, predicted lift ~+10pp). WATCH THE TREND OVER 14-DAY WINDOWS, not the absolute value. DASHBOARD-TRUTH-001: not_applicable / blank / unknown excluded from BOTH numerator and denominator. Matches the guidance_should_follow_rate_low alert. Computed from guidance_training_rows in the dashboard time range (followed=1.0, partial_compliance=0.5). Bands: red <0.05 = genuine collapse (matches the alert floor GUIDANCE_SHOULD_FOLLOW_RATE_FLOOR); yellow 0.05-0.18 = pre-flip by-design steady state (~0.10-0.14 live); green \u22650.18 = the non-violation-credit post-flip target zone.",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -297,11 +297,11 @@
               },
               {
                 "color": "yellow",
-                "value": 0.15
+                "value": 0.05
               },
               {
                 "color": "green",
-                "value": 0.5
+                "value": 0.18
               }
             ]
           }
