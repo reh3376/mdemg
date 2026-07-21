@@ -36,7 +36,7 @@ docker-compose.prod.yml
 │   ├── provisioning/dashboards/
 │   │   └── dashboards.yml          (tells Grafana where to find JSON files)
 │   ├── provisioning/alerting/
-│   │   └── alerts.yml              (22 alert rules across 3 groups)
+│   │   └── alerts.yml              (27 alert rules across 4 groups)
 │   └── dashboards/
 │       ├── mdemg-overview.json      (home dashboard)
 │       ├── mdemg-graph-topology.json
@@ -44,9 +44,10 @@ docker-compose.prod.yml
 │       ├── mdemg-neo4j.json
 │       ├── mdemg-j17.json
 │       ├── mdemg-jiminy.json
+│       ├── mdemg-llm-routing.json
 │       └── mdemg-ft-training.json
 ├── neo4j            (graph database, port 7687)
-└── mdemg            (server on port 8080/9999)
+└── mdemg            (server on port 9999)
 ```
 
 **Datasource**: TimescaleDB (PostgreSQL with time-series extensions). Panels use raw SQL against `metric_samples`, `llm_interactions`, `ft_benchmarks`, `ft_training_cycles`, `ft_model_versions` tables. Continuous aggregates `metrics_hourly` and `metrics_daily` provide pre-aggregated rollups.
@@ -57,9 +58,9 @@ docker-compose.prod.yml
 
 **Host access from containers**: Uses `extra_hosts: host.docker.internal:host-gateway` so containers can reach services running on the Docker host (MDEMG API, Neo4j).
 
-**Startup**: `docker compose -f docker-compose.observability.yml up -d`
+**Startup**: Grafana is part of the main compose stack — `docker compose up -d`. (The provisioning + dashboard files live in `deploy/docker/grafana/`; a standalone stack is also available via `docker compose -f deploy/docker/docker-compose.observability.yml up -d`.)
 
-**Restart after dashboard changes**: `docker compose -f docker-compose.observability.yml restart grafana`
+**Restart after dashboard changes**: `docker compose restart grafana`
 
 **Default credentials**: `admin` / `admin`
 
@@ -150,7 +151,7 @@ datasources:
 
 Every datasource **must** have an explicit `uid` field. Without it:
 - Grafana auto-generates a random UID on first provision
-- Dashboard JSON panels that reference `{ "uid": "prometheus" }` will fail to resolve
+- Dashboard JSON panels that reference `{ "uid": "timescaledb" }` will fail to resolve
 - Dashboards become non-portable between Grafana instances
 
 **Rule**: Always set `uid` in the provisioning YAML, then reference that exact UID in dashboard panel `datasource` fields.
@@ -367,11 +368,12 @@ Single-value display with optional sparkline:
   "title": "Overall Health",
   "type": "stat",
   "gridPos": { "h": 4, "w": 4, "x": 0, "y": 1 },
-  "datasource": { "type": "prometheus", "uid": "prometheus" },
+  "datasource": { "type": "postgres", "uid": "timescaledb" },
   "targets": [
     {
-      "expr": "mdemg_rsic_health_overall{space_id=\"$space_id\"}",
-      "legendFormat": "overall"
+      "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_rsic_health_overall' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+      "format": "time_series",
+      "refId": "A"
     }
   ],
   "options": {
@@ -574,10 +576,10 @@ The Node Graph API datasource sends the `queryText` as URL query parameters to t
 **Every panel must have an explicit `datasource` field**:
 
 ```json
-"datasource": { "type": "prometheus", "uid": "prometheus" }
+"datasource": { "type": "postgres", "uid": "timescaledb" }
 ```
 
-Without this, panels rely on the "default datasource" fallback. This works when Prometheus is marked `isDefault: true`, but:
+Without this, panels rely on the "default datasource" fallback. This works when one datasource is marked `isDefault: true`, but:
 - Fails silently if the default changes
 - Makes dashboards non-portable
 - Causes confusion when multiple datasources exist
@@ -681,12 +683,12 @@ For Neo4j, the query is also a plain string:
 
 **Symptom**: Panels show "Datasource not found" error.
 
-**Root cause**: The datasource provisioning YAML didn't include a `uid` field. Grafana auto-generated a random UID that doesn't match the `{ "uid": "prometheus" }` in the dashboard JSON.
+**Root cause**: The datasource provisioning YAML didn't include a `uid` field. Grafana auto-generated a random UID that doesn't match the `{ "uid": "timescaledb" }` in the dashboard JSON.
 
 **Solution**: Always set explicit `uid` in the provisioning YAML. If the datasource was already provisioned without a UID:
-1. Add `uid: prometheus` to the YAML
+1. Add `uid: timescaledb` to the YAML
 2. Delete the Grafana volume: `docker volume rm docker_grafana-data`
-3. Restart: `docker compose -f docker-compose.observability.yml up -d`
+3. Restart: `docker compose up -d`
 
 ### Issue 4: Collapsed Row Panels Still Visible
 

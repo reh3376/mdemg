@@ -54,6 +54,8 @@ mdemg data check --pre-campaign                # 8 checks pass
 1. Remove the override (recommended) — uses new default `gpt-4.1-nano`
 2. Update the value to `gpt-4.1-nano` explicitly
 
+> **Note (v0.8+):** the default has since changed again. `LLM_MODEL` now defaults to `mdemg-llm-v1`, served by the local llama-server at `http://127.0.0.1:8102/v1` (CONFIG-LOCAL-DEFAULTS-001 — local-first defaults). An unset `LLM_MODEL` resolves to `mdemg-llm-v1`, not `gpt-4.1-nano`.
+
 ```bash
 # Check for affected overrides
 grep -E '(LLM_MODEL|RECLASS_MODEL|RERANK_MODEL)' .env
@@ -72,7 +74,7 @@ grep -E '(LLM_MODEL|RECLASS_MODEL|RERANK_MODEL)' .env
 New optional config vars:
 - `ALERT_ENABLED` (true), `ALERT_COOLDOWN_SEC` (300), `ALERT_MAX_ENTRIES` (50)
 - `ALERT_EVALUATOR_ENABLED` (true), `ALERT_EVALUATOR_INTERVAL_SEC` (30)
-- `LLM_RETRY_ENABLED` (true), `LLM_RETRY_MAX_ATTEMPTS` (3)
+- `LLM_RETRY_ENABLED` (true), `LLM_RETRY_MAX_ATTEMPTS` (5)
 - `HEALTH_PROBE_ENABLED` (true), `HEALTH_PROBE_INTERVAL_SEC` (60)
 
 #### v0.7.4

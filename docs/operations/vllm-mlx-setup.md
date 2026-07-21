@@ -8,6 +8,9 @@
 > `mdemg-llm-v1.Q5_K_M.gguf` (dense Qwen3-14B fine-tune). See the
 > "Local LLM Runtime" section of `CLAUDE.md` and
 > `docs/development/ft-lora/00_README_v2.md` for the current setup.
+> Note also that the `LLM_BASE_URL` key shown below was never a real
+> config key — the endpoint override key is `LLM_ENDPOINT` (current
+> default `http://127.0.0.1:8102/v1`).
 > Retained unchanged below as a historical record (R-LT-4 keep-history).
 
 ## Overview

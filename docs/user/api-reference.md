@@ -136,14 +136,29 @@ curl -s http://localhost:9999/healthz | jq .
 
 ### GET /readyz
 
-Readiness probe. Checks Neo4j connectivity.
+Readiness probe. Runs live checks against Neo4j (schema version), embeddings, plugins, circuit breakers, conversation service (CMS ping), Jiminy, TimescaleDB (schema version), and the neural sidecar.
 
 **Response:**
 ```json
-{ "status": "ready" }
+{
+  "status": "ready",
+  "version": "v0.11.0",
+  "checks": {
+    "neo4j":        { "status": "healthy", "message": "schema version 26", "latency": "12ms" },
+    "embeddings":   { "status": "healthy", "message": "openai (1536 dimensions)" },
+    "plugins":      { "status": "healthy", "message": "2/2 modules active" },
+    "circuit_breakers": { "status": "healthy", "message": "8 circuits monitored" },
+    "conversation": { "status": "healthy", "message": "CMS available" },
+    "jiminy":       { "status": "healthy", "message": "enabled, synthesis=on" },
+    "timescaledb":  { "status": "healthy", "message": "schema version 31", "latency": "4ms" },
+    "neural_sidecar": { "status": "healthy", "message": "J17 sidecar available", "latency": "6ms" }
+  }
+}
 ```
 
-**Status Codes:** `200 OK`, `503 Service Unavailable`
+`status` is `ready`, `degraded` (any check degraded — still `200`), or `not_ready` (`503`). Each check has `status` (`healthy`/`degraded`/`unhealthy`) plus optional `message` and `latency`.
+
+**Status Codes:** `200 OK` (ready or degraded), `503 Service Unavailable` (not_ready)
 
 ```bash
 curl -s http://localhost:9999/readyz
@@ -854,7 +869,7 @@ Return the global graph topology (node counts per layer, edge counts per type) f
 {
   "space_id": "myproject",
   "nodes_by_layer": {"L0": 12500, "L1": 240, "L2": 38, "L3": 7, "L5": 2},
-  "edges_by_type": {"CO_ACTIVATED_WITH": 45000, "PROMOTES_TO": 280, "CONFLICTS_WITH": 18},
+  "edges_by_type": {"CO_ACTIVATED_WITH": 45000, "GENERALIZES": 280, "CONFLICTS_WITH": 18},
   "orphan_count": 12,
   "computed_at": "2026-05-21T17:00:00Z"
 }
@@ -1011,7 +1026,7 @@ All fields required. `query_node_ids` and `rejected_node_ids` must be non-empty 
 
 **Status Codes:** `200 OK`, `400 Bad Request` (empty arrays or missing space_id), `500 Internal Server Error`.
 
-**Config:** `LEARNING_NEGATIVE_WEIGHT`, `LEARNING_NEGATIVE_DECAY_MULT`, `LEARNING_NEGATIVE_MAX_PER_REQUEST`.
+**Config:** `LEARNING_NEGATIVE_WEIGHT`, `LEARNING_NEGATIVE_MAX_PER_REQUEST`.
 
 ---
 
@@ -2084,16 +2099,16 @@ curl -s -X POST http://localhost:9999/v1/jiminy/guide \
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `JIMINY_ENABLED` | `false` | Enable/disable Jiminy guidance |
+| `JIMINY_ENABLED` | `true` | Enable/disable Jiminy guidance. Note: the binary default is `true`, but the Docker compose template defaults the container env to `false` unless `JIMINY_ENABLED` is set in `.env` (`mdemg init --defaults` writes `true`) |
 | `JIMINY_MAX_ITEMS` | `10` | Default max guidance items per request |
 | `JIMINY_TIMEOUT_MS` | `6000` | Timeout for guidance generation (ms) |
-| `JIMINY_EFFECTIVENESS_ENABLED` | `true` | Enable guidance effectiveness tracking |
+| `JIMINY_EFFECTIVENESS_TTL_SEC` | `86400` | TTL for tracked guidance (tracking itself is unconditional while Jiminy is enabled) |
 | `JIMINY_EFFECTIVENESS_TTL_SEC` | `1800` | TTL for tracked guidance (seconds) |
 | `JIMINY_SYNTHESIS_ENABLED` | `true` | Enable LLM-powered guidance synthesis (J15). When enabled, guidance items are synthesized into a coherent narrative |
 | `JIMINY_SYNTHESIS_PROVIDER` | inherits `LLM_PROVIDER` | LLM provider for synthesis |
 | `JIMINY_SYNTHESIS_MODEL` | inherits `LLM_MODEL` | LLM model for synthesis |
-| `JIMINY_SYNTHESIS_MAX_TOKENS` | `2000` | Max tokens for synthesis response |
-| `JIMINY_SYNTHESIS_TIMEOUT_MS` | `10000` | Synthesis LLM timeout (ms) |
+| `JIMINY_SYNTHESIS_MAX_TOKENS` | `3000` | Max tokens for synthesis response |
+| `JIMINY_SYNTHESIS_TIMEOUT_MS` | `30000` | Synthesis LLM timeout (ms) |
 | `JIMINY_SYNTHESIS_TEMPERATURE` | API default | Optional temperature override for synthesis |
 
 **Note:** The guide response now includes a `guidance_id` (CUID2 unique identifier) in the `data` object for effectiveness tracking.
@@ -2143,7 +2158,7 @@ When LLM outcome classification is enabled (`JIMINY_OUTCOME_LLM_ENABLED=true`), 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `JIMINY_OUTCOME_CLASSIFIER_ENABLED` | `true` | Enable semantic outcome classification |
-| `JIMINY_OUTCOME_LLM_ENABLED` | `false` | Enable LLM Tier 2 classification for uncertain cases |
+| `JIMINY_OUTCOME_LLM_ENABLED` | `true` | Enable LLM Tier 2 classification for uncertain cases |
 | `JIMINY_OUTCOME_LLM_MAX_TOKENS` | `100` | Max tokens for LLM classification response |
 | `JIMINY_OUTCOME_CACHE_SIZE` | `256` | LRU cache capacity for classification results |
 
@@ -2665,127 +2680,13 @@ curl -N "http://localhost:9999/v1/jobs/backup-abc123"
 
 ## Codebase Ingestion API
 
-### POST /v1/memory/ingest-codebase
-
-**DEPRECATED:** Use `/v1/memory/ingest/trigger` instead.
-
-Start an async codebase ingestion job. Runs the `mdemg ingest` CLI in the background.
-
-**Request Body:**
-```json
-{
-  "space_id": "my-project",          // required
-  "path": "/path/to/codebase",       // required
-  "source": {
-    "type": "local",                  // "local" or "git"
-    "branch": "main",                // for git sources
-    "since": "2026-01-01"            // for incremental mode
-  },
-  "languages": {
-    "typescript": true,
-    "python": true,
-    "go": true,
-    "java": false,
-    "rust": false,
-    "markdown": true,
-    "include_tests": false
-  },
-  "symbols": {
-    "extract": true,
-    "max_per_file": 50
-  },
-  "exclusions": {
-    "preset": "default",              // "default" | "ml_cuda" | "web_monorepo"
-    "directories": ["vendor", "dist"],
-    "max_file_size": 1048576
-  },
-  "processing": {
-    "batch_size": 50,
-    "workers": 4,
-    "max_elements_per_file": 100,
-    "delay_ms": 0
-  },
-  "llm_summary": {
-    "enabled": true,
-    "provider": "openai",             // "openai" or "ollama"
-    "model": "gpt-4o-mini",
-    "batch_size": 10
-  },
-  "options": {
-    "incremental": true,
-    "archive_deleted": true,
-    "consolidate": true,
-    "dry_run": false,
-    "verbose": false,
-    "limit": 0
-  },
-  "retry": {
-    "max_attempts": 3,
-    "initial_delay_ms": 1000,
-    "timeout_seconds": 600
-  }
-}
-```
-
-**Response (202):**
-```json
-{
-  "job_id": "abc12345",
-  "status": "queued",
-  "space_id": "my-project",
-  "path": "/path/to/codebase"
-}
-```
-
-### GET /v1/memory/ingest-codebase
-
-List all ingestion jobs.
-
-**Response (200):**
-```json
-{
-  "jobs": [
-    { "job_id": "abc12345", "status": "completed", "space_id": "my-project", "path": "/path/to/codebase", "stats": { ... } }
-  ]
-}
-```
-
-### GET /v1/memory/ingest-codebase/{job_id}
-
-Get ingestion job status.
-
-**Response (200):**
-```json
-{
-  "job_id": "abc12345",
-  "status": "completed",
-  "space_id": "my-project",
-  "path": "/path/to/codebase",
-  "stats": {
-    "files_found": 150,
-    "files_processed": 148,
-    "symbols_extracted": 2500,
-    "errors": 2,
-    "rate": 25.5,
-    "duration": "6s"
-  }
-}
-```
-
-### DELETE /v1/memory/ingest-codebase/{job_id}
-
-Cancel a running ingestion job.
-
-**Response (200):**
-```json
-{ "status": "cancelled", "job_id": "abc12345" }
-```
+**Removed in DORMANT-CENSUS-001.** The legacy `/v1/memory/ingest-codebase[/…]` endpoints (deprecated with a `Deprecation` header since Phase 94) no longer exist. Use the Ingestion Pipeline API below (`/v1/memory/ingest/trigger` and related endpoints).
 
 ---
 
 ## Ingestion Pipeline API
 
-The newer ingestion trigger API (preferred over `/v1/memory/ingest-codebase`).
+The ingestion trigger API (successor to the removed `/v1/memory/ingest-codebase`).
 
 ### POST /v1/memory/ingest/trigger
 
@@ -2992,55 +2893,30 @@ Add a comment to an issue.
 
 ---
 
-## Webhooks
+## Human Review API (HITL)
+
+Dataset-agnostic human-in-the-loop review surface (HITL-REVIEW-001). All four endpoints require an admin-scoped API key when `AUTH_API_KEYS` is set. See `docs/features/hitl-review.md`.
+
+- `GET /v1/review/datasets` — list registered reviewable datasets with candidate counts.
+- `POST /v1/review/next` — fetch the next ungraded item for a dataset.
+- `POST /v1/review/grade` — submit a rubric grade (optionally reinforcing the live substrate).
+- `POST /v1/review/reverse` — reverse a prior grade's reinforcement.
+
+---
+
+## Alerts & Hooks
 
 ### POST /v1/alerts/grafana
 
-Grafana alert webhook receiver. Processes incoming Grafana alert notifications and dispatches them through the alert system.
+**Removed in DORMANT-CENSUS-001** (superseded by the server-native alert evaluator). Pending alerts live in `~/.mdemg/alerts/current.json` and are acknowledged via `POST /v1/alerts/clear`.
 
-**Request Body** (Grafana webhook format):
-```json
-{
-  "alerts": [
-    {
-      "status": "firing",
-      "labels": {
-        "alertname": "mdemg-probe-neo4j-down",
-        "severity": "high"
-      },
-      "annotations": {
-        "summary": "Neo4j health probe failing for > 2 minutes"
-      }
-    }
-  ]
-}
-```
+### POST /v1/alerts/clear
 
-**Response (200):**
-```json
-{ "status": "ok" }
-```
+Clear pending alerts after delivery — called by the hooks once alerts have been displayed (cleared = delivered). See `docs/features/hook-channel-health.md`.
 
-**Severity Mapping** (from Grafana `labels.severity`):
-| Label Value | Mapped Severity |
-|-------------|-----------------|
-| `critical` | critical |
-| `high` | high |
-| `warning`, `medium` | medium |
-| `low`, `info` | low |
-| *(missing/other)* | medium |
+### POST /v1/hooks/event
 
-Only alerts with `status: "firing"` are dispatched. Resolved alerts are acknowledged but not stored.
-
-**Status Codes:** `200 OK`, `400 Bad Request` (invalid JSON), `503 Service Unavailable` (no alert dispatcher)
-
-```bash
-curl -s -X POST http://localhost:9999/v1/alerts/grafana \
-  -H "Content-Type: application/json" \
-  -d '{"alerts":[{"status":"firing","labels":{"alertname":"test","severity":"high"},"annotations":{"summary":"Test alert"}}]}'
-```
-
-**UATS Specs:** `grafana_alert_webhook.uats.json` (3 variants)
+Record a hook heartbeat/lifecycle event (feeds the V0024 hook-event telemetry and the `hook_channel_silent` evaluator rule). See `docs/features/hook-channel-health.md`.
 
 ---
 
@@ -4336,20 +4212,6 @@ Return time-series trends for a named metric across a window. Backed by the TSDB
 }
 ```
 
-### GET /v1/prometheus
-
-Prometheus text-format scrape endpoint. Aggregates all `mdemg_*` counters, histograms, and gauges (retrieval, sparse-gate, model-install events, RSIC health, Jiminy follow rate, etc.). Configured as a scrape target in `deploy/docker/prometheus/`.
-
-**Response (200, text/plain; version=0.0.4):**
-```
-# HELP mdemg_retrieval_consensus_strength Per-call consensus signal from the column-voting aggregator
-# TYPE mdemg_retrieval_consensus_strength histogram
-mdemg_retrieval_consensus_strength_bucket{space_id="myproject",le="0.5"} 142
-...
-```
-
-This is distinct from `/v1/metrics?space_id=X` (which returns a JSON snapshot of TSDB rolled-up metrics) — `/v1/prometheus` is for Prometheus / Grafana scrapes and exposes live counters from the running process.
-
 ---
 
 ## Determinism Metrics
@@ -4658,7 +4520,7 @@ Get details for a specific capability gap.
 
 ### POST /v1/feedback
 
-Submit feedback on retrieval results.
+**Removed in DORMANT-CENSUS-001** (zero producers). The live feedback channel is `POST /v1/jiminy/feedback` (called by the `post-tool-observe.py` hook).
 
 ### GET /v1/system/gap-interviews
 

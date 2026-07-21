@@ -137,20 +137,17 @@ brew tap reh3376/mdemg
 brew install mdemg
 ```
 
-**Windows (PowerShell 7+):**
-```powershell
-# Requires PowerShell 7+ (pwsh). Install if needed:
-winget install Microsoft.PowerShell
-
-# Then install MDEMG:
-irm https://raw.githubusercontent.com/reh3376/mdemg-windows/main/install.ps1 | iex
+**Windows (WSL2):**
+```bash
+# The mdemg-windows installer repo is archived. Windows requires WSL2 —
+# inside your WSL2 distro, use the Linux install script:
+curl -fsSL https://raw.githubusercontent.com/reh3376/mdemg/main/scripts/install.sh | bash
 ```
 
-**Linux (APT — Debian/Ubuntu):**
+**Linux (install script):**
 ```bash
-curl -fsSL https://reh3376.github.io/apt-mdemg/pubkey.gpg | sudo gpg --dearmor -o /usr/share/keyrings/mdemg.gpg
-echo "deb [signed-by=/usr/share/keyrings/mdemg.gpg] https://reh3376.github.io/apt-mdemg stable main" | sudo tee /etc/apt/sources.list.d/mdemg.list
-sudo apt update && sudo apt install mdemg
+# The apt-mdemg repo is archived; Linux installs use the main-repo script:
+curl -fsSL https://raw.githubusercontent.com/reh3376/mdemg/main/scripts/install.sh | bash
 ```
 
 **Linux (direct binary):**
@@ -288,7 +285,7 @@ mdemg version
 **Expected output:**
 
 ```
-mdemg v0.3.x
+mdemg v0.11.x (or newer)
   commit:  <short-hash>
   built:   <date>
   go:      go1.26.x

@@ -104,6 +104,7 @@ Interactive project initialization wizard. Detects the local environment (Docker
 | `--defaults` | bool | `false` | Accept all defaults without prompting |
 | `--yes` | bool | `false` | Alias for `--defaults` |
 | `--quick` | bool | `false` | Full auto-setup -- config, Neo4j, server, migrations, ingest, and companion app |
+| `--native` | bool | `false` | Legacy native (non-Docker) deployment (dev-only, not recommended) |
 | `--space-id` | string | `""` | Pre-set space ID |
 | `--neo4j-uri` | string | `""` | Pre-set Neo4j URI |
 | `--embedding-provider` | string | `""` | Pre-set embedding provider (openai/ollama) |
@@ -573,7 +574,7 @@ Check the TimescaleDB connection and display schema version. Reads connection de
 
 **Synopsis:** `mdemg tsdb migrate`
 
-Connect to TimescaleDB and run all pending schema migrations. Migrations are in `internal/tsdb/migrations/` (001-010).
+Connect to TimescaleDB and run all pending schema migrations. Migrations are in `internal/tsdb/migrations/` (001-031).
 
 ---
 
@@ -2639,7 +2640,7 @@ mdemg data clean --space-id mdemg-dev --dry-run=false --force --limit 5   # dele
 
 ## Neural Training Commands
 
-These Python CLI entrypoints are installed alongside the `mdemg` binary by the sidecar installer. They operate on training data collected by `NEURAL_DATA_COLLECTION` and manage cross-encoder model checkpoints in `NEURAL_MODEL_DIR`.
+These Python CLI entrypoints are installed alongside the `mdemg` binary by the sidecar installer. They operate on training data exported from TSDB and manage cross-encoder model checkpoints via their CLI flags (there is no `NEURAL_MODEL_DIR` env var — the only sidecar env vars are the `NEURAL_`-prefixed pydantic-settings fields in `neural/neural_sidecar/config.py`).
 
 ### `mdemg-neural-train`
 
@@ -2795,9 +2796,9 @@ $env:OPENAI_API_KEY = "sk-abc123"
 
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
-| `LLM_PROVIDER` | string | `"openai"` | Top-level text-gen LLM provider |
-| `LLM_MODEL` | string | `"gpt-5.4-mini"` | Top-level text-gen LLM model |
-| `LLM_ENDPOINT` | string | (uses OpenAI endpoint) | Override endpoint for LLM text-generation |
+| `LLM_PROVIDER` | string | `"openai"` | Top-level text-gen LLM provider (`openai` = OpenAI-compatible protocol — the default endpoint is the local llama-server, not api.openai.com) |
+| `LLM_MODEL` | string | `"mdemg-llm-v1"` | Top-level text-gen LLM model (local-first since CONFIG-LOCAL-DEFAULTS-001) |
+| `LLM_ENDPOINT` | string | `"http://127.0.0.1:8102/v1"` | Endpoint for LLM text-generation (local llama-server) |
 
 ### LLM Retry & Resilience
 
@@ -2952,7 +2953,7 @@ $env:OPENAI_API_KEY = "sk-abc123"
 |----------|------|---------|-------------|
 | `RERANK_ENABLED` | bool | `false` | Enable LLM re-ranking |
 | `RERANK_PROVIDER` | string | `""` | LLM provider for rerank |
-| `RERANK_MODEL` | string | `"gpt-4o-mini"` | Model for re-ranking |
+| `RERANK_MODEL` | string | inherits `LLM_MODEL` | Model for re-ranking |
 | `RERANK_TOP_N` | int | `30` | Candidates to re-rank |
 | `RERANK_WEIGHT` | float64 | `0.4` | Weight of rerank score |
 | `RERANK_TIMEOUT_MS` | int | `3000` | Timeout for rerank call in ms |
@@ -2963,7 +2964,7 @@ $env:OPENAI_API_KEY = "sk-abc123"
 |----------|------|---------|-------------|
 | `LLM_SUMMARY_ENABLED` | bool | `true` | Enable LLM summaries |
 | `LLM_SUMMARY_PROVIDER` | string | `"openai"` | Provider for summaries |
-| `LLM_SUMMARY_MODEL` | string | `"gpt-4o-mini"` | Model for summaries |
+| `LLM_SUMMARY_MODEL` | string | inherits `LLM_MODEL` | Model for summaries |
 | `LLM_SUMMARY_MAX_TOKENS` | int | `150` | Max tokens per summary |
 | `LLM_SUMMARY_BATCH_SIZE` | int | `10` | Files per API call |
 | `LLM_SUMMARY_TIMEOUT_MS` | int | `30000` | Request timeout in ms |
@@ -2975,7 +2976,7 @@ $env:OPENAI_API_KEY = "sk-abc123"
 |----------|------|---------|-------------|
 | `SYNTHESIS_ENABLED` | bool | `false` | Enable LLM synthesis in `/consult` |
 | `SYNTHESIS_PROVIDER` | string | `"openai"` | LLM provider |
-| `SYNTHESIS_MODEL` | string | `"gpt-4o-mini"` | Model for synthesis |
+| `SYNTHESIS_MODEL` | string | inherits `LLM_MODEL` | Model for synthesis |
 | `SYNTHESIS_MAX_TOKENS` | int | `2000` | Max tokens for response |
 | `SYNTHESIS_TIMEOUT_MS` | int | `30000` | Timeout in ms |
 
@@ -2985,9 +2986,9 @@ $env:OPENAI_API_KEY = "sk-abc123"
 |----------|------|---------|-------------|
 | `INTENT_ENABLED` | bool | `false` | Enable query rewriting |
 | `INTENT_PROVIDER` | string | `"openai"` | LLM provider |
-| `INTENT_MODEL` | string | `"gpt-4o-mini"` | Model for translation |
+| `INTENT_MODEL` | string | inherits `LLM_MODEL` | Model for translation |
 | `INTENT_MAX_TOKENS` | int | `150` | Max tokens for rewritten query |
-| `INTENT_TIMEOUT_MS` | int | `2000` | Timeout in ms |
+| `INTENT_TIMEOUT_MS` | int | `15000` | Timeout in ms (raised from 2000 in INTENT-DISABLE-001) |
 
 ### Dynamic Emergence (Phase 103)
 
@@ -2995,7 +2996,7 @@ $env:OPENAI_API_KEY = "sk-abc123"
 |----------|------|---------|-------------|
 | `EMERGENCE_ENABLED` | bool | `false` | Enable LLM-driven concept naming |
 | `EMERGENCE_PROVIDER` | string | `"openai"` | LLM provider |
-| `EMERGENCE_MODEL` | string | `"gpt-4o-mini"` | Model for naming |
+| `EMERGENCE_MODEL` | string | inherits `LLM_MODEL` | Model for naming |
 | `EMERGENCE_MAX_TOKENS` | int | `500` | Max tokens for response |
 | `EMERGENCE_TIMEOUT_MS` | int | `10000` | Timeout in ms |
 | `EMERGENCE_MIN_WEIGHT` | float64 | `0.3` | Min CO_ACTIVATED_WITH weight for clustering |
@@ -3008,7 +3009,7 @@ $env:OPENAI_API_KEY = "sk-abc123"
 |----------|------|---------|-------------|
 | `GUARDRAIL_ENABLED` | bool | `false` | Enable guardrail validation |
 | `GUARDRAIL_PROVIDER` | string | `"openai"` | LLM provider |
-| `GUARDRAIL_MODEL` | string | `"gpt-4o-mini"` | Model for evaluation |
+| `GUARDRAIL_MODEL` | string | inherits `LLM_MODEL` | Model for evaluation |
 | `GUARDRAIL_MAX_TOKENS` | int | `1000` | Max tokens for response |
 | `GUARDRAIL_TIMEOUT_MS` | int | `5000` | Timeout in ms |
 | `GUARDRAIL_MAX_CONSTRAINTS` | int | `10` | Max constraints per evaluation |
@@ -3056,7 +3057,6 @@ $env:OPENAI_API_KEY = "sk-abc123"
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
 | `CONFLICT_LOG_ENABLED` | bool | `true` | Enable structured conflict logging |
-| `ORPHAN_CLEANUP_INTERVAL_HOURS` | int | `0` | Scheduled cleanup interval (0 = disabled) |
 
 ### Optimistic Retry
 
@@ -3074,7 +3074,6 @@ $env:OPENAI_API_KEY = "sk-abc123"
 |----------|------|---------|-------------|
 | `EDGE_STALENESS_CASCADE_ENABLED` | bool | `true` | Enable edge staleness cascade |
 | `EDGE_STALENESS_REFRESH_BATCH_SIZE` | int | `100` | Edges per refresh call |
-| `EDGE_STALENESS_RECLUSTER_THRESHOLD` | float64 | `0.3` | Centroid drift threshold |
 
 ### Capability Gap Detection
 
@@ -3156,7 +3155,6 @@ See `docs/features/rsic-feedback-loop.md` for the reliability × user-impact der
 | `REL_EXTRACT_INHERITANCE` | bool | `true` | Extract inheritance relationships |
 | `REL_EXTRACT_CALLS` | bool | `true` | Extract function call relationships |
 | `REL_CROSS_FILE_RESOLVE` | bool | `true` | Enable cross-file symbol resolution |
-| `GO_TYPES_ANALYSIS_ENABLED` | bool | `false` | Use go/types for accurate analysis |
 | `REL_MAX_CALLS_PER_FUNCTION` | int | `50` | Max calls per function |
 | `REL_BATCH_SIZE` | int | `500` | Batch size for relationship insertion |
 | `REL_RESOLUTION_TIMEOUT_SEC` | int | `60` | Timeout for symbol resolution |
@@ -3172,8 +3170,6 @@ See `docs/features/rsic-feedback-loop.md` for the reliability × user-impact der
 | `L5_BRIDGE_EVIDENCE_MIN` | int | `1` | Min bridge evidence for L5 promotion |
 | `L5_SOURCE_MIN_LAYER` | int | `3` | Min layer for L5/dynamic edge sources |
 | `SYMBOL_ACTIVATION_ENABLED` | bool | `true` | Enable symbol-aware activation boost |
-| `SECONDARY_LABELS_ENABLED` | bool | `true` | Enable secondary node labels |
-| `THEME_OF_EDGE_ENABLED` | bool | `true` | Enable THEME_OF edge creation |
 | `CONSOLIDATE_ON_WATCHDOG_ENABLED` | bool | `true` | Trigger consolidation with RSIC force |
 
 ### Data Transmission & Pooling
@@ -3216,7 +3212,7 @@ See `docs/features/rsic-feedback-loop.md` for the reliability × user-impact der
 | `RATE_LIMIT_BY_IP` | bool | `true` | Per-IP vs global rate limiting |
 | `CIRCUIT_BREAKER_ENABLED` | bool | `true` | Enable circuit breaking |
 | `CIRCUIT_BREAKER_THRESHOLD` | int | `5` | Failures before opening |
-| `CIRCUIT_BREAKER_TIMEOUT_SEC` | int | `30` | Seconds before half-open |
+| `CIRCUIT_BREAKER_TIMEOUT` | int | `30` | Seconds before half-open |
 | `AUTH_ENABLED` | bool | `false` | Enable authentication |
 | `AUTH_MODE` | string | `"none"` | Auth mode: `none`, `apikey`, `bearer` |
 | `AUTH_API_KEYS` | string | `""` | Comma-separated API keys |
@@ -3232,7 +3228,7 @@ See `docs/features/rsic-feedback-loop.md` for the reliability × user-impact der
 | `TLS_KEY_FILE` | string | `""` | TLS key file path |
 | `METRICS_ENABLED` | bool | `true` | Enable Prometheus metrics |
 | `METRICS_NAMESPACE` | string | `"mdemg"` | Metrics namespace prefix |
-| `GRACEFUL_SHUTDOWN_TIMEOUT_SEC` | int | `30` | Shutdown timeout in seconds |
+| `GRACEFUL_SHUTDOWN_TIMEOUT` | int | `30` | Shutdown timeout in seconds |
 
 ### Logging
 
@@ -3299,6 +3295,28 @@ See `docs/features/rsic-feedback-loop.md` for the reliability × user-impact der
 | `SYNC_INTERVAL_MINUTES` | int | `0` | Scheduled sync check interval (0 = disabled) |
 | `SYNC_STALE_THRESHOLD_HOURS` | int | `24` | Hours before a space is stale |
 | `MDEMG_SPACE_ID` | string | `""` | Default space ID (used by CLI) |
+
+### Retrieval Pipeline (Phase 13/14 — default ON)
+
+| Variable | Type | Default | Description |
+|----------|------|---------|-------------|
+| `RETRIEVAL_COLUMN_VOTING_ENABLED` | bool | `true` | RRF column-voting scorer (Phase 13.1) instead of legacy linear scorer |
+| `RETRIEVAL_COLUMN_WEIGHT_EMBEDDING` | float64 | `0.50` | Embedding column weight in RRF fusion |
+| `RETRIEVAL_COLUMN_WEIGHT_BM25` | float64 | `0.20` | BM25 column weight |
+| `RETRIEVAL_COLUMN_WEIGHT_GRAPH` | float64 | `0.15` | Graph column weight |
+| `RETRIEVAL_COLUMN_WEIGHT_STRUCTURAL` | float64 | `0.15` | Structural column weight |
+| `RETRIEVAL_RRF_K` | int | `60` | RRF rank constant |
+| `RETRIEVAL_STRUCTURAL_HOPS` | int | `2` | Structural column walk depth |
+| `SPARSE_RETRIEVAL_ENABLED` | bool | `true` | Percentile activation gate post-aggregation pre-rerank (Phase 14.1.1) |
+| `SPARSE_ACTIVATION_PERCENTILE` | float64 | `0.95` | Within-call score percentile cutoff |
+| `SPARSE_MIN_ACTIVE` | int | `15` | Floor on active set size |
+| `SPARSE_MAX_ACTIVE` | int | `20` | Ceiling on active set size |
+| `SPARSE_GATE_CATEGORY_OVERRIDES` | JSON | seeded `{"data_flow_integration":{"min_active":20}}` | Per-category MIN_ACTIVE overrides |
+| `CONTEXT_FINGERPRINT_ENABLED` | bool | `true` | Compute 256-bit context fingerprints at observe time (Phase 14.2.3) |
+| `RETRIEVAL_CONTEXT_COLUMN_ENABLED` | bool | `true` | 5th RRF column ranking by fingerprint Jaccard similarity |
+| `RETRIEVAL_AUDIT_ENABLED` | bool | `true` | Write `retrieval_audit` rows per retrieve (feeds scorer-drift tripwires) |
+
+Per-call overrides: `?sparse=true|false`, `?sparse_percentile=N`, `?category=...`, `?context=auto`, `?intent=true|false` URL params on `/v1/memory/retrieve`. See `docs/features/sparse-retrieval.md` and `docs/features/context-fingerprinting.md`.
 
 ### Jiminy Guidance (Phase Jiminy)
 
@@ -3411,7 +3429,6 @@ See `docs/features/rsic-feedback-loop.md` for the reliability × user-impact der
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
 | `LEARNING_NEGATIVE_WEIGHT` | float64 | `0.15` | Weight reduction per negative feedback |
-| `LEARNING_NEGATIVE_DECAY_MULT` | float64 | `2.0` | Decay multiplier for contradicted edges |
 | `LEARNING_NEGATIVE_MAX_PER_REQUEST` | int | `20` | Max rejected nodes per request |
 
 ### Frontier Detection
@@ -3456,8 +3473,6 @@ See `docs/features/rsic-feedback-loop.md` for the reliability × user-impact der
 
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
-| `GUARDRAIL_HOOK_ENABLED` | bool | `false` | Enable PreToolUse constraint enforcement hook |
-| `GUARDRAIL_HOOK_TIMEOUT_MS` | int | `3000` | Timeout for hook enforcement calls |
 
 ### Feedback Persistence (FSD-2026-001 F3)
 
@@ -3512,7 +3527,6 @@ See `docs/features/rsic-feedback-loop.md` for the reliability × user-impact der
 | `JIMINY_CACHE_ENABLED` | bool | `true` | Enable guidance response cache |
 | `JIMINY_CACHE_TTL_SEC` | int | `300` | Cache TTL in seconds |
 | `JIMINY_CACHE_SIZE` | int | `200` | Max cache entries (LRU eviction) |
-| `JIMINY_PARTIAL_TIMEOUT_MS` | int | `2000` | Timeout for partial guidance results |
 
 ### Activation Weights (FSD-2026-001 F11)
 
@@ -3526,8 +3540,7 @@ See `docs/features/rsic-feedback-loop.md` for the reliability × user-impact der
 
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
-| `CONSTRAINT_DECAY_ENABLED` | bool | `false` | Enable automatic constraint confidence decay |
-| `CONSTRAINT_DECAY_RATE_PER_WEEK` | float64 | `0.01` | Weekly decay rate for unsurfaced constraints |
+| `JIMINY_CORRECTION_DECAY_RATE` | float64 | `0.01` | Temporal decay lambda for correction confidence (ACA-BFC M4) |
 
 ### Authority Levels (FSD-2026-001 F20)
 
@@ -3549,7 +3562,6 @@ See `docs/features/rsic-feedback-loop.md` for the reliability × user-impact der
 |----------|------|---------|-------------|
 | `NEURAL_DATA_COLLECTION` | bool | `false` | Enable training data collection for neural re-ranker |
 | `NEURAL_DATA_DIR` | string | `.mdemg/neural/training-data` | Directory for training data JSONL files |
-| `NEURAL_MODEL_DIR` | string | `.mdemg/neural/models` | Directory for trained cross-encoder model checkpoints |
 | `NEURAL_RERANK_ENABLED` | bool | `false` | Enable neural re-rank provider |
 | `NEURAL_RERANK_URL` | string | `http://localhost:8100` | Python sidecar URL |
 | `NEURAL_RERANK_TIMEOUT_MS` | int | `1000` | Timeout for sidecar re-rank calls |
@@ -3659,13 +3671,44 @@ mdemg
         trigger       Trigger a manual backup
         list          List existing backups
         config        Show backup configuration
+    tsdb
+      start           Start the TimescaleDB container
+      stop            Stop the TimescaleDB container
+      status          TSDB connection + schema version
+      migrate         Apply pending TSDB schema migrations
+      shell           Open psql session
+      stats           Row counts + compression settings
+      backup
+        trigger       Trigger a manual TSDB backup
+        list          List TSDB backups
+        config        Show TSDB backup configuration
+        restore       Restore a TSDB backup
 
   Memory & Ingestion:
     ingest            Ingest a codebase into MDEMG
     consolidate       Run the consolidation pipeline
     embeddings
       check           Test the embedding pipeline
+      backfill        Fill missing embeddings on MemoryNodes
     extract-symbols   Extract code symbols
+
+  Graph & Substrate Maintenance:
+    graph
+      repair          Weight-preserving SymbolNode dedup + orphan sweep
+      backfill-weights Backfill NULL abstraction-edge weights
+    concepts
+      recluster       Full hidden-layer re-cluster (quality escape hatch)
+      repair          Tombstone childless layer>=2 nodes
+      trace           Chain-to-L0 grounding audit
+    corrections
+      rehydrate-structured  Backfill structured correction fields on L0/L1
+    maintenance       Combined decay + prune cycle (schedulable)
+    synergy
+      status          Claude Code <-> MDEMG synergy health
+      check           Synergy checks (--auto to fix)
+      migrate         Migrate synergy data
+      buffer-status   Show synergy buffer state
+      flush-buffer    Flush the synergy buffer
 
   Configuration:
     config
@@ -3678,6 +3721,13 @@ mdemg
       install         Install git hooks
       uninstall       Remove git hooks
       list            List installed hooks
+      doctor          Triage the Claude Code hook channel
+    service
+      install         Install launchd/systemd supervision
+      uninstall       Remove service supervision
+      status          Show service state
+      restart         Restart the supervised service
+      logs            Tail service logs
     sidecar
       init            Initialize sidecar configuration
       status          Show sidecar state
@@ -3755,8 +3805,12 @@ mdemg
       export-auto       Automated daily export with retention
       check             Pre-campaign readiness checks
       curate            Spec-driven (UAITS) curation pipeline
+      curate-guidance   TSDB-sourced guidance training corpus curation
       validate          Validate a UAITS spec / data compliance
       clean             Remove error records + silent failures from TSDB
+    ft-loop
+      report-stage      Record a manual retrain stage to scheduled_job_events
+      promote           Operator-confirm a promote_pending retrain cycle
 
   Neural Training (Python sidecar):
     mdemg-neural-train              Fine-tune cross-encoder re-ranker

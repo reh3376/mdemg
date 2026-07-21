@@ -13,13 +13,15 @@ Add these to your `.env` file for maximum task coverage:
 ```bash
 # Campaign activation flags
 QUERY_CLASSIFY_ENABLED=true
-INTENT_ENABLED=true
+# INTENT_ENABLED stays false — do NOT enable (see warning below)
 JIMINY_ENABLED=true
 JIMINY_EVALUATE_LLM_ENABLED=true
 EMERGENCE_ENABLED=true
 CONSULTING_LLM_CONSTRAINTS_ENABLED=true
 METALEARN_ENABLED=true
 ```
+
+> ⚠️ **Warning — do NOT set `INTENT_ENABLED=true` (INTENT-DISABLE-001, 2026-06-26):** intent translation was proven net-negative in the 120q UVTS A/B (mean −0.010) and was ~70% of all LLM errors (~15% chronic timeout rate, adding avg 3.8s to retrieval). Keep it `false`; re-enable only after a fresh `?intent=true` 120q A/B shows a real lift.
 
 ## Task Categories
 
@@ -29,7 +31,7 @@ These tasks have complete code but are disabled by default.
 
 | Task | Env Var | Default | Action |
 |------|---------|---------|--------|
-| `retrieval.intent_translate` | `INTENT_ENABLED` | `false` | Set `true` |
+| `retrieval.intent_translate` | `INTENT_ENABLED` | `false` | **Keep `false`** — proven net-negative (INTENT-DISABLE-001) |
 | `retrieval.query_classify` | `QUERY_CLASSIFY_ENABLED` | `false` | Set `true` |
 | `hidden.name_emergence` | `EMERGENCE_ENABLED` | `false` | Set `true` |
 

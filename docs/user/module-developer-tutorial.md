@@ -50,7 +50,7 @@ Three module types exist:
 
 ## 2. Prerequisites
 
-- **Go 1.21+** installed (`go version`)
+- **Go 1.26+** installed (`go version`; matches the repo's `go.mod`)
 - MDEMG repo cloned and buildable (`go build ./...`)
 - MDEMG server running:
 
