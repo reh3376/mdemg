@@ -381,6 +381,9 @@ const (
 	confidenceThresholdTaskObs        = 50  // VolatileCount+PermanentCount
 	confidenceThresholdGuidanceEvents = 30  // TotalGuidanceIssued
 	confidenceThresholdProtocolEvents = 30  // TotalEvents
+	// SCORE-RETRIEVAL-REAL-SIGNALS-001: retrieval_events rows in the window
+	// for full-confidence RetrievalQuality.
+	confidenceThresholdRetrievalEvents = 50
 )
 
 // defaultCompressionTargetRatio mirrors the J17_COMPRESSION_TARGET_RATIO
@@ -390,19 +393,25 @@ const (
 // with FromEnv's default in internal/config/config.go.
 const defaultCompressionTargetRatio = 2.0
 
-// scoreRetrieval returns (score, confidence). Confidence is derived from
-// LearningPhase maturity: warm/saturated phases reflect enough edge history
-// to trust the retrieval signal; cold reflects minimal data.
-//
-// DASHBOARD-TRUTH-002 E1 (2026-07-20): the old "saturated=0.7" was a
-// wrong-anchor artifact — saturation is not degradation, and warm=0.9 >
-// saturated=0.7 read as "the more mature the graph, the worse the
-// retrieval". Fixed: saturated=0.9 (equal to warm; sub-1.0 acknowledges
-// no real quality signal is being measured — this function is still a
-// maturity gauge, not a quality gauge). A full rewrite that reads
-// retrieval_events rerank fill-rate + uvts_runs recent mean is deferred
-// to a follow-up sprint; this ships the minimum artifact-close.
+// scoreRetrieval returns (score, confidence). Primary path: mean of the
+// per-stage fill rates from retrieval_events (real quality signal;
+// SCORE-RETRIEVAL-REAL-SIGNALS-001). Fallback: the LearningPhase maturity
+// enum (DASHBOARD-TRUTH-002 E1 fixed its saturated=0.7 wrong-anchor to 0.9)
+// for spaces with zero retrieval traffic in the assessment window.
 func (a *Assessor) scoreRetrieval(r *SelfAssessmentReport) (float64, float64) {
+	// SCORE-RETRIEVAL-REAL-SIGNALS-001 (DASHBOARD-TRUTH-002 E1 full fix):
+	// score from the REAL pipeline signal the assessment already collects —
+	// per-stage fill rates over the window from retrieval_events
+	// (report.RetrievalDataset, populated before scoring). Confidence is
+	// proportional to sample size (DH-005: low-N windows are naturally
+	// down-weighted; zero-N excluded), so no extra config knob is needed.
+	// The enum below remains the FALLBACK for spaces with no retrieval
+	// traffic in the window (maturity prior, weak confidence).
+	if d := r.RetrievalDataset; d != nil && d.TotalQueries > 0 {
+		score := (d.RecallRate + d.BM25Rate + d.RerankRate) / 3.0
+		conf := math.Min(1.0, float64(d.TotalQueries)/float64(confidenceThresholdRetrievalEvents))
+		return clamp(score, 0, 1), conf
+	}
 	switch r.LearningPhase {
 	case "cold":
 		return 0.3, 0.4

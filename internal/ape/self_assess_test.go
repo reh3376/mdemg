@@ -6,6 +6,7 @@ import (
 
 	"mdemg/internal/config"
 	"mdemg/internal/metrics"
+	"mdemg/internal/tsdb"
 )
 
 // assertClose checks that got is within epsilon of want.
@@ -551,7 +552,7 @@ func TestScoreProtocol_CompressionAnchor(t *testing.T) {
 		{"above target clamps to 1.0", 3.0, 5.0, 1.0},
 		{"custom target 2.0: ratio 1.5 scores 0.5", 2.0, 1.5, 0.5},
 		// DASHBOARD-TRUTH-002 E3: defensive fallback default is now 2.0.
-		{"unset target falls back to default 2.0", 0, 2.0, 1.0},          // ratio 2.0 == target 2.0 → 1.0
+		{"unset target falls back to default 2.0", 0, 2.0, 1.0},                  // ratio 2.0 == target 2.0 → 1.0
 		{"misconfigured target <= 1.0 falls back to default 2.0", 1.0, 2.0, 1.0}, // ratio 2.0 == target 2.0 → 1.0
 	}
 	for _, tc := range cases {
@@ -893,7 +894,6 @@ func TestScoreProtocol_StabilityWeighting(t *testing.T) {
 	assertClose(t, got, 0.0975, 0.001, "scoreProtocol stability weighting")
 }
 
-
 // ─── J17 event-gauge no-data gate (fix during J17 dashboard investigation, 2026-07-21) ───
 
 // The in-memory protocol stats reset to zero on every server restart;
@@ -920,7 +920,7 @@ func TestPublishProtocolMetrics_ZeroEvents_SkipsEventDerivedGauges(t *testing.T)
 	a := &Assessor{}
 	a.publishProtocolMetrics(sid, ProtocolStatsResult{
 		TotalEvents:      0,
-		CompressionRatio: 0,   // in-memory reset value — a lie if published
+		CompressionRatio: 0, // in-memory reset value — a lie if published
 		TierDistribution: [3]float64{0, 0, 0},
 		CodeCoverage:     1.0, // null-tolerant default — honest, always published
 	})
@@ -951,4 +951,49 @@ func TestPublishProtocolMetrics_ZeroEvents_SkipsEventDerivedGauges(t *testing.T)
 	if got := m.J17TierT2Fraction(sid).Value(); got != 0.8 {
 		t.Errorf("nonzero-event publish must update tier fraction: got %v, want 0.8", got)
 	}
+}
+
+// ─── SCORE-RETRIEVAL-REAL-SIGNALS-001 ───
+
+func TestScoreRetrieval_RealSignals_RateMean(t *testing.T) {
+	a := newTestAssessor()
+	r := &SelfAssessmentReport{
+		LearningPhase: "saturated", // must be IGNORED when real data present
+		RetrievalDataset: &tsdb.RetrievalQualitySummary{
+			TotalQueries: 279, RecallRate: 1.0, BM25Rate: 1.0, RerankRate: 0.878,
+		},
+	}
+	got, conf := a.scoreRetrieval(r)
+	assertClose(t, got, (1.0+1.0+0.878)/3.0, 0.001, "rate-mean score")
+	assertClose(t, conf, 1.0, 0.001, "full confidence at 279 >= 50 events")
+}
+
+func TestScoreRetrieval_RealSignals_ProportionalConfidence(t *testing.T) {
+	a := newTestAssessor()
+	r := &SelfAssessmentReport{
+		RetrievalDataset: &tsdb.RetrievalQualitySummary{
+			TotalQueries: 10, RecallRate: 1.0, BM25Rate: 1.0, RerankRate: 0.5,
+		},
+	}
+	got, conf := a.scoreRetrieval(r)
+	assertClose(t, got, (1.0+1.0+0.5)/3.0, 0.001, "small-N score still computed")
+	assertClose(t, conf, 10.0/50.0, 0.001, "confidence proportional (DH-005 down-weights noisy N)")
+}
+
+func TestScoreRetrieval_FallbackToEnum_WhenNoDataset(t *testing.T) {
+	a := newTestAssessor()
+	// nil dataset → legacy enum path (byte-identical to DASHBOARD-TRUTH-002 E1)
+	for _, tc := range []struct {
+		phase string
+		want  float64
+	}{{"cold", 0.3}, {"learning", 0.6}, {"warm", 0.9}, {"saturated", 0.9}, {"", 0.5}} {
+		got, _ := a.scoreRetrieval(&SelfAssessmentReport{LearningPhase: tc.phase})
+		assertClose(t, got, tc.want, 0.001, "enum fallback "+tc.phase)
+	}
+	// zero-query dataset → also fallback (no signal)
+	got, _ := a.scoreRetrieval(&SelfAssessmentReport{
+		LearningPhase:    "warm",
+		RetrievalDataset: &tsdb.RetrievalQualitySummary{TotalQueries: 0},
+	})
+	assertClose(t, got, 0.9, 0.001, "zero-query dataset falls back to enum")
 }
