@@ -85,10 +85,46 @@
       }
     },
     {
+      "id": 25,
+      "title": "Latest Benchmark Age",
+      "description": "Days since the most recent benchmark_runs.completed_at. FT-BENCH-REFRESH-001 (2026-07-20): nothing schedules the benchmark automatically today (FT-RECURSIVE-002 default-off), so operators can miss that the 'Latest Run' panel below reads a row from weeks ago. Red at >7 days (matches the default `FT_BENCH_STALENESS_DAYS` config + `ft_benchmark_stale` alert rule).",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 23 },
+      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "-- FT-BENCH-REFRESH-001: freshness gauge over benchmark_runs.\nSELECT COALESCE(EXTRACT(EPOCH FROM (now() - MAX(completed_at))) / 86400.0, 999.0) AS age_days\nFROM benchmark_runs\nWHERE completed_at IS NOT NULL",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "d",
+          "decimals": 1,
+          "noValue": "no runs",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 3 },
+              { "color": "red", "value": 7 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name"
+      }
+    },
+    {
       "id": 10,
       "title": "Phase 10 Benchmark \u2014 Per-Task Pass Rate (latest run)",
       "type": "table",
-      "description": "Reads benchmark_results (V0012). Score = mean of deterministic reward_vector entries across N runs per task, for the most recent run_id.",
+      "description": "Reads benchmark_results (V0012). Score = mean of deterministic reward_vector entries across N runs per task, for the most recent run_id. See adjacent 'Latest Benchmark Age' panel for freshness \u2014 FT-BENCH-REFRESH-001 wired a staleness gauge + alert so operators know when this table is drifting stale.",
       "gridPos": {
         "h": 9,
         "w": 12,

@@ -1129,6 +1129,8 @@ type Config struct {
 	RSICHealthWeightProtocol  float64 // RSIC_HEALTH_WEIGHT_PROTOCOL  — overall-health weight for ProtocolHealth (default: 0.20)
 	RSICHealthWeightSynergy   float64 // RSIC_HEALTH_WEIGHT_SYNERGY   — overall-health weight for SynergyHealth (default: 0.05)
 
+	FTBenchStalenessDays int // FT_BENCH_STALENESS_DAYS — alert when `benchmark_runs` shows no completed run in the last N days (default: 7). Nothing schedules the benchmark automatically today (FT-RECURSIVE-002 default-off); this catches operator neglect (FT-BENCH-REFRESH-001).
+
 	RSICEdgeEntropyFloor float64 // RSIC_EDGE_ENTROPY_FLOOR — Shannon-entropy floor below which the Edge dimension applies a -0.2 penalty. The entropy is binary over CO_ACTIVATED_WITH edges' evidence_count>=5 (strong vs weak) — a mature Hebbian substrate accumulates many single-touch co-activations that never re-trigger, so p is naturally small and entropy is naturally low. Old hardcoded 0.5 fired forever on any healthy live graph (live mdemg-dev: entropy=0.27, penalty=-0.2, dimension pinned at 0.80). Default 0.2 is calibrated below the observed healthy value; set to 0 to disable the penalty entirely (DASHBOARD-TRUTH-002 E2)
 
 	// Synergy Recovery Buffer: store-and-forward during Jiminy outages
@@ -3100,6 +3102,19 @@ func FromEnv() (Config, error) {
 		slog.Warn("J17_COMPRESSION_TARGET_RATIO must be > 1.0, falling back to default",
 			"requested", j17CompressionTargetRatio, "default", 2.0)
 		j17CompressionTargetRatio = 2.0
+	}
+
+	// FT-BENCH-REFRESH-001: alert when benchmark_runs is stale (no
+	// completed run in the last N days). Default 7d matches a weekly
+	// operator cadence; ≤0 treated as 7.
+	ftBenchStalenessDays, err := atoi("FT_BENCH_STALENESS_DAYS", 7)
+	if err != nil {
+		return Config{}, err
+	}
+	if ftBenchStalenessDays <= 0 {
+		slog.Warn("FT_BENCH_STALENESS_DAYS must be > 0, falling back to default",
+			"requested", ftBenchStalenessDays, "default", 7)
+		ftBenchStalenessDays = 7
 	}
 
 	// DASHBOARD-TRUTH-002 E2: entropy floor for the RSIC Edge dimension.
@@ -5944,6 +5959,8 @@ func FromEnv() (Config, error) {
 		RSICHealthWeightSynergy:   rsicHealthWeightSynergy,
 
 		RSICEdgeEntropyFloor: rsicEdgeEntropyFloor,
+
+		FTBenchStalenessDays: ftBenchStalenessDays,
 
 		// TimescaleDB
 		TSDBEnabled:               tsdbEnabled,
