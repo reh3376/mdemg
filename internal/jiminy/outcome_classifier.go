@@ -104,16 +104,16 @@ var ollamaClassifySchema = json.RawMessage(`{
 // OutcomeClassifier performs semantic outcome classification using embeddings
 // and optional LLM-based judgment for uncertain cases.
 type OutcomeClassifier struct {
-	embedder        embeddings.Embedder
-	llm             *llmclient.Client // optional, for Tier 2 classification
-	llmEnabled      bool
-	llmProvider     string  // provider name for conditional behavior (e.g., "ollama" vs "openai")
-	compressPrompts       bool    // J17-PC: compress classification prompts
-	highThreshold         float64 // above this similarity = followed (default: 0.7)
-	lowThreshold          float64 // below this similarity = sub-LOW band (ignored / not_applicable, see naThreshold) (default: 0.2)
-	naThreshold           float64 // JIMINY-CORPUS-001 Epic 4 relevance gate: below this = not_applicable; [this, low) = ignored. ≤0 disables (whole sub-LOW tail is not_applicable)
-	nonViolationCredit    bool    // JIMINY-ACTIONABILITY-COMPLIANCE-CREDIT-001: when true, LLM classifier prompt gets an extended clause telling the LLM to classify must_not-type constraints as not_applicable (not ignored) when the action didn't touch the constraint's mechanism. Routes ~50% of current unrelated-context ignored verdicts to not_applicable, which the shipped writer gate (service.go:1730,1762) filters from constraint_outcomes. Predicted to lift constraint follow rate 10%→~20%. Default false; operator runs 3-day A/B before flipping.
-	maxTokens       int     // J14: max tokens for LLM classification
+	embedder           embeddings.Embedder
+	llm                *llmclient.Client // optional, for Tier 2 classification
+	llmEnabled         bool
+	llmProvider        string  // provider name for conditional behavior (e.g., "ollama" vs "openai")
+	compressPrompts    bool    // J17-PC: compress classification prompts
+	highThreshold      float64 // above this similarity = followed (default: 0.7)
+	lowThreshold       float64 // below this similarity = sub-LOW band (ignored / not_applicable, see naThreshold) (default: 0.2)
+	naThreshold        float64 // JIMINY-CORPUS-001 Epic 4 relevance gate: below this = not_applicable; [this, low) = ignored. ≤0 disables (whole sub-LOW tail is not_applicable)
+	nonViolationCredit bool    // JIMINY-ACTIONABILITY-COMPLIANCE-CREDIT-001: when true, LLM classifier prompt gets an extended clause telling the LLM to classify must_not-type constraints as not_applicable (not ignored) when the action didn't touch the constraint's mechanism. Routes ~50% of current unrelated-context ignored verdicts to not_applicable, which the shipped writer gate (service.go:1730,1762) filters from constraint_outcomes. Predicted to lift constraint follow rate 10%→~20%. Default false; operator runs 3-day A/B before flipping.
+	maxTokens          int     // J14: max tokens for LLM classification
 
 	// G8: circuit breaker for LLM calls
 	cbRegistry *circuitbreaker.Registry

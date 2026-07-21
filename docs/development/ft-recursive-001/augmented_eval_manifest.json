@@ -5,7 +5,7 @@
   "purpose": "SHA-pinned, leak-audited reference for the recursive-loop promotion gate. The eval JSONL + its build manifest live under training_data/eval/ which is gitignored (data), so the gate previously referenced an ad-hoc rebuild. This committed manifest pins the exact artifact + recipe + leak verdict the gate must use.",
   "eval_file": {
     "path": "training_data/eval/valid_clean.jsonl",
-    "sha256": "f215a34a6ffbf7149444525a189e1c46c3259466431c66c5e41ef48024149e4e",
+    "sha256": "79fd8e240911cdc30f5638290d46b173a25747dfc2be438d38c72461c01cf269",
     "rows_total": 240,
     "specs_total": 17,
     "target_per_task": 20,
@@ -220,5 +220,15 @@
     "valid_golden_barred": true,
     "valid_golden_reason": "~99% leaked with training data; permanently barred from gating (Phase 11.5d precedent).",
     "dual_gate": "5a vs current production aggregate (the model being replaced) / 5b vs fresh-merge \u22640.005"
-  }
+  },
+  "amendments": [
+    {
+      "sprint": "APE-REFLECT-EVAL-REFRESH-001",
+      "date": "2026-07-21T14:31:41Z",
+      "reason": "Replaced the 20 ape.reflect rows: originals carried pre-APE-PROMPT-BUDGET-001 prompts (~4,000 est. tokens) whose outputs get clipped mid-array under llama-server's 8,192-token per-slot KV bound (finish_reason=length; json_valid honestly 0 \u2014 eval artifact, not model regression). New rows sampled chronologically from post-2026-06-14 clean production llm_interactions (budget-bounded, ~1,400 est. tokens max) via scripts/refresh_ape_reflect_eval_rows.py; all other tasks' rows byte-identical; leak-audit CLEAN 0/240 against the original 9 sources.",
+      "old_sha256": "f215a34a6ffbf7149444525a189e1c46c3259466431c66c5e41ef48024149e4e",
+      "new_sha256": "79fd8e240911cdc30f5638290d46b173a25747dfc2be438d38c72461c01cf269",
+      "backup": "training_data/eval/valid_clean.jsonl.pre_ape_refresh_bak"
+    }
+  ]
 }

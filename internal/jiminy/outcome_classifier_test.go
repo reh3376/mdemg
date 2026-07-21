@@ -317,7 +317,6 @@ func TestBuildClassifyPrompt_WithoutNegation(t *testing.T) {
 	}
 }
 
-
 // JIMINY-ACTIONABILITY-COMPLIANCE-CREDIT-001: E3 pin tests
 
 // TestResolveClassifySystemPrompt_DefaultOff_ByteIdentical proves the

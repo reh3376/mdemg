@@ -37,6 +37,20 @@ type ProtocolEncoder struct {
 	tierLowThreshold  float64
 	// T1 compact mode for compression optimization
 	t1Compact T1CompactLevel
+
+	// J17-TIER-GATE-001: tier gate mode. "trust" (default, legacy compliance-EMA
+	// gating — byte-identical behavior) or "comprehension" (promotion keyed on
+	// measured comprehension — the axis dense encoding actually risks; the
+	// protocol's purpose is token efficiency, and an agent that COMPREHENDS
+	// codes has earned T1 even when it ignores guidance for relevance reasons).
+	// The T1→T2 comprehension DEMOTION gate (service.go, J17_T1_COMPREHENSION_GATE)
+	// stays active in both modes as the safety net.
+	tierGateMode          string
+	comprehensionHigh     float64 // promotion floor (J17_TIER_COMPREHENSION_HIGH)
+	comprehensionMinSamps int64   // below this many protocol events → fall back to trust logic (cold-start)
+	// comprehensionProvider returns (avg comprehension, total protocol events).
+	// Wired by the service from ProtocolMetricsCollector; nil → trust logic.
+	comprehensionProvider func() (float64, int64)
 }
 
 // NewProtocolEncoder creates a new protocol encoder.
@@ -106,6 +120,31 @@ func (e *ProtocolEncoder) SetT1Compact(level T1CompactLevel) {
 	e.t1Compact = level
 }
 
+// SetComprehensionGate configures the J17-TIER-GATE-001 promotion mode.
+// mode: "trust" (legacy) or "comprehension". Invalid values fall back to
+// "trust". high is the comprehension promotion floor; minSamples the
+// cold-start floor below which selectTier uses legacy trust logic.
+func (e *ProtocolEncoder) SetComprehensionGate(mode string, high float64, minSamples int64) {
+	if mode != "comprehension" {
+		mode = "trust"
+	}
+	if high <= 0 || high > 1 {
+		high = 0.6
+	}
+	if minSamples < 1 {
+		minSamples = 1
+	}
+	e.tierGateMode = mode
+	e.comprehensionHigh = high
+	e.comprehensionMinSamps = minSamples
+}
+
+// SetComprehensionProvider wires the live comprehension signal
+// (ProtocolMetricsCollector overall AvgComprehension + TotalEvents).
+func (e *ProtocolEncoder) SetComprehensionProvider(fn func() (float64, int64)) {
+	e.comprehensionProvider = fn
+}
+
 // SetTierThresholds updates the trust thresholds used for tier selection.
 func (e *ProtocolEncoder) SetTierThresholds(high, low float64) {
 	if high > 0 && high <= 1.0 && low >= 0 && low < 1.0 && low < high {
@@ -132,6 +171,26 @@ func (e *ProtocolEncoder) GetBootstrap() string {
 func (e *ProtocolEncoder) selectTier(item GuidanceItem, trustScore float64) int {
 	// Items with a constraint code can use T1
 	hasCode := item.ConstraintCode != ""
+
+	// J17-TIER-GATE-001: comprehension-keyed promotion. Dense encoding's risk
+	// is INCOMPREHENSION, not non-compliance — key promotion on the measured
+	// axis. Falls back to legacy trust logic on cold start (samples < min)
+	// or when no provider is wired.
+	if e.tierGateMode == "comprehension" && e.comprehensionProvider != nil {
+		score, samples := e.comprehensionProvider()
+		if samples >= e.comprehensionMinSamps {
+			switch {
+			case hasCode && score >= e.comprehensionHigh:
+				return TierCoded
+			case hasCode:
+				return TierTelegraphic
+			case score >= e.comprehensionHigh:
+				return TierTelegraphic
+			default:
+				return TierFullNL
+			}
+		}
+	}
 
 	// Trust-based tier modulation using configurable thresholds
 	switch {

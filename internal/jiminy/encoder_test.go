@@ -219,3 +219,86 @@ func TestGuidanceTypePrefix(t *testing.T) {
 		}
 	}
 }
+
+// ─── J17-TIER-GATE-001: comprehension-keyed T1 promotion ───
+
+// TestSelectTier_TrustMode_ByteIdenticalDefault pins that the default mode
+// ("trust", or an unset/invalid mode) leaves tier selection byte-identical
+// to the legacy compliance-trust logic — even with a provider wired.
+func TestSelectTier_TrustMode_ByteIdenticalDefault(t *testing.T) {
+	coded := GuidanceItem{ConstraintCode: "test-code", Content: "c"}
+	uncoded := GuidanceItem{Content: "c"}
+
+	legacy := NewProtocolEncoder(TierCoded) // no gate configured at all
+	gated := NewProtocolEncoder(TierCoded)
+	gated.SetComprehensionGate("trust", 0.6, 20)
+	gated.SetComprehensionProvider(func() (float64, int64) { return 0.99, 1000 })
+
+	for _, trust := range []float64{0.0, 0.2, 0.35, 0.5, 0.75, 0.76, 1.0} {
+		for _, item := range []GuidanceItem{coded, uncoded} {
+			if a, b := legacy.selectTier(item, trust), gated.selectTier(item, trust); a != b {
+				t.Errorf("trust-mode divergence at trust=%v hasCode=%v: legacy=%d gated=%d",
+					trust, item.ConstraintCode != "", a, b)
+			}
+		}
+	}
+}
+
+// TestSelectTier_ComprehensionMode_TruthTable pins the comprehension-keyed
+// promotion: T1 for coded items once measured comprehension clears the floor
+// — regardless of trust (the axis dense encoding actually risks is
+// incomprehension, not non-compliance).
+func TestSelectTier_ComprehensionMode_TruthTable(t *testing.T) {
+	coded := GuidanceItem{ConstraintCode: "test-code", Content: "c"}
+	uncoded := GuidanceItem{Content: "c"}
+
+	mk := func(score float64, samples int64) *ProtocolEncoder {
+		e := NewProtocolEncoder(TierCoded)
+		e.SetComprehensionGate("comprehension", 0.6, 20)
+		e.SetComprehensionProvider(func() (float64, int64) { return score, samples })
+		return e
+	}
+
+	const lowTrust = 0.23 // the live trust value that blocked T1 for months
+
+	cases := []struct {
+		name string
+		enc  *ProtocolEncoder
+		item GuidanceItem
+		want int
+	}{
+		{"coded + comprehension above floor → T1 (despite low trust)", mk(0.73, 3592), coded, TierCoded},
+		{"coded + comprehension below floor → T2", mk(0.45, 3592), coded, TierTelegraphic},
+		{"uncoded + comprehension above floor → T2", mk(0.73, 3592), uncoded, TierTelegraphic},
+		{"uncoded + comprehension below floor → T3", mk(0.45, 3592), uncoded, TierFullNL},
+		{"cold start (samples < min) falls back to trust logic → T2 for coded at low trust", mk(0.99, 5), coded, TierTelegraphic},
+		{"cold start uncoded low trust → T3", mk(0.99, 5), uncoded, TierFullNL},
+	}
+	for _, tc := range cases {
+		if got := tc.enc.selectTier(tc.item, lowTrust); got != tc.want {
+			t.Errorf("%s: got tier %d, want %d", tc.name, got, tc.want)
+		}
+	}
+
+	// Provider nil → trust logic even in comprehension mode.
+	noProv := NewProtocolEncoder(TierCoded)
+	noProv.SetComprehensionGate("comprehension", 0.6, 20)
+	if got := noProv.selectTier(coded, lowTrust); got != TierTelegraphic {
+		t.Errorf("nil provider must fall back to trust logic: got %d, want %d (T2)", got, TierTelegraphic)
+	}
+}
+
+// TestSetComprehensionGate_Validation pins the setter's defensive fallbacks.
+func TestSetComprehensionGate_Validation(t *testing.T) {
+	e := NewProtocolEncoder(TierCoded)
+	e.SetComprehensionGate("bogus", -1, 0)
+	if e.tierGateMode != "trust" {
+		t.Errorf("invalid mode must fall back to trust, got %q", e.tierGateMode)
+	}
+	if e.comprehensionHigh != 0.6 {
+		t.Errorf("out-of-range high must fall back to 0.6, got %v", e.comprehensionHigh)
+	}
+	if e.comprehensionMinSamps != 1 {
+		t.Errorf("minSamples floor is 1, got %d", e.comprehensionMinSamps)
+	}
+}

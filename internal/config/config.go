@@ -201,18 +201,18 @@ type Config struct {
 	RRFConstant            int     // RRF constant k in 1/(k+rank) formula (default: 60)
 
 	// LLM Re-ranking settings (V0006)
-	RerankEnabled   bool    // Enable LLM re-ranking (default: false)
-	RerankProvider  string  // LLM provider for rerank (openai/ollama/jina)
-	RerankModel     string  // Model for re-ranking (cascades from LLM_MODEL)
-	RerankTopN      int     // Candidates to re-rank (default: 30)
-	RerankWeight    float64 // Weight of rerank score in final (default: 0.4)
-	RerankTimeoutMs int     // Timeout for rerank call in ms (default: 3000)
-	RerankMinBudgetMs int  // RERANK_MIN_BUDGET_MS — LLM-HEALTH-INVESTIGATION-001: skip rerank when caller ctx has less than this remaining (default: 12000; 0 = disabled; floor 3000)
-	NeuralRerankMinBudgetMs int  // NEURAL_RERANK_MIN_BUDGET_MS — NEURAL-RERANK-PRECHECK-001: same pre-check for provider=neural (default: 1500 = neural timeout 1000ms + 500ms margin; 0 = disabled; floor 500)
-	RerankCompress  bool    // RERANK_COMPRESS — compress rerank candidate prompts (default: true)
-	RerankJinaKey   string  // RERANK_JINA_API_KEY — Jina API key for cross-encoder reranking
-	RerankJinaModel string  // RERANK_JINA_MODEL — Jina reranker model (default: jina-reranker-v2-base-multilingual)
-	RerankJinaURL   string  // RERANK_JINA_URL — Jina API base URL (default: https://api.jina.ai/v1)
+	RerankEnabled           bool    // Enable LLM re-ranking (default: false)
+	RerankProvider          string  // LLM provider for rerank (openai/ollama/jina)
+	RerankModel             string  // Model for re-ranking (cascades from LLM_MODEL)
+	RerankTopN              int     // Candidates to re-rank (default: 30)
+	RerankWeight            float64 // Weight of rerank score in final (default: 0.4)
+	RerankTimeoutMs         int     // Timeout for rerank call in ms (default: 3000)
+	RerankMinBudgetMs       int     // RERANK_MIN_BUDGET_MS — LLM-HEALTH-INVESTIGATION-001: skip rerank when caller ctx has less than this remaining (default: 12000; 0 = disabled; floor 3000)
+	NeuralRerankMinBudgetMs int     // NEURAL_RERANK_MIN_BUDGET_MS — NEURAL-RERANK-PRECHECK-001: same pre-check for provider=neural (default: 1500 = neural timeout 1000ms + 500ms margin; 0 = disabled; floor 500)
+	RerankCompress          bool    // RERANK_COMPRESS — compress rerank candidate prompts (default: true)
+	RerankJinaKey           string  // RERANK_JINA_API_KEY — Jina API key for cross-encoder reranking
+	RerankJinaModel         string  // RERANK_JINA_MODEL — Jina reranker model (default: jina-reranker-v2-base-multilingual)
+	RerankJinaURL           string  // RERANK_JINA_URL — Jina API base URL (default: https://api.jina.ai/v1)
 
 	// LLM Summary settings (semantic summaries for ingest)
 	LLMSummaryEnabled   bool   // Feature toggle for LLM summaries (default: true)
@@ -386,18 +386,18 @@ type Config struct {
 	JiminyEvaluateLLMMaxTokens int    // JIMINY_EVALUATE_LLM_MAX_TOKENS — max response tokens (default: 2000)
 
 	// Jiminy J11: Semantic Outcome Classification
-	JiminyOutcomeClassifierEnabled bool    // JIMINY_OUTCOME_CLASSIFIER_ENABLED — enable semantic classifier (default: true)
-	JiminyOutcomeLLMEnabled        bool    // JIMINY_OUTCOME_LLM_ENABLED — enable LLM Tier 2 classification (default: true)
-	JiminyOutcomeSimilarityHigh    float64 // JIMINY_OUTCOME_SIMILARITY_HIGH — threshold for "followed" (default: 0.55)
-	JiminyOutcomeSimilarityLow     float64 // JIMINY_OUTCOME_SIMILARITY_LOW — threshold for "ignored" (default: 0.20)
-	JiminyOutcomeNotApplicableSim  float64 // JIMINY_OUTCOME_NOT_APPLICABLE_SIMILARITY — relevance gate: below this the guidance did not apply → not_applicable; [this, LOW) is a real "ignored" (default: 0.10; ≤0 disables — whole sub-LOW tail is not_applicable)
-	JiminyOutcomeLLMMaxTokens      int     // JIMINY_OUTCOME_LLM_MAX_TOKENS — max tokens for classification (default: 100)
-	JiminyOutcomeCacheSize         int     // JIMINY_OUTCOME_CACHE_SIZE — LRU cache capacity (default: 256)
-	JiminyClassifyCompress         bool    // JIMINY_CLASSIFY_COMPRESS — compress outcome classification prompts (default: true)
-	JiminyNonViolationCreditEnabled bool   // JIMINY_NONVIOLATION_CREDIT_ENABLED — extend tier-2 LLM classifier prompt with a "non-violation credit for must_not" clause. Routes unrelated-context ignored verdicts to not_applicable (already filtered from constraint_outcomes by the writer gate). Predicted to lift constraint follow rate 10%→~20% by shrinking the actionable denominator. Default false; operator runs the 3-day A/B recipe (docs/development/jiminy-actionability-compliance-credit-001/ab_recipe.md) before flipping (JIMINY-ACTIONABILITY-COMPLIANCE-CREDIT-001).
-	JiminyDedupSimilarityThreshold float64 // JIMINY_DEDUP_SIMILARITY_THRESHOLD — semantic dedup cosine threshold (default: 0.85)
-	JiminyCorrectionDecayRate      float64 // JIMINY_CORRECTION_DECAY_RATE — time-decay lambda for corrections (default: 0.01)
-	J17TicketCacheSize             int     // J17_TICKET_CACHE_SIZE — max entries in ticket LRU cache (default: 1000)
+	JiminyOutcomeClassifierEnabled  bool    // JIMINY_OUTCOME_CLASSIFIER_ENABLED — enable semantic classifier (default: true)
+	JiminyOutcomeLLMEnabled         bool    // JIMINY_OUTCOME_LLM_ENABLED — enable LLM Tier 2 classification (default: true)
+	JiminyOutcomeSimilarityHigh     float64 // JIMINY_OUTCOME_SIMILARITY_HIGH — threshold for "followed" (default: 0.55)
+	JiminyOutcomeSimilarityLow      float64 // JIMINY_OUTCOME_SIMILARITY_LOW — threshold for "ignored" (default: 0.20)
+	JiminyOutcomeNotApplicableSim   float64 // JIMINY_OUTCOME_NOT_APPLICABLE_SIMILARITY — relevance gate: below this the guidance did not apply → not_applicable; [this, LOW) is a real "ignored" (default: 0.10; ≤0 disables — whole sub-LOW tail is not_applicable)
+	JiminyOutcomeLLMMaxTokens       int     // JIMINY_OUTCOME_LLM_MAX_TOKENS — max tokens for classification (default: 100)
+	JiminyOutcomeCacheSize          int     // JIMINY_OUTCOME_CACHE_SIZE — LRU cache capacity (default: 256)
+	JiminyClassifyCompress          bool    // JIMINY_CLASSIFY_COMPRESS — compress outcome classification prompts (default: true)
+	JiminyNonViolationCreditEnabled bool    // JIMINY_NONVIOLATION_CREDIT_ENABLED — extend tier-2 LLM classifier prompt with a "non-violation credit for must_not" clause. Routes unrelated-context ignored verdicts to not_applicable (already filtered from constraint_outcomes by the writer gate). Predicted to lift constraint follow rate 10%→~20% by shrinking the actionable denominator. Default false; operator runs the 3-day A/B recipe (docs/development/jiminy-actionability-compliance-credit-001/ab_recipe.md) before flipping (JIMINY-ACTIONABILITY-COMPLIANCE-CREDIT-001).
+	JiminyDedupSimilarityThreshold  float64 // JIMINY_DEDUP_SIMILARITY_THRESHOLD — semantic dedup cosine threshold (default: 0.85)
+	JiminyCorrectionDecayRate       float64 // JIMINY_CORRECTION_DECAY_RATE — time-decay lambda for corrections (default: 0.01)
+	J17TicketCacheSize              int     // J17_TICKET_CACHE_SIZE — max entries in ticket LRU cache (default: 1000)
 
 	// Jiminy J15: Synthesis temperature
 	JiminySynthesisTemperature *float64 // JIMINY_SYNTHESIS_TEMPERATURE — LLM temperature (default: nil = API default)
@@ -440,13 +440,16 @@ type Config struct {
 	J17DefaultTier     int    // J17_DEFAULT_TIER — default encoding tier 1-3 (default: 1)
 
 	// J17-3: Trust Score
-	J17TrustInitial            float64 // J17_TRUST_INITIAL — starting trust score (default: 0.65)
-	J17TrustBoostPerFollow     float64 // J17_TRUST_BOOST_PER_FOLLOW — trust increase per followed constraint (default: 0.05)
-	J17TrustDecayPerIgnore     float64 // J17_TRUST_DECAY_PER_IGNORE — trust decrease per ignored constraint (default: 0.02)
-	J17TrustDecayPerContradict float64 // J17_TRUST_DECAY_PER_CONTRADICT — trust decrease per contradicted constraint (default: 0.04)
-	J17TrustHighThreshold      float64 // J17_TRUST_HIGH_THRESHOLD — above this → dense encoding (default: 0.75)
-	J17TrustLowThreshold       float64 // J17_TRUST_LOW_THRESHOLD — below this → more explanation (default: 0.35)
-	J17TrustTTLHours           int     // J17_TRUST_TTL_HOURS — trust entry expiry in hours (default: 168)
+	J17TrustInitial                float64 // J17_TRUST_INITIAL — starting trust score (default: 0.65)
+	J17TrustBoostPerFollow         float64 // J17_TRUST_BOOST_PER_FOLLOW — trust increase per followed constraint (default: 0.05)
+	J17TrustDecayPerIgnore         float64 // J17_TRUST_DECAY_PER_IGNORE — trust decrease per ignored constraint (default: 0.02)
+	J17TrustDecayPerContradict     float64 // J17_TRUST_DECAY_PER_CONTRADICT — trust decrease per contradicted constraint (default: 0.04)
+	J17TrustHighThreshold          float64 // J17_TRUST_HIGH_THRESHOLD — above this → dense encoding (default: 0.75)
+	J17TrustLowThreshold           float64 // J17_TRUST_LOW_THRESHOLD — below this → more explanation (default: 0.35)
+	J17TierGateMode                string  // J17_TIER_GATE_MODE — "trust" (legacy compliance-EMA tier gating) or "comprehension" (T1 promotion keyed on measured comprehension — the axis dense encoding actually risks; J17-TIER-GATE-001). Invalid → "trust" + WARN (default: "trust")
+	J17TierComprehensionHigh       float64 // J17_TIER_COMPREHENSION_HIGH — comprehension promotion floor for T1 in comprehension mode; aligned with J17_TIER_INEFFECTIVE_THRESHOLD's 0.6 anchor; live 48h avg 0.732 clears (default: 0.6)
+	J17TierComprehensionMinSamples int     // J17_TIER_COMPREHENSION_MIN_SAMPLES — protocol events required before comprehension mode activates; below → legacy trust logic (cold-start; in-memory stats reset on restart) (default: 20)
+	J17TrustTTLHours               int     // J17_TRUST_TTL_HOURS — trust entry expiry in hours (default: 168)
 	// DASHBOARD-TRUTH-001 Epic 4: significance floor for the trust gauges.
 	// A session counts toward mdemg_j17_{min,max,avg}_trust_score and
 	// _trust_session_count only if it is within the TTL of its last trust
@@ -1170,8 +1173,8 @@ type Config struct {
 	JiminyContradictedBridgeWriterFlushIntervalSec int  // JIMINY_CONTRADICTED_BRIDGE_WRITER_FLUSH_INTERVAL_SEC — buffered writer flush cadence (default: 30, floor: 5)
 	JiminyContradictedBridgeWriterBufferSize       int  // JIMINY_CONTRADICTED_BRIDGE_WRITER_BUFFER_SIZE — max rows held before FIFO eviction (default: 1000, 0 = unlimited)
 	JiminyContradictedBridgeMaxContentLen          int  // JIMINY_CONTRADICTED_BRIDGE_MAX_CONTENT_LEN — cap draft_incorrect/draft_correct at this many chars (default: 400)
-	GuidanceCorpusMaxContentBytes        int  // GUIDANCE_CORPUS_MAX_CONTENT_BYTES — truncate guidance/action snapshots to this many bytes (default: 8192, floor: 256)
-	GuidanceCorpusSourceLookupTimeoutMs  int  // GUIDANCE_CORPUS_SOURCE_LOOKUP_TIMEOUT_MS — bounded best-effort Neo4j lookup of source-node role_type/layer at emit (default: 300, 0 = disable; never blocks the hot path beyond this)
+	GuidanceCorpusMaxContentBytes                  int  // GUIDANCE_CORPUS_MAX_CONTENT_BYTES — truncate guidance/action snapshots to this many bytes (default: 8192, floor: 256)
+	GuidanceCorpusSourceLookupTimeoutMs            int  // GUIDANCE_CORPUS_SOURCE_LOOKUP_TIMEOUT_MS — bounded best-effort Neo4j lookup of source-node role_type/layer at emit (default: 300, 0 = disable; never blocks the hot path beyond this)
 
 	// JIMINY-RELEVANCE-001 Epic 2 — guidance label-quality auto-relabel job.
 	// Re-labels heuristic/blank-classifier_source rows in guidance_training_rows
@@ -1189,18 +1192,18 @@ type Config struct {
 	GuidanceShouldFollowLookbackHours int     // GUIDANCE_SHOULD_FOLLOW_LOOKBACK_HOURS — window for the should-follow rate (default: 168 = 7d, floor: 1)
 
 	// HITL-REVIEW-001 — general-purpose human-in-the-loop review + live-reinforcement platform.
-	ReviewEnabled                 bool    // REVIEW_ENABLED — enable the /v1/review/* surface + UI tab (default: true)
-	ReviewWriterFlushIntervalSec  int     // REVIEW_WRITER_FLUSH_INTERVAL_SEC — review_grades writer flush cadence (default: 15, floor: 5)
-	ReviewWriterBufferSize        int     // REVIEW_WRITER_BUFFER_SIZE — max buffered grade rows before FIFO eviction (default: 500, 0 = unbounded)
-	ReviewRubricVersion           string  // REVIEW_RUBRIC_VERSION — the current rubric version; grades not at this version aren't "certified-current" (default: gr-v1)
-	ReviewSampleSize              int     // REVIEW_SAMPLE_SIZE — max items the sampler selects per fetch (default: 200, floor: 1)
-	ReviewActiveUncertaintyBand   float64 // REVIEW_ACTIVE_UNCERTAINTY_BAND — prefer items whose AutoScore is within this band of 0.5 (default: 0.4)
-	ReviewSampleSeed              int64   // REVIEW_SAMPLE_SEED — 0 = time-seeded; non-zero = deterministic sampling (default: 0)
-	ReviewReinforceDefault        bool    // REVIEW_REINFORCE_DEFAULT — default for the per-grade reinforce flag; false = grades are gold-only unless reinforce:true is sent (default: false)
-	ReviewGuidanceSinkEnabled     bool    // REVIEW_GUIDANCE_SINK_ENABLED — enable the guidance live-reinforcement sink (default: true)
-	ReviewGuidanceConfidenceNudge float64 // REVIEW_GUIDANCE_CONFIDENCE_NUDGE — node-confidence delta the guidance sink applies (default: 0.05)
-	ReviewLLMDatasetsEnabled      bool    // REVIEW_LLM_DATASETS_ENABLED — register the 16 MDEMG LLM call sites as reviewable datasets (gold-only review of llm_interactions) (default: true)
-	ReviewContradictedDatasetEnabled bool // REVIEW_CONTRADICTED_DATASET_ENABLED — register the JIMINY-CONTRADICTED-BRIDGE-001 correction-drafts dataset (default: true)
+	ReviewEnabled                    bool    // REVIEW_ENABLED — enable the /v1/review/* surface + UI tab (default: true)
+	ReviewWriterFlushIntervalSec     int     // REVIEW_WRITER_FLUSH_INTERVAL_SEC — review_grades writer flush cadence (default: 15, floor: 5)
+	ReviewWriterBufferSize           int     // REVIEW_WRITER_BUFFER_SIZE — max buffered grade rows before FIFO eviction (default: 500, 0 = unbounded)
+	ReviewRubricVersion              string  // REVIEW_RUBRIC_VERSION — the current rubric version; grades not at this version aren't "certified-current" (default: gr-v1)
+	ReviewSampleSize                 int     // REVIEW_SAMPLE_SIZE — max items the sampler selects per fetch (default: 200, floor: 1)
+	ReviewActiveUncertaintyBand      float64 // REVIEW_ACTIVE_UNCERTAINTY_BAND — prefer items whose AutoScore is within this band of 0.5 (default: 0.4)
+	ReviewSampleSeed                 int64   // REVIEW_SAMPLE_SEED — 0 = time-seeded; non-zero = deterministic sampling (default: 0)
+	ReviewReinforceDefault           bool    // REVIEW_REINFORCE_DEFAULT — default for the per-grade reinforce flag; false = grades are gold-only unless reinforce:true is sent (default: false)
+	ReviewGuidanceSinkEnabled        bool    // REVIEW_GUIDANCE_SINK_ENABLED — enable the guidance live-reinforcement sink (default: true)
+	ReviewGuidanceConfidenceNudge    float64 // REVIEW_GUIDANCE_CONFIDENCE_NUDGE — node-confidence delta the guidance sink applies (default: 0.05)
+	ReviewLLMDatasetsEnabled         bool    // REVIEW_LLM_DATASETS_ENABLED — register the 16 MDEMG LLM call sites as reviewable datasets (gold-only review of llm_interactions) (default: true)
+	ReviewContradictedDatasetEnabled bool    // REVIEW_CONTRADICTED_DATASET_ENABLED — register the JIMINY-CONTRADICTED-BRIDGE-001 correction-drafts dataset (default: true)
 
 	// EVENTGRAPH-001 — TSDB reinforcement_events + federation API (Pattern Y1)
 	EventGraphEnabled                        bool // EVENTGRAPH_ENABLED — record per-pair Hebbian telemetry into reinforcement_events + expose federation API (default: true)
@@ -2974,6 +2977,28 @@ func FromEnv() (Config, error) {
 	}
 	j17BootstrapCodification := getBool("J17_BOOTSTRAP_CODIFICATION", j17Enabled)
 	j17BootstrapSpaceID := get("J17_BOOTSTRAP_SPACE_ID", "mdemg-dev")
+
+	// J17-TIER-GATE-001: comprehension-keyed T1 promotion.
+	j17TierGateMode := get("J17_TIER_GATE_MODE", "trust")
+	if j17TierGateMode != "trust" && j17TierGateMode != "comprehension" {
+		slog.Warn("J17_TIER_GATE_MODE invalid, falling back to trust", "requested", j17TierGateMode)
+		j17TierGateMode = "trust"
+	}
+	j17TierComprehensionHigh, err := atof("J17_TIER_COMPREHENSION_HIGH", 0.6)
+	if err != nil {
+		return Config{}, err
+	}
+	if j17TierComprehensionHigh <= 0 || j17TierComprehensionHigh > 1 {
+		slog.Warn("J17_TIER_COMPREHENSION_HIGH out of (0,1], falling back to default", "requested", j17TierComprehensionHigh, "default", 0.6)
+		j17TierComprehensionHigh = 0.6
+	}
+	j17TierComprehensionMinSamples, err := atoi("J17_TIER_COMPREHENSION_MIN_SAMPLES", 20)
+	if err != nil {
+		return Config{}, err
+	}
+	if j17TierComprehensionMinSamples < 1 {
+		j17TierComprehensionMinSamples = 1
+	}
 
 	// J17-4: Protocol Metrics + RSIC Evolution
 	j17MetricsEnabled := getBool("J17_METRICS_ENABLED", j17Enabled)
@@ -5437,50 +5462,50 @@ func FromEnv() (Config, error) {
 		JiminyWarmMaxAgeSec:                       jiminyWarmMaxAgeSec,
 
 		// Jiminy J7-J12
-		JiminyRetrievalEnabled:         jiminyRetrievalEnabled,
-		JiminyRetrievalTopK:            jiminyRetrievalTopK,
-		JiminyRetrievalHopDepth:        jiminyRetrievalHopDepth,
-		JiminySynthesisEnabled:         jiminySynthesisEnabled,
-		JiminySynthesisProvider:        jiminySynthesisProvider,
-		JiminySynthesisModel:           jiminySynthesisModel,
-		JiminySynthesisMaxTokens:       jiminySynthesisMaxTokens,
-		JiminySynthesisTimeoutMs:       jiminySynthesisTimeoutMs,
-		JiminyEvaluateEnabled:          jiminyEvaluateEnabled,
-		JiminyEvaluateTimeoutMs:        jiminyEvaluateTimeoutMs,
-		JiminyEvaluateMaxConstraints:   jiminyEvaluateMaxConstraints,
-		JiminyEvaluateLLMEnabled:       jiminyEvaluateLLMEnabled,
-		JiminyEvaluateLLMProvider:      jiminyEvaluateLLMProvider,
-		JiminyEvaluateLLMModel:         jiminyEvaluateLLMModel,
-		JiminyEvaluateLLMTimeoutMs:     jiminyEvaluateLLMTimeoutMs,
-		JiminyEvaluateLLMMaxTokens:     jiminyEvaluateLLMMaxTokens,
-		JiminyOutcomeClassifierEnabled: jiminyOutcomeClassifierEnabled,
-		JiminyOutcomeLLMEnabled:        jiminyOutcomeLLMEnabled,
-		JiminyOutcomeSimilarityHigh:    jiminyOutcomeSimilarityHigh,
-		JiminyOutcomeSimilarityLow:     jiminyOutcomeSimilarityLow,
-		JiminyOutcomeNotApplicableSim:  jiminyOutcomeNotApplicableSim,
-		JiminyOutcomeLLMMaxTokens:      jiminyOutcomeLLMMaxTokens,
-		JiminyOutcomeCacheSize:         jiminyOutcomeCacheSize,
-		JiminyClassifyCompress:         jiminyClassifyCompress,
+		JiminyRetrievalEnabled:          jiminyRetrievalEnabled,
+		JiminyRetrievalTopK:             jiminyRetrievalTopK,
+		JiminyRetrievalHopDepth:         jiminyRetrievalHopDepth,
+		JiminySynthesisEnabled:          jiminySynthesisEnabled,
+		JiminySynthesisProvider:         jiminySynthesisProvider,
+		JiminySynthesisModel:            jiminySynthesisModel,
+		JiminySynthesisMaxTokens:        jiminySynthesisMaxTokens,
+		JiminySynthesisTimeoutMs:        jiminySynthesisTimeoutMs,
+		JiminyEvaluateEnabled:           jiminyEvaluateEnabled,
+		JiminyEvaluateTimeoutMs:         jiminyEvaluateTimeoutMs,
+		JiminyEvaluateMaxConstraints:    jiminyEvaluateMaxConstraints,
+		JiminyEvaluateLLMEnabled:        jiminyEvaluateLLMEnabled,
+		JiminyEvaluateLLMProvider:       jiminyEvaluateLLMProvider,
+		JiminyEvaluateLLMModel:          jiminyEvaluateLLMModel,
+		JiminyEvaluateLLMTimeoutMs:      jiminyEvaluateLLMTimeoutMs,
+		JiminyEvaluateLLMMaxTokens:      jiminyEvaluateLLMMaxTokens,
+		JiminyOutcomeClassifierEnabled:  jiminyOutcomeClassifierEnabled,
+		JiminyOutcomeLLMEnabled:         jiminyOutcomeLLMEnabled,
+		JiminyOutcomeSimilarityHigh:     jiminyOutcomeSimilarityHigh,
+		JiminyOutcomeSimilarityLow:      jiminyOutcomeSimilarityLow,
+		JiminyOutcomeNotApplicableSim:   jiminyOutcomeNotApplicableSim,
+		JiminyOutcomeLLMMaxTokens:       jiminyOutcomeLLMMaxTokens,
+		JiminyOutcomeCacheSize:          jiminyOutcomeCacheSize,
+		JiminyClassifyCompress:          jiminyClassifyCompress,
 		JiminyNonViolationCreditEnabled: jiminyNonViolationCreditEnabled,
-		JiminyDedupSimilarityThreshold: jiminyDedupSimilarityThreshold,
-		JiminyCorrectionDecayRate:      jiminyCorrectionDecayRate,
-		J17TicketCacheSize:             j17TicketCacheSize,
-		JiminySynthesisTemperature:     jiminySynthesisTemperature,
-		JiminyGuidanceContextMaxChars:  jiminyGuidanceContextMaxChars,
-		JiminyGuidanceOutputMaxChars:   jiminyGuidanceOutputMaxChars,
-		JiminyEvaluateOutputMaxChars:   jiminyEvaluateOutputMaxChars,
-		JiminyEvaluateItemMaxChars:     jiminyEvaluateItemMaxChars,
-		JiminyEscalationEnabled:        jiminyEscalationEnabled,
-		JiminyEscalationWarnAfter:      jiminyEscalationWarnAfter,
-		JiminyEscalationEscalateAfter:  jiminyEscalationEscalateAfter,
-		JiminyEscalationBlockAfter:     jiminyEscalationBlockAfter,
-		JiminyEscalationBlockEnabled:   jiminyEscalationBlockEnabled,
-		JiminyEscalationDecayMinutes:   jiminyEscalationDecayMinutes,
-		JiminyEscalationPersistEnabled: jiminyEscalationPersistEnabled,
-		JiminyStrictStatePath:          jiminyStrictStatePath,
-		JiminyCodeRegenEnabled:         jiminyCodeRegenEnabled,
-		JiminyCodeRegenThreshold:       jiminyCodeRegenThreshold,
-		JiminyCodeRegenMinSamples:      jiminyCodeRegenMinSamples,
+		JiminyDedupSimilarityThreshold:  jiminyDedupSimilarityThreshold,
+		JiminyCorrectionDecayRate:       jiminyCorrectionDecayRate,
+		J17TicketCacheSize:              j17TicketCacheSize,
+		JiminySynthesisTemperature:      jiminySynthesisTemperature,
+		JiminyGuidanceContextMaxChars:   jiminyGuidanceContextMaxChars,
+		JiminyGuidanceOutputMaxChars:    jiminyGuidanceOutputMaxChars,
+		JiminyEvaluateOutputMaxChars:    jiminyEvaluateOutputMaxChars,
+		JiminyEvaluateItemMaxChars:      jiminyEvaluateItemMaxChars,
+		JiminyEscalationEnabled:         jiminyEscalationEnabled,
+		JiminyEscalationWarnAfter:       jiminyEscalationWarnAfter,
+		JiminyEscalationEscalateAfter:   jiminyEscalationEscalateAfter,
+		JiminyEscalationBlockAfter:      jiminyEscalationBlockAfter,
+		JiminyEscalationBlockEnabled:    jiminyEscalationBlockEnabled,
+		JiminyEscalationDecayMinutes:    jiminyEscalationDecayMinutes,
+		JiminyEscalationPersistEnabled:  jiminyEscalationPersistEnabled,
+		JiminyStrictStatePath:           jiminyStrictStatePath,
+		JiminyCodeRegenEnabled:          jiminyCodeRegenEnabled,
+		JiminyCodeRegenThreshold:        jiminyCodeRegenThreshold,
+		JiminyCodeRegenMinSamples:       jiminyCodeRegenMinSamples,
 
 		// J17: AI-to-AI Communication Protocol
 		J17Enabled:                     j17Enabled,
@@ -5499,6 +5524,9 @@ func FromEnv() (Config, error) {
 		J17TrustDecayPerContradict:     j17TrustDecayPerContradict,
 		J17TrustHighThreshold:          j17TrustHighThreshold,
 		J17TrustLowThreshold:           j17TrustLowThreshold,
+		J17TierGateMode:                j17TierGateMode,
+		J17TierComprehensionHigh:       j17TierComprehensionHigh,
+		J17TierComprehensionMinSamples: j17TierComprehensionMinSamples,
 		J17TrustTTLHours:               j17TrustTTLHours,
 		J17TrustMinFeedbackCount:       j17TrustMinFeedbackCount,
 		J17TrustMode:                   j17TrustMode,
@@ -5686,33 +5714,33 @@ func FromEnv() (Config, error) {
 		RetrievalAuditEnabled:           retrievalAuditEnabled,
 
 		// EVENTGRAPH-001 — TSDB reinforcement_events + federation API
-		GuidanceCorpusEnabled:                guidanceCorpusEnabled,
+		GuidanceCorpusEnabled:                          guidanceCorpusEnabled,
 		JiminyContradictedBridgeEnabled:                jiminyContradictedBridgeEnabled,
 		JiminyContradictedBridgeWriterFlushIntervalSec: jiminyContradictedBridgeWriterFlushIntervalSec,
 		JiminyContradictedBridgeWriterBufferSize:       jiminyContradictedBridgeWriterBufferSize,
 		JiminyContradictedBridgeMaxContentLen:          jiminyContradictedBridgeMaxContentLen,
-		GuidanceCorpusWriterFlushIntervalSec: guidanceCorpusWriterFlushIntervalSec,
-		GuidanceCorpusWriterBufferSize:       guidanceCorpusWriterBufferSize,
-		GuidanceCorpusMaxContentBytes:        guidanceCorpusMaxContentBytes,
-		GuidanceCorpusSourceLookupTimeoutMs:  guidanceCorpusSourceLookupTimeoutMs,
-		GuidanceAuditEnabled:                 guidanceAuditEnabled,
-		GuidanceAuditIntervalHours:           guidanceAuditIntervalHours,
-		GuidanceAuditSampleSize:              guidanceAuditSampleSize,
-		GuidanceAuditInitialDelaySec:         guidanceAuditInitialDelaySec,
-		GuidanceShouldFollowRateFloor:        guidanceShouldFollowRateFloor,
-		GuidanceShouldFollowLookbackHours:    guidanceShouldFollowLookbackHours,
-		ReviewEnabled:                        reviewEnabled,
-		ReviewWriterFlushIntervalSec:         reviewWriterFlushIntervalSec,
-		ReviewWriterBufferSize:               reviewWriterBufferSize,
-		ReviewRubricVersion:                  reviewRubricVersion,
-		ReviewSampleSize:                     reviewSampleSize,
-		ReviewActiveUncertaintyBand:          reviewActiveUncertaintyBand,
-		ReviewSampleSeed:                     reviewSampleSeed,
-		ReviewReinforceDefault:               reviewReinforceDefault,
-		ReviewGuidanceSinkEnabled:            reviewGuidanceSinkEnabled,
-		ReviewLLMDatasetsEnabled:             reviewLLMDatasetsEnabled,
-		ReviewContradictedDatasetEnabled:     reviewContradictedDatasetEnabled,
-		ReviewGuidanceConfidenceNudge:        reviewGuidanceConfidenceNudge,
+		GuidanceCorpusWriterFlushIntervalSec:           guidanceCorpusWriterFlushIntervalSec,
+		GuidanceCorpusWriterBufferSize:                 guidanceCorpusWriterBufferSize,
+		GuidanceCorpusMaxContentBytes:                  guidanceCorpusMaxContentBytes,
+		GuidanceCorpusSourceLookupTimeoutMs:            guidanceCorpusSourceLookupTimeoutMs,
+		GuidanceAuditEnabled:                           guidanceAuditEnabled,
+		GuidanceAuditIntervalHours:                     guidanceAuditIntervalHours,
+		GuidanceAuditSampleSize:                        guidanceAuditSampleSize,
+		GuidanceAuditInitialDelaySec:                   guidanceAuditInitialDelaySec,
+		GuidanceShouldFollowRateFloor:                  guidanceShouldFollowRateFloor,
+		GuidanceShouldFollowLookbackHours:              guidanceShouldFollowLookbackHours,
+		ReviewEnabled:                                  reviewEnabled,
+		ReviewWriterFlushIntervalSec:                   reviewWriterFlushIntervalSec,
+		ReviewWriterBufferSize:                         reviewWriterBufferSize,
+		ReviewRubricVersion:                            reviewRubricVersion,
+		ReviewSampleSize:                               reviewSampleSize,
+		ReviewActiveUncertaintyBand:                    reviewActiveUncertaintyBand,
+		ReviewSampleSeed:                               reviewSampleSeed,
+		ReviewReinforceDefault:                         reviewReinforceDefault,
+		ReviewGuidanceSinkEnabled:                      reviewGuidanceSinkEnabled,
+		ReviewLLMDatasetsEnabled:                       reviewLLMDatasetsEnabled,
+		ReviewContradictedDatasetEnabled:               reviewContradictedDatasetEnabled,
+		ReviewGuidanceConfidenceNudge:                  reviewGuidanceConfidenceNudge,
 
 		EventGraphEnabled:                        eventGraphEnabled,
 		EventGraphWriterFlushIntervalSec:         eventGraphWriterFlushIntervalSec,
