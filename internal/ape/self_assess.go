@@ -226,6 +226,10 @@ func (a *Assessor) Assess(ctx context.Context, spaceID string, tier CycleTier) (
 		}
 		if retQual, dErr := a.datasetProvider.RetrievalQuality(ctx, spaceID, window); dErr == nil {
 			report.RetrievalDataset = retQual
+			// SCORE-RETRIEVAL-REAL-SIGNALS-001: section 5 scored the dimension
+			// BEFORE this fetch (live-smoke-caught ordering bug) — recompute now
+			// that the real signal is present so the primary path actually fires.
+			report.RetrievalQuality, report.RetrievalConfidence = a.scoreRetrieval(report)
 		} else {
 			slog.Warn("RSIC assess: retrieval quality query failed", "error", dErr)
 		}
