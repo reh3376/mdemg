@@ -56,7 +56,7 @@ FT-BENCH-REFRESH-001 E2 ran the benchmark against the current GGUF endpoint on `
 
 ```bash
 cd /Users/reh3376/mdemg
-python -m neural.benchmarks.run_benchmark \
+neural/.venv/bin/python -m neural.benchmarks.run_benchmark \
   --config configs/benchmark_phase10.yaml \
   --mlx-base-url http://127.0.0.1:8102/v1 \
   --mlx-model-name mdemg-llm-v1.Q5_K_M.gguf \
@@ -64,9 +64,11 @@ python -m neural.benchmarks.run_benchmark \
   --rows-per-spec 5 \
   --n-runs 1 \
   --mlx-timeout-s 300 \
-  --persist-tsdb \
+  --apply-tsdb \
   --out training_data/eval/benchmark_$(date +%s).json
 ```
+
+`--apply-tsdb` (BENCH-SIDECAR-APPLY-001) writes the SQL sidecar (audit artifact) AND applies it directly — no manual `psql < sidecar.sql` step. Apply failure is non-fatal: the sidecar remains the recovery path. Requires psycopg (pinned in `neural/pyproject.toml` [training]; use `neural/.venv/bin/python`). The older `--persist-tsdb` (sidecar-only) still works.
 
 Adjust `--rows-per-spec` / `--n-runs` per how thorough you want the refresh; larger values increase wall time proportionally. Once the run completes, the Latest Benchmark Age panel drops to <1d, the alert rule reads back below threshold, and the Per-Task Pass Rate panel displays the fresh data.
 
