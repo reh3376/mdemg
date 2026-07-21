@@ -474,6 +474,10 @@ Endpoints:
 
 ---
 
+## Documentation Governance (DOC-CURRENCY-002 — 2026-07-21)
+
+A 181-finding repo-wide doc audit (5 read-only agents) + consolidated fix sprint brought all living docs current. ⚠️ **Docs must name only env vars the code actually reads** — the recurring class was fabricated/renamed variables that silently no-op when set (CMS.md documented a whole `CMS_*`/`STABILITY_*` block that never existed; cli-reference had 8 fabricated rows; even a code comment pointed at nonexistent `SIDECAR_HOST` — real: `NEURAL_HOST` via pydantic `env_prefix`). Tripwire: `scripts/verify_doc_env_vars.py` (advisory CI step; `--strict` locally) checks every UPPER_SNAKE token in living docs (CLAUDE.md, CMS.md, README, docs/features, docs/user) against the code corpus; legitimate prose goes in `scripts/doc_env_vars_allowlist.txt` WITH a comment. It caught 5 real drifts during its own build sprint, two in freshly-written text — run it after writing any doc that names config. ⚠️ **When a doc names a variable, copy the name from `internal/config/config.go`, never from another doc or memory** (the WATCHDOG-prefixed RSIC thresholds and the CONTEXT-vs-CTX strict threshold both propagated doc→doc for months). Fix-agent contract that worked: re-verify each finding against code BEFORE editing — 4 of 181 findings were themselves wrong and were skipped with code citations, not applied. Sprint: `docs/development/doc-currency-002/`.
+
 ## Enforced Protocols (Hook-Backed)
 
 Hooks in `.claude/hooks/` run automatically — they are not optional.

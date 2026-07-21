@@ -76,3 +76,4 @@ SYNERGY_OVERLAP_THRESHOLD  # synergy-optimization.md: deliberate negative mentio
 SYNERGY_MAX_HOOK_TOKENS    # same
 SYNERGY_CRON_INTERVAL      # same
 SYNERGY_CRON_ENABLED       # same
+SIDECAR_HOST            # CLAUDE.md governance note: deliberate negative mention (the fixed code-comment bug; real: NEURAL_HOST)
