@@ -142,7 +142,8 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext, consultant Co
 		slog.Info("jiminy: semantic outcome classifier enabled",
 			"high_threshold", cfg.JiminyOutcomeSimilarityHigh, "low_threshold", cfg.JiminyOutcomeSimilarityLow,
 			"not_applicable_threshold", cfg.JiminyOutcomeNotApplicableSim,
-			"llm_enabled", cfg.JiminyOutcomeLLMEnabled, "cache_size", cfg.JiminyOutcomeCacheSize)
+			"llm_enabled", cfg.JiminyOutcomeLLMEnabled, "cache_size", cfg.JiminyOutcomeCacheSize,
+			"nonviolation_credit", cfg.JiminyNonViolationCreditEnabled)
 	}
 
 	// J12: Initialize escalation tracker if enabled
