@@ -171,6 +171,7 @@ func allRules() []AlertRule {
 	rules = append(rules, ScorerDriftRules(0, 0, 0, 0, 0)...)
 	rules = append(rules, EmergenceCycleRules(0, 0)...)
 	rules = append(rules, Neo4jCPURule(0))
+	rules = append(rules, FTBenchmarkStalenessRule(0))
 	return rules
 }
 
@@ -223,6 +224,40 @@ func TestNeo4jCPURule(t *testing.T) {
 	}
 	if got := Neo4jCPURule(750); got.Threshold != 750 {
 		t.Errorf("custom threshold not honored, got %v", got.Threshold)
+	}
+}
+
+// FT-BENCH-REFRESH-001: staleness rule reads benchmark_runs directly,
+// COALESCE'd (999 when zero rows), Service "ft-benchmark" (distinct
+// per NOSILENT-001 cooldown-key contract). Default 7d fallback on ≤0.
+func TestFTBenchmarkStalenessRule(t *testing.T) {
+	def := FTBenchmarkStalenessRule(0)
+	if def.Threshold != 7 {
+		t.Errorf("zero/neg → default 7d, got %v", def.Threshold)
+	}
+	if def.ID != "ft_benchmark_stale" {
+		t.Errorf("ID = %q, want ft_benchmark_stale", def.ID)
+	}
+	if def.Service != "ft-benchmark" {
+		t.Errorf("Service = %q, want ft-benchmark (distinct cooldown key per NOSILENT-001)", def.Service)
+	}
+	if def.Severity != SeverityHigh {
+		t.Errorf("Severity = %v, want HIGH", def.Severity)
+	}
+	if !strings.Contains(def.QuerySQL, "COALESCE") {
+		t.Errorf("query must be COALESCE'd (idle-safe), got: %s", def.QuerySQL)
+	}
+	if !strings.Contains(def.QuerySQL, "MAX(completed_at)") {
+		t.Errorf("query must aggregate MAX(completed_at), got: %s", def.QuerySQL)
+	}
+	if strings.Contains(def.QuerySQL, "LIMIT 1") {
+		t.Errorf("query must NOT use LIMIT 1 (TSDB-CONSUME-001), got: %s", def.QuerySQL)
+	}
+	if got := FTBenchmarkStalenessRule(30); got.Threshold != 30 {
+		t.Errorf("custom threshold not honored, got %v", got.Threshold)
+	}
+	if def.Operator != "gt" {
+		t.Errorf("Operator = %q, want gt (fires when age exceeds threshold)", def.Operator)
 	}
 }
 
