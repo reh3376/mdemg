@@ -1517,6 +1517,89 @@ func TestConsecutiveFailure_ResetsOnSuccess(t *testing.T) {
 	}
 }
 
+// LLM-HEALTH-CANCELLATION-ALERT-001: caller cancellations are neutral — they
+// never trip the consecutive-failure alert regardless of count.
+func TestConsecutiveFailure_CallerCancellationNeutral(t *testing.T) {
+	origCB := defaultAlertCallback
+	origThreshold := defaultFailureThreshold
+	defer func() {
+		defaultAlertCallback = origCB
+		defaultFailureThreshold = origThreshold
+	}()
+
+	var alertCount atomic.Int32
+	defaultAlertCallback = func(_ string, _ int, _ error) {
+		alertCount.Add(1)
+	}
+	defaultFailureThreshold = 3
+
+	c := &Client{
+		taskName:            "test-task",
+		consecutiveFailures: new(atomic.Int32),
+		failureThreshold:    3,
+		tripped:             new(atomic.Bool),
+	}
+
+	// Wrapped forms mirror production ("http request: Post ...: context deadline exceeded").
+	canceled := fmt.Errorf("http request: %w", context.Canceled)
+	deadline := fmt.Errorf("http request: %w", context.DeadlineExceeded)
+	for range 3 {
+		c.trackResult(canceled)
+		c.trackResult(deadline)
+	}
+
+	if alertCount.Load() != 0 {
+		t.Errorf("expected 0 alerts from cancellations, got %d", alertCount.Load())
+	}
+	if got := c.consecutiveFailures.Load(); got != 0 {
+		t.Errorf("expected counter unchanged at 0, got %d", got)
+	}
+}
+
+// LLM-HEALTH-CANCELLATION-ALERT-001: a cancellation interleaved in a real
+// failure streak neither resets nor advances it — the alert still fires when
+// real failures alone reach the threshold.
+func TestConsecutiveFailure_CancellationPreservesRealStreak(t *testing.T) {
+	origCB := defaultAlertCallback
+	origThreshold := defaultFailureThreshold
+	defer func() {
+		defaultAlertCallback = origCB
+		defaultFailureThreshold = origThreshold
+	}()
+
+	var mu sync.Mutex
+	var fired []int
+	defaultAlertCallback = func(_ string, count int, _ error) {
+		mu.Lock()
+		fired = append(fired, count)
+		mu.Unlock()
+	}
+	defaultFailureThreshold = 3
+
+	c := &Client{
+		taskName:            "test-task",
+		consecutiveFailures: new(atomic.Int32),
+		failureThreshold:    3,
+		tripped:             new(atomic.Bool),
+	}
+
+	real := fmt.Errorf("connection refused")
+	c.trackResult(real)                                                  // 1
+	c.trackResult(fmt.Errorf("http request: %w", context.Canceled))      // neutral
+	c.trackResult(real)                                                  // 2
+	c.trackResult(fmt.Errorf("http request: %w", context.DeadlineExceeded)) // neutral
+	c.trackResult(real)                                                  // 3 — fires
+
+	mu.Lock()
+	defer mu.Unlock()
+	if len(fired) != 1 {
+		t.Fatalf("expected exactly 1 alert, got %d", len(fired))
+	}
+	if fired[0] != 3 {
+		t.Errorf("expected count=3, got %d", fired[0])
+	}
+}
+
 func TestConsecutiveFailure_NoFireBelowThreshold(t *testing.T) {
 	origCB := defaultAlertCallback
 	origThreshold := defaultFailureThreshold
