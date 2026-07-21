@@ -141,7 +141,37 @@ A follow-up to ALERT-TRUTH-001, fixing 6 measurement artifacts that made healthy
 - **J17 "Min/Avg/Max/Count Trust"** count only *significant live* sessions — within the TTL of last update AND ≥ `J17_TRUST_MIN_FEEDBACK_COUNT` (default 5) feedback events. Stale test sessions expire (TTL cleanup now actually runs; hydration preserves `last_feed_at` provenance).
 - **Jiminy "Outcome Distribution" / "Outcome Trends"** read *windowed* `constraint_outcomes` counts, NOT the lifetime-cumulative multi-credit gauges (which credit a guidance_id as followed if ANY edge followed → inflated ~3× vs the honest follow rate). **"Should-Follow Follow Rate"** excludes `not_applicable` from the denominator. **"Guidance Items With Recorded Outcomes"** (formerly "Total Guidance Issued") counts distinct guidance_ids with ≥1 outcome edge, all-time — not issuance volume.
 
-New config knobs: `J17_NLI_CALIBRATION_MIN_SAMPLES` (50), `J17_COMPRESSION_TARGET_RATIO` (3.0, >1.0), `J17_TRUST_MIN_FEEDBACK_COUNT` (5). Sprint: `docs/development/dashboard-truth-001/`.
+New config knobs: `J17_NLI_CALIBRATION_MIN_SAMPLES` (50), `J17_COMPRESSION_TARGET_RATIO` (3.0, >1.0 — recalibrated to 2.0 by DASHBOARD-TRUTH-002), `J17_TRUST_MIN_FEEDBACK_COUNT` (5). Sprint: `docs/development/dashboard-truth-001/`.
+
+## DASHBOARD-TRUTH-002 (2026-07-20) — second wave
+
+9 additional artifacts closed across the same 5 dashboards. Same forensic family: wrong-anchor thresholds, missing no-data gates, hardcoded values inappropriate for mature substrates, gauge-vs-transition-log mixups.
+
+**RSIC scoring formula fixes** (`internal/ape/self_assess.go`):
+- `scoreRetrieval`: `saturated=0.7` → `saturated=0.9` (was penalising graph maturity relative to `warm=0.9`).
+- `scoreEdge`: hardcoded 0.5 entropy floor → new `RSIC_EDGE_ENTROPY_FLOOR` config (default 0.2, live-calibrated below observed healthy value 0.27; set to 0 to disable). A mature Hebbian substrate has long-tail evidence-count distribution → entropy is naturally low, was permanently -0.2'd.
+- `scoreProtocol`: applies the DH-004 "no data = neutral" gate to `restoreScore` when `TicketRestoreTotal=0`. `J17_COMPRESSION_TARGET_RATIO` default recalibrated 3.0 → 2.0 (30d live p95).
+
+**Grafana panel-shape fixes**:
+- Retrieval Pipeline Health (`mdemg-rsic.json`): `gauge`/`lastNotNull` on a 3-row UNION was silently showing only the last row (rerank); converted to `bargauge` horizontal.
+- Cycle Admission Ratio companion (`mdemg-rsic.json`): new stat panel `cycles/(cycles+rejections)` — normalises the raw Trigger Rejection Rate for operators (RSIC-STORM-001 designs aggressive rejection).
+- Min/Max Trust Score (`mdemg-j17.json`): SQL now gates on `trust_session_count>=2` via CTE → renders "N/A" when N=1 (a distributional stat over a set of one is degenerate).
+- Constraint Effectiveness (`mdemg-jiminy.json`): All-Time and Selected Range unified to `constraint_outcomes` with `classifier_source IN ('llm','tier1','explicit')` filter — was reading Neo4j cumulative (pre-fix half-credit inflated) vs TSDB windowed with different thresholds.
+- LLM endpoint state (`mdemg-ft-training.json`): read `mdemg_mlx_health_state` continuous gauge from `metric_samples` (was reading the transition-log table which is empty during steady-state UP).
+- Recent watchdog events (`mdemg-ft-training.json`): drop `$__timeFilter` (rare-event stream — most recent event may be >30d ago).
+
+**Regression pin (`neural/training/tests/test_reward_functions.py::test_compute_reward_output_keys_are_exactly_spec`)** — asserts the benchmark writer never persists reward-vector keys outside the spec's declared set. Catches the class of drift that led to the historical `hidden.reclassify=0.500` display artifact.
+
+**Architectural rules pinned**:
+1. RSIC dimension scoring functions must read real signals, NOT enum-lookups of maturity/phase.
+2. Shannon entropy over edge weights needs a config-tunable floor (mature graphs are low-p by design).
+3. Any success-rate metric with a "no data" case must gate to neutral 1.0 when the denominator is 0 — the DH-004 pattern generalises.
+4. Multi-row gauge panels must NOT use `lastNotNull` — use bargauge or split into stat panels.
+5. Aggregate stats (min/max) computed over a live set must gate visibility on a set-size floor.
+6. Writers must NOT persist reward-vector keys the spec doesn't declare.
+7. Panels reading "state" must use the continuous gauge, NOT the transition-log.
+
+New config knob: `RSIC_EDGE_ENTROPY_FLOOR` (default 0.2). Recalibrated: `J17_COMPRESSION_TARGET_RATIO` default 3.0 → 2.0. Sprint: `docs/development/dashboard-truth-002/`.
 
 ## Filter contract: LLM error-rate panels (GRAFANA-PANEL-FILTER-001, 2026-07-20)
 

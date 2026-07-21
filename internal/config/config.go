@@ -1129,6 +1129,8 @@ type Config struct {
 	RSICHealthWeightProtocol  float64 // RSIC_HEALTH_WEIGHT_PROTOCOL  — overall-health weight for ProtocolHealth (default: 0.20)
 	RSICHealthWeightSynergy   float64 // RSIC_HEALTH_WEIGHT_SYNERGY   — overall-health weight for SynergyHealth (default: 0.05)
 
+	RSICEdgeEntropyFloor float64 // RSIC_EDGE_ENTROPY_FLOOR — Shannon-entropy floor below which the Edge dimension applies a -0.2 penalty. The entropy is binary over CO_ACTIVATED_WITH edges' evidence_count>=5 (strong vs weak) — a mature Hebbian substrate accumulates many single-touch co-activations that never re-trigger, so p is naturally small and entropy is naturally low. Old hardcoded 0.5 fired forever on any healthy live graph (live mdemg-dev: entropy=0.27, penalty=-0.2, dimension pinned at 0.80). Default 0.2 is calibrated below the observed healthy value; set to 0 to disable the penalty entirely (DASHBOARD-TRUTH-002 E2)
+
 	// Synergy Recovery Buffer: store-and-forward during Jiminy outages
 	SynergyRecoveryBufferSpace string // SYNERGY_RECOVERY_BUFFER_SPACE — CMS space for buffered observations (default: "synergy-buffer")
 	SynergyRecoveryBufferPath  string // SYNERGY_RECOVERY_BUFFER_PATH — local JSONL fallback path (default: ".mdemg/synergy-recovery-buffer.jsonl")
@@ -3082,14 +3084,35 @@ func FromEnv() (Config, error) {
 	// compression sub-score (score 1.0 at target, 0.0 at ratio 1.0, linear
 	// between). Must be > 1.0 — a target at or below 1.0 (no compression)
 	// makes the sub-score degenerate.
-	j17CompressionTargetRatio, err := atof("J17_COMPRESSION_TARGET_RATIO", 3.0)
+	//
+	// DASHBOARD-TRUTH-002 E3 (2026-07-20): default recalibrated 3.0→2.0.
+	// The DASHBOARD-TRUTH-001 pick of 3.0 was defensively-excellent but
+	// above the observed 30d live p95 of 2.0 — the sub-score was hitting
+	// ~0.435 on realistic compression. The new 2.0 default matches the
+	// achievable ceiling; operators may raise it to demand more
+	// compression once the T1 tier is reachable (currently 0% live —
+	// blocked by trust EMA per DASHBOARD-TRUTH-002 triage §J17).
+	j17CompressionTargetRatio, err := atof("J17_COMPRESSION_TARGET_RATIO", 2.0)
 	if err != nil {
 		return Config{}, err
 	}
 	if j17CompressionTargetRatio <= 1.0 {
 		slog.Warn("J17_COMPRESSION_TARGET_RATIO must be > 1.0, falling back to default",
-			"requested", j17CompressionTargetRatio, "default", 3.0)
-		j17CompressionTargetRatio = 3.0
+			"requested", j17CompressionTargetRatio, "default", 2.0)
+		j17CompressionTargetRatio = 2.0
+	}
+
+	// DASHBOARD-TRUTH-002 E2: entropy floor for the RSIC Edge dimension.
+	// Live-calibrated at 0.2 (below the observed healthy mdemg-dev value
+	// 0.27). Set to 0 to disable the penalty entirely.
+	rsicEdgeEntropyFloor, err := atof("RSIC_EDGE_ENTROPY_FLOOR", 0.2)
+	if err != nil {
+		return Config{}, err
+	}
+	if rsicEdgeEntropyFloor < 0 {
+		slog.Warn("RSIC_EDGE_ENTROPY_FLOOR must be >= 0, falling back to default",
+			"requested", rsicEdgeEntropyFloor, "default", 0.2)
+		rsicEdgeEntropyFloor = 0.2
 	}
 
 	// Startup validation: active mode requires sidecar URL
@@ -5919,6 +5942,8 @@ func FromEnv() (Config, error) {
 		RSICHealthWeightGuidance:  rsicHealthWeightGuidance,
 		RSICHealthWeightProtocol:  rsicHealthWeightProtocol,
 		RSICHealthWeightSynergy:   rsicHealthWeightSynergy,
+
+		RSICEdgeEntropyFloor: rsicEdgeEntropyFloor,
 
 		// TimescaleDB
 		TSDBEnabled:               tsdbEnabled,

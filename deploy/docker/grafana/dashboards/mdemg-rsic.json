@@ -1643,8 +1643,9 @@
       }
     },
     {
-      "title": "Retrieval Pipeline Health",
-      "type": "gauge",
+      "title": "Retrieval Pipeline Health (per stage)",
+      "description": "Per-stage fill rate for retrieval: recall (vector), bm25 (sparse), rerank (LLM/neural). DASHBOARD-TRUTH-002 E4 (2026-07-20): converted gauge→bargauge so all 3 stages are visible; the old gauge+lastNotNull silently displayed only the LAST row of the UNION (rerank), hiding recall/bm25. Rerank <100%25 is EXPECTED when the LLM-HEALTH-INVESTIGATION-001 E2 pre-check fires (RerankMinBudgetMs) — fails-open, not a defect.",
+      "type": "bargauge",
       "gridPos": {
         "h": 8,
         "w": 12,
@@ -1679,12 +1680,52 @@
         }
       },
       "options": {
-        "reduceOptions": {
-          "calcs": ["lastNotNull"]
-        },
         "orientation": "horizontal",
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "/^rate_pct$/",
+          "values": true
+        }
+      }
+    },
+    {
+      "title": "Cycle Admission Ratio",
+      "description": "Ratio of admitted RSIC cycles to total triggers (admits / (admits + rejections)). DASHBOARD-TRUTH-002 E5 (2026-07-20): companion to Trigger Rejection Rate — the raw rate reads scary in isolation (~6-11/min), but RSIC-STORM-001 admission-time reservation is DESIGNED to reject aggressively (~40 rejections per admission is on-spec). This ratio normalises the signal so operators can distinguish 'aggressive rejection working as designed' from 'admission pipeline broken'.",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 96 },
+      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "-- DASHBOARD-TRUTH-002 E5: admits / (admits + rejections) over the panel time window.\nWITH admits AS (\n  SELECT COALESCE(SUM(value), 0)::float AS n FROM metric_samples\n  WHERE metric_name = 'mdemg_rsic_cycle_total'\n    AND metric_type = 'counter'\n    AND labels->>'outcome' = 'started'\n    AND space_id = '$space_id'\n    AND $__timeFilter(time)\n), rej AS (\n  SELECT COALESCE(SUM(value), 0)::float AS n FROM metric_samples\n  WHERE metric_name = 'mdemg_rsic_trigger_rejected_total'\n    AND metric_type = 'counter'\n    AND space_id = '$space_id'\n    AND $__timeFilter(time)\n)\nSELECT COALESCE(admits.n / NULLIF(admits.n + rej.n, 0), 0) AS admission_ratio FROM admits, rej",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "decimals": 3,
+          "noValue": "N/A",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "orange", "value": 0.02 },
+              { "color": "green", "value": 0.10 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value_and_name"
       }
     },
     {

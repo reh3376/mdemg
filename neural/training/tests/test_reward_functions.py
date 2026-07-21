@@ -505,3 +505,34 @@ class TestRegistry:
     def test_compute_unknown_reward(self):
         scores = compute_reward("test", ["nonexistent"])
         assert scores["nonexistent"] == 0.0
+
+    def test_compute_reward_output_keys_are_exactly_spec(self):
+        """DASHBOARD-TRUTH-002 E8 regression pin.
+
+        compute_reward MUST NOT return any key not in the input reward_names
+        list. If it ever does, downstream `AVG` over reward_vector jsonb keys
+        in mdemg-ft-training's "Latest Run — Task Scores" panel silently
+        drags the mean by any 0.0-scored vestigial key (the historical
+        hidden.reclassify=0.5 bug: json_valid=1.0 + vestigial
+        classification_accuracy=0.0 averaged to exactly 0.5).
+
+        The writer path is already correct via `spec.reward_functions`
+        filter; this pin catches any future regression that widens the
+        output. See docs/development/dashboard-truth-002/ for context.
+        """
+        # A response that WOULD score positively on any of ["json_valid",
+        # "format_valid", "classification_accuracy"] if they were run —
+        # verifies we only emit the requested subset.
+        response = '{"type": "arch"}'
+        for names in [
+            ["json_valid"],
+            ["json_valid", "format_valid"],
+            ["classification_accuracy"],
+            [],
+        ]:
+            scores = compute_reward(response, names, expected="arch")
+            assert set(scores.keys()) == set(names), (
+                f"reward_vector keys {set(scores.keys())} != spec-declared {set(names)} — "
+                "regression: writer path is emitting vestigial keys "
+                "(DASHBOARD-TRUTH-002 E8)"
+            )

@@ -142,7 +142,7 @@
     },
     {
       "title": "Constraint Eff. (All-Time)",
-      "description": "Volume-weighted effectiveness across constraints with 5+ outcomes (all time). Shows N/A when no constraints meet threshold \u2014 this means insufficient data, not 0% effectiveness.",
+      "description": "Volume-weighted effectiveness across constraints with 5+ outcomes (all time). DASHBOARD-TRUTH-002 E7 (2026-07-20): reads TSDB constraint_outcomes directly (was reading Neo4j gauge which cumulated pre-2026-06-11 heuristic half-credit inflation \u2192 All-Time and Selected Range diverged by up to 0.10 for the same underlying data). Now both panels share source-of-truth AND filter classifier_source IN ('llm','tier1','explicit') to exclude the ~50%25 heuristic-labeled rows. HAVING >= 5 preserves the historical All-Time threshold; Selected Range uses HAVING >= 2 for smaller windows.",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -157,7 +157,7 @@
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_jiminy_constraint_effectiveness' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "rawSql": "-- DASHBOARD-TRUTH-002 E7: unified source-of-truth (was reading pre-fix-inflated Neo4j gauge).\nWITH per_constraint AS (\n  SELECT constraint_id,\n         COUNT(*) AS surfaced,\n         SUM(CASE WHEN outcome_type = 'followed' THEN 1.0 ELSE 0.0 END) AS followed,\n         SUM(CASE WHEN outcome_type = 'partial_compliance' THEN 0.5 ELSE 0.0 END) AS partial_half\n  FROM constraint_outcomes\n  WHERE space_id = '$space_id'\n    AND classifier_source IN ('llm', 'tier1', 'explicit')\n  GROUP BY constraint_id\n  HAVING COUNT(*) >= 5\n)\nSELECT now() AS time,\n       CASE WHEN SUM(surfaced) > 0\n            THEN (SUM(followed) + SUM(partial_half)) / SUM(surfaced)::float\n            ELSE NULL\n       END AS value\nFROM per_constraint",
           "format": "time_series"
         }
       ],
@@ -213,7 +213,7 @@
       "targets": [
         {
           "refId": "A",
-          "rawSql": "WITH per_constraint AS ( SELECT constraint_id, COUNT(*) AS surfaced, SUM(CASE WHEN outcome_type = 'followed' THEN 1.0 ELSE 0.0 END) AS followed, SUM(CASE WHEN outcome_type = 'partial_compliance' THEN 0.5 ELSE 0.0 END) AS partial_half FROM constraint_outcomes WHERE space_id = '$space_id' AND $__timeFilter(time) GROUP BY constraint_id HAVING COUNT(*) >= 2 ) SELECT now() AS time, CASE WHEN SUM(surfaced) > 0 THEN (SUM(followed) + SUM(partial_half)) / SUM(surfaced)::float ELSE NULL END AS value FROM per_constraint",
+          "rawSql": "-- DASHBOARD-TRUTH-002 E7: added classifier_source filter for parity with All-Time panel (excludes pre-2026-06-11 heuristic-dominated rows).\nWITH per_constraint AS (\n  SELECT constraint_id,\n         COUNT(*) AS surfaced,\n         SUM(CASE WHEN outcome_type = 'followed' THEN 1.0 ELSE 0.0 END) AS followed,\n         SUM(CASE WHEN outcome_type = 'partial_compliance' THEN 0.5 ELSE 0.0 END) AS partial_half\n  FROM constraint_outcomes\n  WHERE space_id = '$space_id'\n    AND classifier_source IN ('llm', 'tier1', 'explicit')\n    AND $__timeFilter(time)\n  GROUP BY constraint_id\n  HAVING COUNT(*) >= 2\n)\nSELECT now() AS time,\n       CASE WHEN SUM(surfaced) > 0\n            THEN (SUM(followed) + SUM(partial_half)) / SUM(surfaced)::float\n            ELSE NULL\n       END AS value\nFROM per_constraint",
           "format": "time_series"
         }
       ],

@@ -1003,6 +1003,7 @@
     },
     {
       "title": "Min Trust Score",
+      "description": "Minimum trust across TTL-live sessions clearing J17_TRUST_MIN_FEEDBACK_COUNT. DASHBOARD-TRUTH-002 E6 (2026-07-20): SQL returns NULL (renders 'N/A') when trust_session_count < 2 — a distributional stat over a set of one is meaningless (min == max == avg by construction). See Active Trust Sessions panel for the current N.",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -1016,7 +1017,7 @@
       },
       "targets": [
         {
-          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_j17_min_trust_score' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "rawSql": "-- DASHBOARD-TRUTH-002 E6: gate min/max on N>=2 (single-session set is degenerate).\nWITH latest_n AS (\n  SELECT COALESCE(MAX(value), 0) AS n FROM metric_samples\n  WHERE metric_name = 'mdemg_j17_trust_session_count'\n    AND metric_type = 'gauge'\n    AND space_id = '$space_id'\n    AND $__timeFilter(time)\n)\nSELECT time, CASE WHEN (SELECT n FROM latest_n) >= 2 THEN value ELSE NULL END AS value\nFROM metric_samples\nWHERE metric_name = 'mdemg_j17_min_trust_score' AND metric_type = 'gauge'\n  AND space_id = '$space_id' AND $__timeFilter(time)\nORDER BY time",
           "format": "time_series",
           "refId": "A"
         }
@@ -1054,6 +1055,7 @@
     },
     {
       "title": "Max Trust Score",
+      "description": "Maximum trust across TTL-live sessions clearing J17_TRUST_MIN_FEEDBACK_COUNT. DASHBOARD-TRUTH-002 E6 (2026-07-20): SQL returns NULL (renders 'N/A') when trust_session_count < 2 — a distributional stat over a set of one is meaningless (min == max == avg by construction). See Active Trust Sessions panel for the current N.",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -1067,7 +1069,7 @@
       },
       "targets": [
         {
-          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_j17_max_trust_score' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "rawSql": "-- DASHBOARD-TRUTH-002 E6: gate min/max on N>=2 (single-session set is degenerate).\nWITH latest_n AS (\n  SELECT COALESCE(MAX(value), 0) AS n FROM metric_samples\n  WHERE metric_name = 'mdemg_j17_trust_session_count'\n    AND metric_type = 'gauge'\n    AND space_id = '$space_id'\n    AND $__timeFilter(time)\n)\nSELECT time, CASE WHEN (SELECT n FROM latest_n) >= 2 THEN value ELSE NULL END AS value\nFROM metric_samples\nWHERE metric_name = 'mdemg_j17_max_trust_score' AND metric_type = 'gauge'\n  AND space_id = '$space_id' AND $__timeFilter(time)\nORDER BY time",
           "format": "time_series",
           "refId": "A"
         }
