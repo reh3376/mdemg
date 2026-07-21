@@ -469,6 +469,12 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 					rules = append(rules, alert.Neo4jBackupStalenessRule(neoStaleness))
 				}
 			}
+			// FT-BENCH-REFRESH-001: alert when benchmark_runs is stale.
+			// Nothing schedules the benchmark automatically today; this is
+			// the "operator didn't refresh the model quality signal in N
+			// days" alarm. Reads benchmark_runs directly (not via
+			// scheduled_job_events; the writer is a standalone Python CLI).
+			rules = append(rules, alert.FTBenchmarkStalenessRule(cfg.FTBenchStalenessDays))
 			// HOOKSYNC-001: hook-channel absence detection — sessions active
 			// (post-tool-observe heartbeats) but zero prompt-context fires.
 			if cfg.HookHealthAlertEnabled {

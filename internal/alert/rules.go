@@ -705,6 +705,37 @@ func Neo4jBackupStalenessRule(stalenessHours int) AlertRule {
 		"scheduled-job-staleness-neo4j", "neo4j-backup", stalenessHours)
 }
 
+// FTBenchmarkStalenessRule alerts when the FT `benchmark_runs` table has no
+// completed run in the window (FT-BENCH-REFRESH-001). Reads `benchmark_runs`
+// directly (not via scheduled_job_events) because the benchmark writer is a
+// standalone Python CLI (`neural.benchmarks.run_benchmark --persist-tsdb`)
+// not a Go scheduled job. Nothing schedules the benchmark automatically today
+// (FT-RECURSIVE-002 default-off); this rule ensures operator awareness when
+// the dashboard's "Latest Run" panel starts reading a stale row.
+//
+// Idle-safe SQL: aggregate + COALESCE, no ORDER BY … LIMIT 1
+// (TSDB-CONSUME-001 contract).
+// Distinct Service label (NOSILENT-001 cooldown-key contract).
+func FTBenchmarkStalenessRule(stalenessDays int) AlertRule {
+	if stalenessDays <= 0 {
+		stalenessDays = 7
+	}
+	return AlertRule{
+		ID:          "ft_benchmark_stale",
+		Title:       "FT Benchmark Not Refreshed",
+		Service:     "ft-benchmark",
+		Severity:    SeverityHigh,
+		Interval:    1 * time.Hour,
+		ForDuration: 0,
+		QuerySQL: `SELECT COALESCE(EXTRACT(EPOCH FROM (now() - MAX(completed_at))) / 86400.0, 999.0) AS age_days
+			FROM benchmark_runs
+			WHERE completed_at IS NOT NULL`,
+		Threshold: float64(stalenessDays),
+		Operator:  "gt",
+		Enabled:   true,
+	}
+}
+
 // HookHealthRules returns the HOOKSYNC-001 hook-channel absence rule. The
 // per-prompt delivery channel (prompt-context) had a months-long silent
 // outage caught only by manual audit; this is the "job never ran" guarantee
