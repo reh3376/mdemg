@@ -29,7 +29,7 @@
       },
       "options": {
         "mode": "html",
-        "content": "## FT Pipeline Dashboard\n\n**Live sections:** LLM interaction collection (V0002), Phase 10 benchmark history (V0012 `benchmark_runs`/`benchmark_results`), LLM endpoint health (V0018, Phase 13.5 watchdog).\n\n**TSDB-CONSUME-001 (2026-06-11):** the Model Version Timeline, Benchmark Scores, Training Cycle History, and Exogenous Ratio panels were **removed** \u2014 they read `ft_model_versions` / `ft_benchmarks` / `ft_training_cycles`, which have **no writer** (0 rows ever). The tables remain: they are the designated sinks for the FT recursive-retraining loop (FT Phases 6/7/9 \u2014 NOT STARTED; trigger: FT-CLASSIFY-002). Restore the panels from git history when that loop ships writers."
+        "content": "## FT Pipeline Dashboard\n\n**Live sections:** LLM interaction collection (V0002), Phase 10 benchmark history (V0012 `benchmark_runs`/`benchmark_results`), LLM endpoint health (V0018, Phase 13.5 watchdog).\n\n**TSDB-CONSUME-001 (2026-06-11):** the Model Version Timeline, Benchmark Scores, Training Cycle History, and Exogenous Ratio panels were **removed** — they read `ft_model_versions` / `ft_benchmarks` / `ft_training_cycles`, which have **no writer** (0 rows ever). The tables remain: they are the designated sinks for the FT recursive-retraining loop (FT Phases 6/7/9 — NOT STARTED; trigger: FT-CLASSIFY-002). Restore the panels from git history when that loop ships writers."
       },
       "fieldConfig": {
         "defaults": {},
@@ -89,8 +89,16 @@
       "title": "Latest Benchmark Age",
       "description": "Days since the most recent benchmark_runs.completed_at. FT-BENCH-REFRESH-001 (2026-07-20): nothing schedules the benchmark automatically today (FT-RECURSIVE-002 default-off), so operators can miss that the 'Latest Run' panel below reads a row from weeks ago. Red at >7 days (matches the default `FT_BENCH_STALENESS_DAYS` config + `ft_benchmark_stale` alert rule).",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 23 },
-      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 23
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
       "targets": [
         {
           "refId": "A",
@@ -106,15 +114,28 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 3 },
-              { "color": "red", "value": 7 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 3
+              },
+              {
+                "color": "red",
+                "value": 7
+              }
             ]
           }
         }
       },
       "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
         "colorMode": "background",
         "graphMode": "none",
         "textMode": "value_and_name"
@@ -122,9 +143,9 @@
     },
     {
       "id": 10,
-      "title": "Phase 10 Benchmark \u2014 Per-Task Pass Rate (latest run)",
+      "title": "Phase 10 Benchmark — Per-Task Pass Rate (latest run)",
       "type": "table",
-      "description": "Reads benchmark_results (V0012). Score = mean of deterministic reward_vector entries across N runs per task, for the most recent run_id. See adjacent 'Latest Benchmark Age' panel for freshness \u2014 FT-BENCH-REFRESH-001 wired a staleness gauge + alert so operators know when this table is drifting stale.",
+      "description": "Reads benchmark_results (V0012). Score = mean of deterministic reward_vector entries across N runs per task, for the most recent run_id. See adjacent 'Latest Benchmark Age' panel for freshness — FT-BENCH-REFRESH-001 wired a staleness gauge + alert so operators know when this table is drifting stale.",
       "gridPos": {
         "h": 9,
         "w": 12,
@@ -186,9 +207,9 @@
     },
     {
       "id": 11,
-      "title": "Phase 10 Benchmark \u2014 Per-Task Reward Variance (stddev)",
+      "title": "Phase 10 Benchmark — Per-Task Reward Variance (stddev)",
       "type": "bargauge",
-      "description": "Reads benchmark_results (V0012). Stddev of the per-run scalar reward across N runs for each task in the most recent benchmark \u2014 Phase 11 GRPO uses this as advantage-normalization denominator.",
+      "description": "Reads benchmark_results (V0012). Stddev of the per-run scalar reward across N runs for each task in the most recent benchmark — Phase 11 GRPO uses this as advantage-normalization denominator.",
       "gridPos": {
         "h": 9,
         "w": 12,
@@ -240,7 +261,7 @@
     },
     {
       "id": 12,
-      "title": "Phase 10 Benchmark \u2014 Stagnation Flag (latest)",
+      "title": "Phase 10 Benchmark — Stagnation Flag (latest)",
       "type": "stat",
       "description": "Reads benchmark_runs.stagnation_flag for the most recent run. Phase 10 informational-only; becomes blocking in Phase 11 once benchmark_runs count >= 3.",
       "gridPos": {
@@ -311,7 +332,7 @@
     },
     {
       "id": 13,
-      "title": "Phase 10 Benchmark \u2014 Aggregate Weighted Score (history)",
+      "title": "Phase 10 Benchmark — Aggregate Weighted Score (history)",
       "type": "timeseries",
       "description": "Reads benchmark_runs.aggregate_weighted_score over time. Group-weighted score (T:0.50 / C:0.35 / J:0.15). Stagnation threshold = |delta| < 0.005 across last 3.",
       "gridPos": {
@@ -348,7 +369,7 @@
     },
     {
       "id": 7,
-      "title": "Entropy Health",
+      "title": "LLM Output Quality (HITL-graded)",
       "type": "gauge",
       "gridPos": {
         "h": 8,
@@ -363,7 +384,7 @@
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT time_bucket('$__interval', time) AS time,\n  AVG(quality) AS value\nFROM llm_interactions\nWHERE quality IS NOT NULL\n  AND space_id = '$space_id'\n  AND $__timeFilter(time)\nGROUP BY 1\nORDER BY 1",
+          "rawSql": "-- HITL grades on llm:* datasets (HITL-REVIEW-001 review_grades)\nSELECT time_bucket('$__interval', time) AS time,\n  AVG(gold_score) AS value\nFROM review_grades\nWHERE dataset_id LIKE 'llm:%'\n  AND $__timeFilter(time)\nGROUP BY 1\nORDER BY 1",
           "format": "time_series"
         }
       ],
@@ -399,9 +420,10 @@
               }
             ]
           },
-          "noValue": "Not yet collected"
+          "noValue": "No HITL grades in window"
         }
-      }
+      },
+      "description": "Average HITL gold_score across llm:* call-site datasets (review_grades, HITL-REVIEW-001). Replaces the writerless 'Entropy Health' panel, which read llm_interactions.quality — a column that was NULL on all 91,468 rows ever ('populated post-hoc by annotation job' — the job was never built; the honest producer is HITL grading). Sparse until review cadence picks up; 'No HITL grades in window' is the truthful empty state."
     },
     {
       "id": 14,
@@ -486,7 +508,7 @@
       "id": 16,
       "type": "stat",
       "title": "State transitions in window",
-      "description": "Count of watchdog state changes (up\u2194degraded\u2194down) in selected time range. Steady state should be 0; transitions indicate endpoint instability.",
+      "description": "Count of watchdog state changes (up↔degraded↔down) in selected time range. Steady state should be 0; transitions indicate endpoint instability.",
       "datasource": {
         "type": "postgres",
         "uid": "timescaledb"
@@ -584,7 +606,7 @@
       "id": 18,
       "type": "table",
       "title": "Recent watchdog events (last 30)",
-      "description": "Forensic view: when did each transition happen, what error triggered it, what was the state machine doing. probe_recovery rows mark down\u2192up healing events; fast_fail_burst rows mark llmclient short-circuit windows. DASHBOARD-TRUTH-002 E10 (2026-07-20): dropped the $__timeFilter \u2014 this is a RARE-event stream (12 lifetime events on mdemg-dev, newest ~15 days ago) so a narrow dashboard time range showed 'No data'. Now always shows the last 30 events regardless of range.",
+      "description": "Forensic view: when did each transition happen, what error triggered it, what was the state machine doing. probe_recovery rows mark down→up healing events; fast_fail_burst rows mark llmclient short-circuit windows. DASHBOARD-TRUTH-002 E10 (2026-07-20): dropped the $__timeFilter — this is a RARE-event stream (12 lifetime events on mdemg-dev, newest ~15 days ago) so a narrow dashboard time range showed 'No data'. Now always shows the last 30 events regardless of range.",
       "datasource": {
         "type": "postgres",
         "uid": "timescaledb"

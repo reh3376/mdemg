@@ -686,7 +686,7 @@
     },
     {
       "title": "Avg Time Between Compactions",
-      "description": "Average interval between auto-compact events. Computed from consecutive mdemg_compact_event_ts epoch timestamps.",
+      "description": "Average interval between Claude auto-compact events (pre-compact hook → compact_event_ts). Computed over DISTINCT event timestamps of the LAST 10 events regardless of dashboard window — compactions are rare (days apart), so a windowed query read 'no value' on any range narrower than ~2 events, and the gauge's repeated flush rows previously inflated COUNT(*) (interval understated). LONGER is BETTER: frequent compaction means context pressure. Fixed 2026-07-21 during the operator's J17 dashboard investigation.",
       "type": "stat",
       "datasource": {
         "type": "postgres",
@@ -699,16 +699,16 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "red",
                 "value": null
               },
               {
                 "color": "yellow",
-                "value": 120
+                "value": 360
               },
               {
-                "color": "red",
-                "value": 360
+                "color": "green",
+                "value": 1440
               }
             ]
           }
@@ -741,7 +741,7 @@
             "uid": "timescaledb"
           },
           "format": "table",
-          "rawSql": "SELECT (MAX(value) - MIN(value)) / NULLIF(COUNT(*) - 1, 0) / 60.0 AS value FROM metric_samples WHERE metric_name = 'mdemg_compact_event_ts' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time)",
+          "rawSql": "-- distinct compact events, last 10 lifetime (rare-event stream; no window filter)\nWITH ev AS (\n  SELECT DISTINCT value FROM metric_samples\n  WHERE metric_name = 'mdemg_compact_event_ts' AND metric_type = 'gauge'\n    AND space_id = '$space_id' AND value > 0\n  ORDER BY value DESC LIMIT 10\n)\nSELECT (MAX(value) - MIN(value)) / NULLIF(COUNT(*) - 1, 0) / 60.0 AS value FROM ev",
           "refId": "A"
         }
       ]
