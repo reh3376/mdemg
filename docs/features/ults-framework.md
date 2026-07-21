@@ -158,7 +158,7 @@ The runner exits `0` if all checks pass, `1` otherwise.
 
 ### Benchmark automation
 
-`quality_metrics` and their `threshold` values are the source of truth for automated scoring thresholds in `docs/benchmarks/`. The benchmark runner derives per-task pass/fail criteria from ULTS specs rather than hardcoding them.
+`quality_metrics` and their `threshold` values are the source of truth for automated scoring thresholds in `docs/architecture/benchmarks/`. The benchmark runner derives per-task pass/fail criteria from ULTS specs rather than hardcoding them.
 
 ### Prompt versioning
 

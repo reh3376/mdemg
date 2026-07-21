@@ -70,3 +70,9 @@ MDEMG_API_KEY          # api-reference: operator-side shell variable holding the
 GUIDANCE_CORPUS_RETRAIN_MIN_GOLD_ROWS  # guidance-training-corpus.md: PROPOSED name for a future retrain-trigger sprint (explicitly "not built here")
 NEURAL_MODEL_DIR       # cli-reference: deliberate negative mention ("there is no NEURAL_MODEL_DIR env var")
 JIMINY_EFFECTIVENESS_ENABLED  # jiminy-effectiveness-tracking.md: deliberate negative mention (never existed; tracking unconditional)
+LLM_PROMPT_CACHE_PATH   # service-resilience.md: deliberate negative mention (never wired; tune on the llama-server command line)
+LLM_PROMPT_CACHE_SIZE_MB  # same negative mention
+SYNERGY_OVERLAP_THRESHOLD  # synergy-optimization.md: deliberate negative mention (never existed)
+SYNERGY_MAX_HOOK_TOKENS    # same
+SYNERGY_CRON_INTERVAL      # same
+SYNERGY_CRON_ENABLED       # same
