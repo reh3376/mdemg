@@ -395,6 +395,16 @@ jobs:
         # at all (allowlist requires a cited in-flight plan).
         run: python3 scripts/verify_config_consumers.py
 
+      - name: Doc env-var drift checker (advisory, soft-fail)
+        # DOC-CURRENCY-002: living docs naming env vars that no code reads
+        # (the CMS.md class — documented for months, silently no-oped when
+        # set). Heuristic linter, NOT a contract test: prose legitimately
+        # contains UPPER_SNAKE tokens, so unknowns route through
+        # scripts/doc_env_vars_allowlist.txt and this step never blocks.
+        # Run `python3 scripts/verify_doc_env_vars.py --strict` locally.
+        continue-on-error: true
+        run: python3 scripts/verify_doc_env_vars.py --strict
+
       - name: Route consumer guard (merge-blocking)
         # DORMANT-CENSUS-001: every registered API route must have an
         # adjudicated inventory entry (consumers + disposition) in
