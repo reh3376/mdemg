@@ -736,7 +736,7 @@
       }
     },
     {
-      "title": "Trigger Rejection Rate",
+      "title": "Trigger Rejection Rate (per min)",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -780,7 +780,8 @@
             ]
           }
         }
-      }
+      },
+      "description": "Rejected RSIC trigger attempts PER MINUTE, bucketed by the dashboard interval. 5-10/min is NORMAL and by design: RSIC-STORM-001 admission-time reservation rejects aggressively (~40 rejections per 1 admitted cycle, dominated by cooldown rejections) to prevent the historical 20-30k cascade cycles/day. See the adjacent Cycle Admission Ratio panel for the normalized health signal — worry about admission ratio collapsing, not about the raw rejection rate."
     },
     {
       "title": "Watchdog Escalation Level",
@@ -1630,16 +1631,29 @@
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "total_calls" },
-            "properties": [{ "id": "unit", "value": "short" }]
+            "matcher": {
+              "id": "byName",
+              "options": "total_calls"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              }
+            ]
           }
         ]
       },
       "options": {
         "orientation": "horizontal",
         "showValue": "auto",
-        "stacking": { "mode": "none" },
-        "legend": { "displayMode": "list", "placement": "bottom" }
+        "stacking": {
+          "mode": "none"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
       }
     },
     {
@@ -1672,9 +1686,18 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "orange", "value": 70 },
-              { "color": "green", "value": 90 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 70
+              },
+              {
+                "color": "green",
+                "value": 90
+              }
             ]
           }
         }
@@ -1685,7 +1708,9 @@
         "showUnfilled": true,
         "valueMode": "color",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "/^rate_pct$/",
           "values": true
         }
@@ -1695,8 +1720,16 @@
       "title": "Cycle Admission Ratio",
       "description": "Ratio of admitted RSIC cycles to total triggers (admits / (admits + rejections)). DASHBOARD-TRUTH-002 E5 (2026-07-20): companion to Trigger Rejection Rate — the raw rate reads scary in isolation (~6-11/min), but RSIC-STORM-001 admission-time reservation is DESIGNED to reject aggressively (~40 rejections per admission is on-spec). This ratio normalises the signal so operators can distinguish 'aggressive rejection working as designed' from 'admission pipeline broken'.",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 96 },
-      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 96
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
       "targets": [
         {
           "refId": "A",
@@ -1714,15 +1747,28 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "orange", "value": 0.02 },
-              { "color": "green", "value": 0.10 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0.02
+              },
+              {
+                "color": "green",
+                "value": 0.1
+              }
             ]
           }
         }
       },
       "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
         "colorMode": "value",
         "graphMode": "none",
         "textMode": "value_and_name"
@@ -1757,9 +1803,14 @@
         "legend": {
           "displayMode": "table",
           "placement": "right",
-          "calcs": ["sum", "lastNotNull"]
+          "calcs": [
+            "sum",
+            "lastNotNull"
+          ]
         },
-        "tooltip": { "mode": "multi" }
+        "tooltip": {
+          "mode": "multi"
+        }
       }
     },
     {
@@ -1793,15 +1844,25 @@
         "legend": {
           "displayMode": "table",
           "placement": "right",
-          "calcs": ["lastNotNull", "mean"]
+          "calcs": [
+            "lastNotNull",
+            "mean"
+          ]
         },
-        "tooltip": { "mode": "multi" }
+        "tooltip": {
+          "mode": "multi"
+        }
       }
     },
     {
       "title": "Dimension Confidence (DH-005)",
       "type": "row",
-      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 200},
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 200
+      },
       "collapsed": false,
       "panels": []
     },
@@ -1809,71 +1870,358 @@
       "title": "Retrieval Confidence",
       "type": "stat",
       "description": "Data-sufficiency confidence for RetrievalQuality. Based on LearningPhase: cold=0.4, learning=0.7, warm/saturated=1.0. DH-005.",
-      "gridPos": {"h": 4, "w": 3, "x": 0, "y": 201},
-      "datasource": {"type": "postgres", "uid": "timescaledb"},
-      "targets": [{"rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_rsic_health_retrieval_confidence' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time", "format": "time_series", "refId": "A"}],
-      "options": {"colorMode": "value", "graphMode": "none"},
-      "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1, "noValue": "N/A", "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 0.4}, {"color": "green", "value": 0.7}]}}}
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 0,
+        "y": 201
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "targets": [
+        {
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_rsic_health_retrieval_confidence' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "noValue": "N/A",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.4
+              },
+              {
+                "color": "green",
+                "value": 0.7
+              }
+            ]
+          }
+        }
+      }
     },
     {
       "title": "Memory Confidence",
       "type": "stat",
       "description": "Data-sufficiency confidence for MemoryHealth. Ramps linearly to 1.0 at 100 nodes. DH-005.",
-      "gridPos": {"h": 4, "w": 3, "x": 3, "y": 201},
-      "datasource": {"type": "postgres", "uid": "timescaledb"},
-      "targets": [{"rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_rsic_health_memory_confidence' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time", "format": "time_series", "refId": "A"}],
-      "options": {"colorMode": "value", "graphMode": "none"},
-      "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1, "noValue": "N/A", "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 0.4}, {"color": "green", "value": 0.7}]}}}
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 3,
+        "y": 201
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "targets": [
+        {
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_rsic_health_memory_confidence' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "noValue": "N/A",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.4
+              },
+              {
+                "color": "green",
+                "value": 0.7
+              }
+            ]
+          }
+        }
+      }
     },
     {
       "title": "Edge Confidence",
       "type": "stat",
       "description": "Data-sufficiency confidence for EdgeHealth. Ramps linearly to 1.0 at 50 edges; 0 when graph has no edges. DH-005.",
-      "gridPos": {"h": 4, "w": 3, "x": 6, "y": 201},
-      "datasource": {"type": "postgres", "uid": "timescaledb"},
-      "targets": [{"rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_rsic_health_edge_confidence' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time", "format": "time_series", "refId": "A"}],
-      "options": {"colorMode": "value", "graphMode": "none"},
-      "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1, "noValue": "N/A", "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 0.4}, {"color": "green", "value": 0.7}]}}}
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 6,
+        "y": 201
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "targets": [
+        {
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_rsic_health_edge_confidence' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "noValue": "N/A",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.4
+              },
+              {
+                "color": "green",
+                "value": 0.7
+              }
+            ]
+          }
+        }
+      }
     },
     {
       "title": "Task Confidence",
       "type": "stat",
       "description": "Data-sufficiency confidence for TaskPerformance. Ramps linearly to 1.0 at 50 observations (volatile + permanent). DH-005.",
-      "gridPos": {"h": 4, "w": 3, "x": 9, "y": 201},
-      "datasource": {"type": "postgres", "uid": "timescaledb"},
-      "targets": [{"rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_rsic_health_task_confidence' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time", "format": "time_series", "refId": "A"}],
-      "options": {"colorMode": "value", "graphMode": "none"},
-      "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1, "noValue": "N/A", "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 0.4}, {"color": "green", "value": 0.7}]}}}
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 9,
+        "y": 201
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "targets": [
+        {
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_rsic_health_task_confidence' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "noValue": "N/A",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.4
+              },
+              {
+                "color": "green",
+                "value": 0.7
+              }
+            ]
+          }
+        }
+      }
     },
     {
       "title": "Guidance Confidence",
       "type": "stat",
       "description": "Data-sufficiency confidence for GuidanceHealth. Ramps linearly to 1.0 at 30 guidance events; 0 when Jiminy has issued none. DH-005.",
-      "gridPos": {"h": 4, "w": 3, "x": 12, "y": 201},
-      "datasource": {"type": "postgres", "uid": "timescaledb"},
-      "targets": [{"rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_rsic_health_guidance_confidence' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time", "format": "time_series", "refId": "A"}],
-      "options": {"colorMode": "value", "graphMode": "none"},
-      "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1, "noValue": "N/A", "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 0.4}, {"color": "green", "value": 0.7}]}}}
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 12,
+        "y": 201
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "targets": [
+        {
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_rsic_health_guidance_confidence' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "noValue": "N/A",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.4
+              },
+              {
+                "color": "green",
+                "value": 0.7
+              }
+            ]
+          }
+        }
+      }
     },
     {
       "title": "Protocol Confidence",
       "type": "stat",
       "description": "Data-sufficiency confidence for ProtocolHealth (J17). Ramps linearly to 1.0 at 30 J17 events; 0 when none recorded. DH-005.",
-      "gridPos": {"h": 4, "w": 3, "x": 15, "y": 201},
-      "datasource": {"type": "postgres", "uid": "timescaledb"},
-      "targets": [{"rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_rsic_health_protocol_confidence' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time", "format": "time_series", "refId": "A"}],
-      "options": {"colorMode": "value", "graphMode": "none"},
-      "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1, "noValue": "N/A", "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 0.4}, {"color": "green", "value": 0.7}]}}}
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 15,
+        "y": 201
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "targets": [
+        {
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_rsic_health_protocol_confidence' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "noValue": "N/A",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.4
+              },
+              {
+                "color": "green",
+                "value": 0.7
+              }
+            ]
+          }
+        }
+      }
     },
     {
       "title": "Synergy Confidence",
       "type": "stat",
       "description": "Data-sufficiency confidence for SynergyHealth. Binary: 1.0 when Jiminy healthy AND files present, 0 otherwise. DH-005.",
-      "gridPos": {"h": 4, "w": 3, "x": 18, "y": 201},
-      "datasource": {"type": "postgres", "uid": "timescaledb"},
-      "targets": [{"rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_rsic_health_synergy_confidence' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time", "format": "time_series", "refId": "A"}],
-      "options": {"colorMode": "value", "graphMode": "none"},
-      "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1, "noValue": "N/A", "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 0.4}, {"color": "green", "value": 0.7}]}}}
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 18,
+        "y": 201
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "targets": [
+        {
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_rsic_health_synergy_confidence' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "noValue": "N/A",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.4
+              },
+              {
+                "color": "green",
+                "value": 0.7
+              }
+            ]
+          }
+        }
+      }
     }
   ],
   "refresh": "30s",
