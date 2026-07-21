@@ -149,8 +149,16 @@ def apply_to_tsdb(report: dict[str, Any], dsn: str | None = None, _connect=None)
     `_connect` is a test seam (defaults to psycopg.connect).
     """
     if _connect is None:
-        import psycopg  # deferred: not a hard dep for JSON-only users
-        _connect = psycopg.connect
+        # Deferred import; not a hard dep for JSON-only users. Prefer psycopg
+        # (v3, the UVTS runner's driver) but fall back to psycopg2 (the
+        # scripts/ convention) — environments in this repo have one or the
+        # other, and the subset of the API used here is identical.
+        try:
+            import psycopg
+            _connect = psycopg.connect
+        except ImportError:
+            import psycopg2
+            _connect = psycopg2.connect
 
     stmts = [render_benchmark_runs_insert(report)]
     stmts.extend(render_benchmark_results_inserts(report))
