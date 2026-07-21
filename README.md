@@ -88,7 +88,7 @@ Once the stack is running, open the built-in browser dashboard:
 http://localhost:${MDEMG_PORT}/ui/
 ```
 
-The dashboard has 10 tabs: Status (health + Grafana links + restart), Memory (layer breakdown + export/import), Learning (Hebbian stats + freeze/prune), Config (editable with Save All), Logs (searchable viewer), RSIC (service controls + trigger), Plugins (lifecycle management), and Features (service status). Links to 7 Grafana dashboards for detailed metrics.
+The dashboard has 11 tabs: Status (health + Grafana links + restart), Memory (layer breakdown + export/import), Learning (Hebbian stats + freeze/prune), Config (editable with Save All), Logs (searchable viewer), RSIC (service controls + trigger), Plugins (lifecycle management), Features (service status), Backup (backup + restore), Training Data (fine-tuning data pipeline), and Review (HITL dataset grading). Links to 8 Grafana dashboards for detailed metrics.
 
 ### Step 3: Ingest Your Codebase
 
@@ -158,8 +158,8 @@ curl -X POST http://localhost:9999/v1/memory/consolidate \
   -H "Content-Type: application/json" -d '{"space_id": "benchmark"}'
 
 # 5. Run benchmark
-# Questions: docs/benchmarks/whk-wms/test_questions_120_agent.json
-# Grader: docs/benchmarks/grader_v4.py
+# Questions: docs/architecture/benchmarks/whk-wms/test_questions_120_agent.json
+# Grader: docs/architecture/benchmarks/grader_v4.py
 ```
 
 **Report output**: `grades_*.json` contains per-question scores with evidence breakdown.
@@ -168,7 +168,7 @@ curl -X POST http://localhost:9999/v1/memory/consolidate \
 
 ```bash
 # Question bank hash (SHA-256)
-shasum -a 256 docs/benchmarks/whk-wms/test_questions_120_agent.json
+shasum -a 256 docs/architecture/benchmarks/whk-wms/test_questions_120_agent.json
 # Expected: 24aa17a215e4e58b8b44c7faef9f14228edb0e6d3f8f657d867b1bfa850f7e9e
 ```
 
@@ -184,7 +184,7 @@ Full reproducibility details for skeptics:
 | **Question Set** | `test_questions_120_agent.json` (120 questions) |
 | **Question Hash** | `sha256:24aa17a2...` |
 | **Answer Key** | `test_questions_120.json` |
-| **Grader** | `grade_answers.py` |
+| **Grader** | `docs/architecture/benchmarks/grader_v4.py` |
 | **Scoring Weights** | Evidence: 0.70 / Concept: 0.15 / Semantic: 0.15 |
 | **Target Codebase** | whk-wms (507K LOC TypeScript) |
 | **Include Patterns** | `**/*.ts`, `**/*.tsx`, `**/*.json` |
@@ -286,7 +286,8 @@ the local MLX LoRA pipeline and are benchmarked on the held-out slice
 candidate that regresses is rejected, which is the gate doing its job. This is
 the offline outer loop of MDEMG's self-improvement, complementing RSIC's
 online micro-corrections; the fully-automated recursive-retraining loop is
-specced but not yet built, so today the loop runs operator-driven, not closed.
+built (`internal/ftloop`) and ships default-off (`FT_LOOP_ENABLED`), so by
+default the loop runs operator-driven.
 
 Feature docs: [`fine-tuning-pipeline.md`](docs/features/fine-tuning-pipeline.md),
 [`neural-training-pipeline.md`](docs/features/neural-training-pipeline.md),
@@ -458,12 +459,12 @@ Requires `AUTH_API_KEYS`. Operator escape hatch when a breaker trips on a transi
 
 MDEMG extracts code symbols during ingestion using the Unified Parser Test Schema (UPTS):
 
-**Supported Languages (27 UPTS-validated, 100% pass rate):**
+**Supported Languages (28 UPTS-validated, 100% pass rate):**
 
 - **Systems**: Go, Rust, C, C++, CUDA
 - **JVM**: Java, Kotlin
 - **.NET**: C#
-- **Scripting**: Python, TypeScript/JavaScript, Lua, Shell
+- **Scripting**: Python, TypeScript/JavaScript, PHP, Lua, Shell
 - **API Schemas**: Protocol Buffers, GraphQL, OpenAPI
 - **Configuration**: YAML, TOML, JSON, INI
 - **Infrastructure**: Terraform/HCL, Dockerfile, Makefile
@@ -499,7 +500,7 @@ curl -X POST http://localhost:9999/v1/conversation/observe \
   }'
 ```
 
-**Observation Types:** `decision`, `correction`, `learning`, `preference`, `error`, `progress`
+**Observation Types:** 15 types including `decision`, `correction`, `learning`, `preference`, `error`, `progress`, `constraint`, `insight`, and `note` (see `internal/conversation/types.go` for the full set)
 
 Observations are surprise-weighted (novel information persists longer) and form themes via consolidation.
 
@@ -523,8 +524,8 @@ Add to `~/.cursor/mcp.json`:
 {
   "mcpServers": {
     "mdemg": {
-      "command": "/path/to/mdemg/bin/mdemg-mcp",
-      "args": [],
+      "command": "mdemg",
+      "args": ["mcp"],
       "env": {
         "MDEMG_ENDPOINT": "http://localhost:9999"
       }
@@ -577,17 +578,17 @@ open http://localhost:3000  # Grafana (admin/admin)
 | Component | Port | Description |
 |-----------|------|-------------|
 | TimescaleDB | 5433 | Metrics storage (time-series SQL) |
-| Grafana | 3000 | Dashboard visualization and alerting |
-| Blackbox Exporter | 9115 | HTTP/TCP health probes |
+| Grafana | 3000 | Dashboard visualization (dashboards only — alerting is server-native) |
 
 ### MDEMG Overview Dashboard
 
-Pre-configured dashboard with 10 panels:
+Pre-configured dashboard with 12 panels:
 
 - Request Rate, P95 Latency, Error Rate, Circuit Breakers
 - Request Latency Distribution (p50/p95/p99)
 - Requests by Status, Cache Hit Ratios
 - Retrieval Latency, Rate Limit Rejections, Embedding Latency
+- Historical Trends row: 90-day Health Trend
 
 ### Metrics Endpoint
 
@@ -682,7 +683,7 @@ See [AGENT_HANDOFF.md](AGENT_HANDOFF.md) for detailed phase specifications.
 - [Architecture](docs/architecture/01_Architecture.md) - System design and components
 - [Graph Schema](docs/architecture/02_Graph_Schema.md) - Neo4j labels and relationships
 - [Retrieval & Scoring](docs/architecture/06_Retrieval_API_and_Scoring.md) - Scoring algorithm details
-- [Benchmarking Guide](docs/benchmarks/BENCHMARK_V4_README.md) - Running and validating benchmarks
+- [Benchmarking Guide](docs/architecture/benchmarks/BENCHMARK_V4_README.md) - Running and validating benchmarks
 - [Backup & Restore Guide](docs/development/NEO4J_BACKUP.md) - Backup configuration and retention
 - [Agent Handoff](AGENT_HANDOFF.md) - Complete development context and phase registry
 
