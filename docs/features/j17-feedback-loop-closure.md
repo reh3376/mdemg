@@ -213,7 +213,7 @@ New constants in `post-tool-observe.py`:
 | `internal/jiminy/service.go` | Modified | `recordCacheHitMetrics()` — records J17 protocol metrics on cache hits (prerequisite fix) |
 | `internal/api/server.go` | Modified | Bootstrap RSIC assessment goroutine (prerequisite fix) |
 | `internal/jiminy/service_cache_metrics_test.go` | New | 10 unit tests for cache hit metrics |
-| `tests/integration/j17_feedback_loop_test.go` | New | 3 integration tests: feedback updates metrics, endpoint returns OK, prometheus has J17 metrics |
+| `tests/integration/j17_feedback_loop_test.go` | New | 3 integration tests: feedback updates metrics, endpoint returns OK, `/v1/metrics/snapshot` has J17 metrics (originally written against the pre-2026-03-28 Prometheus endpoint; migrated to the JSON snapshot) |
 | `tests/integration/j17_metrics_test.go` | Modified | Fixed metric name assertion (`j17_events_total` not `j17_total_events`) |
 
 ## 8. Dependencies

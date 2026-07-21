@@ -71,7 +71,7 @@ This document catalogs which API endpoints have UI representation and which do n
 
 ### Metrics & Analytics (4+ routes)
 - `/v1/metrics`, `/v1/metrics/snapshot`
-- `/v1/prometheus`, `/v1/metrics/trends`
+- `/v1/metrics/trends` (the former `/v1/prometheus` endpoint was retired in the 2026-03-28 Prometheus→TSDB migration — see docs/features/prometheus-observability-monitoring.md)
 
 ### Infrastructure (10+ routes)
 - File watcher: `/v1/filewatcher/start`, `/v1/filewatcher/status`, `/v1/filewatcher/stop`
