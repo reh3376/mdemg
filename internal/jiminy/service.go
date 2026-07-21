@@ -3003,11 +3003,11 @@ func (s *Service) fetchActionableCandidates(ctx context.Context, spaceID string,
 			corrCorrect := getStr("corrCorrect")
 			corrContext := getStr("corrContext")
 			items = append(items, GuidanceItem{
-				Type:                 gType,
-				Priority:             "high",
-				Content:              content,
-				Confidence:           conf,
-				SourceNodes:          []string{nodeID},
+				Type:                gType,
+				Priority:            "high",
+				Content:             content,
+				Confidence:          conf,
+				SourceNodes:         []string{nodeID},
 				CorrectionIncorrect: corrIncorrect,
 				CorrectionCorrect:   corrCorrect,
 				CorrectionContext:   corrContext,

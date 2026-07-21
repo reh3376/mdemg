@@ -220,7 +220,6 @@ func TestGuidanceTypePrefix(t *testing.T) {
 	}
 }
 
-
 // ─── J17-TIER-GATE-001: comprehension-keyed T1 promotion ───
 
 // TestSelectTier_TrustMode_ByteIdenticalDefault pins that the default mode
@@ -263,10 +262,10 @@ func TestSelectTier_ComprehensionMode_TruthTable(t *testing.T) {
 	const lowTrust = 0.23 // the live trust value that blocked T1 for months
 
 	cases := []struct {
-		name    string
-		enc     *ProtocolEncoder
-		item    GuidanceItem
-		want    int
+		name string
+		enc  *ProtocolEncoder
+		item GuidanceItem
+		want int
 	}{
 		{"coded + comprehension above floor → T1 (despite low trust)", mk(0.73, 3592), coded, TierCoded},
 		{"coded + comprehension below floor → T2", mk(0.45, 3592), coded, TierTelegraphic},

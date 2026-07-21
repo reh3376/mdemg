@@ -300,8 +300,8 @@ func TestAggregatesFiltered_SignificanceFloor(t *testing.T) {
 
 	now := time.Now()
 	scorer.RestoreEntry("stale-test", 0.05, now.Add(-2000*time.Hour)) // stale → excluded by TTL
-	scorer.RestoreEntry("one-shot", 0.10, now.Add(-1*time.Hour))     // fresh, insignificant → excluded by floor
-	scorer.RestoreEntry("significant", 0.80, now.Add(-1*time.Hour))  // fresh + significant → included
+	scorer.RestoreEntry("one-shot", 0.10, now.Add(-1*time.Hour))      // fresh, insignificant → excluded by floor
+	scorer.RestoreEntry("significant", 0.80, now.Add(-1*time.Hour))   // fresh + significant → included
 
 	feedback := map[string]int{"stale-test": 20, "one-shot": 1, "significant": 12}
 	minFeed := 5
