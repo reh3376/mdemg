@@ -1185,7 +1185,7 @@ type Config struct {
 	// JIMINY-RELEVANCE-001 Epic 4 — should-follow follow-rate alert.
 	// "Follow rate on guidance that SHOULD have been followed" (actionable
 	// constraint/correction types) — excludes correctly-ignored advisory items.
-	GuidanceShouldFollowRateFloor     float64 // GUIDANCE_SHOULD_FOLLOW_RATE_FLOOR — alert when actionable-compliance rate drops below this (default: 0.15 post JIMINY-ACTIONABILITY-COMPLIANCE-CREDIT-001; was 0.5 pre-JIMINY-ACTIONABILITY-INVERSION-001 verdict; 0 disables the rule)
+	GuidanceShouldFollowRateFloor     float64 // GUIDANCE_SHOULD_FOLLOW_RATE_FLOOR — alert when actionable-compliance rate drops below this (default: 0.05 — must sit BELOW the ~0.10-0.14 by-design steady state so only genuine collapse fires; was 0.5 pre-JIMINY-ACTIONABILITY-INVERSION-001 verdict; 0 disables the rule)
 	GuidanceShouldFollowLookbackHours int     // GUIDANCE_SHOULD_FOLLOW_LOOKBACK_HOURS — window for the should-follow rate (default: 168 = 7d, floor: 1)
 
 	// HITL-REVIEW-001 — general-purpose human-in-the-loop review + live-reinforcement platform.
@@ -3534,16 +3534,19 @@ func FromEnv() (Config, error) {
 		guidanceAuditInitialDelaySec = 0 // 0 = skip the initial run
 	}
 	// JIMINY-ACTIONABILITY-INVERSION-001 verdict: real actionable rate under
-	// Lever C over-surfacing has an expected floor around 10-25% (not >90%);
-	// old default 0.5 caused chronic alerting on honest data. Recalibrated
-	// to 0.15 (still above the baseline 0.10, so a genuine collapse still
-	// fires; but doesn't fire on the by-design steady-state).
-	guidanceShouldFollowRateFloor, err := atof("GUIDANCE_SHOULD_FOLLOW_RATE_FLOOR", 0.15)
+	// Lever C over-surfacing has an expected steady state around 0.10-0.14
+	// (live 168h: 0.1137), rising to ~0.20 once the non-violation-credit flag
+	// is enabled. The alert is `rate < floor`, so the floor must sit BELOW
+	// steady state to fire only on genuine collapse — 0.05 per the fix_spec
+	// recommendation. (An interim 0.15 default shipped briefly in
+	// JIMINY-ACTIONABILITY-COMPLIANCE-CREDIT-001 E6 with inverted reasoning
+	// and would have kept the alert chronically firing; corrected same-day.)
+	guidanceShouldFollowRateFloor, err := atof("GUIDANCE_SHOULD_FOLLOW_RATE_FLOOR", 0.05)
 	if err != nil {
 		return Config{}, err
 	}
 	if guidanceShouldFollowRateFloor < 0 || guidanceShouldFollowRateFloor > 1 {
-		guidanceShouldFollowRateFloor = 0.15 // out-of-range → default
+		guidanceShouldFollowRateFloor = 0.05 // out-of-range → default
 	}
 	guidanceShouldFollowLookbackHours, err := atoi("GUIDANCE_SHOULD_FOLLOW_LOOKBACK_HOURS", 168)
 	if err != nil {
