@@ -197,6 +197,23 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext, consultant Co
 	if cfg.J17Enabled {
 		encoder = NewProtocolEncoder(cfg.J17DefaultTier)
 		encoder.SetTierThresholds(cfg.J17TrustHighThreshold, cfg.J17TrustLowThreshold)
+		// J17-TIER-GATE-001: comprehension-keyed T1 promotion (default mode
+		// "trust" = byte-identical legacy). Provider wired below once
+		// protocolMetrics exists.
+		encoder.SetComprehensionGate(cfg.J17TierGateMode, cfg.J17TierComprehensionHigh,
+			int64(cfg.J17TierComprehensionMinSamples))
+		if protocolMetrics != nil {
+			pm := protocolMetrics
+			encoder.SetComprehensionProvider(func() (float64, int64) {
+				snap := pm.Snapshot()
+				return snap.AvgComprehension, snap.TotalEvents
+			})
+		}
+		slog.Info("j17: tier gate configured",
+			"mode", cfg.J17TierGateMode,
+			"comprehension_high", cfg.J17TierComprehensionHigh,
+			"min_samples", cfg.J17TierComprehensionMinSamples,
+			"provider_wired", protocolMetrics != nil)
 		trustScorer = NewTrustScorer(TrustConfig{
 			Initial:            cfg.J17TrustInitial,
 			BoostPerFollow:     cfg.J17TrustBoostPerFollow,
