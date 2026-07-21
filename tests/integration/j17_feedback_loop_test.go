@@ -290,8 +290,14 @@ func TestJ17_FeedbackEndpointReturnsOK(t *testing.T) {
 	}
 }
 
-// TestJ17_PrometheusHasJ17Metrics verifies that the Prometheus scrape endpoint
-// exposes the two core J17 metrics: j17_total_events and j17_compression_ratio.
+// TestJ17_SnapshotHasJ17Metrics verifies the /v1/metrics/snapshot contract for
+// the core J17 gauges:
+//   - j17_events_total is ALWAYS published (honest at zero).
+//   - j17_compression_ratio is EVENT-DERIVED and gated on TotalEvents > 0
+//     (j17EventGaugesMeaningful, 2026-07-21): a zero-event window must NOT
+//     emit a synthetic 0.0 (the no-data-as-zero artifact class that diluted
+//     the Average Compression panel across restarts). The assertion is
+//     order-robust: presence must MATCH whether protocol events exist.
 func TestJ17_SnapshotHasJ17Metrics(t *testing.T) {
 	RequireServiceReady(t)
 
@@ -316,18 +322,41 @@ func TestJ17_SnapshotHasJ17Metrics(t *testing.T) {
 	body := string(bodyBytes)
 
 	// --- Assert j17_events_total metric name is present ---
-	// The APE live-collector always registers j17_* gauges when RSIC is wired up;
-	// the metric appears in the JSON snapshot with the "mdemg_" project prefix.
+	// The APE live-collector always registers j17_events_total when RSIC is
+	// wired up (it is honest at zero); the metric appears in the JSON snapshot
+	// with the "mdemg_" project prefix.
 	if !strings.Contains(body, "j17_events_total") {
 		t.Errorf("/v1/metrics/snapshot body does not contain 'j17_events_total'; got:\n%s", body)
 	} else {
 		t.Log("j17_events_total metric found in /v1/metrics/snapshot output")
 	}
 
-	// --- Assert j17_compression_ratio metric name is present ---
-	if !strings.Contains(body, "j17_compression_ratio") {
-		t.Errorf("/v1/metrics/snapshot body does not contain 'j17_compression_ratio'; got:\n%s", body)
-	} else {
-		t.Log("j17_compression_ratio metric found in /v1/metrics/snapshot output")
+	// --- j17_compression_ratio: presence must MATCH protocol-event existence ---
+	// Event-derived gauges are gated on TotalEvents > 0 (no-data-as-zero fix).
+	// A CI environment with zero protocol events must NOT expose the gauge;
+	// an environment where events flowed MUST expose it.
+	var snap struct {
+		Data struct {
+			Gauges map[string]float64 `json:"gauges"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(bodyBytes, &snap); err != nil {
+		t.Fatalf("failed to parse /v1/metrics/snapshot JSON: %v", err)
+	}
+	eventsSeen := false
+	for k, v := range snap.Data.Gauges {
+		if strings.Contains(k, "j17_events_total") && v > 0 {
+			eventsSeen = true
+			break
+		}
+	}
+	hasCompression := strings.Contains(body, "j17_compression_ratio")
+	switch {
+	case eventsSeen && !hasCompression:
+		t.Errorf("protocol events exist (j17_events_total > 0) but 'j17_compression_ratio' is missing from the snapshot")
+	case !eventsSeen && hasCompression:
+		t.Errorf("zero protocol events but 'j17_compression_ratio' is present — the j17EventGaugesMeaningful gate must skip event-derived gauges at TotalEvents==0")
+	default:
+		t.Logf("gauge-gate contract holds: events_seen=%v, compression_present=%v", eventsSeen, hasCompression)
 	}
 }
