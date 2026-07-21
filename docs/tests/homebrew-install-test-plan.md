@@ -1,6 +1,6 @@
 # Homebrew Install Test Plan
 
-**Version**: v0.2.1
+**Version**: `<CURRENT_VERSION>` (substitute the release under test; plan last executed against v0.2.1)
 **Date**: 2026-03-10
 **Purpose**: Validate that `brew install mdemg` delivers a fully functional MDEMG installation.
 
@@ -40,7 +40,7 @@ brew install mdemg
 
 **Expected**:
 - [ ] Tap succeeds without errors
-- [ ] Install downloads `mdemg_0.2.1_darwin_{arm64|amd64}.tar.gz`
+- [ ] Install downloads `mdemg_<CURRENT_VERSION>_darwin_{arm64|amd64}.tar.gz`
 - [ ] SHA256 checksum passes
 - [ ] No build-from-source step (binary install only)
 
@@ -68,7 +68,7 @@ mdemg version
 ```
 
 **Expected**:
-- [ ] Outputs version `0.2.1`
+- [ ] Outputs version `<CURRENT_VERSION>`
 - [ ] Shows commit hash (not "unknown")
 - [ ] Shows build date (not "unknown")
 
@@ -221,7 +221,7 @@ kill $SERVE_PID 2>/dev/null
 
 **Expected**:
 - [ ] Server starts on port 9999 (or configured port)
-- [ ] `/healthz` returns `{"status":"ok","version":"0.2.1"}`
+- [ ] `/healthz` returns `{"status":"ok","version":"<CURRENT_VERSION>"}`
 - [ ] Server shuts down cleanly on SIGTERM
 
 ### 5.2 Start server (daemon mode)
@@ -256,7 +256,7 @@ curl -s http://localhost:9999/readyz | python3 -m json.tool
 ```
 
 **Expected**:
-- [ ] `/healthz` returns status "ok" with version "0.2.1"
+- [ ] `/healthz` returns status "ok" with version "<CURRENT_VERSION>"
 - [ ] `/readyz` returns readiness status
 
 ### 5.5 Stop server

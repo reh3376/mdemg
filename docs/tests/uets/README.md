@@ -65,7 +65,7 @@ python uets_runner.py validate-all --spec-dir ../specs/ --report report.json
 | `verify-hashes --spec-dir <dir>` | Verify fixture integrity via hashes |
 | `extract-clusters --output <path>` | Extract clusters from Neo4j into fixture JSON |
 
-Common flags: `--skip-hash` (skip fixture verification), `--report <path>` (JSON report output), `--endpoint <url>` (override model endpoint).
+Common flags: `--report <path>` (JSON report output), `--endpoint <url>` (override model endpoint).
 
 ### Remote Execution
 
