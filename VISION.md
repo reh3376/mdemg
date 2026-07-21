@@ -121,11 +121,11 @@ MDEMG is evolving from a unified memory store into a **Modular Intelligence Engi
 
 ### Benchmarking & Performance Validation
 
-MDEMG's effectiveness is continuously validated through rigorous benchmarking against a real-world industrial codebase (whk-wms: 507K LOC TypeScript, 120 domain-specific questions). The system has improved from a **0.567 baseline** to a **0.898 peak score** (+58.4%) with **100% high-score rate** and **100% strong evidence rate** — entirely through architectural improvements, not parameter tuning. See [Performance Trajectory](#performance-trajectory) for the full arc and [Up-to-Date Benchmark Summary](docs/tests/UP_TO_DATE_BENCHMARK_SUMMARY.md) for details.
+MDEMG's effectiveness is continuously validated through rigorous benchmarking against a real-world industrial codebase (whk-wms: 507K LOC TypeScript, 120 domain-specific questions). The system has improved from a **0.567 baseline** to a **0.898 peak score** (+58.4%) with **100% high-score rate** and **100% strong evidence rate** — entirely through architectural improvements, not parameter tuning. See [Performance Trajectory](#performance-trajectory) for the full arc and [Up-to-Date Benchmark Summary](docs/architecture/benchmarks/UP_TO_DATE_BENCHMARK_SUMMARY.md) for details.
 
 ### Public Repository Standards
 
-To facilitate global collaboration while maintaining the core system's integrity, MDEMG follows strict public-readiness standards. This ensures that the engine is secure, the architecture is extensible for contributors, and the "Internal Dialog" remains a reliable substrate for all AI agents. (See [Repo-to-Public Roadmap](docs/repo-to-public-roadmap.md) for the full strategy).
+To facilitate global collaboration while maintaining the core system's integrity, MDEMG follows strict public-readiness standards. This ensures that the engine is secure, the architecture is extensible for contributors, and the "Internal Dialog" remains a reliable substrate for all AI agents. (See [Repo-to-Public Roadmap](docs/development/repo-to-public-roadmap.md) for the full strategy).
 
 #### Integration with Retrieval Pipeline
 
@@ -216,7 +216,7 @@ A higher-order capability where MDEMG acts as an **SME (Subject Matter Expert)**
 
 The operational core of MDEMG's active participation. Jiminy emerged from the realization that retrieval-on-demand was fundamentally too passive — by the time an agent asks for context, it has often already made the mistake that context would have prevented.
 
-Jiminy is injected into **every user prompt** via Claude Code hooks, running automatically before the agent acts. It orchestrates 5 knowledge sources in parallel with a 6-second timeout:
+Jiminy is injected into **every user prompt** via Claude Code hooks, running automatically before the agent acts. It orchestrates 4 knowledge sources in parallel under a config-driven guidance budget (90-second warm-compute default):
 
 | Source | What It Surfaces |
 |--------|-----------------|
@@ -266,7 +266,7 @@ MDEMG runs as a Docker Compose stack with 5 services:
 | neo4j | Knowledge graph (5-layer memory hierarchy) |
 | timescaledb | Time-series metrics + LLM interaction recording for training |
 | neural-sidecar | Python ML sidecar (re-ranking, NLI, tier prediction) |
-| grafana | Observability dashboards (7 pre-provisioned) |
+| grafana | Observability dashboards (8 pre-provisioned) |
 
 `mdemg init` generates `.env` with dynamic port allocation, writes `docker-compose.yml` from embedded template, and starts all services.
 
@@ -278,7 +278,7 @@ export → quality filter → format converter → dataset versioner → train �
 
 All scripts in `neural/training/`. See `docs/development/ft-lora/03_IMPLEMENTATION_PLAN_v2.md`.
 
-**Fine-tuning target (Sprint FT-LORA onwards, 2026-04-21):** Qwen3.6-35B-A3B MoE (Apache 2.0, 35B total / 3B active, 256 experts = 8 routed + 1 shared, 262K context). Fallback: Qwen3.5-35B-A3B. Strategy: **two-tier MoE-Sieve LoRA** — Tier 1 universal (attention + shared expert) + Tier 2 per-family (top-25% routed experts). See `docs/development/ft-lora/00_README_v2.md` for the full v5.0 plan.
+**Fine-tuning: SHIPPED (2026-05, dense pivot 2026-04-22):** production model `mdemg-llm-v1` — single-tier LoRA on dense `Qwen3-14B-4bit`, served as GGUF Q5_K_M via llama-server on `127.0.0.1:8102`. (The original Qwen3.6-35B-A3B MoE target and two-tier MoE-Sieve strategy were abandoned when the Metal 499K MTLResource ceiling blocked every MoE LoRA backward pass — architectural, not quant-specific.) See `docs/development/ft-lora/00_README_v2.md` for the full history.
 
 **No-tool-calling architectural policy:** all 16 MDEMG LLM call sites are single-shot structured-output or reasoning. Tool-calling is explicitly banned across the stack — nine banned patterns (`tool_use`, `tool_call`, `function_call`, `--tool-call-parser`, `enable-auto-tool-choice`, `preserve_thinking`, etc.) are grep-audited each sprint. See `docs/development/ft-lora/01_RESEARCH_v2.md §2.8`.
 
@@ -288,7 +288,7 @@ Each project directory gets an isolated MDEMG stack via COMPOSE_PROJECT_NAME sco
 
 ### Browser Dashboard
 
-`http://localhost:{PORT}/ui/` — 10-tab dashboard for status, memory, learning, config, logs, RSIC, plugins, features, backups, and training data.
+`http://localhost:{PORT}/ui/` — 11-tab dashboard for status, memory, learning, config, logs, RSIC, plugins, features, backups, training data, and review.
 
 ### Upgrade Automation
 
@@ -605,7 +605,7 @@ Quantitative validation against the whk-wms benchmark (507K LOC TypeScript, 120 
 
 The trajectory from 0.567 to 0.898 (+58.4%) validates the core thesis: emergent architecture with Hebbian learning produces measurable, compounding retrieval quality improvements. Each major jump came from fixing a specific failure mode, not from parameter tuning.
 
-For the complete performance history, see the [Up-to-Date Benchmark Summary](docs/tests/UP_TO_DATE_BENCHMARK_SUMMARY.md).
+For the complete performance history, see the [Up-to-Date Benchmark Summary](docs/architecture/benchmarks/UP_TO_DATE_BENCHMARK_SUMMARY.md).
 
 ---
 
