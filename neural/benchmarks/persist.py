@@ -120,3 +120,47 @@ def write_sql_sidecar(report: dict[str, Any], out_sql: Path) -> int:
     out_sql.write_text("\n".join(lines) + "\n")
     # 1 benchmark_runs INSERT + N benchmark_results INSERTs
     return 1 + len(results_inserts)
+
+
+# ─── BENCH-SIDECAR-APPLY-001: direct TSDB apply ──────────────────────────────
+
+def tsdb_dsn_from_env() -> str:
+    """libpq DSN from TSDB_* env vars — same names/defaults as
+    docs/tests/uvts/runners/uvts_runner.py::_tsdb_dsn (the established
+    Python-side pattern)."""
+    import os
+    return (
+        f"host={os.environ.get('TSDB_HOST', 'localhost')} "
+        f"port={os.environ.get('TSDB_PORT', '5433')} "
+        f"user={os.environ.get('TSDB_USER', 'mdemg')} "
+        f"password={os.environ.get('TSDB_PASSWORD', 'mdemg_metrics')} "
+        f"dbname={os.environ.get('TSDB_DB', 'mdemg_metrics')}"
+    )
+
+
+def apply_to_tsdb(report: dict[str, Any], dsn: str | None = None, _connect=None) -> int:
+    """Execute the V0012 INSERTs directly against TSDB in one transaction.
+
+    Returns the number of statements applied. Raises on connect/execute
+    failure — the CALLER decides whether that is fatal (run_benchmark treats
+    it as non-fatal: the sidecar file remains the recovery path, mirroring
+    the UVTS runner's best-effort persistence).
+
+    `_connect` is a test seam (defaults to psycopg.connect).
+    """
+    if _connect is None:
+        import psycopg  # deferred: not a hard dep for JSON-only users
+        _connect = psycopg.connect
+
+    stmts = [render_benchmark_runs_insert(report)]
+    stmts.extend(render_benchmark_results_inserts(report))
+
+    conn = _connect(dsn or tsdb_dsn_from_env(), connect_timeout=5)
+    try:
+        with conn.cursor() as cur:
+            for stmt in stmts:
+                cur.execute(stmt)
+        conn.commit()
+    finally:
+        conn.close()
+    return len(stmts)
