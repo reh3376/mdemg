@@ -394,6 +394,7 @@ type Config struct {
 	JiminyOutcomeLLMMaxTokens      int     // JIMINY_OUTCOME_LLM_MAX_TOKENS — max tokens for classification (default: 100)
 	JiminyOutcomeCacheSize         int     // JIMINY_OUTCOME_CACHE_SIZE — LRU cache capacity (default: 256)
 	JiminyClassifyCompress         bool    // JIMINY_CLASSIFY_COMPRESS — compress outcome classification prompts (default: true)
+	JiminyNonViolationCreditEnabled bool   // JIMINY_NONVIOLATION_CREDIT_ENABLED — extend tier-2 LLM classifier prompt with a "non-violation credit for must_not" clause. Routes unrelated-context ignored verdicts to not_applicable (already filtered from constraint_outcomes by the writer gate). Predicted to lift constraint follow rate 10%→~20% by shrinking the actionable denominator. Default false; operator runs the 3-day A/B recipe (docs/development/jiminy-actionability-compliance-credit-001/ab_recipe.md) before flipping (JIMINY-ACTIONABILITY-COMPLIANCE-CREDIT-001).
 	JiminyDedupSimilarityThreshold float64 // JIMINY_DEDUP_SIMILARITY_THRESHOLD — semantic dedup cosine threshold (default: 0.85)
 	JiminyCorrectionDecayRate      float64 // JIMINY_CORRECTION_DECAY_RATE — time-decay lambda for corrections (default: 0.01)
 	J17TicketCacheSize             int     // J17_TICKET_CACHE_SIZE — max entries in ticket LRU cache (default: 1000)
@@ -1184,7 +1185,7 @@ type Config struct {
 	// JIMINY-RELEVANCE-001 Epic 4 — should-follow follow-rate alert.
 	// "Follow rate on guidance that SHOULD have been followed" (actionable
 	// constraint/correction types) — excludes correctly-ignored advisory items.
-	GuidanceShouldFollowRateFloor     float64 // GUIDANCE_SHOULD_FOLLOW_RATE_FLOOR — alert when should-follow follow rate drops below this (default: 0.5; 0 disables the rule)
+	GuidanceShouldFollowRateFloor     float64 // GUIDANCE_SHOULD_FOLLOW_RATE_FLOOR — alert when actionable-compliance rate drops below this (default: 0.15 post JIMINY-ACTIONABILITY-COMPLIANCE-CREDIT-001; was 0.5 pre-JIMINY-ACTIONABILITY-INVERSION-001 verdict; 0 disables the rule)
 	GuidanceShouldFollowLookbackHours int     // GUIDANCE_SHOULD_FOLLOW_LOOKBACK_HOURS — window for the should-follow rate (default: 168 = 7d, floor: 1)
 
 	// HITL-REVIEW-001 — general-purpose human-in-the-loop review + live-reinforcement platform.
@@ -2823,6 +2824,9 @@ func FromEnv() (Config, error) {
 		return Config{}, err
 	}
 	jiminyClassifyCompress := getBool("JIMINY_CLASSIFY_COMPRESS", true)
+	// JIMINY-ACTIONABILITY-COMPLIANCE-CREDIT-001: default OFF; operator flips
+	// after running the 3-day A/B recipe to verify the predicted lift.
+	jiminyNonViolationCreditEnabled := getBool("JIMINY_NONVIOLATION_CREDIT_ENABLED", false)
 	jiminyDedupSimilarityThreshold, err := atof("JIMINY_DEDUP_SIMILARITY_THRESHOLD", 0.85)
 	if err != nil {
 		return Config{}, err
@@ -3529,12 +3533,17 @@ func FromEnv() (Config, error) {
 	if guidanceAuditInitialDelaySec < 0 {
 		guidanceAuditInitialDelaySec = 0 // 0 = skip the initial run
 	}
-	guidanceShouldFollowRateFloor, err := atof("GUIDANCE_SHOULD_FOLLOW_RATE_FLOOR", 0.5)
+	// JIMINY-ACTIONABILITY-INVERSION-001 verdict: real actionable rate under
+	// Lever C over-surfacing has an expected floor around 10-25% (not >90%);
+	// old default 0.5 caused chronic alerting on honest data. Recalibrated
+	// to 0.15 (still above the baseline 0.10, so a genuine collapse still
+	// fires; but doesn't fire on the by-design steady-state).
+	guidanceShouldFollowRateFloor, err := atof("GUIDANCE_SHOULD_FOLLOW_RATE_FLOOR", 0.15)
 	if err != nil {
 		return Config{}, err
 	}
 	if guidanceShouldFollowRateFloor < 0 || guidanceShouldFollowRateFloor > 1 {
-		guidanceShouldFollowRateFloor = 0.5 // out-of-range → default
+		guidanceShouldFollowRateFloor = 0.15 // out-of-range → default
 	}
 	guidanceShouldFollowLookbackHours, err := atoi("GUIDANCE_SHOULD_FOLLOW_LOOKBACK_HOURS", 168)
 	if err != nil {
@@ -5449,6 +5458,7 @@ func FromEnv() (Config, error) {
 		JiminyOutcomeLLMMaxTokens:      jiminyOutcomeLLMMaxTokens,
 		JiminyOutcomeCacheSize:         jiminyOutcomeCacheSize,
 		JiminyClassifyCompress:         jiminyClassifyCompress,
+		JiminyNonViolationCreditEnabled: jiminyNonViolationCreditEnabled,
 		JiminyDedupSimilarityThreshold: jiminyDedupSimilarityThreshold,
 		JiminyCorrectionDecayRate:      jiminyCorrectionDecayRate,
 		J17TicketCacheSize:             j17TicketCacheSize,

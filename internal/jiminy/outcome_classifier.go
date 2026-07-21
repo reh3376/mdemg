@@ -57,6 +57,39 @@ Action format: "replaced 'OLD' with 'NEW'" = OLD was REMOVED, NEW was ADDED. Foc
 Negation words in quoted code are NOT contradiction indicators.
 JSON only: {"outcome": "...", "confidence": 0.0-1.0, "reasoning": "..."}`
 
+// nonViolationCreditClause is appended to the classifier system prompt when
+// OutcomeClassifierConfig.NonViolationCredit is true (JIMINY-ACTIONABILITY-
+// COMPLIANCE-CREDIT-001). Routes must_not-type "the action didn't touch the
+// mechanism" verdicts to `not_applicable` (already filtered from
+// constraint_outcomes by the shipped service.go:1730,1762 writer gate) rather
+// than `ignored` (which inflates the actionable denominator).
+//
+// Default OFF; operator flips JIMINY_NONVIOLATION_CREDIT_ENABLED=true in .env
+// after running the 3-day A/B recipe (ab_recipe.md).
+const nonViolationCreditClause = `
+
+NON-VIOLATION CREDIT for must_not-type constraints:
+- If a must_not-type constraint (e.g. "NEVER commit directly to main", "must_not use raw SQL", "never call X directly") applies to a mechanism the action DID NOT touch, classify the action as "not_applicable", NOT "ignored".
+- Only use "ignored" when the action clearly touched the constraint's mechanism AND the agent had genuine opportunity to apply the constraint but didn't.
+- Example: constraint "never commit to main" + action "read a config file" = not_applicable (the action didn't touch git-commit mechanism), not ignored.
+- Example: constraint "never commit to main" + action "committed on dev branch and pushed" = followed (respected the constraint by using dev).
+- Example: constraint "never commit to main" + action "committed directly to main" = contradicted.
+This rule reduces false-ignored labels on constraints that don't apply to the specific action being taken.`
+
+// resolveClassifySystemPrompt returns the effective system prompt for tier-2
+// classification. When nonViolationCredit is true, appends the extension
+// clause. Default-off path returns the historical byte-identical prompt.
+func (oc *OutcomeClassifier) resolveClassifySystemPrompt() string {
+	base := classifySystemPrompt
+	if oc.compressPrompts {
+		base = classifySystemPromptCompact
+	}
+	if oc.nonViolationCredit {
+		return base + nonViolationCreditClause
+	}
+	return base
+}
+
 // ollamaClassifySchema is the JSON schema for Ollama grammar-constrained classification.
 var ollamaClassifySchema = json.RawMessage(`{
 	"type": "object",
@@ -75,10 +108,11 @@ type OutcomeClassifier struct {
 	llm             *llmclient.Client // optional, for Tier 2 classification
 	llmEnabled      bool
 	llmProvider     string  // provider name for conditional behavior (e.g., "ollama" vs "openai")
-	compressPrompts bool    // J17-PC: compress classification prompts
-	highThreshold   float64 // above this similarity = followed (default: 0.7)
-	lowThreshold    float64 // below this similarity = sub-LOW band (ignored / not_applicable, see naThreshold) (default: 0.2)
-	naThreshold     float64 // JIMINY-CORPUS-001 Epic 4 relevance gate: below this = not_applicable; [this, low) = ignored. ≤0 disables (whole sub-LOW tail is not_applicable)
+	compressPrompts       bool    // J17-PC: compress classification prompts
+	highThreshold         float64 // above this similarity = followed (default: 0.7)
+	lowThreshold          float64 // below this similarity = sub-LOW band (ignored / not_applicable, see naThreshold) (default: 0.2)
+	naThreshold           float64 // JIMINY-CORPUS-001 Epic 4 relevance gate: below this = not_applicable; [this, low) = ignored. ≤0 disables (whole sub-LOW tail is not_applicable)
+	nonViolationCredit    bool    // JIMINY-ACTIONABILITY-COMPLIANCE-CREDIT-001: when true, LLM classifier prompt gets an extended clause telling the LLM to classify must_not-type constraints as not_applicable (not ignored) when the action didn't touch the constraint's mechanism. Routes ~50% of current unrelated-context ignored verdicts to not_applicable, which the shipped writer gate (service.go:1730,1762) filters from constraint_outcomes. Predicted to lift constraint follow rate 10%→~20%. Default false; operator runs 3-day A/B before flipping.
 	maxTokens       int     // J14: max tokens for LLM classification
 
 	// G8: circuit breaker for LLM calls
@@ -104,6 +138,7 @@ type OutcomeClassifierConfig struct {
 	MaxTokens              int     // J14: max tokens (default: 100)
 	CacheSize              int     // J14: LRU cache capacity (default: 256)
 	CompressPrompts        bool    // J17-PC: compress classification prompts to reduce tokens
+	NonViolationCredit     bool    // JIMINY-ACTIONABILITY-COMPLIANCE-CREDIT-001: extend classifier prompt with must_not non-violation credit clause. Default false.
 }
 
 // classifyCacheEntry holds a cached classification result.
@@ -115,14 +150,15 @@ type classifyCacheEntry struct {
 // NewOutcomeClassifier creates a new semantic outcome classifier.
 func NewOutcomeClassifier(embedder embeddings.Embedder, cfg OutcomeClassifierConfig) *OutcomeClassifier {
 	oc := &OutcomeClassifier{
-		embedder:        embedder,
-		llmEnabled:      cfg.LLMEnabled,
-		compressPrompts: cfg.CompressPrompts,
-		highThreshold:   cfg.HighThreshold,
-		lowThreshold:    cfg.LowThreshold,
-		maxTokens:       cfg.MaxTokens,
-		cacheMap:        make(map[string]*list.Element),
-		cacheList:       list.New(),
+		embedder:           embedder,
+		llmEnabled:         cfg.LLMEnabled,
+		compressPrompts:    cfg.CompressPrompts,
+		highThreshold:      cfg.HighThreshold,
+		lowThreshold:       cfg.LowThreshold,
+		maxTokens:          cfg.MaxTokens,
+		nonViolationCredit: cfg.NonViolationCredit,
+		cacheMap:           make(map[string]*list.Element),
+		cacheList:          list.New(),
 	}
 
 	if oc.highThreshold <= 0 {
@@ -265,10 +301,7 @@ func (oc *OutcomeClassifier) llmClassify(ctx context.Context, item GuidanceItem,
 
 	prompt := buildClassifyPrompt(item, actionSummary, baseSimilarity, oc.compressPrompts, hasNegation, matchedPattern)
 
-	sysPrompt := classifySystemPrompt
-	if oc.compressPrompts {
-		sysPrompt = classifySystemPromptCompact
-	}
+	sysPrompt := oc.resolveClassifySystemPrompt()
 
 	msgs := []llmclient.Message{
 		{Role: "system", Content: sysPrompt},

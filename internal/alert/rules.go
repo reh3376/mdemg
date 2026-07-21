@@ -388,7 +388,7 @@ func GuidanceShouldFollowRules(rateFloor float64, lookbackHours int) []AlertRule
 	return []AlertRule{
 		{
 			ID:          "guidance_should_follow_rate_low",
-			Title:       "Guidance Should-Follow Follow Rate Low",
+			Title:       "Actionable Compliance Rate Low",
 			Service:     "guidance-should-follow",
 			Severity:    SeverityMedium,
 			Interval:    60 * time.Second,
