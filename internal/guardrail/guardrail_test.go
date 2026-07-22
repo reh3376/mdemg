@@ -4,7 +4,40 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"unicode/utf8"
 )
+
+// TSDB-WRITER-UTF8-001: a mid-rune byte cut produced invalid UTF-8 that
+// poisoned an llm_interactions flush batch. The cut must land on a rune
+// boundary and stay within the byte budget.
+func TestTruncateString_RuneSafe(t *testing.T) {
+	// '→' is 3 bytes (0xe2 0x86 0x92). Build strings where the cut lands on
+	// every possible mid-rune offset.
+	for pad := 0; pad < 4; pad++ {
+		prefix := strings.Repeat("a", 195+pad)
+		s := prefix + strings.Repeat("→", 10)
+		for _, maxLen := range []int{197, 198, 199, 200, 201, 202} {
+			got := truncateString(s, maxLen)
+			if !utf8.ValidString(got) {
+				t.Errorf("pad=%d maxLen=%d: invalid UTF-8 output %q", pad, maxLen, got)
+			}
+			if len(got) > maxLen {
+				t.Errorf("pad=%d maxLen=%d: output %d bytes exceeds budget", pad, maxLen, len(got))
+			}
+		}
+	}
+	// tiny budgets (maxLen < 4) must also stay rune-safe
+	for _, maxLen := range []int{1, 2, 3} {
+		got := truncateString("→→", maxLen)
+		if !utf8.ValidString(got) {
+			t.Errorf("maxLen=%d: invalid UTF-8 %q", maxLen, got)
+		}
+	}
+	// no-truncate fast path unchanged
+	if got := truncateString("short", 100); got != "short" {
+		t.Errorf("fast path: got %q", got)
+	}
+}
 
 // ============================================================
 // buildResponse tests

@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+	"unicode/utf8"
 )
 
 func TestNewClient(t *testing.T) {
@@ -648,6 +649,38 @@ func TestWithSessionID(t *testing.T) {
 	ctx = WithSessionID(ctx, "sess-abc-123")
 	if got := SessionIDFromContext(ctx); got != "sess-abc-123" {
 		t.Errorf("SessionIDFromContext = %q, want %q", got, "sess-abc-123")
+	}
+}
+
+// TSDB-WRITER-UTF8-001: the recorder is the single chokepoint for every
+// producer — invalid UTF-8 (e.g. an upstream mid-rune byte truncation) must
+// be sanitized here, or one poisoned row fails the whole flush batch
+// (SQLSTATE 22021; 10 rows dropped live 2026-07-22).
+func TestRecordInteraction_SanitizesInvalidUTF8(t *testing.T) {
+	rec := &mockRecorder{}
+	c := New(Config{Provider: "openai", Model: "test"})
+	c.recorder = rec
+	c.taskName = "test.task"
+
+	// "\xe2\x86." is the live poison signature: a split '→' followed by '.'
+	bad := "constraint: never do X \xe2\x86. more text"
+	c.recordInteraction(context.Background(),
+		[]Message{{Role: "system", Content: bad}, {Role: "user", Content: bad}},
+		bad, 10, 5, 100, nil)
+
+	if len(rec.records) != 1 {
+		t.Fatalf("expected 1 record, got %d", len(rec.records))
+	}
+	r := rec.records[0]
+	for name, v := range map[string]string{
+		"SystemPrompt": r.SystemPrompt, "UserPrompt": r.UserPrompt, "Response": r.Response,
+	} {
+		if !utf8.ValidString(v) {
+			t.Errorf("%s: invalid UTF-8 survived sanitization: %q", name, v)
+		}
+	}
+	if !strings.Contains(r.Response, "more text") {
+		t.Errorf("sanitization must preserve surrounding content: %q", r.Response)
 	}
 }
 
