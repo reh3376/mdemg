@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"maps"
+	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
@@ -130,10 +131,23 @@ WHERE h.last_backward_pass IS NULL
    OR EXISTS {
         MATCH (h)-[nr:ABSTRACTS_TO]->(nc:MemoryNode)
         WHERE nc.layer >= 2
-          AND (nc.last_forward_pass > h.last_backward_pass
+          AND (nc.last_forward_change > h.last_backward_pass
                OR nr.created_at > h.last_backward_pass)
       }
 RETURN h.node_id AS id ORDER BY id`
+
+// stampForwardChangeCypher marks nodes the INCREMENTAL forward actually
+// recomputed this pass. The backward cascade keys on last_forward_change,
+// not last_forward_pass: other forward writers (theme/emergent repeats)
+// stamp last_forward_pass unconditionally every cycle, which made a
+// stamp-based cascade select EVERY L1 (live cycle 1: backward 16.2s while
+// forward dropped to 0.28s). last_forward_change moves only on real
+// incremental updates, so the cascade stays proportional to actual change.
+const stampForwardChangeCypher = `
+MATCH (n:MemoryNode {space_id: $spaceId})
+WHERE n.node_id IN $ids AND n.last_forward_pass >= $passStart
+SET n.last_forward_change = n.last_forward_pass
+RETURN count(n) AS stamped`
 
 const backwardAggBody = `OPTIONAL MATCH (h)-[rUp:ABSTRACTS_TO]->(c:MemoryNode)
 WHERE c.layer >= 2 AND (c.message_pass_embedding IS NOT NULL OR c.embedding IS NOT NULL)
@@ -232,10 +246,18 @@ func (s *Service) forwardPassHiddenLayerIncremental(ctx context.Context, spaceID
 	if err != nil {
 		return 0, fmt.Errorf("collect pending forward hidden: %w", err)
 	}
-	return s.processByIDBatches(ctx, forwardHiddenByIDsCypher, spaceID, ids, map[string]any{
+	passStart := time.Now().UTC()
+	updated, err := s.processByIDBatches(ctx, forwardHiddenByIDsCypher, spaceID, ids, map[string]any{
 		"alpha": s.cfg.HiddenLayerForwardAlpha,
 		"beta":  s.cfg.HiddenLayerForwardBeta,
 	})
+	if err != nil {
+		return updated, err
+	}
+	if err := s.stampForwardChange(ctx, spaceID, ids, passStart); err != nil {
+		return updated, fmt.Errorf("stamp forward change (hidden): %w", err)
+	}
+	return updated, nil
 }
 
 // forwardPassConceptLayerIncremental is the gated L2+ forward pass.
@@ -244,10 +266,40 @@ func (s *Service) forwardPassConceptLayerIncremental(ctx context.Context, spaceI
 	if err != nil {
 		return 0, fmt.Errorf("collect pending forward concept: %w", err)
 	}
-	return s.processByIDBatches(ctx, forwardConceptByIDsCypher, spaceID, ids, map[string]any{
+	passStart := time.Now().UTC()
+	updated, err := s.processByIDBatches(ctx, forwardConceptByIDsCypher, spaceID, ids, map[string]any{
 		"alpha": s.cfg.HiddenLayerForwardAlpha,
 		"beta":  s.cfg.HiddenLayerForwardBeta,
 	})
+	if err != nil {
+		return updated, err
+	}
+	if err := s.stampForwardChange(ctx, spaceID, ids, passStart); err != nil {
+		return updated, fmt.Errorf("stamp forward change (concept): %w", err)
+	}
+	return updated, nil
+}
+
+// stampForwardChange sets last_forward_change on the subset of ids the
+// incremental pass actually re-aggregated (their last_forward_pass advanced
+// past passStart). Cheap: runs over the small pending-id set only.
+func (s *Service) stampForwardChange(ctx context.Context, spaceID string, ids []string, passStart time.Time) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer sess.Close(ctx)
+	_, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		r, err := tx.Run(ctx, stampForwardChangeCypher, map[string]any{
+			"spaceId": spaceID, "ids": ids, "passStart": passStart,
+		})
+		if err != nil {
+			return nil, err
+		}
+		_, _ = r.Consume(ctx)
+		return nil, nil
+	})
+	return err
 }
 
 // backwardPassIncremental is the gated backward pass.

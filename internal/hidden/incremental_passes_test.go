@@ -137,7 +137,7 @@ func TestIncrementalGatePredicates(t *testing.T) {
 		"pending_forward_concept": {pendingForwardConceptCypher, []string{
 			"last_forward_pass IS NULL", "nh.last_forward_pass > c.last_forward_pass", "nh.updated_at > c.last_forward_pass", "nr.created_at > c.last_forward_pass"}},
 		"pending_backward": {pendingBackwardHiddenCypher, []string{
-			"last_backward_pass IS NULL", "nb.updated_at > h.last_backward_pass", "nc.last_forward_pass > h.last_backward_pass"}},
+			"last_backward_pass IS NULL", "nb.updated_at > h.last_backward_pass", "nc.last_forward_change > h.last_backward_pass"}},
 	} {
 		for _, w := range tc.wants {
 			if !strings.Contains(tc.q, w) {
