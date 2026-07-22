@@ -378,6 +378,72 @@ def send_jiminy_feedback(tool_name: str, tool_input: dict, tool_output: str):
         pass
 
 
+# ── GUARDRAIL-PRODUCER-001: produce real guardrail.evaluate training rows ──
+GUARDRAIL_DIFF_MAX_BYTES = int(os.environ.get("MDEMG_GUARDRAIL_DIFF_MAX_BYTES", "8000"))
+
+
+def _synth_diff(tool_name: str, tool_input: dict) -> tuple[str, str]:
+    """Synthesize a minimal unified-diff-ish payload from Write/Edit input.
+
+    Returns (file_path, diff) or ("", "") when not synthesizable. Only
+    Write/Edit — Bash output has no reliable change representation.
+    """
+    fp = tool_input.get("file_path", "")
+    if not fp:
+        return "", ""
+    if tool_name == "Write":
+        content = tool_input.get("content", "")
+        if not content:
+            return "", ""
+        body = "\n".join("+" + line for line in content.splitlines())
+        return fp, f"--- /dev/null\n+++ {fp}\n{body}"[:GUARDRAIL_DIFF_MAX_BYTES]
+    if tool_name == "Edit":
+        old = tool_input.get("old_string", "")
+        new = tool_input.get("new_string", "")
+        if not (old or new):
+            return "", ""
+        minus = "\n".join("-" + line for line in old.splitlines())
+        plus = "\n".join("+" + line for line in new.splitlines())
+        return fp, f"--- {fp}\n+++ {fp}\n{minus}\n{plus}"[:GUARDRAIL_DIFF_MAX_BYTES]
+    return "", ""
+
+
+def send_guardrail_producer(tool_name: str, tool_input: dict):
+    """Fire-and-forget async guardrail evaluation of a real Write/Edit.
+
+    The server path (gated on GUARDRAIL_PRODUCER_ENABLED) detaches the
+    evaluation and answers 202 in milliseconds; the llm_interactions row it
+    records is production training data for guardrail.evaluate. Fail-open:
+    never blocks or fails the hook.
+    """
+    fp, diff = _synth_diff(tool_name, tool_input)
+    if not diff:
+        return
+    payload = json.dumps({
+        "space_id": SPACE_ID,
+        "files_changed": [fp],
+        "diff": diff,
+        "agent_trust_level": "standard",
+        "async": True,
+    })
+    try:
+        subprocess.Popen(
+            [
+                "curl", "-sf", "-X", "POST",
+                f"{MDEMG_URL}/v1/memory/guardrail/validate",
+                "-H", "Content-Type: application/json",
+                "-d", payload,
+                "--connect-timeout", "3",
+                "--max-time", "5",
+                "-o", "/dev/null",
+            ],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except Exception:
+        pass
+
+
 def observe(content: str, obs_type: str, tags: list[str] | None = None):
     """Fire-and-forget observation to CMS."""
     payload = {
@@ -784,6 +850,10 @@ def main():
     # J17: Close the feedback loop — correlate guidance with agent action
     if tool_name in ("Write", "Edit", "Bash"):
         send_jiminy_feedback(tool_name, tool_input, output_str)
+
+    # GUARDRAIL-PRODUCER-001: async guardrail evaluation of real edits
+    if tool_name in ("Write", "Edit"):
+        send_guardrail_producer(tool_name, tool_input)
 
     sys.exit(0)
 

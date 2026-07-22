@@ -27,7 +27,7 @@
       "phase104",
       "llm_required"
     ],
-    "sha256": "a86213ad69e942cff7e37aa0a3a82a03740134be43b6c7558005cc04b1faf6a8"
+    "sha256": "bd32115bbf1e93ee570d6309b120b5c7d3909935c1f2a539cb6e42933569d33b"
   },
   "variables": {
     "space_id": "uats-test-space",
@@ -128,6 +128,36 @@
           {
             "path": "$.error",
             "op": "exists"
+          }
+        ]
+      }
+    },
+    {
+      "name": "async_producer_accepted",
+      "description": "GUARDRAIL-PRODUCER-001: async:true never runs synchronously \u2014 returns 202 {queued} when the producer is enabled, 200 {disabled} when gated off, 200 {dropped} at concurrency capacity. All three are contract-valid; the response carries no verdict fields.",
+      "request": {
+        "body": {
+          "async": true
+        }
+      },
+      "expected": {
+        "status": [
+          200,
+          202
+        ],
+        "body_assertions": [
+          {
+            "path": "$.status",
+            "op": "one_of",
+            "expected": [
+              "queued",
+              "disabled",
+              "dropped"
+            ]
+          },
+          {
+            "path": "$.data",
+            "op": "not_exists"
           }
         ]
       }
