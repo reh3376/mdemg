@@ -274,6 +274,12 @@ type Config struct {
 	GuardrailMaxConstraints int    // GUARDRAIL_MAX_CONSTRAINTS — max constraints per evaluation (default: 10, range 1-50)
 	GuardrailCompress       bool   // GUARDRAIL_COMPRESS — compress guardrail eval prompts (default: true)
 
+	// GUARDRAIL-PRODUCER-001: async producer path — PostToolUse hook fires
+	// fire-and-forget evaluations of real Write/Edit changes so
+	// guardrail.evaluate accumulates production training rows.
+	GuardrailProducerEnabled       bool // GUARDRAIL_PRODUCER_ENABLED — accept async producer evaluations (default: false; flip after live smoke)
+	GuardrailProducerMaxConcurrent int  // GUARDRAIL_PRODUCER_MAX_CONCURRENT — max simultaneous detached evaluations, excess dropped (default: 1, floor 1)
+
 	// Dynamic Reclassification settings
 	ReclassEnabled       bool    // RECLASS_ENABLED — enable LLM-based reclassification of oversized categories (default: true)
 	ReclassThreshold     float64 // RECLASS_THRESHOLD — min fraction of total nodes to trigger (default: 0.25, range: 0.05-0.90)
@@ -2521,6 +2527,14 @@ func FromEnv() (Config, error) {
 		return Config{}, errors.New("GUARDRAIL_MAX_CONSTRAINTS must be in range [1, 50]")
 	}
 	guardrailCompress := getBool("GUARDRAIL_COMPRESS", true)
+	guardrailProducerEnabled := getBool("GUARDRAIL_PRODUCER_ENABLED", false)
+	guardrailProducerMaxConcurrent, err := atoi("GUARDRAIL_PRODUCER_MAX_CONCURRENT", 1)
+	if err != nil {
+		return Config{}, err
+	}
+	if guardrailProducerMaxConcurrent < 1 {
+		return Config{}, errors.New("GUARDRAIL_PRODUCER_MAX_CONCURRENT must be >= 1")
+	}
 
 	// Dynamic Reclassification settings
 	reclassEnabled := getBool("RECLASS_ENABLED", true)
@@ -5428,6 +5442,8 @@ func FromEnv() (Config, error) {
 		GuardrailTimeoutMs:      guardrailTimeoutMs,
 		GuardrailMaxConstraints: guardrailMaxConstraints,
 		GuardrailCompress:       guardrailCompress,
+		GuardrailProducerEnabled:       guardrailProducerEnabled,
+		GuardrailProducerMaxConcurrent: guardrailProducerMaxConcurrent,
 
 		// Phase Jiminy: Jiminy Guidance
 		JiminyEnabled:                             jiminyEnabled,

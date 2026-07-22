@@ -1094,6 +1094,12 @@ type GuardrailValidateRequest struct {
 	// Values: "restricted" (all constraints), "standard" (org_policy + team_standard),
 	// "elevated" (org_policy only). Optional; omit for no filtering.
 	AgentTrustLevel string `json:"agent_trust_level,omitempty"`
+
+	// GUARDRAIL-PRODUCER-001: when true the evaluation runs detached from the
+	// request context and the handler returns 202 immediately — the
+	// fire-and-forget producer path (PostToolUse hook). Gated on
+	// GUARDRAIL_PRODUCER_ENABLED server-side.
+	Async bool `json:"async,omitempty"`
 }
 
 // GuardrailViolation represents a single constraint violation or warning.
