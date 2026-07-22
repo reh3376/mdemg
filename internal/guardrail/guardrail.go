@@ -45,6 +45,12 @@ type GuardrailConfig struct {
 	// RRF-SCALE-002: cosine floor for constraint vector retrieval
 	// (GUARDRAIL_CONSTRAINT_SIM_FLOOR; was hardcoded 0.3 in Cypher).
 	ConstraintSimFloor float64
+
+	// GUARDRAIL-CORRECTIONS-001: when true, retrieval also matches
+	// role_type='correction' nodes. Corrections carry no constraint_type,
+	// so they render as type "correction" and cap at Warning tier
+	// (isBlockingType is must/must_not only).
+	IncludeCorrections bool
 }
 
 // Validator defines the interface for guardrail validation.

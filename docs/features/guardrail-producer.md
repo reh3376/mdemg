@@ -80,11 +80,20 @@ role-filtered `vector.similarity.cosine` over only the constraint partition
 - UATS `guardrail_validate` 5/5 incl. the new env-robust
   `async_producer_accepted` variant (accepts queued/disabled/dropped).
 
-## Follow-ups (disclosed, not built)
+## Corrections in retrieval (GUARDRAIL-CORRECTIONS-001 — shipped 2026-07-22)
 
-- Include `role_type='correction'` nodes (JIMINY-CORRECTION-PRODUCER-001
-  minted 33) in guardrail retrieval — durable rules too; needs its own
-  prompt-shape check.
+`GUARDRAIL_INCLUDE_CORRECTIONS` (code default false; dev `.env` true after
+smoke) unions `role_type='correction'` into BOTH retrieval phases
+(semantic partition-cosine + keyword). Corrections carry no
+`constraint_type`, so the Cypher coalesces their type to `'correction'` —
+rendered in the prompt and capped at **Warning** tier
+(`isBlockingType` is must/must_not only): learned lessons advise, hard
+constraints block. Live: the `mdemg db start` fixture returned
+**Warning (warnings=1)** with 5 correction items in the prompt; flag-off
+(process-env-verified) is constraints-only. Applies identically to the
+sync MCP `validate_changes` path (one retrieval function — disclosed).
+
+## Follow-ups (disclosed, not built)
 - Producer-specific sim floor if row noise ever outweighs the negative-
   example value (data-decide from HITL grades, not up front).
 - Sampling/throttle knobs if the concurrency-bound-plus-drop policy proves

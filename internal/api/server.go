@@ -496,6 +496,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 			ConstraintDefaultAuthority: cfg.ConstraintDefaultAuthority,
 			CompressPrompts:            cfg.GuardrailCompress,
 			ConstraintSimFloor:         cfg.GuardrailConstraintSimFloor,
+			IncludeCorrections:         cfg.GuardrailIncludeCorrections,
 		}
 		// Sprint FT-LORA-B: build an llmclient for the guardrail service.
 		// Pre-bound with the canonical ULTS task name so all interactions are

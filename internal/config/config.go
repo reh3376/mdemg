@@ -279,6 +279,7 @@ type Config struct {
 	// guardrail.evaluate accumulates production training rows.
 	GuardrailProducerEnabled       bool // GUARDRAIL_PRODUCER_ENABLED — accept async producer evaluations (default: false; flip after live smoke)
 	GuardrailProducerMaxConcurrent int  // GUARDRAIL_PRODUCER_MAX_CONCURRENT — max simultaneous detached evaluations, excess dropped (default: 1, floor 1)
+	GuardrailIncludeCorrections    bool // GUARDRAIL_INCLUDE_CORRECTIONS — retrieval also matches role_type='correction' nodes (Warning-tier; default: false; flip after live smoke)
 
 	// Dynamic Reclassification settings
 	ReclassEnabled       bool    // RECLASS_ENABLED — enable LLM-based reclassification of oversized categories (default: true)
@@ -2535,6 +2536,7 @@ func FromEnv() (Config, error) {
 	if guardrailProducerMaxConcurrent < 1 {
 		return Config{}, errors.New("GUARDRAIL_PRODUCER_MAX_CONCURRENT must be >= 1")
 	}
+	guardrailIncludeCorrections := getBool("GUARDRAIL_INCLUDE_CORRECTIONS", false)
 
 	// Dynamic Reclassification settings
 	reclassEnabled := getBool("RECLASS_ENABLED", true)
@@ -5444,6 +5446,7 @@ func FromEnv() (Config, error) {
 		GuardrailCompress:       guardrailCompress,
 		GuardrailProducerEnabled:       guardrailProducerEnabled,
 		GuardrailProducerMaxConcurrent: guardrailProducerMaxConcurrent,
+		GuardrailIncludeCorrections:    guardrailIncludeCorrections,
 
 		// Phase Jiminy: Jiminy Guidance
 		JiminyEnabled:                             jiminyEnabled,

@@ -60,6 +60,21 @@ func primaryFilePath(diffCtx DiffContext) string {
 	return ""
 }
 
+// retrievalRoleTypes returns the role_type values retrieval matches —
+// GUARDRAIL-CORRECTIONS-001: corrections (durable operator-taught rules)
+// join when IncludeCorrections is set.
+func (g *GuardrailService) retrievalRoleTypes() []string {
+	if g.cfg.IncludeCorrections {
+		return []string{"constraint", "correction"}
+	}
+	return []string{"constraint"}
+}
+
+// typeCoalesceExpr renders constraint_type for the prompt + Block/Warning
+// mapping: corrections have no constraint_type property, so label them
+// 'correction' (isBlockingType('correction')=false → Warning tier).
+const typeCoalesceExpr = `coalesce(c.constraint_type, CASE WHEN c.role_type = 'correction' THEN 'correction' ELSE '' END)`
+
 // retrieveConstraints performs two-phase constraint retrieval:
 // Phase A: Semantic (vector similarity) search against constraint embeddings
 // Phase B: Keyword matching against constraint content
@@ -144,12 +159,13 @@ func (g *GuardrailService) semanticSearch(ctx context.Context, spaceID, summary 
 	// the shipped Lever-C pattern: role-filtered cosine over ONLY the
 	// constraint partition (~tens-to-hundreds of nodes — O(n) is trivial).
 	cypher := `
-	MATCH (c:MemoryNode {space_id: $spaceId, role_type: 'constraint'})
-	WHERE NOT coalesce(c.is_archived, false)
+	MATCH (c:MemoryNode {space_id: $spaceId})
+	WHERE c.role_type IN $roleTypes
+	  AND NOT coalesce(c.is_archived, false)
 	  AND c.embedding IS NOT NULL
 	WITH c, vector.similarity.cosine(c.embedding, $embedding) AS sim
 	WHERE sim > $simFloor` + g.scopeClause() + g.authorityClause(trustLevel) + `
-	RETURN c.node_id AS node_id, c.name AS name, c.constraint_type AS constraint_type,
+	RETURN c.node_id AS node_id, c.name AS name, ` + typeCoalesceExpr + ` AS constraint_type,
 	       c.content AS content, c.confidence AS confidence, sim
 	ORDER BY sim DESC LIMIT 10`
 
@@ -163,6 +179,7 @@ func (g *GuardrailService) semanticSearch(ctx context.Context, spaceID, summary 
 		"simFloor":  simFloor,
 		"spaceId":   spaceID,
 		"embedding": embedding,
+		"roleTypes": g.retrievalRoleTypes(),
 	}
 	if g.cfg.ConstraintScopeFilteringEnabled {
 		params["filePath"] = primaryFilePath(diffCtx)
@@ -218,16 +235,18 @@ func (g *GuardrailService) keywordSearch(ctx context.Context, spaceID string, ke
 	// Build keyword match conditions
 	// Each keyword is checked via toLower(c.content) CONTAINS kw
 	cypher := `
-	MATCH (c:MemoryNode {space_id: $spaceId, role_type: 'constraint'})
-	WHERE NOT coalesce(c.is_archived, false)
+	MATCH (c:MemoryNode {space_id: $spaceId})
+	WHERE c.role_type IN $roleTypes
+	  AND NOT coalesce(c.is_archived, false)
 	  AND ANY(kw IN $keywords WHERE toLower(c.content) CONTAINS kw)` + g.scopeClause() + g.authorityClause(trustLevel) + `
-	RETURN c.node_id AS node_id, c.name AS name, c.constraint_type AS constraint_type,
+	RETURN c.node_id AS node_id, c.name AS name, ` + typeCoalesceExpr + ` AS constraint_type,
 	       c.content AS content, c.confidence AS confidence
 	ORDER BY c.confidence DESC LIMIT 10`
 
 	params := map[string]any{
-		"spaceId":  spaceID,
-		"keywords": keywords,
+		"spaceId":   spaceID,
+		"keywords":  keywords,
+		"roleTypes": g.retrievalRoleTypes(),
 	}
 	if g.cfg.ConstraintScopeFilteringEnabled {
 		params["filePath"] = primaryFilePath(diffCtx)

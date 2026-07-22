@@ -1190,3 +1190,19 @@ func TestPrimaryFilePath(t *testing.T) {
 		})
 	}
 }
+
+// GUARDRAIL-CORRECTIONS-001: role set follows the flag; type coalesce caps
+// corrections at Warning via isBlockingType.
+func TestRetrievalRoleTypes_Flag(t *testing.T) {
+	off := &GuardrailService{cfg: GuardrailConfig{}}
+	if got := off.retrievalRoleTypes(); len(got) != 1 || got[0] != "constraint" {
+		t.Errorf("flag off: got %v, want [constraint]", got)
+	}
+	on := &GuardrailService{cfg: GuardrailConfig{IncludeCorrections: true}}
+	if got := on.retrievalRoleTypes(); len(got) != 2 || got[1] != "correction" {
+		t.Errorf("flag on: got %v, want [constraint correction]", got)
+	}
+	if isBlockingType("correction") {
+		t.Error("correction must NOT be a blocking type (Warning tier)")
+	}
+}
