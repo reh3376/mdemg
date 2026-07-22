@@ -135,19 +135,20 @@ func (g *GuardrailService) semanticSearch(ctx context.Context, spaceID, summary 
 	sess := g.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer sess.Close(ctx)
 
-	// Use HNSW vector index for O(log N) recall, then post-filter by role_type
-	indexName := g.cfg.VectorIndexName
-	if indexName == "" {
-		indexName = "memNodeEmbedding"
-	}
-
+	// GUARDRAIL-PRODUCER-001 live-smoke fix: the original form
+	// (db.index.vector.queryNodes top-200, THEN role_type filter) is the
+	// JIMINY-ACTIONABILITY-001 Lever-C class — constraints are ~0.1% of a
+	// production-scale space and essentially never appear in a global
+	// top-200, so semantic retrieval returned 0 on real spaces (tiny test
+	// spaces fit inside 200, which is why contracts stayed green). Fix is
+	// the shipped Lever-C pattern: role-filtered cosine over ONLY the
+	// constraint partition (~tens-to-hundreds of nodes — O(n) is trivial).
 	cypher := `
-	CALL db.index.vector.queryNodes($indexName, 200, $embedding)
-	YIELD node AS c, score AS sim
-	WHERE c.space_id = $spaceId
-	  AND c.role_type = 'constraint'
-	  AND NOT coalesce(c.is_archived, false)
-	  AND sim > $simFloor` + g.scopeClause() + g.authorityClause(trustLevel) + `
+	MATCH (c:MemoryNode {space_id: $spaceId, role_type: 'constraint'})
+	WHERE NOT coalesce(c.is_archived, false)
+	  AND c.embedding IS NOT NULL
+	WITH c, vector.similarity.cosine(c.embedding, $embedding) AS sim
+	WHERE sim > $simFloor` + g.scopeClause() + g.authorityClause(trustLevel) + `
 	RETURN c.node_id AS node_id, c.name AS name, c.constraint_type AS constraint_type,
 	       c.content AS content, c.confidence AS confidence, sim
 	ORDER BY sim DESC LIMIT 10`
@@ -162,7 +163,6 @@ func (g *GuardrailService) semanticSearch(ctx context.Context, spaceID, summary 
 		"simFloor":  simFloor,
 		"spaceId":   spaceID,
 		"embedding": embedding,
-		"indexName": indexName,
 	}
 	if g.cfg.ConstraintScopeFilteringEnabled {
 		params["filePath"] = primaryFilePath(diffCtx)
