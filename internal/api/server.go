@@ -136,6 +136,8 @@ type Server struct {
 
 	// Phase 104: Active MCP Guardrails
 	guardrailValidator guardrail.Validator
+	// GUARDRAIL-PRODUCER-001: bounds concurrent detached producer evaluations.
+	guardrailProducerSem chan struct{}
 
 	// Phase 105: Global Meta-Learning
 	metaLearnSvc *metalearn.Service
@@ -1058,6 +1060,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		tsdbBackupScheduler:     tsdbBackupSched,
 		intentTranslator:        intentTrans,
 		guardrailValidator:      guardrailVal,
+		guardrailProducerSem:    make(chan struct{}, max(1, cfg.GuardrailProducerMaxConcurrent)),
 		jiminySvc:               jiminySvc,
 		warmStore:               jiminy.NewWarmStore(),
 		metaLearnSvc:            metaLearnSvc,

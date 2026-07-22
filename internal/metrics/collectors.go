@@ -270,6 +270,8 @@ type StandardMetrics struct {
 	JiminyWarmCompleted func(spaceID string) *Counter
 	JiminyWarmErrors    func(spaceID string) *Counter
 	JiminyWarmDebounced func(spaceID string) *Counter
+	// GUARDRAIL-PRODUCER-001: async producer outcomes (queued/dropped/disabled).
+	GuardrailProducer func(status string) *Counter
 	JiminyLatestAge     func(spaceID string) *Gauge
 	JiminyLatestServed  func(spaceID string) *Counter
 
@@ -822,6 +824,10 @@ func NewStandardMetrics(r *Registry) *StandardMetrics {
 	m.JiminyWarmDebounced = func(spaceID string) *Counter {
 		return r.NewCounter("jiminy_warm_debounced_total", "Warm requests skipped by debounce",
 			map[string]string{"space_id": spaceID})
+	}
+	m.GuardrailProducer = func(status string) *Counter {
+		return r.NewCounter("guardrail_producer_total", "Guardrail async producer requests by outcome",
+			map[string]string{"status": status})
 	}
 	m.JiminyLatestAge = func(spaceID string) *Gauge {
 		return r.NewGauge("jiminy_latest_age_ms", "Age of latest pre-computed guidance in ms",

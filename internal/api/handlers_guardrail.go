@@ -1,10 +1,14 @@
 package api
 
 import (
+	"context"
+	"log/slog"
 	"net/http"
+	"time"
 
 	"mdemg/internal/guardrail"
 	"mdemg/internal/llmclient"
+	"mdemg/internal/metrics"
 	"mdemg/internal/models"
 )
 
@@ -38,6 +42,15 @@ func (s *Server) handleGuardrailValidate(w http.ResponseWriter, r *http.Request)
 	}
 	if req.Diff == "" {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "diff is required"})
+		return
+	}
+
+	// GUARDRAIL-PRODUCER-001: fire-and-forget producer path. The evaluation
+	// detaches from the request context (a hook's short curl must never
+	// caller-cancel it mid-LLM) and the handler answers immediately; the
+	// llm_interactions row the detached call records IS the product.
+	if req.Async {
+		s.handleGuardrailProducerAsync(w, req)
 		return
 	}
 
@@ -86,4 +99,70 @@ func (s *Server) handleGuardrailValidate(w http.ResponseWriter, r *http.Request)
 			Warnings:   warnings,
 		},
 	})
+}
+
+// handleGuardrailProducerAsync runs the GUARDRAIL-PRODUCER-001 fire-and-forget
+// path: gate → bounded concurrency → evaluation detached from the request
+// context → immediate 202. The llm_interactions row recorded by the detached
+// Validate call is the product; the HTTP response carries no verdict.
+func (s *Server) handleGuardrailProducerAsync(w http.ResponseWriter, req models.GuardrailValidateRequest) {
+	producerCounter := func(status string) {
+		if m := metrics.Metrics(); m != nil {
+			m.GuardrailProducer(status).Inc()
+		}
+	}
+
+	if !s.cfg.GuardrailProducerEnabled {
+		producerCounter("disabled")
+		writeJSON(w, http.StatusOK, map[string]any{"status": "disabled"})
+		return
+	}
+
+	select {
+	case s.guardrailProducerSem <- struct{}{}:
+	default:
+		// At capacity — drop rather than queue: the producer is opportunistic
+		// sampling of real edits, not a delivery guarantee, and unbounded
+		// backlog is exactly the llama-server saturation mode to avoid.
+		producerCounter("dropped")
+		writeJSON(w, http.StatusOK, map[string]any{"status": "dropped"})
+		return
+	}
+
+	timeoutMs := s.cfg.GuardrailTimeoutMs
+	if timeoutMs <= 0 {
+		timeoutMs = 5000
+	}
+	// Detached from the request context by construction (fresh Background,
+	// never r.Context()): the hook's curl exits in milliseconds and must not
+	// caller-cancel the evaluation mid-LLM. Bounded by GuardrailTimeoutMs.
+	bgCtx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutMs)*time.Millisecond)
+	if req.SpaceID != "" {
+		bgCtx = llmclient.WithSpaceID(bgCtx, req.SpaceID)
+	}
+
+	vreq := guardrail.ValidateRequest{
+		SpaceID:         req.SpaceID,
+		FilesChanged:    req.FilesChanged,
+		Diff:            req.Diff,
+		AgentTrustLevel: req.AgentTrustLevel,
+	}
+	go func() {
+		defer cancel()
+		defer func() { <-s.guardrailProducerSem }()
+		result, err := s.guardrailValidator.Validate(bgCtx, vreq)
+		if err != nil {
+			slog.Warn("guardrail producer: detached evaluation errored", "space_id", vreq.SpaceID, "error", err)
+			return
+		}
+		slog.Info("guardrail producer: evaluation complete",
+			"space_id", vreq.SpaceID,
+			"files", len(vreq.FilesChanged),
+			"status", result.Status,
+			"violations", len(result.Violations),
+			"warnings", len(result.Warnings))
+	}()
+
+	producerCounter("queued")
+	writeJSON(w, http.StatusAccepted, map[string]any{"status": "queued"})
 }
