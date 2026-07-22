@@ -1,5 +1,44 @@
 # Consolidation Performance
 
+
+## Sprint B (CONSOLIDATE-PERF-002, 2026-07-22) — incremental forward/backward passes
+
+`HIDDEN_INCREMENTAL_PASSES_ENABLED` (code default false; dev `.env` true
+after live smoke): the forward (L1 + L2+) and backward passes gate on
+`last_forward_pass`/`last_backward_pass` vs member `updated_at`, membership
+edge `created_at`, and cascade advancement — then process
+collect-pending-ids in id-batches (never gate+SKIP/LIMIT: stamping mutates
+the filtered set mid-pagination). Aggregation math lives in ONE shared
+const per pass used by both paths; `TestLegacyPassCypherComposition` pins
+the composed legacy strings byte-for-byte. The backward cascade keys on
+`last_forward_change` — stamped only by the incremental forward on real
+updates — because theme/emergent forward writers stamp `last_forward_pass`
+unconditionally every cycle (live-caught: a stamp-based cascade selected
+every L1). `DYNAMIC_EDGE_INCREMENTAL_LOOKBACK_HOURS` (6; 0 = full sweep)
+bounds dynamic-edge seeds to recently created/updated nodes.
+
+Live (mdemg-dev, vs the 7d legacy averages):
+
+| Phase | legacy avg | incremental |
+|---|---|---|
+| forward_initial | 17.0s | **0.18–0.33s** |
+| backward | 15.8s | **0.23–0.38s** |
+| step:dynamic_edges | 23.7s | **0.45–0.56s** |
+| post_clustering | 29.2s | 2.48s |
+
+≈55s → ≈1s per cycle on these phases × ~14 cycles/day ≈ **12+ min/day of
+heavy Neo4j load removed** (the retrieval-contention driver from
+RETRIEVAL-TYPED-EDGES-002). Propagation verified surgically: touching ONE
+member's `updated_at` re-aggregated exactly its L1 (forward + change-stamp +
+backward) and cascaded its concept, at incremental speed.
+
+Correctness caveats (documented): weight-only drift (decay touching edge
+weights) and theme-writer-only concept changes are invisible to the gates —
+both self-correct when any member changes; `concepts recluster` /
+`full_recluster` remains the explicit full path. Rollback:
+`HIDDEN_INCREMENTAL_PASSES_ENABLED=false` restores byte-identical legacy
+sweeps.
+
 ## Why
 
 Memory consolidation builds the hierarchy (L0 observations → L1 patterns → L2–L5
