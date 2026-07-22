@@ -1235,7 +1235,7 @@ Response:
 - Embeddings are auto-generated for each observation if not provided
 - Set `node_id` to update an existing node instead of creating a new one
 - Use `canonical_time` for content that refers to a specific point in time (e.g., "deployed v2.0 on Jan 15")
-- The batch size limit is configurable via `BATCH_INGEST_MAX_ITEMS` (default: 2000)
+- The batch size limit is configurable via `BATCH_INGEST_MAX_ITEMS` (default: 500, max: 2000)
 
 ---
 

@@ -16,7 +16,7 @@ phase: FT-INFRA
 
 ## Vision & Goals
 
-Local model deployment (Qwen3 via vllm-mlx with think mode) prepends `<think>...</think>` blocks before JSON output, breaking all 16 LLM consumers' JSON parsers. A unified sanitization pipeline ensures any model's output format works consistently across the entire codebase, eliminating duplicated cleanup code and enabling future model-specific profiles.
+Local model deployment (Qwen3 via llama-server with think mode) prepends `<think>...</think>` blocks before JSON output, breaking all 16 LLM consumers' JSON parsers. A unified sanitization pipeline ensures any model's output format works consistently across the entire codebase, eliminating duplicated cleanup code and enabling future model-specific profiles.
 
 ## Current State
 

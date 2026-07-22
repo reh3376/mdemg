@@ -192,7 +192,7 @@ TicketPayload {
     escalation_snapshot:   map[constraint_node_id -> {Level, IgnoreCount}]
     active_constraint_ids: Currently surfaced constraints
     conversation_phase:    Protocol state identifier
-    issued_at, ttl:        Lifecycle metadata (default 168-hour / 7-day TTL)
+    issued_at, ttl:        Lifecycle metadata (default 4-hour TTL)
 }
 ```
 
@@ -254,7 +254,7 @@ The default mode is now an **exponential moving average (EMA)** that makes trust
 ```
 trust ← trust + α·(target(outcome) − trust)
 target:  Followed = 1.0,  PartialCompliance = 0.6,  Ignored = 0.2,  Contradicted = 0.0
-α = JIMINY_TRUST_EMA_ALPHA (default 0.1)
+α = J17_TRUST_EMA_ALPHA (default 0.1)
 ```
 
 - A floored session climbs back past the high threshold once guidance is followed again (a sustained Followed run converges toward 1.0).
@@ -266,7 +266,7 @@ It does **not** fake promotion: T1 still requires trust above the high threshold
 | Config | Default | Meaning |
 |--------|---------|---------|
 | `JIMINY_TRUST_MODE` | `ema` | `ema` (recoverable) or `ratchet` (legacy fixed-delta, for rollback) |
-| `JIMINY_TRUST_EMA_ALPHA` | `0.1` | EMA learning rate ∈ (0,1]; higher = faster tracking of the recent regime |
+| `J17_TRUST_EMA_ALPHA` | `0.1` | EMA learning rate ∈ (0,1]; higher = faster tracking of the recent regime |
 
 Forward-only: existing Neo4j `J17TrustState` scores self-heal toward their recent regime as new feedback arrives. **Live-verified:** the previously-floored session moved `0.0 → 0.10` on a single real `Followed` through `POST /v1/jiminy/feedback` (the EMA signature `0.1·(1.0−0)`). See `docs/development/jiminy-effectiveness-001/`.
 
@@ -737,7 +737,7 @@ Each cycle through this loop makes the protocol slightly better. Constraints tha
 | `J17_ENABLED` | `true` | Enable J17 protocol |
 | `J17_DEFAULT_TIER` | `1` | Default encoding tier |
 | `J17_TICKET_SECRET` | auto-gen | HMAC signing key (auto-generates if unset) |
-| `J17_TICKET_TTL_HOURS` | `168` | Session ticket time-to-live (7 days; trust is persisted to Neo4j so longer TTL is safe) |
+| `J17_TICKET_TTL_HOURS` | `4` | Session ticket time-to-live (trust survives ticket expiry — it is persisted to Neo4j) |
 | `J17_SEQUENCE_BUFFER_SIZE` | `1000` | Ring buffer size for event replay |
 | `J17_BOOTSTRAP_ENABLED` | `true` | Send bootstrap header on first session |
 
@@ -745,12 +745,12 @@ Each cycle through this loop makes the protocol slightly better. Constraints tha
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `J17_TRUST_INITIAL` | `0.5` | Starting trust score |
-| `J17_TRUST_BOOST_PER_FOLLOW` | `0.02` | Trust increase when agent follows |
-| `J17_TRUST_DECAY_PER_IGNORE` | `0.03` | Trust decrease when agent ignores |
-| `J17_TRUST_DECAY_PER_CONTRADICT` | `0.05` | Trust decrease when agent contradicts |
-| `J17_TRUST_HIGH_THRESHOLD` | `0.8` | Threshold for dense encoding |
-| `J17_TRUST_LOW_THRESHOLD` | `0.4` | Threshold for verbose encoding |
+| `J17_TRUST_INITIAL` | `0.65` | Starting trust score |
+| `J17_TRUST_BOOST_PER_FOLLOW` | `0.05` | Trust increase when agent follows |
+| `J17_TRUST_DECAY_PER_IGNORE` | `0.02` | Trust decrease when agent ignores |
+| `J17_TRUST_DECAY_PER_CONTRADICT` | `0.04` | Trust decrease when agent contradicts |
+| `J17_TRUST_HIGH_THRESHOLD` | `0.75` | Threshold for dense encoding |
+| `J17_TRUST_LOW_THRESHOLD` | `0.35` | Threshold for verbose encoding |
 
 ### RSIC Integration
 
@@ -1090,6 +1090,8 @@ NLI Score → RecordOutcomeWithTier → ProtocolMetrics.Snapshot()
 | `J17_TIER_DRIFT_DETECTION_ENABLED` | `true` | Enable tier drift RSIC pattern |
 | `J17_NLI_CALIBRATION_WINDOW_SIZE` | `500` | Calibration ring buffer size |
 | `J17_NLI_CALIBRATION_BIAS_THRESHOLD` | `0.15` | Max NLI-vs-heuristic bias |
+| `J17_NLI_CALIBRATION_MIN_SAMPLES` | `50` | Min like-for-like samples before the bias alert can fire (DASHBOARD-TRUTH-001) |
+| `J17_COMPRESSION_TARGET_RATIO` | `2.0` | Compression ratio scored as "excellent" by the RSIC Protocol dimension (must be > 1.0) |
 
 ### Key Files
 

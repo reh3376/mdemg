@@ -2,7 +2,7 @@
 
 Purpose: canonical map of each UxTS framework to its schema, specs, runner, CI coverage, current status, and known gaps.
 
-Last updated: 2026-06-11 (UXTS-CI-001 — counts refreshed to on-disk truth; drift checker now covers ULTS/UITS/UTDS/UAITS/UBENCH and runs merge-blocking in CI)
+Last updated: 2026-07-21 (DOC-CURRENCY-002 — §2/§3/§5 refreshed to on-disk + ci.yml truth: counts, merge-blocking vs soft-fail per step, UVTS runner reinstated as functional/live-gated, UBENCH rows added)
 
 > **Architectural constraint (Sprint FT-LORA onwards, 2026-04-21):** MDEMG operates under a **no-tool-calling policy** — all 16 MDEMG LLM call sites are single-shot structured-output / reasoning. ULTS specs and ULTS-derived training data must not introduce `tool_use`, `function_call`, `toolCalls`, `tools: [`, `preserve_thinking`, `--tool-call-parser`, `enable-auto-tool-choice`, `tool_call`, or `tool_response` patterns. Any future UxTS framework that adds LLM contracts inherits this constraint. See `ft-lora/01_RESEARCH_v2.md §2.8`.
 
@@ -36,20 +36,21 @@ Last updated: 2026-06-11 (UXTS-CI-001 — counts refreshed to on-disk truth; dri
 | Framework | Schema | Specs | Runner / Harness | CI / Automation |
 | --------- | ------ | ----- | ---------------- | --------------- |
 | UNTS | n/a (registry format in docs) | `docs/specs/unts-hash-verification.md`, `docs/specs/unts-registry.json` | `internal/unts/` (Go gRPC service + scanner + registry) | no dedicated CI gate |
-| UDTS | `docs/api/api-spec/udts/schema/udts.schema.json` | Canonical: `docs/api/api-spec/udts/specs/` (12); Drafts: `docs/api/api-spec/udts/drafts/` (4) | `tests/udts/contract_test.go` (hand-coded per RPC) | canonical dialect guard via `uxts-canonical-specs.yml` |
-| UATS | `docs/api/api-spec/uats/schema/uats.schema.json` | `docs/api/api-spec/uats/specs/` (124) | `docs/api/api-spec/uats/runners/uats_runner.py` v1.1.0 | CI-gated in `ci.yml` |
-| UPTS | `docs/lang-parser/lang-parse-spec/upts/schema/upts.schema.json` | `docs/lang-parser/lang-parse-spec/upts/specs/` (27) | `docs/lang-parser/lang-parse-spec/upts/runners/upts_runner.py` | CI-gated in `parser-tests.yml` |
+| UDTS | `docs/api/api-spec/udts/schema/udts.schema.json` | Canonical: `docs/api/api-spec/udts/specs/` (15); Drafts: `docs/api/api-spec/udts/drafts/` (4) | `tests/udts/contract_test.go` (hand-coded per RPC) | canonical dialect guard via `uxts-canonical-specs.yml` |
+| UATS | `docs/api/api-spec/uats/schema/uats.schema.json` | `docs/api/api-spec/uats/specs/` (214) | `docs/api/api-spec/uats/runners/uats_runner.py` v1.1.0 | merge-blocking in `ci.yml` (validate-all vs live server + TSDB) |
+| UPTS | `docs/lang-parser/lang-parse-spec/upts/schema/upts.schema.json` | `docs/lang-parser/lang-parse-spec/upts/specs/` (28) | `docs/lang-parser/lang-parse-spec/upts/runners/upts_runner.py` | CI-gated in `parser-tests.yml` |
 | UBTS | `docs/tests/ubts/schema/ubts.schema.json` | `docs/tests/ubts/specs/` (3), profiles under `docs/tests/ubts/profiles/` (3) | `docs/tests/ubts/runners/ubts_runner.py` v1.1.0 | CI smoke gate in `ci.yml` (soft-fail) |
-| USTS | `docs/tests/usts/schema/usts.schema.json` | Canonical: `docs/tests/usts/specs/` (3); Drafts: `docs/tests/usts/drafts/` (2) | `docs/tests/usts/runners/usts_runner.py` | no CI gate |
+| USTS | `docs/tests/usts/schema/usts.schema.json` | Canonical: `docs/tests/usts/specs/` (5); Drafts: `docs/tests/usts/drafts/` (2) | `docs/tests/usts/runners/usts_runner.py` | merge-blocking in `ci.yml` (UXTS-CI-001) |
 | UAMS | `docs/tests/uams/schema/uams.schema.json` | `docs/tests/uams/specs/` (4) | none (spec-only, no runner/fixtures) | no CI gate |
-| UOBS | `docs/tests/uobs/schema/uobs.schema.json` | Canonical: `docs/tests/uobs/specs/` (9); Drafts: `docs/tests/uobs/drafts/` (1) | `docs/tests/uobs/runners/uobs_runner.py` | no CI gate |
-| UOTS | `docs/api/api-spec/uots/schema/uots.schema.json` | `docs/api/api-spec/uots/specs/` (11) | `docs/api/api-spec/uots/runners/uots_runner.py` | Makefile target `test-uots`; no CI gate |
-| UVTS | `docs/tests/uvts/schema/uvts.schema.json` | Canonical: `docs/tests/uvts/specs/` (1); Drafts: `docs/tests/uvts/drafts/` (1) | none (spec-only; runner stub exists but is setup-only, not functional) | canonical dialect guard via `uxts-canonical-specs.yml` |
-| UETS | `docs/tests/uets/schema/uets.schema.json` | `docs/tests/uets/specs/` (8) | `docs/tests/uets/runners/uets_runner.py` | no CI gate |
-| UITS | `docs/tests/uits/schema/uits.schema.json` | `docs/tests/uits/specs/` (11) | `docs/tests/uits/runners/uits_runner.py` | soft-fail CI gate |
-| ULTS | `docs/tests/ults/schema/ults.schema.json` | `docs/tests/ults/specs/` (16) | `docs/tests/ults/runners/ults_runner.py` | no CI gate |
+| UOBS | `docs/tests/uobs/schema/uobs.schema.json` | Canonical: `docs/tests/uobs/specs/` (11); Drafts: `docs/tests/uobs/drafts/` (1) | `docs/tests/uobs/runners/uobs_runner.py` | soft-fail CI step in `ci.yml` |
+| UOTS | `docs/api/api-spec/uots/schema/uots.schema.json` | `docs/api/api-spec/uots/specs/` (11) | `docs/api/api-spec/uots/runners/uots_runner.py` | merge-blocking in `ci.yml` (un-zombied by UXTS-CI-001); Makefile `test-uots` |
+| UVTS | `docs/tests/uvts/schema/uvts.schema.json` | Canonical: `docs/tests/uvts/specs/` (3); Drafts: `docs/tests/uvts/drafts/` (1) | `docs/tests/uvts/runners/uvts_runner.py` + `uvts_ab_compare.py` (fully functional since Phase 12; graded 120q corpus, V0016 TSDB persistence) | no CI step (stub-embedder CI grading deleted in UXTS-CI-001); live-gated via `make test-uvts-quick`/`-full` + the Note 02 A/B merge gate |
+| UETS | `docs/tests/uets/schema/uets.schema.json` | `docs/tests/uets/specs/` (8) | `docs/tests/uets/runners/uets_runner.py` | soft-fail CI step in `ci.yml` |
+| UITS | `docs/tests/uits/schema/uits.schema.json` | `docs/tests/uits/specs/` (11) | `docs/tests/uits/runners/uits_runner.py` | no CI gate (manual runner invocation only) |
+| ULTS | `docs/tests/ults/schema/ults.schema.json` | `docs/tests/ults/specs/` (17) | `docs/tests/ults/runners/ults_runner.py` | merge-blocking `--verify-hashes` in `ci.yml` (prompt-drift tripwire, UXTS-CI-001) |
 | UTDS | `docs/tests/utds/schema/utds.schema.json` | `docs/tests/utds/specs/` (3) | `docs/tests/utds/runners/utds_runner.py` | no CI gate |
-| UAITS | `docs/tests/uaits/schema/uaits.schema.json` | `docs/tests/uaits/specs/` (1: mdemg, 4 datasets) | `docs/tests/uaits/runners/uaits_runner.py` | no CI gate |
+| UAITS | `docs/tests/uaits/schema/uaits.schema.json` | `docs/tests/uaits/specs/` (1: mdemg, 4 datasets) | `docs/tests/uaits/runners/uaits_runner.py` | no CI gate (drift checker covers spec counts) |
+| UBENCH | `docs/tests/ubench/schema/ubench.schema.json` | `docs/tests/ubench/specs/` (1: mdemg, 108 rows / 17 tasks) | `docs/tests/ubench/runners/` + `docs/tests/ubench/contracts/` (pytest) | merge-blocking `make test-ubench-lint` + dataset↔holdout contract in `ci.yml` |
 
 ---
 
@@ -64,13 +65,14 @@ Last updated: 2026-06-11 (UXTS-CI-001 — counts refreshed to on-disk truth; dri
 | UOBS | `metrics`, `health`, `dependency` | `logging` (draft), `tracing` | Yes (parity hard-fail for unimplemented types) |
 | UOTS | `prometheus_metrics`, `grafana_dashboard`, `alert_rules` | `log_format`, `trace_propagation` | Yes (explicit fail for unimplemented types) |
 | UDTS | Hand-coded per RPC | N/A (not spec-driven) | N/A |
-| UVTS | N/A (spec-only, no functional runner) | All | N/A |
+| UVTS | Full grading pipeline (question corpus, per-category scoring, A/B compare with per-question regression gate) | none | N/A (quality-graded, not parity-checked) |
 | USTS | `rate_limiting`, `data_exposure`, `injection` | `authentication` (draft, needs USTS_AUTH_ENABLED), `test_cases` format (draft) | Yes (parity hard-fail for auth, test_cases) |
 | UAMS | N/A (no runner) | All | N/A |
 | UITS | All threshold fields, scoring_profiles weights/thresholds | `fidelity` (placeholder), `t2_telegraphic`/`custom` encoding | Yes (parity hard-fail for unsupported features) |
 | ULTS | All required fields, version format, task name format, quality weights sum, prompt hash format | none | Yes (parity hard-fail for unknown fields) |
 | UTDS | All required fields, export_id pattern, schema_version ≥ 8, SHA-256 checksums, row counts, privacy hard gate (violations = 0) | none | Yes (hard-fail on privacy violations, unknown tables, schema mismatch) |
 | UAITS | All required fields, paradigm enum, output_type↔paradigm match, temporal_split=true, split ratio sum, dataset name uniqueness, ULTS task name format, TSDB table names | none | Yes (parity hard-fail for unknown paradigm, invalid output type, ratio mismatch) |
+| UBENCH | All required fields, dataset/holdout SHAs, `min_rows_per_task` dataset↔holdout contract, `min_aggregate_weighted_score` + `max_truncated_rows` run gates | none | Yes (lint + contract hard-fail) |
 
 ---
 
@@ -88,10 +90,10 @@ Last updated: 2026-06-11 (UXTS-CI-001 — counts refreshed to on-disk truth; dri
 
 1. ~~Governance docs lag repo state~~ — **Remediated**: All counts and statuses updated.
 2. ~~UOBS/UOTS overlap~~ — **Remediated**: Authority split documented (UOBS = runtime, UOTS = artifacts).
-3. CI concentrated on UATS/UPTS; UBTS now has soft-fail CI. Other frameworks still lack CI gates.
+3. ~~CI concentrated on UATS/UPTS~~ — **Remediated (UXTS-CI-001, 2026-06-11)**: USTS, UOTS, ULTS `--verify-hashes`, UBENCH lint+contract, and the drift checker are merge-blocking; UBTS/UOBS/UETS run soft-fail. Remaining no-gate: UITS, UETS-full, UTDS, UAITS, UAMS (spec-only), UVTS (live-gated by design — see 6).
 4. ~~UNTS scanner limited to manifest + UDTS~~ — **Remediated**: Scanner now covers all 8 UxTS frameworks.
 5. ~~UAMS claims fixtures/runner that don't exist~~ — **Remediated**: Marked spec-only, phantom claims removed.
-6. ~~UVTS runner is setup-only~~ — **Demoted**: UVTS reclassified as spec-only (runner stub non-functional).
+6. ~~UVTS runner is setup-only~~ — **Superseded**: the runner has been fully functional since Phase 12 (graded 120q corpus, TSDB persistence, A/B harness). UVTS deliberately has no CI step — stub-embedder grading measures nothing (UXTS-CI-001); it gates retrieval changes via the live `make test-uvts-*` flow + Note 02 merge gate.
 7. ~~USTS not audited for schema-runner parity~~ — **Remediated**: Parity checks added. Auth/guardrail specs moved to drafts.
 8. **UOBS `logging` type unimplemented** — `LLMInteractionWriter` writes to `llm_interactions` hypertable but the UOBS runner does not support `type: "logging"`. Interaction metrics tracked via `type: "metrics"` as interim.
 9. **K8s/Helm manifests lack UOTS coverage** — New TimescaleDB and neural-sidecar manifests in `deploy/kubernetes/` and `deploy/helm/` have no artifact observability specs.

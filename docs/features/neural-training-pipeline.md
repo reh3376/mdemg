@@ -165,9 +165,10 @@ mdemg-neural-train --from-checkpoint .mdemg/neural/models/current
 |----------|------|---------|-------------|
 | `NEURAL_DATA_COLLECTION` | bool | `false` | Enable training data logging during retrieval |
 | `NEURAL_DATA_DIR` | string | `.mdemg/neural/training-data` | Directory for JSONL training data files |
-| `NEURAL_MODEL_DIR` | string | `.mdemg/neural/models` | Directory for versioned model checkpoints |
 | `NEURAL_RERANK_ENABLED` | bool | `false` | Use neural re-ranker instead of LLM re-ranker |
 | `NEURAL_RERANK_URL` | string | `http://localhost:8100` | Sidecar endpoint URL |
+
+The model checkpoint directory is CLI-only: `--model-dir` on `train.py` (default `.mdemg/neural/models`) — there is no `NEURAL_MODEL_DIR` env var.
 
 ### File Inventory
 
@@ -239,10 +240,10 @@ A single `Client` struct handles both providers:
 
 ```go
 client := llmclient.New(llmclient.Config{
-    Provider:  "openai",                          // or "ollama"
-    Model:     "gpt-4.1-nano",
+    Provider:  "openai",                          // OpenAI-compatible protocol (local llama-server) — or "ollama"
+    Model:     "mdemg-llm-v1",
     APIKey:    "sk-...",
-    BaseURL:   "https://api.openai.com/v1",
+    BaseURL:   "http://127.0.0.1:8102/v1",
     TimeoutMs: 30000,
 })
 

@@ -576,6 +576,10 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                     help="override n_runs")
     ap.add_argument("--enable-judge", action="store_true",
                     help="also call the LLM judge (requires OPENAI_API_KEY)")
+    ap.add_argument("--apply-tsdb", action="store_true",
+                    help="after writing the SQL sidecar, execute the INSERTs "
+                         "directly against TSDB (TSDB_* env DSN; non-fatal on "
+                         "failure — the sidecar remains the recovery path)")
     ap.add_argument("--persist-tsdb", action="store_true",
                     help="(Epic 3 TBD) also write rows to TSDB V0012 tables")
     ap.add_argument("--mlx-timeout-s", type=float, default=None,
@@ -647,6 +651,19 @@ def main(argv: list[str] | None = None) -> int:
         n = write_sql_sidecar(report, sql_path)
         print(f"tsdb sidecar written: {sql_path} ({n} statements)")
         print(f"  apply with: psql \"$TSDB_URL\" -f {sql_path}")
+
+    if ns.apply_tsdb:
+        # BENCH-SIDECAR-APPLY-001: direct apply, sidecar kept as audit artifact.
+        from neural.benchmarks.persist import apply_to_tsdb, write_sql_sidecar
+        if not opts.persist_tsdb:
+            sql_path = ns.out.with_suffix(".sql")
+            n = write_sql_sidecar(report, sql_path)
+            print(f"tsdb sidecar written: {sql_path} ({n} statements)")
+        try:
+            applied = apply_to_tsdb(report)
+            print(f"tsdb applied: {applied} statements (run_id {report.get('run_id')})")
+        except Exception as e:  # non-fatal: sidecar is the recovery path
+            print(f"WARN: tsdb apply failed ({e}) — apply the sidecar manually", file=sys.stderr)
 
     print(f"aggregate_weighted_score = {report['aggregate_weighted_score']:.4f}")
     print(f"specs_with_matched_rows  = {report['specs_with_matched_rows']}/{report['specs_total']}")

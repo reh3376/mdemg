@@ -31,7 +31,7 @@ the restore-validation reference).
 1. **Safety snapshot** (`snapshot_before: true`): a keep-forever full
    backup, and the restore now *waits for that job to complete* —
    failing closed on snapshot failure or timeout
-   (`BACKUP_SNAPSHOT_WAIT_TIMEOUT_SEC`, default 300).
+   (`BACKUP_SNAPSHOT_WAIT_TIMEOUT_SEC`, default 3600).
 2. **Checksum gate**: the file's SHA-256 must match the manifest before
    any import. Legacy manifests without a checksum warn and proceed.
 3. **Completeness check**: the file's actual chunk counts must match the
@@ -65,7 +65,7 @@ NOSILENT-001's tsdb-backup rule via a shared factory.
 |---|---|---|
 | `BACKUP_ENABLED` | true | Neo4j backup subsystem |
 | `BACKUP_INITIAL_DELAY_MIN` | 5 | initial partial backup after start (0 = off) |
-| `BACKUP_SNAPSHOT_WAIT_TIMEOUT_SEC` | 300 | max wait for triggered backup jobs (safety snapshot + scheduled-run reporting) |
+| `BACKUP_SNAPSHOT_WAIT_TIMEOUT_SEC` | 3600 | max wait for triggered backup jobs (safety snapshot + scheduled-run reporting) |
 | `BACKUP_JOB_STALENESS_HOURS` | 0 | staleness alert window; 0 = partial interval × 2 |
 
 ## How to use

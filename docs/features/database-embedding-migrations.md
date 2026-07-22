@@ -55,6 +55,12 @@ mdemg db stop --remove       # Stop and remove container (volume preserved)
 mdemg db shell               # Open cypher-shell in running container
 ```
 
+> ⚠️ **Footgun:** `mdemg db start` creates a fresh single-container volume
+> (`mdemg-neo4j-data`, hyphens) — NOT the Docker Compose volume
+> (`mdemg_neo4j_data`, underscores) that holds existing CMS data. On an
+> existing install use `docker compose up -d neo4j` instead, or the graph
+> comes up empty.
+
 **Embedding Provider Check:**
 
 ```bash

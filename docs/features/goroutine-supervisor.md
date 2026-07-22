@@ -38,13 +38,15 @@ after the supervisor is already running; `Go` registers and launches
 immediately. The supervisor outlives permanently-failed workers so late
 workers stay supervised.
 
-### Supervised loops (15 when fully enabled)
+### Supervised loops (15 when fully enabled, 16 with the FT loop)
 
 health-prober, mlx-watchdog, alert-evaluator (original 3) +
 periodic-consolidation, context-cooler, space-prune-scheduler,
 weekly-gap-interviews, scheduled-sync, rsic-macro-cron, rsic-watchdog,
 rsic-store-flush, signal-learner-flush, neo4j-backup-scheduler,
 tsdb-backup-scheduler, llm-fastfail-burst-flush (SUPERVISOR-002).
+ft-loop-controller joins as a conditional 16th when `FT_LOOP_ENABLED=true`
+(FT-RECURSIVE-002; `server.go::goSupervised("ft-loop-controller", …)`).
 
 The buffered TSDB event writers are deliberately NOT supervised here —
 their failure mode is flush-error and their observability is

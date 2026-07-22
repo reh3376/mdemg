@@ -53,6 +53,8 @@ The LLM is constrained by a system prompt that instructs output of ONLY the rewr
 2. `INTENT_ENABLED=false` — Translator not initialized (nil check)
 3. LLM error or timeout — Original query used, error logged, request continues
 
+Per-call URL override: `?intent=true|false` on `/v1/memory/retrieve` (mirrors `?sparse=`) forces translation on/off for one call — the INTENT-DISABLE-001 re-verification A/B tool.
+
 ### Configuration
 
 See Configuration Reference table below.
@@ -61,8 +63,8 @@ See Configuration Reference table below.
 
 ### Known Limitations
 
-- Disabled by default (`INTENT_ENABLED=false`) — must be explicitly enabled
-- Adds ~200-500ms latency per query (LLM round-trip)
+- Disabled by default (`INTENT_ENABLED=false`) — evidence-backed (INTENT-DISABLE-001 120q UVTS A/B: intent OFF 0.4170 vs ON 0.4070, net −0.010); re-enable only after a fresh `?intent=true` 120q A/B shows a real lift
+- Adds avg ~3.8s (up to 15s) latency per query (LLM round-trip, live-measured in INTENT-DISABLE-001)
 - Quality depends on LLM model capability
 
 ### Risks & Gaps
@@ -94,7 +96,7 @@ None — intent translation is API-only (triggered via request field).
 | `INTENT_PROVIDER` | `openai` | LLM provider: `openai` or `ollama` |
 | `INTENT_MODEL` | `gpt-4o-mini` | Model for intent translation |
 | `INTENT_MAX_TOKENS` | `150` | Max tokens for rewritten query (10-500) |
-| `INTENT_TIMEOUT_MS` | `2000` | Timeout in ms (min: 200) |
+| `INTENT_TIMEOUT_MS` | `15000` | Timeout in ms (min: 200; raised from 2000 in INTENT-DISABLE-001 — 2000 was below avg local-model latency ~4400ms) |
 
 ## Dependencies
 

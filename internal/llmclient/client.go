@@ -298,8 +298,21 @@ func (c *Client) CompleteWithUsage(ctx context.Context, messages []Message, opts
 	return text, tokensIn, tokensOut, err
 }
 
+// isCallerCancellation reports whether err is the caller's context being
+// canceled or its deadline expiring — the LLM-HEALTH-INVESTIGATION-001
+// contract: caller-cancellation is NOT an LLM health event. Real HTTP-500s /
+// provider timeouts / parse errors are neither Canceled nor DeadlineExceeded.
+func isCallerCancellation(err error) bool {
+	return errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)
+}
+
 // trackResult updates the consecutive failure counter and fires the alert callback
 // only on the transition to tripped state. On success the counter and tripped flag reset.
+// Caller cancellations are NEUTRAL: they don't count toward the threshold (not an
+// LLM health event) and don't reset it (no evidence the endpoint is healthy either) —
+// without this, a saturation window of client-deadline cancellations fires HIGH
+// consecutive-failure alerts while the filtered real-error rate is zero
+// (LLM-HEALTH-CANCELLATION-ALERT-001; the watchdog remains the server-down authority).
 func (c *Client) trackResult(err error) {
 	if c.consecutiveFailures == nil {
 		return
@@ -309,6 +322,9 @@ func (c *Client) trackResult(err error) {
 		if c.tripped != nil {
 			c.tripped.Store(false)
 		}
+		return
+	}
+	if isCallerCancellation(err) {
 		return
 	}
 	count := c.consecutiveFailures.Add(1)
@@ -357,7 +373,7 @@ func (c *Client) recordInteraction(ctx context.Context, messages []Message, resp
 		// cancellation is not an LLM health event. Real HTTP-500s / provider
 		// timeouts / parse errors are neither Canceled nor DeadlineExceeded, so
 		// they land in the error rate as before.
-		if errors.Is(callErr, context.Canceled) || errors.Is(callErr, context.DeadlineExceeded) {
+		if isCallerCancellation(callErr) {
 			rec.Error = "caller_canceled: " + callErr.Error()
 		} else {
 			rec.Error = callErr.Error()

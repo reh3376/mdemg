@@ -141,7 +141,7 @@ TimescaleDB stores operational metrics, LLM interaction logs, embedding events, 
 | SSL mode | `TSDB_SSL_MODE` | `disable` | PostgreSQL SSL mode |
 | Max conns | `TSDB_MAX_CONNS` | `10` | Connection pool size |
 | Flush interval | `TSDB_FLUSH_INTERVAL_SEC` | `60` | Seconds between batch flushes to TSDB |
-| Schema version | `TSDB_REQUIRED_SCHEMA_VERSION` | `8` | Required schema version (server refuses to start if behind) |
+| Schema version | `TSDB_REQUIRED_SCHEMA_VERSION` | `31` | Required schema version (server refuses to start if behind) |
 
 ### Event Logging Flags
 

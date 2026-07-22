@@ -109,9 +109,9 @@ Thank you for your interest in contributing to MDEMG (Multi-Dimensional Emergent
 
 ### Test Frameworks
 
-All test frameworks in this project follow the **UxTS (Universal-x Test Specification)** methodology — declarative JSON specs validated by executable runners governed by explicit schemas. For the comprehensive guide covering architecture, spec writing, CI integration, governance, and all 15 frameworks, see **[docs/guides/UXTS_DEVELOPER_GUIDE.md](docs/guides/UXTS_DEVELOPER_GUIDE.md)**.
+All test frameworks in this project follow the **UxTS (Universal-x Test Specification)** methodology — declarative JSON specs validated by executable runners governed by explicit schemas. For the comprehensive guide covering architecture, spec writing, CI integration, governance, and all 16 frameworks, see **[docs/guides/UXTS_DEVELOPER_GUIDE.md](docs/guides/UXTS_DEVELOPER_GUIDE.md)**.
 
-**UPTS (Universal Parser Test Specification)** validates 27 language parsers against JSON spec files with SHA256 fixture verification. There are two runners:
+**UPTS (Universal Parser Test Specification)** validates 28 language parsers against JSON spec files with SHA256 fixture verification. There are two runners:
 
 1. **Go-native test harness** (`internal/languages/upts_test.go`): Loads UPTS specs, parses fixtures through the actual Go parser, and validates output against expected symbols. No external dependencies — runs via standard `go test`. This is the primary validation method.
 
@@ -282,6 +282,11 @@ go test ./tests/udts/... -run TestUNTS -v
 | UNTS | Hash verification | `internal/unts/`, `docs/specs/` |
 | UETS | Emergence evaluation | `docs/tests/uets/` |
 | UITS | Iterative-improvement | `docs/tests/uits/` |
+| UOTS | Artifact-level observability contracts | `docs/api/api-spec/uots/` |
+| ULTS | LLM task contracts | `docs/tests/ults/` |
+| UTDS | Training-data export validation | `docs/tests/utds/` |
+| UAITS | Training-data curation governance | `docs/tests/uaits/` |
+| UBENCH | Aggregate LLM eval benchmark | `docs/tests/ubench/` |
 
 ### Dynamic Port Allocation
 
@@ -289,7 +294,7 @@ The MDEMG server uses dynamic port allocation. When started, it writes the actua
 
 ## Claude Code Hooks
 
-Five hooks in `.claude/hooks/` are **tracked in the repository** (explicitly un-ignored in `.gitignore`). These are project-level infrastructure — CMS integration, destructive command guards, and context management — shared across all developers. Do not modify them without a PR.
+Six hooks in `.claude/hooks/` are **tracked in the repository** (explicitly un-ignored in `.gitignore`). These are project-level infrastructure — CMS integration, destructive command guards, and context management — shared across all developers. Do not modify them without a PR.
 
 The rest of `.claude/` (settings, memory, etc.) remains gitignored and developer-specific.
 
@@ -299,13 +304,14 @@ The rest of `.claude/` (settings, memory, etc.) remains gitignored and developer
 |------|---------|---------|
 | `post-tool-observe.py` | After tool use | Auto-captures CMS observations (build results, errors, config changes); triggers codebase re-ingest on `git push`; detects degraded memory state in API responses |
 | `pre-bash-check.py` | Before Bash | Blocks destructive commands (reset-db, rm -rf, force push, DROP TABLE) |
+| `pre-write-check.py` | Before Write/Edit | (`/strict` mode only) Blocks Write/Edit when an escalated constraint is violated; fail-open when the server is unreachable |
 | `session-start.sh` | Session start | Restores CMS context via `/v1/conversation/resume`; detects 0-observation anomaly with CRITICAL warning; auto-triggers RSIC micro assessment; displays RSIC health summary |
 | `prompt-context.sh` | Before prompt | Injects CMS recall context; warns on empty recall for non-trivial queries; displays session health ribbon |
 | `pre-compact.sh` | Before compaction | Saves context snapshot to CMS before auto-compaction; includes session health in snapshot |
 
 ### Re-Ingest on Push
 
-The `post-tool-observe.py` hook detects `git push` commands targeting the mdemg repo and automatically triggers an incremental codebase re-ingest + consolidation via `bin/ingest-codebase`. This keeps the `mdemg-dev` CMS space in sync with the latest code.
+The `post-tool-observe.py` hook detects `git push` commands targeting the mdemg repo and automatically triggers an incremental codebase re-ingest + consolidation via `./bin/mdemg ingest --incremental --consolidate`. This keeps the `mdemg-dev` CMS space in sync with the latest code.
 
 If this hook is missing or the binary is not built, re-ingest must be triggered manually:
 
@@ -321,7 +327,7 @@ curl http://localhost:9999/v1/memory/ingest/status/<job_id>
 
 ### Hook Registration
 
-The 5 tracked hooks are automatically available when you clone the repo. Hook registration in `.claude/settings.local.json` (developer-specific, gitignored) can be generated with:
+The 6 tracked hooks are automatically available when you clone the repo. Hook registration in `.claude/settings.local.json` (developer-specific, gitignored) can be generated with:
 
 ```bash
 # Automatic (recommended) — registers hooks in settings
@@ -456,7 +462,7 @@ Full details, code examples, and the guide for adding new steps: **[docs/develop
 
 ## API Endpoints
 
-Full API specs are in `docs/api/api-spec/uats/specs/` (one `.uats.json` per endpoint). Below is the complete endpoint list registered in `internal/api/server.go`:
+Full API specs are in `docs/api/api-spec/uats/specs/` (one `.uats.json` per endpoint). Below is a partial endpoint list registered in `internal/api/server.go` (167 routes total — see [docs/user/api-reference.md](docs/user/api-reference.md) for the full reference):
 
 ### Health & Readiness
 
@@ -657,7 +663,7 @@ Auto-prune scheduler runs in the background on a configurable interval (`SPACE_P
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/v1/metrics` | Prometheus-style metrics |
+| GET | `/v1/metrics` | JSON graph metrics (nodes by layer, edges by type, hub nodes) |
 | GET | `/v1/metrics/snapshot` | JSON metrics snapshot endpoint |
 | GET | `/v1/modules` | List modules |
 | POST | `/v1/modules/{id}` | Module sync |
@@ -665,7 +671,6 @@ Auto-prune scheduler runs in the background on a configurable interval (`SPACE_P
 | POST | `/v1/plugins/create` | Create plugin from spec |
 | GET | `/v1/ape/status` | APE scheduler status |
 | POST | `/v1/ape/trigger` | Trigger APE action |
-| POST | `/v1/feedback` | Submit feedback |
 | GET | `/v1/system/capability-gaps` | List capability gaps |
 | * | `/v1/system/capability-gaps/{id}` | Capability gap operations |
 | GET | `/v1/system/gap-interviews` | Gap interview sessions |

@@ -67,7 +67,7 @@ mdemg synergy check [--auto] [--space-id]      # Cron-compatible health check
 
 ### RSIC Monitoring (Epic 3)
 
-**New Assessment Dimension**: `SynergyHealth` added as 7th RSIC dimension (10% weight).
+**New Assessment Dimension**: `SynergyHealth` added as 7th RSIC dimension (weight `0.05` — `RSIC_HEALTH_WEIGHT_SYNERGY`, DH-005 default).
 
 Scoring factors:
 - Jiminy health (unhealthy → 0.0 score)
@@ -97,11 +97,12 @@ Scoring factors:
 | `SYNERGY_TARGET_CLAUDE_LINES` | 150 | Target CLAUDE.md line count |
 | `SYNERGY_TARGET_MEMORY_LINES` | 120 | Target MEMORY.md line count |
 | `SYNERGY_OVERLAP_SAMPLE_SIZE` | 5 | Lines sampled for overlap check |
-| `SYNERGY_OVERLAP_THRESHOLD` | 0.85 | Similarity threshold |
 | `SYNERGY_OVERFLOW_ALERT_THRESHOLD` | 5 | Events/24h before RSIC alert |
-| `SYNERGY_MAX_HOOK_TOKENS` | 500 | Max per-prompt hook tokens |
-| `SYNERGY_CRON_INTERVAL` | 4h | Health check cron interval |
-| `SYNERGY_CRON_ENABLED` | true | Cron health checks switch |
+
+(An earlier version of this table listed `SYNERGY_OVERLAP_THRESHOLD`,
+`SYNERGY_MAX_HOOK_TOKENS`, `SYNERGY_CRON_INTERVAL`, and
+`SYNERGY_CRON_ENABLED` — none of these were ever read by
+`internal/config/config.go`; the eight rows above are the complete family.)
 
 ## Key Files
 

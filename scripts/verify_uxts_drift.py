@@ -114,8 +114,16 @@ def parse_documented_counts(matrix_path: Path) -> dict[str, int]:
     text = matrix_path.read_text(encoding="utf-8")
     counts: dict[str, int] = {}
     # Match rows like: | UATS | ... | active (124 specs, CI-gated) | 124 canonical, 7 drafts |
+    # Scope to the "## 1) Framework Inventory" section ONLY: later sections
+    # (e.g. §2 Source of Truth) also start rows with framework names but put
+    # other columns at index 5 — DOC-CURRENCY-002's CI column mentions
+    # "UXTS-CI-001", whose digits this regex misread as a spec count of 1.
+    in_inventory = False
     for line in text.splitlines():
-        if not line.startswith("|"):
+        if line.startswith("## "):
+            in_inventory = line.startswith("## 1)")
+            continue
+        if not in_inventory or not line.startswith("|"):
             continue
         cells = [c.strip() for c in line.split("|")]
         if len(cells) < 6:

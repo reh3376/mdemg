@@ -219,7 +219,7 @@ mdemg_rsic_health_protocol_confidence{space_id}
 mdemg_rsic_health_synergy_confidence{space_id}
 ```
 
-Exposed via `/metrics`, persisted by TSDB writeback, and visualised in the "Dimension Confidence (DH-005)" row of the `mdemg-rsic` Grafana dashboard.
+Exposed via `/v1/metrics/snapshot`, persisted by TSDB writeback, and visualised in the "Dimension Confidence (DH-005)" row of the `mdemg-rsic` Grafana dashboard.
 
 ## Context Cooler Graduation Fix (DH-004)
 

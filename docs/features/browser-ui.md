@@ -12,7 +12,7 @@ phase: "DOCKER-P2b"
 ## Summary
 
 **Feature**: Browser Dashboard UI
-**Summary**: 10-tab embedded web dashboard at /ui/ for status monitoring, memory exploration, learning controls, configuration, logs, RSIC, plugins, features, backups, and training data.
+**Summary**: 11-tab embedded web dashboard at /ui/ for status monitoring, memory exploration, learning controls, configuration, logs, RSIC, plugins, features, backups, training data, and human review (HITL).
 
 
 The MDEMG browser dashboard is a lightweight web UI served at `/ui/` from the MDEMG server. It provides quick health overview, unique data not available in Grafana, and action triggers — all without leaving the browser.
@@ -47,6 +47,7 @@ The port is whatever `MDEMG_PORT` is set to in your `.env` (default 9999).
 | **Features** | Controllable + config-only service listing with lifecycle controls | `GET /v1/admin/features`, `POST /v1/admin/features/start\|stop\|restart` |
 | **Backup** | Trigger/list/restore/delete backups, active operation polling, type filter | `/v1/backup/trigger`, `/v1/backup/list`, `/v1/backup/status/*`, `/v1/backup/restore`, `DELETE /v1/backup/{id}` |
 | **Training Data** | Export TSDB training data for LoRA fine-tuning curation pipeline | `POST /v1/training-data/export`, `GET /v1/training-data/status/{id}`, `GET /v1/training-data/download/{id}` |
+| **Review** | HITL grading of curated datasets against versioned rubrics, gold certification, optional live reinforcement (HITL-REVIEW-001) | `/v1/review/*` |
 
 ## Config Tab — Editable Configuration
 
@@ -188,7 +189,7 @@ internal/api/
   ui_embed.go             — //go:embed ui/* + http.FileServer
   ui/
     index.html            — HTML shell + Catppuccin Mocha CSS
-    main.js               — Tab switching, polling orchestration (9 tabs)
+    main.js               — Tab switching, polling orchestration (11 tabs)
     api.js                — All fetch() calls (get/post/patch/del)
     state.js              — Pub/sub reactive state
     utils/
@@ -205,6 +206,7 @@ internal/api/
       features.js         — Service listing with lifecycle controls
       backup.js           — Backup trigger/list/restore/delete + status polling
       training_data.js    — Training data export for LoRA fine-tuning
+      review.js           — HITL dataset grading (HITL-REVIEW-001)
 ```
 
 ## E2E Test Coverage (UI-AUDIT-2026-04-09)

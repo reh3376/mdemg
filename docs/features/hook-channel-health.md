@@ -67,7 +67,7 @@ Config (all default-on, no hardcoding):
 | `HOOK_ACTIVITY_MIN_EVENTS` | `5` | activity heartbeats required before the rule is eligible |
 | `HOOK_HEARTBEAT_COOLDOWN_SEC` | `300` | post-tool-observe heartbeat throttle |
 | `MDEMG_BIND_ADDR` | `127.0.0.1` | compose publish address (`0.0.0.0` = wide, pair with `AUTH_API_KEYS`) |
-| `SIDECAR_HOST` | `127.0.0.1` | neural sidecar bind (pydantic-settings) |
+| `NEURAL_HOST` | `127.0.0.1` | neural sidecar bind (pydantic-settings `env_prefix="NEURAL_"` + field `host`) |
 
 Known limitation: PostToolUse fires only on successful tool completion
 (HOOKWIRE-001), so the activity heartbeat undercounts on failure-heavy

@@ -254,17 +254,17 @@ UxTS currently defines 15 frameworks, each owning one verification concern:
 
 | Acronym | Full Name | Domain | Status | Specs |
 |---------|-----------|--------|--------|-------|
-| **UATS** | Universal API Test Specification | HTTP endpoint acceptance contracts | active | 129 |
+| **UATS** | Universal API Test Specification | HTTP endpoint acceptance contracts | active | 214 |
 | **UPTS** | Universal Parser Test Specification | Language parser conformance | active | 27 |
 | **UBTS** | Universal Benchmark Test Specification | Throughput/latency/load regression | active | 3 |
 | **UETS** | Universal Emergence Test Specification | LLM concept-naming quality | active | 8 |
 | **UOBS** | Universal Observability Specification | Runtime observability behavior | active | 3 |
-| **UOTS** | Universal Observability Test Specification | Artifact-level observability contracts | active | 5 |
+| **UOTS** | Universal Observability Test Specification | Artifact-level observability contracts | active | 11 |
 | **UDTS** | Universal DevSpace Test Specification | gRPC contract tests | active | 7 |
 | **UNTS** | Universal Hash Test Specification | Hash integrity registry | active | N/A (registry) |
 | **USTS** | Universal Security Test Specification | Security behavior and hardening | pilot | 3 |
 | **UAMS** | Universal Auth Method Specification | Auth method contracts | spec-only | 4 |
-| **UVTS** | Universal Validation Test Specification | Semantic retrieval quality | spec-only | 1 |
+| **UVTS** | Universal Validation Test Specification | Semantic retrieval quality | active (live-gated) | 3 |
 | **UITS** | Universal Iterative-Improvement Test Specification | T1 encoding comprehension | active | 11 |
 | **ULTS** | Universal LLM Task Specification | LLM task contracts, quality metrics | active | 16 |
 | **UTDS** | Universal Training Data Specification | Export manifests, privacy gates | active | 3 |
@@ -678,18 +678,18 @@ The source of truth for this table is `docs/development/UXTS_FRAMEWORK_MATRIX.md
 
 | Framework | Schema | Specs Dir | Runner | CI Gate | Status |
 |-----------|--------|-----------|--------|---------|--------|
-| **UATS** | `docs/api/api-spec/uats/schema/uats.schema.json` | `docs/api/api-spec/uats/specs/` (129) | `uats_runner.py` v1.1.0 | `ci.yml` (block) | active |
+| **UATS** | `docs/api/api-spec/uats/schema/uats.schema.json` | `docs/api/api-spec/uats/specs/` (214) | `uats_runner.py` v1.1.0 | `ci.yml` (block) | active |
 | **UPTS** | `docs/lang-parser/lang-parse-spec/upts/schema/upts.schema.json` | `docs/lang-parser/lang-parse-spec/upts/specs/` (27) | `upts_runner.py` | `parser-tests.yml` (block) | active |
 | **UBTS** | `docs/tests/ubts/schema/ubts.schema.json` | `docs/tests/ubts/specs/` (3) | `ubts_runner.py` v1.1.0 | `ci.yml` (soft-fail) | active |
 | **UETS** | `docs/tests/uets/schema/uets.schema.json` | `docs/tests/uets/specs/` (8) | `uets_runner.py` | No CI gate | active |
 | **UOBS** | `docs/tests/uobs/schema/uobs.schema.json` | `docs/tests/uobs/specs/` (3) | `uobs_runner.py` | No CI gate | active |
-| **UOTS** | `docs/api/api-spec/uots/schema/uots.schema.json` | `docs/api/api-spec/uots/specs/` (5) | `uots_runner.py` | Makefile target | active |
+| **UOTS** | `docs/api/api-spec/uots/schema/uots.schema.json` | `docs/api/api-spec/uots/specs/` (11) | `uots_runner.py` | `ci.yml` (block) + Makefile target | active |
 | **UDTS** | `docs/api/api-spec/udts/schema/udts.schema.json` | `docs/api/api-spec/udts/specs/` (7) | `contract_test.go` | Canonical guard | active |
 | **UNTS** | N/A (registry format) | `docs/specs/unts-registry.json` | `internal/unts/` (Go) | No CI gate | active |
 | **USTS** | `docs/tests/usts/schema/usts.schema.json` | `docs/tests/usts/specs/` (3) | `usts_runner.py` | No CI gate | pilot |
 | **UAMS** | `docs/tests/uams/schema/uams.schema.json` | `docs/tests/uams/specs/` (4) | None | No CI gate | spec-only |
 | **UITS** | `docs/tests/uits/schema/uits.schema.json` | `docs/tests/uits/specs/` (11) | `uits_runner.py` | Soft-fail | active |
-| **UVTS** | `docs/tests/uvts/schema/uvts.schema.json` | `docs/tests/uvts/specs/` (1) | None (stub only) | Canonical guard | spec-only |
+| **UVTS** | `docs/tests/uvts/schema/uvts.schema.json` | `docs/tests/uvts/specs/` (3) | `uvts_runner.py` + `uvts_ab_compare.py` | Live-gated (`make test-uvts-*`, no CI step) | active (live-gated) |
 
 ### 6.4 Case Study: The UOBS/UOTS Authority Split
 

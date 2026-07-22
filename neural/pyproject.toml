@@ -21,6 +21,10 @@ dev = [
 training = [
     "jsonschema>=4.20.0",
     "cuid2>=2.0.0",
+    # BENCH-SIDECAR-APPLY-001: run_benchmark --apply-tsdb + UVTS runner TSDB
+    # persistence (psycopg v3; soft-import in code, declared here because the
+    # training extra is where benchmark tooling deps live).
+    "psycopg[binary]>=3.1",
 ]
 lora = [
     "mlx-lm>=0.20.0",

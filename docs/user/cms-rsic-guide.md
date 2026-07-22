@@ -771,7 +771,7 @@ curl -s -X POST http://localhost:9999/v1/self-improve/assess \
 
 **Sub-score calculation**:
 
-- **Overall Health** = 0.30 x retrieval_quality + 0.25 x memory_health + 0.25 x edge_health + 0.20 x task_performance
+- **Overall Health** (DH-005) = normalized weighted-confidence sum over up to 7 dimensions: `overall = Σ(w_i·c_i·s_i) / Σ(w_i·c_i)` where `s_i` is the dimension score, `c_i` its data-sufficiency confidence, and `w_i` a configurable weight (`RSIC_HEALTH_WEIGHT_*`, defaults: retrieval 0.08, memory 0.15, edge 0.15, task 0.20, guidance 0.17, protocol 0.20, synergy 0.05). Dimensions without data (confidence = 0) are excluded automatically, not penalized. See `docs/features/rsic-feedback-loop.md`.
 - **Retrieval Quality**: Based on learning phase (cold=0.3, learning=0.6, warm=0.9, saturated=0.7)
 - **Memory Health**: Starts at 1.0, penalized by high orphan ratio (>10%: -0.1, >20%: -0.3), high correction rate (>15%: -0.2), stale consolidation (>24h: -0.2)
 - **Edge Health**: Starts at 1.0, penalized by high ratio of weak edges (>30%: -0.3) and low entropy (<0.5: -0.2)
@@ -1211,7 +1211,7 @@ mdemg hooks list
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `JIMINY_ENABLED` | `false` | Must be set to `true` to enable Jiminy. When disabled, the endpoint returns 503 and hooks skip guidance injection. |
+| `JIMINY_ENABLED` | `true` | Enabled by default in the binary (the Docker compose template defaults the container to `false` unless set in `.env`). When disabled, the endpoint returns 503 and hooks skip guidance injection. |
 | `JIMINY_MAX_ITEMS` | `10` | Maximum guidance items per request |
 | `JIMINY_TIMEOUT_MS` | `6000` | Timeout for guidance generation (ms). Jiminy queries four sources in parallel; this caps total wall time. |
 | `JIMINY_MIN_CONFIDENCE` | `0.3` | Minimum confidence threshold for inclusion |

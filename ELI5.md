@@ -166,7 +166,7 @@ Jiminy flips this around. Instead of waiting to be asked, it **proactively check
 ```
 You type: "Let's refactor the auth module to use session cookies"
                     ↓
-        Jiminy activates (runs in the background, < 6 seconds)
+        Jiminy activates (runs in the background, a few seconds)
                     ↓
     ┌───────────────┼───────────────┐───────────────┐
     ↓               ↓               ↓               ↓
@@ -195,7 +195,7 @@ You type: "Let's refactor the auth module to use session cookies"
         AI sees the warning BEFORE responding to you
 ```
 
-All four checks run **in parallel** (at the same time) with a 6-second timeout. If any source is slow or fails, the others still work — Jiminy is designed to fail silently rather than block your work.
+All four checks run **in parallel** (at the same time), taking a few seconds in the background. If any source is slow or fails, the others still work — Jiminy is designed to fail silently rather than block your work.
 
 **Real-world analogy:** Jiminy is literally your conscience. That voice in your head that says "wait, don't touch the hot stove — remember what happened last time?" That's what Jiminy does for AI agents. It's the difference between an AI that repeats mistakes and one that learns from them.
 

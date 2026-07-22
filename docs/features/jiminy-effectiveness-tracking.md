@@ -55,9 +55,9 @@ For each tracked guidance item, the system classifies the outcome using a 3-tier
 |---------|---------|-----------|
 | `followed` | Agent acted consistently with guidance | Tier 1: similarity >= 0.55 and no negation; or Tier 2: LLM judgment |
 | `partial_compliance` | Agent partially addressed guidance | Tier 2: LLM judgment; or Tier 3: heuristic fallback for uncertain range |
-| `ignored` | Agent's action shows no evidence of considering guidance | Tier 2: LLM semantic judgment only |
+| `ignored` | Agent's action shows no evidence of considering guidance | Tier 1: similarity in `[0.10, 0.20)` (relevant domain, JIMINY-CORPUS-001 E4); or Tier 2: LLM semantic judgment |
 | `contradicted` | Agent's action directly opposes guidance | Tier 2: LLM judgment (with negation context); or Tier 3: heuristic when negation detected and no LLM |
-| `not_applicable` | Guidance topic unrelated to action | Tier 1: similarity < 0.20 |
+| `not_applicable` | Guidance topic unrelated to action | Tier 1: similarity < `JIMINY_OUTCOME_NOT_APPLICABLE_SIMILARITY` (0.10) |
 | `unknown` | No action_summary provided or classification failed | Empty input or LLM/parse error |
 
 Negation patterns ("instead of", "did not", "skipped", etc.) are detected but never short-circuit classification — they are passed as context to the LLM Tier 2 for semantic evaluation. The LLM prompt explains that action summaries using `replaced 'OLD' with 'NEW'` format mean OLD was removed, so negation words in OLD text are from deleted code.
@@ -177,10 +177,11 @@ See `docs/features/j17-feedback-loop-closure.md` for the full implementation sto
 
 | Parameter | Default | Env Var | Description |
 |-----------|---------|---------|-------------|
-| JiminyEffectivenessEnabled | `true` | `JIMINY_EFFECTIVENESS_ENABLED` | Enable/disable effectiveness tracking |
-| JiminyEffectivenessTTLSec | `7200` | `JIMINY_EFFECTIVENESS_TTL_SEC` | TTL for tracked guidance (seconds) |
+| JiminyEffectivenessTTLSec | `86400` | `JIMINY_EFFECTIVENESS_TTL_SEC` | TTL for tracked guidance (seconds; raised 7200→86400 by DD-P1P2 — must exceed realistic feedback delay) |
 
-When disabled, `Guide()` still works normally but doesn't generate `guidance_id` or track items.
+There is no separate enable flag — tracking is unconditional while Jiminy is
+enabled (an earlier version of this doc described a `JIMINY_EFFECTIVENESS_ENABLED`
+variable that never existed).
 
 ## Key Files
 

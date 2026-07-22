@@ -14,6 +14,12 @@ phase: FT-OAI-001
 **Feature**: OpenAI Fine-Tuning Post-Processor + Evaluation Harness
 **Summary**: Converts MDEMG's curated MLX chat JSONL into OpenAI-shaped train/val files, launches and monitors an OpenAI fine-tuning job, then runs a seeded cosine-similarity evaluation of the fine-tuned model against its base. Produced the first in-house fine-tune: `ft:gpt-4.1-mini-2025-04-14:whiskey-house:mdemg-ftoai001:DX9KJuuq`.
 
+> **Status (2026-04-22): OpenAI fine-tuning is DROPPED.** FT-OAI-003 was never run;
+> all fine-tuning moved to local MLX LoRA (production model `mdemg-llm-v1` served via
+> llama-server). Runtime defaults are local-first (`LLM_MODEL=mdemg-llm-v1`,
+> CONFIG-LOCAL-DEFAULTS-001); OpenAI remains teacher/embedding-only. Retained as
+> history of the FT-OAI-001/002 line.
+
 ## Vision & Goals
 
 MDEMG generates high volumes of structured LLM interactions across ~10 task types (`ape.reflect`, `consulting.classify`, `retrieval.query_classify`, `jiminy.*`, `hidden.*`, …). Each task has a fixed JSON output schema defined in its ULTS spec. Off-the-shelf base models (e.g. `gpt-4.1-mini-2025-04-14`) follow these schemas well enough for bootstrap but drift on rarer task variants and occasionally hallucinate fields.
@@ -48,7 +54,7 @@ Verdict (vs `gpt-4.1-mini` base, in-frame): **MARGINAL** on mean cosine (+0.032,
 | **FT-OAI-001 (this run)** | **0.8641** | **−0.0339** |
 | Stock `gpt-5.4-mini` (prod target) | 0.8980 | 0.0000 |
 
-**FT-OAI-001 closed ~48% of the stock-4.1-mini → stock-5.4-mini quality gap** (0.0319 / 0.0658). The north star is not "FT beats prod on quality" — it is **`FT(gpt-4.1-mini) ≈ prod(gpt-5.4-mini)` quality at `gpt-4.1-mini` inference cost.** `gpt-4.1-mini` is materially cheaper per token than `gpt-5.4-mini`; if FT-OAI-003 closes the remaining ~52% of the gap, we get prod-level responses at the cheaper base's cost envelope — a significant economic win at scale.
+**FT-OAI-001 closed ~48% of the stock-4.1-mini → stock-5.4-mini quality gap** (0.0319 / 0.0658). The north star is not "FT beats prod on quality" — it is **`FT(gpt-4.1-mini) ≈ prod(gpt-5.4-mini)` quality at `gpt-4.1-mini` inference cost.** `gpt-4.1-mini` is materially cheaper per token than `gpt-5.4-mini`; if FT-OAI-003 closes the remaining ~52% of the gap, we get prod-level responses at the cheaper base's cost envelope — a significant economic win at scale. *(FT-OAI-003 dropped 2026-04-22 — never run.)*
 
 **Deploy decision:** deferred pending the actual per-token cost ratio of `gpt-4.1-mini` vs `gpt-5.4-mini` on recent OpenAI billing. `.env` / `.env.example` remain unchanged. Calling deploy now would be premature. Worst regressions to address in FT-OAI-003: `retrieval.intent_translate` −0.149, `hidden.name_emergence` −0.114, `__unattributed__` −0.113.
 
@@ -177,7 +183,7 @@ These limitations from the FT-OAI-001 run have been addressed. The sprint did no
 - **G1b — `finish_reason` captured**: eval harness now reads `resp.choices[0].finish_reason` and writes the value (`stop`, `length`, etc.) into every row.
 - **G1c — token counts**: `prompt_tokens` and `completion_tokens` captured from `resp.usage` into every row.
 - **A1–A7 per-record metrics**: rows now also carry `latency_ms` (from `time.perf_counter()` wall-clock on the completion call), `retry_count`, `truncation_flag` (derived from `finish_reason == "length"`), `embedding_model_version`, `request_id`, `hallucination_indicator` (fires when GT is `{"type":"none","summary":""}` and response is not), `input_chars`, `output_chars`. `summary.json` gained `latency_stats` (mean / p50 / p95 / p99), `truncation_rate`, `mean_retries`, and `hallucination_rate_on_none_gt`.
-- **G3 — `__unattributed__` attribution**: investigation at `training_data/openai_ft/20260420/unattributed_investigation.md` showed the bucket is 100% recoverable by a sys-prompt-only fallback (14 unique system_prompts in `filtered.jsonl`, zero cross-task collisions, 605/605 test records recoverable). The fix itself lands in FT-OAI-003 per Epic 4 gate (no mid-sprint heuristic changes).
+- **G3 — `__unattributed__` attribution**: investigation at `training_data/openai_ft/20260420/unattributed_investigation.md` showed the bucket is 100% recoverable by a sys-prompt-only fallback (14 unique system_prompts in `filtered.jsonl`, zero cross-task collisions, 605/605 test records recoverable). The fix itself lands in FT-OAI-003 per Epic 4 gate (no mid-sprint heuristic changes). *(Never landed — FT-OAI-003 dropped.)*
 - **R1 — `retrieval.intent_translate` regression**: investigation at `training_data/openai_ft/20260420/intent_translate_investigation.md` traces Δ=−0.079 to under-representation (127 train records vs 28,324 for `ape.reflect`, 223× less) plus one confabulation tail. Mitigation (8× upweight) lands in FT-OAI-003 via `--task-weights`.
 - **T1 — training-metrics harvest**: `scripts/openai_ft_check.py --on-complete --job-id <id>` parses OpenAI's result_file CSV into `training_metrics.json` with `best_val_loss_step`, `best_val_loss`, `final_train_loss`, `final_valid_loss`, and full per-step `train_loss_series` / `valid_loss_series`.
 - **T2 — `--n-epochs` override**: `scripts/openai_ft_upload_and_launch.py --n-epochs <int|auto> --n-epochs-rationale "<reason>"` passes `hyperparameters={"n_epochs": int}` to `fine_tuning.jobs.create()`. Rationale is required when `--n-epochs != auto` and is recorded in `run_notes.md`.
@@ -190,7 +196,7 @@ These limitations from the FT-OAI-001 run have been addressed. The sprint did no
 
 ### Known Limitations
 
-- **Base-model mismatch (FT-OAI-001 training base ≠ production base)**: the FT was trained against `gpt-4.1-mini-2025-04-14`, but `.env` runs `gpt-5.4-mini`. Quality-only, FT lags prod by Δ=−0.034 (0.898 vs 0.864). Strategically, FT-OAI-001 closed ~48% of the stock-4.1-mini → stock-5.4-mini gap (0.0319 / 0.0658) — meaningful progress toward `FT(cheap-base) ≈ stock(prod-base)` at the cheaper base's inference cost. FT-OAI-001 is **not deployed** until the `gpt-4.1-mini` / `gpt-5.4-mini` cost ratio is quantified and the remaining ~52% of the gap is evaluated in FT-OAI-003. See `training_data/openai_ft/20260420/eval_comparison_vs_gpt54mini.md`.
+- **Base-model mismatch (FT-OAI-001 training base ≠ production base)**: the FT was trained against `gpt-4.1-mini-2025-04-14`, but `.env` runs `gpt-5.4-mini`. Quality-only, FT lags prod by Δ=−0.034 (0.898 vs 0.864). Strategically, FT-OAI-001 closed ~48% of the stock-4.1-mini → stock-5.4-mini gap (0.0319 / 0.0658) — meaningful progress toward `FT(cheap-base) ≈ stock(prod-base)` at the cheaper base's inference cost. FT-OAI-001 is **not deployed** until the `gpt-4.1-mini` / `gpt-5.4-mini` cost ratio is quantified and the remaining ~52% of the gap is evaluated in FT-OAI-003. See `training_data/openai_ft/20260420/eval_comparison_vs_gpt54mini.md`. *(Overtaken: FT-OAI-003 dropped; production runtime is now local-first — `LLM_MODEL` defaults to `mdemg-llm-v1`, not `gpt-5.4-mini`.)*
 - **Cap-symmetric baseline re-eval (G2)**: FT-OAI-002 Epic 3 is staged but blocked on user auth (~$4.05 live OpenAI cost). Until run, the headline FT win of +0.032 is still measured against a 1024-cap baseline vs a 4096-cap FT. The harness + command are ready; see run_notes.md.
 - **Mild overfitting after step 1200**: `best_val_loss=0.68360` at step 1200 vs `final_val_loss=0.81301` at step 1500. Future runs should consider `n_epochs=2` when the loss curve confirms this pattern. FT-OAI-002 T2 exposes `--n-epochs 2` with mandatory rationale.
 
@@ -203,7 +209,7 @@ These limitations from the FT-OAI-001 run have been addressed. The sprint did no
 
 ### Future Improvements
 
-**FT-OAI-003 (north star)** — close the remaining ~52% of the `gpt-4.1-mini` → `gpt-5.4-mini` gap so `FT(cheap-base) ≈ stock(prod-base)` on quality. Candidate levers (ordered roughly by expected ROI):
+**FT-OAI-003 (north star — DROPPED 2026-04-22, never run)** — close the remaining ~52% of the `gpt-4.1-mini` → `gpt-5.4-mini` gap so `FT(cheap-base) ≈ stock(prod-base)` on quality. Candidate levers (ordered roughly by expected ROI):
 1. Fix training-data noise in `__unattributed__` (largest per-task delta to recover — FT showed −0.113 on this slice) — requires the FT-OAI-002 Epic 4 investigation first
 2. Tune hyperparameters: force `n_epochs=2` per the step 1200/1500 best-val signal (FT-OAI-001 mildly overfit past 1200)
 3. Upweight regressed tasks via `--task-weights`: `retrieval.intent_translate` (−0.149), `hidden.name_emergence` (−0.114)

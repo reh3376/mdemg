@@ -27,9 +27,9 @@ Existing `ide-agent` data is untouched; bare installs (no env, no param)
 keep the old behavior. Operators who want historical ide-agent observations
 in their project space migrate them explicitly.
 
-## Tool surface (23 tools)
+## Tool surface (24 tools)
 
-12 memory tools (store/recall/associate/reflect/status/symbols/ingest×5/
+13 memory tools (store/recall/associate/reject/reflect/status/symbols/ingest×5/
 space_freshness — all space-aware), 6 Linear tools, `validate_changes`,
 `jiminy_guide`, and three new in this sprint:
 

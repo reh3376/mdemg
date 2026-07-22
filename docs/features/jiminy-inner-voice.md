@@ -121,7 +121,7 @@ FRONTIERS:
 | Parameter | Default | Env Var | Description |
 |-----------|---------|---------|-------------|
 | JiminyEnabled | `true` | `JIMINY_ENABLED` | Master toggle for Jiminy guidance service |
-| JiminyTimeoutMs | `6000` | `JIMINY_TIMEOUT_MS` | Overall timeout for Guide() in milliseconds |
+| JiminyTimeoutMs | `0` | `JIMINY_TIMEOUT_MS` | Overall timeout for Guide() in ms; `0` = derive from `JIMINY_WARM_COMPUTE_TIMEOUT_MS` (default 90000) |
 | JiminyMaxItems | `10` | `JIMINY_MAX_ITEMS` | Maximum guidance items returned |
 | JiminyMinConfidence | `0.3` | `JIMINY_MIN_CONFIDENCE` | Minimum confidence threshold to include an item |
 | JiminyIncludeFrontiers | `true` | `JIMINY_INCLUDE_FRONTIERS` | Enable/disable frontier node suggestions |
@@ -140,7 +140,7 @@ Additional CMS config: `CMS_JIMINY_BASE_CONFIDENCE` (default: `0.5`) — base co
 | JiminySynthesisProvider | (inherits) | `JIMINY_SYNTHESIS_PROVIDER` | LLM provider for synthesis |
 | JiminySynthesisModel | (inherits) | `JIMINY_SYNTHESIS_MODEL` | LLM model for synthesis |
 | JiminySynthesisMaxTokens | `2000` | `JIMINY_SYNTHESIS_MAX_TOKENS` | Max tokens for synthesis |
-| JiminySynthesisTimeoutMs | `10000` | `JIMINY_SYNTHESIS_TIMEOUT_MS` | Synthesis timeout (ms) |
+| JiminySynthesisTimeoutMs | `30000` | `JIMINY_SYNTHESIS_TIMEOUT_MS` | Synthesis timeout (ms) |
 | JiminyEvaluateEnabled | `true` | `JIMINY_EVALUATE_ENABLED` | Enable agent output evaluation (J9) |
 | JiminyEvaluateTimeoutMs | `3000` | `JIMINY_EVALUATE_TIMEOUT_MS` | Evaluation timeout (ms) |
 | JiminyEvaluateMaxConstraints | `10` | `JIMINY_EVALUATE_MAX_CONSTRAINTS` | Max constraints to check per evaluation |
@@ -154,6 +154,8 @@ Additional CMS config: `CMS_JIMINY_BASE_CONFIDENCE` (default: `0.5`) — base co
 | JiminyEscalationBlockAfter | `6` | `JIMINY_ESCALATION_BLOCK_AFTER` | Ignores before BLOCKED |
 | JiminyEscalationBlockEnabled | `false` | `JIMINY_ESCALATION_BLOCK_ENABLED` | Enable hard blocking at max escalation |
 | JiminyEscalationDecayMinutes | `60` | `JIMINY_ESCALATION_DECAY_MINUTES` | Escalation state decay period |
+
+> **Addendum:** later sprints added ~a dozen newer `JIMINY_*` vars not tabled here — `JIMINY_WARM_COMPUTE_TIMEOUT_MS` (90000), the 4-band gate `JIMINY_OUTCOME_NOT_APPLICABLE_SIMILARITY` (0.10), surfacing Levers A/B/C (`JIMINY_SURFACE_*`, `JIMINY_DIRECTIVE_SYNTHESIS_ENABLED`, `JIMINY_GUIDANCE_CONSTRAINT_*`), cooldown (`JIMINY_SURFACE_COOLDOWN_*`), and `JIMINY_CONTRADICTED_BRIDGE_ENABLED`. See `internal/config/config.go` and `docs/features/jiminy-actionability.md`.
 
 ### J13-J15 Configuration
 
@@ -189,13 +191,14 @@ The outcome classifier determines whether the agent followed, partially followed
 | Tier | Method | Range | Outcomes |
 |------|--------|-------|----------|
 | 1 | Embedding cosine similarity | `>= highThreshold` (0.55) AND no negation | followed |
-| 1 | Embedding cosine similarity | `< lowThreshold` (0.20) | not_applicable |
+| 1 | Embedding cosine similarity | `< notApplicableThreshold` (0.10) | not_applicable |
+| 1 | Embedding cosine similarity | `[0.10, 0.20)` — below lowThreshold but relevant domain | ignored |
 | 2 | LLM classification | uncertain range OR high-sim + negation | followed / partial_compliance / ignored / contradicted |
 | 3 | Heuristic fallback (no LLM) | negation detected | contradicted |
 | 3 | Heuristic fallback (no LLM) | `>= highThreshold`, no negation | followed |
 | 3 | Heuristic fallback (no LLM) | uncertain range, no negation | partial_compliance |
 
-**`not_applicable` vs `ignored`**: Guidance is surfaced based on the user's context (e.g., "implementing error handling"), but outcomes are classified against the actual action taken (e.g., "Wrote config.go: func Validate()"). When the guidance topic doesn't overlap with the action topic, cosine similarity is correctly low — but the guidance wasn't *ignored*, it was *not applicable* to that specific action. Items classified as `not_applicable` are excluded from persistence, confidence decay, escalation tracking, and protocol metrics. `OutcomeIgnored` is now only reachable via LLM Tier 2 semantic judgment, representing a deliberate determination that relevant guidance was not followed.
+**`not_applicable` vs `ignored`**: Guidance is surfaced based on the user's context (e.g., "implementing error handling"), but outcomes are classified against the actual action taken (e.g., "Wrote config.go: func Validate()"). When the guidance topic doesn't overlap with the action topic, cosine similarity is correctly low — but the guidance wasn't *ignored*, it was *not applicable* to that specific action. Items classified as `not_applicable` are excluded from persistence, confidence decay, escalation tracking, and protocol metrics. Since JIMINY-CORPUS-001 E4 the sub-LOW tail is a 4-band split: only `< JIMINY_OUTCOME_NOT_APPLICABLE_SIMILARITY` (default 0.10; ≤0 disables the gate) is `not_applicable`, while `[0.10, 0.20)` is a real tier-1 `ignored` (relevant domain, not followed). `OutcomeIgnored` therefore arrives via that tier-1 band or via LLM Tier 2 semantic judgment — and a tier-2 LLM relevance verdict always takes precedence (the gate is a tier-1 short-circuit below LOW, where tier 2 never runs).
 
 **Content normalization**: Guidance content from the retrieval pipeline uses a structured metadata format (`"Module: X. Related to: a, b. Key functions: f"`) that embeds into a different region of semantic space than action summaries, producing a cosine similarity ceiling of ~0.33 even for matching topics. Guide() normalizes all content to natural language before returning: items with LLM-generated `SEMANTIC:` blocks use the natural language portion directly; others are converted from structured to prose format. This raises the similarity ceiling to ~0.59 for matching topics.
 

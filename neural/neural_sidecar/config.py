@@ -8,7 +8,7 @@ class Settings(BaseSettings):
 
     # HOOKSYNC-001: loopback by default — the sidecar serves an internal
     # scoring API; only the local mdemg server calls it. Override via the
-    # SIDECAR_HOST env var (pydantic-settings) for multi-host setups.
+    # NEURAL_HOST env var (env_prefix below) for multi-host setups.
     host: str = "127.0.0.1"
     port: int = 8100
     rerank_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"

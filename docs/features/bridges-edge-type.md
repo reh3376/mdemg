@@ -54,7 +54,7 @@ case metrics.LayerDistance > 0 && metrics.CosineSimilarity >= 0.4 && metrics.Cos
 
 **Role in L5 Emergence:** BRIDGES edges are one of three qualifying edge types for L5 emergent concept detection (along with ANALOGOUS_TO and COMPOSES_WITH). The L5 step queries for L3+ nodes connected by these edge types and clusters them using union-find. Without BRIDGES, cross-layer patterns could not feed into L5 emergence.
 
-BRIDGES edges are created automatically during consolidation (pipeline phase 25, `dynamic_edges` step).
+BRIDGES edges are created automatically during consolidation (pipeline phase 25, `dynamic_edges` step). Since RETRIEVAL-TYPED-EDGES-002 (2026-07-03) candidate pairs come from a per-node top-K query over the `memNodeEmbedding` vector index (not a Cartesian cross-join), with endpoints gated by `DYNAMIC_EDGE_MIN_LAYER` (default 1, so L1/L2 nodes participate — not just L3+).
 
 ### Configuration
 
@@ -95,7 +95,11 @@ None identified.
 | `DYNAMIC_EDGES_ENABLED` | `true` | Master toggle for all dynamic edge creation |
 | `DYNAMIC_EDGE_MIN_CONFIDENCE` | `0.5` | Minimum confidence for any dynamic edge |
 | `DYNAMIC_EDGE_DEGREE_CAP` | `10` | Max dynamic edges per node |
-| `L5_SOURCE_MIN_LAYER` | `3` | Minimum layer for source nodes (affects which nodes get BRIDGES edges) |
+| `DYNAMIC_EDGE_MIN_LAYER` | `1` | Minimum layer for dynamic semantic-edge endpoints (L0 excluded) |
+| `DYNAMIC_EDGE_TOPK` | `10` | Per-node nearest-neighbor edges to consider |
+| `DYNAMIC_EDGE_SIM_THRESHOLD` | `0.30` | Minimum cosine similarity for a dynamic edge |
+| `DYNAMIC_EDGE_OVERSAMPLE` | `8` | Vector-index fetch multiplier (TopK×Oversample, then layer/space/degree filter) |
+| `L5_SOURCE_MIN_LAYER` | `3` | Minimum layer for L5 emergence source nodes (dynamic-edge endpoints gate on `DYNAMIC_EDGE_MIN_LAYER`) |
 
 ## Dependencies
 

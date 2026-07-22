@@ -89,7 +89,7 @@ See Configuration Reference table below.
 |---------|---------|-------------|
 | `EMERGENCE_ENABLED` | `false` | Master toggle for dynamic emergence |
 | `EMERGENCE_PROVIDER` | `openai` | LLM provider: `openai` or `ollama` |
-| `EMERGENCE_MODEL` | `gpt-4o-mini` | Model for concept naming |
+| `EMERGENCE_MODEL` | inherits `LLM_MODEL` (`mdemg-llm-v1`) | Model for concept naming (CONFIG-LOCAL-DEFAULTS-001 local-first cascade) |
 | `EMERGENCE_MAX_TOKENS` | `500` | Max tokens for naming response (100-4000) |
 | `EMERGENCE_TIMEOUT_MS` | `10000` | Timeout for naming call in ms (min: 1000) |
 | `EMERGENCE_MIN_WEIGHT` | `0.3` | Min CO_ACTIVATED_WITH weight (0.0-1.0) |

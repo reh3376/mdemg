@@ -54,6 +54,8 @@ live data 2026-03-31). Policies are removable
 deleted rows are only recoverable from backups. The migration is idempotent
 (guarded ALTERs; `if_not_exists` policies) — auto-migrate re-runs it safely.
 
+Later schema additions (after this sprint): V0026 `constraint_outcomes` classifier-source column, V0027 `guidance_training_rows` (JIMINY-RELEVANCE-001), V0028/V0029 `review_grades` + suggested-guidance (HITL-REVIEW-001), V0030/V0031 `contradicted_correction_drafts` + `applied_node_id` (JIMINY-CONTRADICTED-BRIDGE-001). Current required schema version: 31.
+
 ### Honest metrics plane
 
 - **Windowed percentiles**: synthetic `*_p95` / `*_p99` gauges are now

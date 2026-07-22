@@ -159,13 +159,13 @@ If `SetTSDBClient()` is never called (TimescaleDB unreachable, disabled, or conn
 
 If a consumer creates an `llmclient.Client` without calling `WithContext(taskName, spaceID)`, the record is written with `task_name = ""`. The curation pipeline cannot route these records to task-specific fine-tuning datasets.
 
-**Current state**: All 16 production consumers wire `WithContext()`. Verified in PR #218.
+**Current state**: All 17 production consumers wire `WithContext()` (the 16 original call sites + `guardrail.evaluate`, routed through `llmclient` in Sprint B). Verified in PR #218.
 
 **How to detect**: `SELECT count(*) FROM llm_interactions WHERE task_name = '';` — any non-zero result indicates a regression.
 
 ### 2.4 Auto-Flush Errors Swallowed
 
-All three writers use a background goroutine that flushes every 30 seconds (configurable via `TSDB_FLUSH_INTERVAL_SEC`). If `CopyFrom` fails during auto-flush:
+All three writers use a background goroutine that flushes every 60 seconds (configurable via `TSDB_FLUSH_INTERVAL_SEC`, default 60). If `CopyFrom` fails during auto-flush:
 
 - The error is logged via `slog.Warn("...: auto-flush failed")` but **NOT returned to any caller**
 - The buffered records are **lost** — the buffer was already cleared before `CopyFrom` was attempted
@@ -183,7 +183,7 @@ The writers use a Go slice buffer (`make([]T, 0, 32)`) that grows unboundedly. T
 
 Each writer has a `Close()` method that performs a final flush. If the server process crashes (SIGKILL, OOM) before `Close()` is called, all buffered records since the last successful flush are lost.
 
-**Mitigation**: `mdemg service install` sets up launchd/systemd supervision that restarts the process. The 30-second flush interval limits the maximum data loss window to ~30 seconds of records.
+**Mitigation**: `mdemg service install` sets up launchd/systemd supervision that restarts the process. The 60-second flush interval limits the maximum data loss window to ~60 seconds of records.
 
 ### 2.7 Privacy Scrubbing Asymmetry
 
@@ -239,7 +239,7 @@ LLMInteractionWriter        EmbeddingEventWriter       RetrievalEventWriter
     │ buffer[]                  │ buffer[]                  │ buffer[]
     │                           │                           │
     └──────────┬────────────────┴───────────────────────────┘
-               │ 30s flush interval
+               │ 60s flush interval
                ▼
     pgx.CopyFrom → TimescaleDB Hypertables
 ```

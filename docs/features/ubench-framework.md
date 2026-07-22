@@ -119,6 +119,8 @@ This invokes `python -m neural.benchmarks.run_benchmark` under the spec's pinned
 (currently `configs/benchmark_phase10.yaml`) and asserts the resulting aggregate score
 clears `thresholds.min_aggregate_weighted_score` (0.80) with zero truncated rows.
 
+TSDB persistence: `run_benchmark` supports `--apply-tsdb` — after writing the SQL sidecar, it executes the INSERTs directly against TSDB (`TSDB_*` env DSN; non-fatal on failure — the sidecar remains the recovery path).
+
 ### When a contract fails
 
 Three failure shapes:

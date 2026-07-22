@@ -18,10 +18,14 @@ usts/
 ├── schema/
 │   └── usts.schema.json     # JSON Schema for validation
 ├── specs/
-│   ├── auth_required.usts.json
-│   ├── rate_limit_enforcement.usts.json
+│   ├── control_char_injection.usts.json
 │   ├── input_injection.usts.json
+│   ├── metrics_snapshot_security.usts.json
+│   ├── rate_limit_enforcement.usts.json
 │   └── sensitive_data_exposure.usts.json
+├── drafts/
+│   ├── auth_required.usts.json
+│   └── guardrail_enforcement.phase104.usts.json
 ├── payloads/
 │   ├── cypher_injection.txt
 │   └── sql_injection.txt
@@ -38,12 +42,12 @@ usts/
 pip install requests
 ```
 
-### 2. Run Authentication Tests
+### 2. Run Injection Tests
 
 ```bash
 cd docs/tests/usts
 python runners/usts_runner.py \
-  --spec specs/auth_required.usts.json \
+  --spec specs/input_injection.usts.json \
   --base-url http://localhost:9999
 ```
 

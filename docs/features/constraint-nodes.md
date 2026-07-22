@@ -48,7 +48,7 @@ The constraint step is non-required — failure does not block the pipeline. Res
 
 ### Configuration
 
-No configuration required — constraint detection is always active during observation and consolidation.
+Constraint detection is always active during observation. Promotion is gated since JIMINY-CORPUS-001: `ConstraintPromotionGate` (`internal/hidden/constraint_gate.go`, default-on) rejects observations whose source `obs_type` is in `CONSTRAINT_PROMOTION_DENY_OBS_TYPES` (default `progress,error,task,context` — transient types can't be durable rules) or whose content matches `CONSTRAINT_PROMOTION_REJECT_PATTERNS` (built-in junk-class set). See Configuration Reference below.
 
 ## Notes
 
@@ -79,7 +79,11 @@ None — API-only endpoints.
 
 ## Configuration Reference
 
-None — no configurable parameters.
+| Env Var | Default | Description |
+|---------|---------|-------------|
+| `CONSTRAINT_PROMOTION_GATE_ENABLED` | `true` | Enable the promotion gate (JIMINY-CORPUS-001) |
+| `CONSTRAINT_PROMOTION_DENY_OBS_TYPES` | `progress,error,task,context` | Source obs_types never promoted (transient provenance) |
+| `CONSTRAINT_PROMOTION_REJECT_PATTERNS` | built-in junk-class set | JSON array of Go regexes; matching content never promoted (`[]` disables the pattern layer) |
 
 ## Dependencies
 
@@ -94,7 +98,9 @@ None — no configurable parameters.
 
 - `internal/conversation/constraint_detector.go` - Regex-based auto-detection with confidence scoring
 - `internal/hidden/constraint_nodes.go` - Node promotion and `IMPLEMENTS_CONSTRAINT` edge creation
-- `internal/hidden/step_constraint.go` - Pipeline step adapter (phase 20)
+- `internal/hidden/constraint_gate.go` - `ConstraintPromotionGate` (JIMINY-CORPUS-001)
+- `internal/hidden/correction_nodes.go` - Sibling producer for `role_type='correction'` nodes (JIMINY-CORRECTION-PRODUCER-001; mirrors this producer, gated by `internal/hidden/correction_gate.go`)
+- `internal/hidden/step_constraint.go` - Pipeline step adapter (phase 20; `correctionStep` registered alongside)
 - `internal/api/handlers_conversation.go` - `handleConstraintsList`, `handleConstraintStats` handlers
 - `docs/api/api-spec/uats/specs/constraints_list.uats.json` - Contract test for list endpoint
 - `docs/api/api-spec/uats/specs/constraints_stats.uats.json` - Contract test for stats endpoint

@@ -2,7 +2,7 @@
 
 **Framework #12** in the UxTS ecosystem.
 
-Formalizes iterative self-improvement testing for any T1-encoded content that requires comprehension validation. LLM-dependent, non-deterministic, soft-fail CI gate.
+Formalizes iterative self-improvement testing for any T1-encoded content that requires comprehension validation. LLM-dependent, non-deterministic, no CI gate (manual runner invocation only).
 
 ## Quick Start
 

@@ -56,12 +56,12 @@ llama-server \
   --jinja
 ```
 
-KV cache bound: 32768 / 4 = 8 K per slot. Production `ape.reflect` prompts are ~5800 tokens so this fits comfortably. The `--parallel 4` slot count means 4 concurrent calls share the model without copy overhead.
+KV cache bound: 32768 / 4 = 8 K per slot. Production `ape.reflect` prompts grew to ~7489 tokens (live-measured 2026-06-13), starving output; they are now bounded to `RSIC_LLM_REFLECT_PROMPT_BUDGET_TOKENS` (default 3500) per APE-PROMPT-BUDGET-001 so they fit comfortably. The `--parallel 4` slot count means 4 concurrent calls share the model without copy overhead.
 
 ### Workflow
 
 1. `mdemg start` runs `internal/cli/preflight_mlx.go` which probes `LLM_ENDPOINT` synchronously
-2. If probe fails AND `MDEMG_ALLOW_NO_MLX != "1"`, mdemg refuses to start (always-on policy)
+2. If probe fails AND `MDEMG_ALLOW_NO_LLM != "1"` (legacy alias `MDEMG_ALLOW_NO_MLX`), mdemg refuses to start (always-on policy)
 3. After successful preflight, the watchdog goroutine starts probing `/v1/models` every 5 s (see `mlx-watchdog.md`)
 4. LLM calls flow through `internal/llmclient` → llama-server's `/v1/chat/completions`
 5. State transitions + fast-fail bursts persist to V0018 via the writer
@@ -73,9 +73,8 @@ KV cache bound: 32768 / 4 = 8 K per slot. Production `ape.reflect` prompts are ~
 |---|---|---|
 | `LLM_ENDPOINT` | `http://127.0.0.1:8102/v1` | The OpenAI-compat endpoint. **Phase 13.5 default** (was `8101` for mlx-server) |
 | `LLM_MODEL` | `mdemg-llm-v1` | The model name advertised to callers (matches `--model` filename's logical name) |
-| `LLM_MAX_TOKENS` | `4096` | Ceiling on completion length per call; per-task overrides exist |
 | `MLX_MERGED_MODEL_PATH` | (path) | MLX form of the model — research/training only; production callers use the GGUF via the endpoint |
-| `MDEMG_ALLOW_NO_MLX` | unset | When `1`, mdemg startup proceeds even if endpoint unreachable. Naming is historical; honored across runtimes |
+| `MDEMG_ALLOW_NO_LLM` | unset | When `1`, mdemg startup proceeds even if endpoint unreachable. Legacy alias `MDEMG_ALLOW_NO_MLX` still honored (deprecation log) |
 
 ### V0018 telemetry (Phase 13.5 follow-up)
 

@@ -495,53 +495,41 @@ timeline
 
 ## Configuration
 
+> Verified against `internal/config/config.go` (DOC-CURRENCY-002, 2026-07-21). Earlier
+> versions of this section listed `CMS_*` variables that never existed — setting them
+> silently no-ops. The real knobs:
+
 ```bash
-# Resume
-CMS_RESUME_MAX_TOKENS=4000
-CMS_RESUME_DEFAULT_STRATEGY=task_focused
-
-# Scoring weights
-CMS_RELEVANCE_WEIGHT_RECENCY=0.3
-CMS_RELEVANCE_WEIGHT_IMPORTANCE=0.4
-CMS_RELEVANCE_WEIGHT_TASK_RELEVANCE=0.3
-
-# Templates & snapshots
-CMS_TEMPLATES_ENABLED=true
-CMS_SNAPSHOT_ON_SESSION_END=true
-CMS_SNAPSHOT_ON_COMPACTION=true
-
-# Volatile memory (Context Cooler)
-STABILITY_INCREASE_PER_REINFORCEMENT=0.15
-STABILITY_DECAY_RATE=0.1
-TOMBSTONE_THRESHOLD=0.05
-GRADUATION_STABILITY_THRESHOLD=0.8
-REINFORCEMENT_WINDOW_HOURS=2
-
-# Governance
-CMS_ORG_REVIEW_REQUIRED=true
+# Volatile memory (Context Cooler) — the background loop itself defaults OFF
+CONTEXT_COOLER_ENABLED=false            # enable the cooler background loop
+COOLER_REINFORCEMENT_WINDOW_HOURS=2     # reinforcement window
+COOLER_STABILITY_DECAY_RATE=0.1         # daily decay for unreinforced nodes
+COOLER_TOMBSTONE_THRESHOLD=0.05         # stability below which nodes tombstone
+COOLER_TOMBSTONE_MAX_PER_RUN=500        # cap per graduation run (0 = unlimited)
+COOLER_GRADUATION_THRESHOLD=0.8         # stability required to graduate
 
 # RSIC — Cycle Periods
 RSIC_MICRO_ENABLED=true
 RSIC_MESO_PERIOD_HOURS=6
-RSIC_MESO_PERIOD_SESSIONS=5
+RSIC_MESO_PERIOD_SESSIONS=10
 RSIC_MACRO_CRON="0 3 * * *"
 
-# RSIC — Safety Bounds
-RSIC_MAX_NODE_PRUNE_PCT=5
-RSIC_MAX_EDGE_PRUNE_PCT=10
-RSIC_ROLLBACK_WINDOW=3
+# RSIC — Safety Bounds (fractions, not percentages)
+RSIC_MAX_NODE_PRUNE_PCT=0.05            # max fraction of nodes one action can prune
+RSIC_MAX_EDGE_PRUNE_PCT=0.10            # max fraction of edges one action can prune
+RSIC_ROLLBACK_WINDOW=3600               # seconds to keep rollback snapshots
 
 # RSIC — Watchdog
 RSIC_WATCHDOG_ENABLED=true
-RSIC_WATCHDOG_CHECK_INTERVAL_SEC=60
-RSIC_WATCHDOG_DECAY_RATE=1.0
-RSIC_WATCHDOG_NUDGE_THRESHOLD=0.3
-RSIC_WATCHDOG_WARN_THRESHOLD=0.6
-RSIC_WATCHDOG_FORCE_THRESHOLD=0.9
+RSIC_WATCHDOG_CHECK_SEC=300             # seconds between checks
+RSIC_WATCHDOG_DECAY_RATE=0.1            # decay-score increase per hour without a cycle
+RSIC_NUDGE_THRESHOLD=0.3
+RSIC_WARN_THRESHOLD=0.6
+RSIC_FORCE_THRESHOLD=0.9
 
 # RSIC — Calibration
-RSIC_CALIBRATION_WINDOW_DAYS=7
-RSIC_MIN_CONFIDENCE_THRESHOLD=0.3
+RSIC_CALIBRATION_DAYS=30                # days of history for calibration
+RSIC_MIN_CONFIDENCE=0.3                 # minimum confidence to execute an action
 
 # Meta-Cognition (Phase 80)
 METACOG_ENABLED=true

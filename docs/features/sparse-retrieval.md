@@ -12,7 +12,7 @@ phase: phase 14 + phase 14.1 + phase 14.1.1
 ## Summary
 
 **Feature**: `sparse-retrieval`
-**Summary**: Pre-rerank percentile gate that cuts the candidate list down to those whose score crosses a per-call activation threshold. Within `[MIN_ACTIVE, MAX_ACTIVE]` clamps; emits per-call metadata + Prometheus histograms + V0019 hypertable rows. **Default-on as of Phase 14.1.1 (2026-05-04)** with the hybrid config that passed the canonical 120q A/B: `SPARSE_RETRIEVAL_ENABLED=true`, `SPARSE_MIN_ACTIVE=15` global, plus a `data_flow_integration` per-category override at `MIN=20`. Operator opt-out via `SPARSE_RETRIEVAL_ENABLED=false`. The Phase 14 → 14.1 → 14.1.1 sequence is the full narrative — Phase 14 shipped flag-off after a 120q regression in `architecture_structure`; Phase 14.1 added per-category overrides; Phase 14.1.1 closed with the simpler-first hybrid that mean-improved +0.003 with 0 regressions and 10 improvements.
+**Summary**: Pre-rerank percentile gate that cuts the candidate list down to those whose score crosses a per-call activation threshold. Within `[MIN_ACTIVE, MAX_ACTIVE]` clamps; emits per-call metadata + internal metric histograms + V0019 hypertable rows. **Default-on as of Phase 14.1.1 (2026-05-04)** with the hybrid config that passed the canonical 120q A/B: `SPARSE_RETRIEVAL_ENABLED=true`, `SPARSE_MIN_ACTIVE=15` global, plus a `data_flow_integration` per-category override at `MIN=20`. Operator opt-out via `SPARSE_RETRIEVAL_ENABLED=false`. The Phase 14 → 14.1 → 14.1.1 sequence is the full narrative — Phase 14 shipped flag-off after a 120q regression in `architecture_structure`; Phase 14.1 added per-category overrides; Phase 14.1.1 closed with the simpler-first hybrid that mean-improved +0.003 with 0 regressions and 10 improvements.
 
 ## Vision & Goals
 
@@ -37,7 +37,7 @@ Phase 14 shipped the gate code + V0019 metrics + tests, then ran a 4-preset A/B 
 | Per-request override | `internal/api/handlers.go` | `?sparse=true|false` + `?sparse_percentile=N` URL params; JSON body fields take precedence |
 | Request struct | `internal/models/models.go` | `SparseEnabled` + `SparsePercentile` fields |
 | Config | `internal/config/config.go` | 4 knobs + Validate() bounds (`SPARSE_*`) |
-| Prometheus | `internal/metrics/collectors.go` | 3 histograms: `sparse_gate_active_count`, `sparse_gate_dropped_fraction`, `sparse_gate_threshold` |
+| Metrics | `internal/metrics/collectors.go` | 3 histograms: `sparse_gate_active_count`, `sparse_gate_dropped_fraction`, `sparse_gate_threshold` (internal registry → TSDB `metric_samples` / `/v1/metrics/snapshot`; no Prometheus scrape endpoint) |
 | TSDB writer | `internal/tsdb/sparse_gate_writer.go` | Buffered V0019 writer; mirrors V0017 / V0018 patterns |
 | TSDB schema | V0019 hypertable | One row per gate firing |
 | Adapter | `internal/api/server.go::sparseGateRecorderAdapter` | Translates retrieval-side metadata → tsdb row (cycle-safe) |
@@ -94,9 +94,9 @@ R-7 is what operators expect when they say "p95" — same definition as Excel's 
 
 The percentile gate alone admits very few candidates in the high-confidence tail of typical distributions (Phase 14 Epic 0 showed p95 admits 1–2 of K=20 in the dominant production K range). The MIN_ACTIVE floor prevents the gate from collapsing to a single candidate — protects against rerank staring at an empty input.
 
-### Why default `MIN_ACTIVE=3` (not Phase 14 Epic 2's empirically-passing MIN=10)
+### Why Phase 14 shipped default `MIN_ACTIVE=3` (superseded — default is now `15`, default-on since Phase 14.1.1)
 
-Phase 14 Epic 2's 16q quick PASSED at MIN=10/p95. The 120q full FAILED per-question on `architecture_structure`. Shipping default MIN=10 would invite operators to flip the gate on and hit the same failure mode without the diagnostic data Phase 14.1 will use to mitigate. Default MIN=3 is the conservative floor (matches sprint plan §13 fork #2 + the spec); operators who opt in should set MIN=10 explicitly while Phase 14.1 ships.
+Phase 14 Epic 2's 16q quick PASSED at MIN=10/p95. The 120q full FAILED per-question on `architecture_structure`. Shipping default MIN=10 would invite operators to flip the gate on and hit the same failure mode without the diagnostic data Phase 14.1 will use to mitigate. Default MIN=3 was the conservative floor at Phase 14 ship; Phase 14.1.1 flipped defaults to `SPARSE_RETRIEVAL_ENABLED=true` + `SPARSE_MIN_ACTIVE=15` (with a `data_flow_integration` per-category override at MIN=20) after the hybrid 120q A/B passed.
 
 ### Why ship flag-off (not default-on)
 
@@ -114,14 +114,14 @@ V0017 captures pre-gate state (top_k_node_ids, consensus_strength). V0019 captur
 
 ### Known limitations
 
-- **Default-off pending Phase 14.1 retune.** Operators who opt in via `SPARSE_RETRIEVAL_ENABLED=true` should set `SPARSE_MIN_ACTIVE=10` and expect ~50% rerank input reduction with mean parity AND 7 boundary regressions on the 120q lnl_demo corpus.
+- **Default-on since Phase 14.1.1** (`SPARSE_RETRIEVAL_ENABLED=true`, `SPARSE_MIN_ACTIVE=15`, `SPARSE_GATE_CATEGORY_OVERRIDES` seeding `data_flow_integration` at MIN=20). Expect ~25% rerank-input reduction on most calls, full passthrough on `data_flow_integration`. Operator opt-out: `SPARSE_RETRIEVAL_ENABLED=false`.
 - **`architecture_structure` category sensitivity**: queries needing rank 11–20 citations get cut. Phase 14.1 plans per-category MIN_ACTIVE override (`{"architecture_structure": {"min_active": 20}, ...}`).
 - **Floating-point boundary**: the comparator at `uvts_ab_compare.py` uses strict `<` for regression check, which counts deltas of `-0.10000000001` as regressions. Phase 14.1 should add an `eps` tolerance.
 - **Cache-hit retrieves bypass the gate** (because the cached response was already gated when computed). Subsequent identical queries don't re-execute the gate. By design but operators should not interpret V0019 row counts as "1 row per /v1/memory/retrieve call".
 
 ### Risks & gaps
 
-- **Spec recommendation drift**: Note 06 spec recommended `MIN_ACTIVE=3` and the default ships there, but operator-recommendation-via-doc says MIN=10. The doc + the code default disagree. Phase 14.1 should reconcile.
+- **Spec recommendation drift**: resolved — Phase 14.1.1 reconciled at `SPARSE_MIN_ACTIVE=15` global + per-category overrides, default-on.
 - **No test coverage of category-specific behavior**: Tier 1 unit tests verify percentile + clamp correctness on synthetic distributions but don't exercise per-category regression patterns.
 
 ### Future improvements

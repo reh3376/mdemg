@@ -17,7 +17,7 @@ All items must pass before data collection begins.
 
 ## 1. Schema & Migration
 
-- [ ] All instances on the current TSDB schema (26 as of V0026 `classifier_source`; authoritative value: `TSDB_REQUIRED_SCHEMA_VERSION` default in `internal/config/config.go`)
+- [ ] All instances on the current TSDB schema (31 as of V0031 `applied_node_id`; authoritative value: `TSDB_REQUIRED_SCHEMA_VERSION` default in `internal/config/config.go`)
 - [ ] Verify column exists on all 3 tables:
   ```bash
   docker compose exec -T timescaledb psql -U mdemg -d mdemg_metrics -c "

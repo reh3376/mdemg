@@ -182,7 +182,7 @@ MDEMG Server
 ├── CB State Changes                → alert dispatcher → user
 ├── LLM Consecutive Failures        → alert dispatcher → user
 ├── TSDB Writer Overflow            → alert dispatcher → user
-├── RSIC Self-Reflect (29 patterns) → alert dispatcher → user
+├── RSIC Self-Reflect (~36 patterns) → alert dispatcher → user
 └── Alert Evaluator (13 rules)      → alert dispatcher → user
       ├── Periodic TSDB queries (30s default)
       ├── ForDuration state tracking (prevents flapping)
@@ -234,21 +234,15 @@ Concurrent RSIC reflection cycles (`ape.reflect` + `consulting.classify` + `jimi
 
 | Env Var | Default | Description |
 |---|---|---|
-| `RSIC_MAX_CONCURRENT_CYCLES` | `2` | Maximum parallel RSIC cycles. Excess attempts queue (with timeout) |
-| `RSIC_CYCLE_QUEUE_TIMEOUT_MS` | `15000` | Time-out for cycles waiting in queue before returning a transient error |
+| `RSIC_LLM_CONCURRENCY_LIMIT` | `2` | Max in-flight RSIC LLM calls (min 1, max 8). Excess calls wait on the semaphore |
 
-Implementation: `internal/rsic/coordinator.go` — `sync.WaitGroup` + `chan struct{}` semaphore.
+Implementation: `internal/ape/cycle.go` — buffered `chan struct{}` semaphore sized to `RSICLLMConcurrencyLimit`.
 
 ### Prompt Cache Configuration (Epic 4)
 
 llama-server's `--prompt-cache` flag retains the prompt-prefix KV state across calls, dramatically reducing time-to-first-token for repeated prompt patterns (RSIC reflection prompts share a long prefix). Phase 11.6.x configured the cache size and aging.
 
-| Env Var | Default | Description |
-|---|---|---|
-| `LLM_PROMPT_CACHE_PATH` | `/tmp/mdemg-prompt-cache` | Disk path for the persisted KV cache |
-| `LLM_PROMPT_CACHE_SIZE_MB` | `512` | Maximum cache size; LRU eviction beyond |
-
-Operators verifying the cache is hot can `tail -f $LLM_PROMPT_CACHE_PATH` for new entries during steady-state load.
+Note: the `LLM_PROMPT_CACHE_PATH` / `LLM_PROMPT_CACHE_SIZE_MB` env vars originally documented here were never wired into `internal/config/config.go` — prompt-cache tuning is done directly on the llama-server command line.
 
 ### ConflictTracker Production Wiring (Epic 5 / Workstream C #1)
 
@@ -260,7 +254,6 @@ When two pieces of guidance produce contradictory signals (e.g. one says "follow
 | Env Var | Default | Description |
 |---|---|---|
 | `CONFLICT_TRACKER_ENABLED` | `true` | Master toggle; false suppresses V0015 writes |
-| `CONFLICT_TRACKER_DEDUP_WINDOW_SEC` | `300` | Identical conflicts within window dedup to one row |
 
 ### Jiminy Defaults
 
@@ -269,7 +262,6 @@ Phase 11.6.x flipped two Jiminy defaults that the original phase missed:
 | Env Var | Pre-11.6.x | Post-11.6.x | Rationale |
 |---|---|---|---|
 | `JIMINY_OUTCOME_LLM_ENABLED` | `false` | `true` | Tier-2 outcome classifier was effective enough to default-on |
-| `JIMINY_FOLLOW_RATE_PERSIST` | `false` | `true` | T1 comprehension gate (`J17_T1_COMPREHENSION_GATE`) needs persisted history |
 
 ## Documents Accessed
 

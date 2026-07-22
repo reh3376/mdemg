@@ -1,17 +1,35 @@
 # Ingest Codebase API
 
-## Endpoint: `POST /v1/memory/ingest-codebase`
+> Rewritten by DOC-CURRENCY-002 (2026-07-21) against `internal/api/handlers.go` +
+> `internal/models/models.go`. Earlier versions of this doc described a
+> `POST /v1/memory/ingest-codebase` endpoint with a nested request schema
+> (`source`/`languages`/`symbols`/`exclusions`/`processing`/`llm_summary`/
+> `options`/`retry`) — **that endpoint and schema never shipped**. The real
+> surface is below.
 
-Triggers codebase ingestion as a background job. Returns immediately with a job ID for status tracking.
+## Endpoints
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| POST | `/v1/memory/ingest/trigger` | Start a codebase ingestion background job |
+| GET | `/v1/memory/ingest/status/{job_id}` | Job status + progress |
+| POST | `/v1/memory/ingest/cancel/{job_id}` | Cancel a running job |
+| GET | `/v1/memory/ingest/jobs` | List all ingestion jobs |
+| POST | `/v1/memory/ingest/files` | Re-ingest specific files (sync ≤50 files, background job >50) |
+
+The server executes the job by delegating to the `mdemg ingest` CLI
+subprocess with `--progress-json` streaming (binary resolved via
+`resolveMdemgBin()`: `MDEMG_BIN` → `os.Executable()` → PATH → `./bin/mdemg` —
+INGEST-EXEC-001). Scheduled-sync runs additionally report to
+`scheduled_job_events` as `job_name='codebase-sync'` (NOSILENT pattern);
+manual API-triggered jobs are visible through the job queue only.
 
 ---
 
 ## Quick Start
 
-### Minimal Request
-
 ```bash
-curl -X POST http://localhost:9999/v1/memory/ingest-codebase \
+curl -X POST http://localhost:9999/v1/memory/ingest/trigger \
   -H "Content-Type: application/json" \
   -d '{
     "space_id": "my-project",
@@ -19,317 +37,157 @@ curl -X POST http://localhost:9999/v1/memory/ingest-codebase \
   }'
 ```
 
-### Response
+**Response (202 Accepted):**
 
 ```json
 {
-  "job_id": "a1b2c3d4",
-  "status": "queued",
+  "job_id": "ingest-a1b2c3d4",
   "space_id": "my-project",
-  "path": "/path/to/codebase"
+  "status": "pending",
+  "message": "Ingestion job created. Use GET /v1/memory/ingest/status/ingest-a1b2c3d4 to check progress.",
+  "created_at": "2026-07-21T12:00:00Z"
 }
 ```
 
 ---
 
-## Full Request Schema
+## Trigger Request Schema (`models.IngestTriggerRequest` — flat, not nested)
 
 ```json
 {
   "space_id": "string (required)",
   "path": "string (required)",
-
-  "source": {
-    "type": "local | git",
-    "branch": "string",
-    "since": "string (default: HEAD~1)"
-  },
-
-  "languages": {
-    "typescript": true,
-    "python": true,
-    "java": true,
-    "rust": true,
-    "go": true,
-    "markdown": true,
-    "include_tests": false
-  },
-
-  "symbols": {
-    "extract": true,
-    "max_per_file": 1000
-  },
-
-  "exclusions": {
-    "preset": "default | ml_cuda | web_monorepo",
-    "directories": [".git", "vendor", "node_modules"],
-    "max_file_size": 1048576
-  },
-
-  "processing": {
-    "batch_size": 100,
-    "workers": 4,
-    "max_elements_per_file": 500,
-    "delay_ms": 50
-  },
-
-  "llm_summary": {
-    "enabled": false,
-    "provider": "openai | ollama",
-    "model": "gpt-4o-mini",
-    "batch_size": 10
-  },
-
-  "options": {
-    "incremental": false,
-    "archive_deleted": true,
-    "consolidate": true,
-    "dry_run": false,
-    "verbose": false,
-    "limit": 0
-  },
-
-  "retry": {
-    "max_attempts": 3,
-    "initial_delay_ms": 2000,
-    "timeout_seconds": 300
-  }
+  "batch_size": 100,
+  "workers": 4,
+  "timeout_seconds": 300,
+  "extract_symbols": true,
+  "consolidate": true,
+  "include_tests": false,
+  "incremental": false,
+  "since_commit": "HEAD~1",
+  "exclude_dirs": [".git", "vendor", "node_modules"],
+  "limit": 0,
+  "dry_run": false
 }
 ```
 
----
+| Field | Type | Default | Forwarded as | Description |
+|-------|------|---------|--------------|-------------|
+| `space_id` | string | required | `--space-id` | Target MDEMG space (1–256 chars) |
+| `path` | string | required | `--path` | Local filesystem path to the codebase |
+| `batch_size` | int | 100 | `--batch` | Items per batch |
+| `workers` | int | 4 | `--workers` | Parallel worker count |
+| `timeout_seconds` | int | 300 | `--timeout` | HTTP timeout per batch |
+| `extract_symbols` | bool | true | `--extract-symbols` | Extract code symbols (functions, classes, constants) |
+| `consolidate` | bool | true | `--consolidate` | Run consolidation after ingestion |
+| `include_tests` | bool | false | `--include-tests` | Include test files |
+| `incremental` | bool | false | `--incremental` | Only files changed since `since_commit` |
+| `since_commit` | string | `HEAD~1` | `--since` | Git ref for incremental comparison |
+| `exclude_dirs` | []string | — | `--exclude` (comma-joined) | Directories to skip |
+| `limit` | int | 0 (no limit) | `--limit` | Max elements to ingest |
+| `dry_run` | bool | false | `--dry-run` | Preview without ingesting |
 
-## Options Reference
-
-### Required Fields
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `space_id` | string | MDEMG space identifier |
-| `path` | string | Local filesystem path to codebase |
-
-### Source Configuration (`source`)
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `type` | string | `"local"` | Source type: `"local"` or `"git"` |
-| `branch` | string | - | Git branch (for git sources) |
-| `since` | string | `"HEAD~1"` | Commit to compare for incremental mode |
-
-### Language Filters (`languages`)
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `typescript` | bool | `true` | Include .ts, .tsx, .js, .jsx files |
-| `python` | bool | `true` | Include .py files |
-| `java` | bool | `true` | Include .java files |
-| `rust` | bool | `true` | Include .rs files |
-| `go` | bool | `true` | Include .go files |
-| `markdown` | bool | `true` | Include .md files |
-| `include_tests` | bool | `false` | Include test files (*_test.go,*.spec.ts) |
-
-### Symbol Extraction (`symbols`)
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `extract` | bool | `true` | Extract code symbols (functions, classes, constants) |
-| `max_per_file` | int | `1000` | Maximum symbols to extract per file |
-
-### Exclusions (`exclusions`)
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `preset` | string | `"default"` | Preset: `"default"`, `"ml_cuda"`, `"web_monorepo"` |
-| `directories` | []string | `[".git", "vendor", "node_modules", ".worktrees"]` | Directories to exclude |
-| `max_file_size` | int | `1048576` | Max file size in bytes (1MB default) |
-
-**Presets:**
-
-- `default`: Standard exclusions for most projects
-- `ml_cuda`: Excludes large model files, CUDA kernels
-- `web_monorepo`: Excludes node_modules, dist, build artifacts
-
-### Processing (`processing`)
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `batch_size` | int | `100` | Files per batch (optimal for ~15/s per worker) |
-| `workers` | int | `4` | Parallel worker count |
-| `max_elements_per_file` | int | `500` | Max code elements per file |
-| `delay_ms` | int | `50` | Delay between batches in milliseconds |
-
-### LLM Summary (`llm_summary`)
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `enabled` | bool | `false` | Generate semantic summaries using LLM |
-| `provider` | string | `"openai"` | LLM provider: `"openai"` or `"ollama"` |
-| `model` | string | `"gpt-4o-mini"` | Model for summary generation |
-| `batch_size` | int | `10` | Files per LLM API call |
-
-**Note:** Requires `OPENAI_API_KEY` environment variable when using OpenAI.
-
-### General Options (`options`)
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `incremental` | bool | `false` | Only ingest files changed since last commit |
-| `archive_deleted` | bool | `true` | Archive nodes for deleted files |
-| `consolidate` | bool | `true` | Run consolidation after ingestion |
-| `dry_run` | bool | `false` | Preview without actually ingesting |
-| `verbose` | bool | `false` | Verbose logging |
-| `limit` | int | `0` | Limit elements to ingest (0 = unlimited) |
-
-### Retry Configuration (`retry`)
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `max_attempts` | int | `3` | Maximum retry attempts per batch |
-| `initial_delay_ms` | int | `2000` | Initial retry delay (doubles each retry) |
-| `timeout_seconds` | int | `300` | HTTP timeout for batch requests |
+**Accepted but not forwarded by the trigger handler** (present on the request
+model; the handler currently drops them before building the CLI args):
+`include_md`, `include_ts`, `include_py`, `archive_deleted`. Use the
+`mdemg ingest` CLI directly if you need those toggles
+(`--archive-deleted` is honored on the scheduled-sync path).
 
 ---
 
-## Job Management
-
-### Check Job Status
+## Job Status
 
 ```bash
-GET /v1/memory/ingest-codebase/{job_id}
+curl -s http://localhost:9999/v1/memory/ingest/status/ingest-a1b2c3d4
 ```
 
-**Response:**
+**Response (`models.IngestJobStatusResponse`):**
 
 ```json
 {
-  "job_id": "a1b2c3d4",
-  "status": "running",
+  "job_id": "ingest-a1b2c3d4",
   "space_id": "my-project",
-  "path": "/path/to/codebase",
-  "stats": {
-    "files_found": 4522,
-    "files_processed": 1500,
-    "symbols_extracted": 8234,
-    "errors": 0,
-    "rate": 14.5,
-    "duration": "1m45s"
+  "status": "running",
+  "created_at": "2026-07-21T12:00:00Z",
+  "started_at": "2026-07-21T12:00:01Z",
+  "progress": {
+    "total": 4522,
+    "current": 1500,
+    "percentage": 33.2,
+    "phase": "ingesting",
+    "rate": 14.5
   }
 }
 ```
 
-**Status values:** `queued`, `running`, `completed`, `failed`, `cancelled`
+`completed_at`, `result`, and `error` appear once terminal.
+**Status values:** `pending`, `running`, `completed`, `failed`, `cancelled`.
 
-### List All Jobs
-
-```bash
-GET /v1/memory/ingest-codebase
-```
-
-**Response:**
-
-```json
-{
-  "jobs": [
-    {"job_id": "a1b2c3d4", "status": "completed", ...},
-    {"job_id": "e5f6g7h8", "status": "running", ...}
-  ]
-}
-```
-
-### Cancel Job
+## List Jobs
 
 ```bash
-DELETE /v1/memory/ingest-codebase/{job_id}
+curl -s http://localhost:9999/v1/memory/ingest/jobs
 ```
 
-**Response:**
+Returns `{"jobs": [...], "count": N}` — each entry carries `job_id`,
+`status`, `space_id`, `created_at`, `started_at`/`completed_at` when set, and
+the same `progress` object.
 
-```json
-{
-  "status": "cancelled",
-  "job_id": "a1b2c3d4"
-}
+## Cancel
+
+```bash
+curl -X POST http://localhost:9999/v1/memory/ingest/cancel/ingest-a1b2c3d4
 ```
+
+**200:** `{"job_id": "...", "status": "cancelled", "message": "Job cancellation requested"}`
+**404:** job unknown or already completed.
+
+## Re-ingest Specific Files
+
+```bash
+curl -X POST http://localhost:9999/v1/memory/ingest/files \
+  -H "Content-Type: application/json" \
+  -d '{"space_id": "my-project", "files": ["internal/api/handlers.go"]}'
+```
+
+Synchronous for ≤50 files (results inline); >50 files falls back to a
+background job with the status flow above. Also exposed as the MCP tool
+`memory_ingest_files`.
 
 ---
 
 ## Examples
 
-### TypeScript Project (Fast)
-
-```json
-{
-  "space_id": "my-ts-app",
-  "path": "/home/user/projects/my-ts-app",
-  "languages": {
-    "typescript": true,
-    "python": false,
-    "java": false,
-    "rust": false,
-    "markdown": true
-  },
-  "processing": {
-    "workers": 8
-  }
-}
-```
-
-### ML/CUDA Project
-
-```json
-{
-  "space_id": "ml-training",
-  "path": "/home/user/ml-project",
-  "exclusions": {
-    "preset": "ml_cuda"
-  },
-  "symbols": {
-    "extract": true,
-    "max_per_file": 500
-  }
-}
-```
-
-### Incremental Update
+### Incremental update (changed files only)
 
 ```json
 {
   "space_id": "my-project",
   "path": "/home/user/my-project",
-  "options": {
-    "incremental": true
-  },
-  "source": {
-    "since": "HEAD~5"
-  }
+  "incremental": true,
+  "since_commit": "HEAD~5"
 }
 ```
 
-### With LLM Summaries
-
-```json
-{
-  "space_id": "documented-project",
-  "path": "/home/user/project",
-  "llm_summary": {
-    "enabled": true,
-    "provider": "openai",
-    "model": "gpt-4o-mini"
-  }
-}
-```
-
-### Dry Run Preview
+### Dry-run preview
 
 ```json
 {
   "space_id": "test",
   "path": "/home/user/project",
-  "options": {
-    "dry_run": true,
-    "verbose": true,
-    "limit": 100
-  }
+  "dry_run": true,
+  "limit": 100
+}
+```
+
+### Big monorepo
+
+```json
+{
+  "space_id": "monorepo",
+  "path": "/home/user/monorepo",
+  "workers": 8,
+  "exclude_dirs": ["node_modules", "dist", "build", ".worktrees"]
 }
 ```
 
@@ -337,40 +195,20 @@ DELETE /v1/memory/ingest-codebase/{job_id}
 
 ## Error Responses
 
-### 400 Bad Request
-
-```json
-{"error": "space_id is required"}
-{"error": "path is required"}
-{"error": "path does not exist: /invalid/path"}
-```
-
-### 404 Not Found
-
-```json
-{"error": "job not found"}
-```
-
-### 405 Method Not Allowed
-
-```json
-"Method not allowed"
-```
-
----
+| Status | Body |
+|--------|------|
+| 400 | `{"error": "space_id is required"}` / `{"error": "path is required"}` / `{"error": "job_id required in path"}` |
+| 404 | `{"error": "job not found: <id>"}` |
+| 405 | empty body (method not allowed) |
 
 ## Performance Guidelines
 
-| Codebase Size | Recommended Workers | Expected Rate | Estimated Time |
-|---------------|--------------------:|:-------------:|----------------|
-| Small (<1K files) | 2-4 | 10-15/s | < 2 min |
-| Medium (1K-10K) | 4-8 | 12-18/s | 5-15 min |
-| Large (10K-50K) | 8-12 | 15-20/s | 30-60 min |
-| Monorepo (50K+) | 12-16 | 15-25/s | 1-3 hours |
+| Codebase Size | Recommended Workers | Expected Rate |
+|---------------|--------------------:|:-------------:|
+| Small (<1K files) | 2–4 | 10–15 files/s |
+| Medium (1K–10K) | 4–8 | 12–18 files/s |
+| Large (10K–50K) | 8–12 | 15–20 files/s |
 
-**Tips:**
-
-- Use `incremental: true` for subsequent updates
-- Use `preset: "ml_cuda"` for ML repos with large binaries
-- Increase `batch_size` for faster networks
-- Reduce `max_file_size` to skip large generated files
+Use `incremental: true` for subsequent updates; `dry_run` + `limit` to
+preview scope cheaply. UATS contracts for this surface live under
+`docs/api/api-spec/uats/specs/` (`memory_ingest_*`).

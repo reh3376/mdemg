@@ -302,7 +302,7 @@ Use this template for each session entry:
 6. Decisions made:
    - Reused existing patterns: subcommand group (db.go), init wizard (init.go), atomic write (daemon.go), config validation (yaml_config.go), JSON output (config_cmd.go).
    - Service probe uses 3s timeout (probeTimeout constant).
-   - Status probes mdemg-api (HTTP /healthz), neo4j (TCP 7687), embedder (HTTP 11434).
+   - Status probes mdemg-api (HTTP /healthz), neo4j (TCP 7687), embedder (HTTP 11434). (`/healthz` is the mdemg API's health endpoint; the neural sidecar itself serves `GET /health`.)
    - Stub commands print "not yet implemented" message (no error exit).
 7. Open questions:
    - None for S1 scope.

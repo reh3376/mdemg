@@ -1,0 +1,79 @@
+# Allowlist for scripts/verify_doc_env_vars.py — UPPER_SNAKE tokens that
+# appear in living docs but are NOT env vars read by this codebase.
+# One token per line; '#' comments. Add a reason with every entry.
+
+# ── Deliberate historical / negative mentions (CLAUDE.md records what was
+#    removed or what the WRONG name was — the mention is the point) ──
+SCORING_RHO            # ACA-BFC: removed dead config field (suffixed SCORING_RHO_* variants remain real)
+TSDB_DBNAME            # ACA-BFC H2: the old wrong compose key, renamed to TSDB_DATABASE
+MDEMG_MODEL_ADAPTER_BASE  # DOC-TRUTH-001: documented as the WRONG name (code reads MDEMG_ADAPTER_BASE)
+LISTEN_PORT            # DD-P1P2 compose cleanup note: variable that was removed
+ALERT_RETRIEVE         # prose shorthand for the ALERT_RETRIEVE_* SLO family
+RETRIEVAL_CONTEXT_STRICT_THRESHOLD  # recorded as the never-existed name (real: RETRIEVAL_CTX_STRICT_THRESHOLD)
+
+# ── External / CI environment variables (real, but owned by other systems) ──
+BUILD_SOURCESDIRECTORY # Azure Pipelines builtin
+CI_COMMIT_BEFORE_SHA   # GitLab CI builtin
+GITHUB_WORKSPACE       # GitHub Actions builtin
+GITHUB_SHA             # GitHub Actions builtin
+LINEAR_API_KEY         # Linear MCP integration (consumed by the MCP server env)
+LINEAR_WORKSPACE_ID    # Linear MCP integration
+OBSIDIAN_VAULT_PATH    # operator-side example in the ingestion guide
+TEST_BETA_KEY          # beta-testing doc example value
+
+# ── Shell-recipe local variables (docs show runnable scripts; these are
+#    script-local, not process config) ──
+BASE_MODEL
+BASE_SHA
+BENCHMARK_CONFIG
+EXPORT_SINCE_DAYS
+GATE_MIN_SCORE
+GATE_PORT
+GATE_TASK_FILTER
+LORA_ALPHA
+LORA_RANK
+WORK_DIR
+LLAMA_GGUF
+SYMLINK_TARGET
+SHA256_PREFIX
+DB_PASSWORD            # generic placeholder in the CMS/RSIC guide
+
+# ── Prose fragments of longer real names / notation ──
+HISTORY_CYCLES         # fragment of RSIC_LLM_REFLECT_* prose in the prompt-budget doc
+INCLUDE_DATASETS       # same doc, dataset-gating prose
+PROMPT_BUDGET_TOKENS   # fragment of RSIC_LLM_REFLECT_PROMPT_BUDGET_TOKENS
+MIN_SAMPLES            # fragment of J17_TIER_COMPREHENSION_MIN_SAMPLES
+QX_K_M                 # quant-name pattern (Q4_K_M/Q5_K_M/Q8_0 family)
+J17_ON                 # prose "J17 ON"
+NO_UUID_V4             # prose "no UUID v4" (CUIDv2 rule)
+VAR_NAME               # docs/features/_TEMPLATE.md placeholder
+RELATIONSHIP_EXTRACTION  # concept name in bridges-edge-type.md, not a var
+
+# ── Document/file references (UPPER_SNAKE doc names) ──
+API_REFERENCE
+BENCHMARK_V4_README
+FRAMEWORK_GOVERNANCE
+MODULE_DEVELOPMENT_GUIDE
+SDK_PLUGIN_GUIDE
+UXTS_DEVELOPER_GUIDE
+UAITS_SPEC
+NEO4J_BACKUP           # backup filename-prefix reference in README
+
+# ── Real vars invisible to the checker (constructed names) ──
+NEURAL_TIER_MODEL      # real: pydantic-settings env_prefix "NEURAL_" + field tier_model (never appears literally)
+
+# ── Fictional example content inside docs ──
+MDEMG_DB_POOL_SIZE     # api-reference: example guidance STRING content, not a real var
+MDEMG_API_KEY          # api-reference: operator-side shell variable holding their key (server reads AUTH_API_KEYS)
+
+# ── Proposed / negative mentions ──
+GUIDANCE_CORPUS_RETRAIN_MIN_GOLD_ROWS  # guidance-training-corpus.md: PROPOSED name for a future retrain-trigger sprint (explicitly "not built here")
+NEURAL_MODEL_DIR       # cli-reference: deliberate negative mention ("there is no NEURAL_MODEL_DIR env var")
+JIMINY_EFFECTIVENESS_ENABLED  # jiminy-effectiveness-tracking.md: deliberate negative mention (never existed; tracking unconditional)
+LLM_PROMPT_CACHE_PATH   # service-resilience.md: deliberate negative mention (never wired; tune on the llama-server command line)
+LLM_PROMPT_CACHE_SIZE_MB  # same negative mention
+SYNERGY_OVERLAP_THRESHOLD  # synergy-optimization.md: deliberate negative mention (never existed)
+SYNERGY_MAX_HOOK_TOKENS    # same
+SYNERGY_CRON_INTERVAL      # same
+SYNERGY_CRON_ENABLED       # same
+SIDECAR_HOST            # CLAUDE.md governance note: deliberate negative mention (the fixed code-comment bug; real: NEURAL_HOST)

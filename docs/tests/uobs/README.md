@@ -18,9 +18,19 @@ uobs/
 ├── schema/
 │   └── uobs.schema.json     # JSON Schema for validation
 ├── specs/
-│   ├── prometheus_metrics.uobs.json
+│   ├── embedding_event_logging.uobs.json
+│   ├── embedding_health.uobs.json
 │   ├── health_endpoints.uobs.json
-│   └── log_format.uobs.json
+│   ├── health_probes.uobs.json
+│   ├── jiminy_protocol_metrics.uobs.json
+│   ├── llm_interaction_logging.uobs.json
+│   ├── metrics_snapshot_observability.uobs.json
+│   ├── prometheus_metrics.uobs.json
+│   ├── retrieval_event_logging.uobs.json
+│   ├── rsic_task_cleanup.uobs.json
+│   └── tsdb_backup_health.uobs.json
+├── drafts/
+│   └── log_format.uobs.json # logging type unimplemented in runner
 ├── alerts/
 │   └── latency_slo.yaml     # Prometheus alerting rules
 ├── dashboards/
