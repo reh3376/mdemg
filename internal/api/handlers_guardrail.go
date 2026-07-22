@@ -136,9 +136,9 @@ func (s *Server) handleGuardrailProducerAsync(w http.ResponseWriter, req models.
 	// Detached from the request context by construction (fresh Background,
 	// never r.Context()): the hook's curl exits in milliseconds and must not
 	// caller-cancel the evaluation mid-LLM. Bounded by GuardrailTimeoutMs.
-	bgCtx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutMs)*time.Millisecond)
+	valueCtx := context.Background()
 	if req.SpaceID != "" {
-		bgCtx = llmclient.WithSpaceID(bgCtx, req.SpaceID)
+		valueCtx = llmclient.WithSpaceID(valueCtx, req.SpaceID)
 	}
 
 	vreq := guardrail.ValidateRequest{
@@ -148,8 +148,9 @@ func (s *Server) handleGuardrailProducerAsync(w http.ResponseWriter, req models.
 		AgentTrustLevel: req.AgentTrustLevel,
 	}
 	go func() {
-		defer cancel()
 		defer func() { <-s.guardrailProducerSem }()
+		bgCtx, cancel := context.WithTimeout(valueCtx, time.Duration(timeoutMs)*time.Millisecond)
+		defer cancel()
 		result, err := s.guardrailValidator.Validate(bgCtx, vreq)
 		if err != nil {
 			slog.Warn("guardrail producer: detached evaluation errored", "space_id", vreq.SpaceID, "error", err)
