@@ -87,11 +87,11 @@ curl -X POST http://localhost:9999/v1/memory/ingest/trigger \
 | `limit` | int | 0 (no limit) | `--limit` | Max elements to ingest |
 | `dry_run` | bool | false | `--dry-run` | Preview without ingesting |
 
-**Accepted but not forwarded by the trigger handler** (present on the request
-model; the handler currently drops them before building the CLI args):
-`include_md`, `include_ts`, `include_py`, `archive_deleted`. Use the
-`mdemg ingest` CLI directly if you need those toggles
-(`--archive-deleted` is honored on the scheduled-sync path).
+**Language toggles + archive behavior** (pointer-bools, honored since
+INGEST-TRIGGER-FORWARD-001): `include_md`, `include_ts`, `include_py`
+(CLI default true) and `archive_deleted` (CLI default true) forward as
+`--include-md/ts/py=%t` / `--archive-deleted=%t` when set; an omitted field
+emits no flag, so the CLI default stays authoritative.
 
 ---
 
