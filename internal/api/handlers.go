@@ -2803,7 +2803,32 @@ func (s *Server) handleIngestTrigger(w http.ResponseWriter, r *http.Request) {
 	// Generate job ID
 	jobID := "ingest-" + uuid.New().String()[:8]
 
-	// Build job configuration
+	config := buildIngestConfigFromRequest(req)
+
+	// Create job
+	queue := jobs.GetQueue()
+	job, ctx := queue.CreateJob(jobID, "ingest-codebase", config)
+
+	// Start background ingestion
+	go s.runIngestJob(ctx, job)
+
+	// Return job reference
+	writeJSON(w, http.StatusAccepted, models.IngestTriggerResponse{
+		JobID:     jobID,
+		SpaceID:   req.SpaceID,
+		Status:    string(jobs.StatusPending),
+		Message:   "Ingestion job created. Use GET /v1/memory/ingest/status/" + jobID + " to check progress.",
+		CreatedAt: job.CreatedAt.Format(time.RFC3339),
+	})
+}
+
+// buildIngestConfigFromRequest maps an IngestTriggerRequest onto the job
+// config that buildIngestArgsFromConfig turns into CLI flags. Pointer-bool
+// fields land in the config only when set — an omitted field emits no CLI
+// flag, so the CLI default stays the single source of truth
+// (INGEST-TRIGGER-FORWARD-001: include_md/ts/py + archive_deleted were
+// accepted by the request model but silently dropped before).
+func buildIngestConfigFromRequest(req models.IngestTriggerRequest) map[string]any {
 	config := map[string]any{
 		"space_id": req.SpaceID,
 		"path":     req.Path,
@@ -2844,6 +2869,19 @@ func (s *Server) handleIngestTrigger(w http.ResponseWriter, r *http.Request) {
 	config["incremental"] = req.Incremental
 	config["dry_run"] = req.DryRun
 
+	if req.IncludeMarkdown != nil {
+		config["include_md"] = *req.IncludeMarkdown
+	}
+	if req.IncludeTS != nil {
+		config["include_ts"] = *req.IncludeTS
+	}
+	if req.IncludePython != nil {
+		config["include_py"] = *req.IncludePython
+	}
+	if req.ArchiveDeleted != nil {
+		config["archive_deleted"] = *req.ArchiveDeleted
+	}
+
 	if req.SinceCommit != "" {
 		config["since_commit"] = req.SinceCommit
 	}
@@ -2853,22 +2891,7 @@ func (s *Server) handleIngestTrigger(w http.ResponseWriter, r *http.Request) {
 	if req.Limit > 0 {
 		config["limit"] = req.Limit
 	}
-
-	// Create job
-	queue := jobs.GetQueue()
-	job, ctx := queue.CreateJob(jobID, "ingest-codebase", config)
-
-	// Start background ingestion
-	go s.runIngestJob(ctx, job)
-
-	// Return job reference
-	writeJSON(w, http.StatusAccepted, models.IngestTriggerResponse{
-		JobID:     jobID,
-		SpaceID:   req.SpaceID,
-		Status:    string(jobs.StatusPending),
-		Message:   "Ingestion job created. Use GET /v1/memory/ingest/status/" + jobID + " to check progress.",
-		CreatedAt: job.CreatedAt.Format(time.RFC3339),
-	})
+	return config
 }
 
 // ingestProgressEvent represents a structured JSON progress line from the CLI.
@@ -3067,6 +3090,15 @@ func buildIngestArgsFromConfig(config map[string]any, listenAddr string) []strin
 	}
 	if v, ok := config["include_tests"].(bool); ok && v {
 		args = append(args, "--include-tests")
+	}
+	if v, ok := config["include_md"].(bool); ok {
+		args = append(args, fmt.Sprintf("--include-md=%t", v))
+	}
+	if v, ok := config["include_ts"].(bool); ok {
+		args = append(args, fmt.Sprintf("--include-ts=%t", v))
+	}
+	if v, ok := config["include_py"].(bool); ok {
+		args = append(args, fmt.Sprintf("--include-py=%t", v))
 	}
 	if v, ok := config["incremental"].(bool); ok && v {
 		args = append(args, "--incremental")

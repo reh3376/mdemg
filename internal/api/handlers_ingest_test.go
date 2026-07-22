@@ -6,6 +6,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"mdemg/internal/models"
 )
 
 func TestBuildIngestArgsFromConfig(t *testing.T) {
@@ -97,6 +99,44 @@ func TestBuildIngestArgsFromConfig(t *testing.T) {
 				"--dry-run": true,
 			},
 		},
+		{
+			// INGEST-TRIGGER-FORWARD-001: language toggles + archive_deleted
+			// emit explicit =true/=false flags when present in config.
+			name: "language toggles forwarded",
+			config: map[string]any{
+				"space_id":        "test",
+				"path":            "/tmp",
+				"include_md":      false,
+				"include_ts":      true,
+				"include_py":      false,
+				"archive_deleted": false,
+			},
+			listenAddr: ":9999",
+			wantArgs: map[string]bool{
+				"--include-md=false":      true,
+				"--include-ts=true":       true,
+				"--include-py=false":      true,
+				"--archive-deleted=false": true,
+			},
+		},
+		{
+			// Omitted toggles emit NO flag — the CLI default stays authoritative.
+			name: "language toggles omitted when absent",
+			config: map[string]any{
+				"space_id": "test",
+				"path":     "/tmp",
+			},
+			listenAddr: ":9999",
+			wantArgs: map[string]bool{
+				"--progress-json": true,
+			},
+			wantAbsent: []string{
+				"--include-md=true", "--include-md=false",
+				"--include-ts=true", "--include-ts=false",
+				"--include-py=true", "--include-py=false",
+				"--archive-deleted=true", "--archive-deleted=false",
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -125,6 +165,41 @@ func TestBuildIngestArgsFromConfig(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// INGEST-TRIGGER-FORWARD-001: request pointer-bools land in the job config
+// only when set; omitted fields stay out of the config entirely.
+func TestBuildIngestConfigFromRequest_PointerBools(t *testing.T) {
+	f := false
+	tr := true
+
+	set := buildIngestConfigFromRequest(models.IngestTriggerRequest{
+		SpaceID:         "s",
+		Path:            "/tmp",
+		IncludeMarkdown: &f,
+		IncludeTS:       &tr,
+		IncludePython:   &f,
+		ArchiveDeleted:  &f,
+	})
+	for k, want := range map[string]bool{
+		"include_md": false, "include_ts": true, "include_py": false, "archive_deleted": false,
+	} {
+		got, ok := set[k].(bool)
+		if !ok {
+			t.Errorf("%s: expected bool in config, missing", k)
+			continue
+		}
+		if got != want {
+			t.Errorf("%s: got %v, want %v", k, got, want)
+		}
+	}
+
+	unset := buildIngestConfigFromRequest(models.IngestTriggerRequest{SpaceID: "s", Path: "/tmp"})
+	for _, k := range []string{"include_md", "include_ts", "include_py", "archive_deleted"} {
+		if _, present := unset[k]; present {
+			t.Errorf("%s: expected absent from config when request field is nil", k)
+		}
 	}
 }
 
