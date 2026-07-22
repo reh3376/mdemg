@@ -250,6 +250,8 @@ type Config struct {
 	HiddenThemeIdentitySimThreshold     float64 // HIDDEN_THEME_IDENTITY_SIM_THRESHOLD — centroid cosine floor for matching a cluster to an EXISTING theme (in-place update, stable node identity) instead of recreating (default: 0.90; HIDDEN-CHURN-001)
 	HiddenPatternIdentitySimThreshold   float64 // HIDDEN_PATTERN_IDENTITY_SIM_THRESHOLD — centroid cosine floor for the FALLBACK match of a cluster to an EXISTING L1 hidden pattern when member-overlap finds none (in-place update, stable node identity) instead of recreating (default: 0.90; HIDDEN-CHURN-002)
 	HiddenPatternMemberJaccardThreshold float64 // HIDDEN_PATTERN_MEMBER_JACCARD_THRESHOLD — PRIMARY identity match: Jaccard overlap of a cluster's L0 member set with an existing pattern's members. Stable under KMeans repartition jitter (centroid-cosine alone left ~28% churn/cycle). 0 disables member matching (centroid-only). (default: 0.5; HIDDEN-CHURN-002)
+	HiddenIncrementalPassesEnabled      bool    // HIDDEN_INCREMENTAL_PASSES_ENABLED — CONSOLIDATE-PERF-002: forward/backward passes gate on last_*_pass vs member/edge recency, recomputing only nodes whose inputs changed (default: false; flip after live smoke)
+	DynamicEdgeIncrementalLookbackHours int     // DYNAMIC_EDGE_INCREMENTAL_LOOKBACK_HOURS — CONSOLIDATE-PERF-002: dynamic-edge seeds restricted to nodes created/updated within this window; 0 = full sweep (default: 6; only active when HIDDEN_INCREMENTAL_PASSES_ENABLED)
 	HiddenIncrementalEnabled            bool    // HIDDEN_INCREMENTAL_ENABLED — default consolidation hidden step assigns only ORPHAN L0 nodes to existing patterns (incremental), never re-clustering stable patterns → ~0% identity churn + lower CPU; false = fall back to the CHURN-002 full re-cluster (default: true; HIDDEN-CHURN-003)
 	HiddenIncrementalAssignSimThreshold float64 // HIDDEN_INCREMENTAL_ASSIGN_SIM_THRESHOLD — cosine floor for assigning an orphan L0 node to an existing pattern (below it the orphan clusters into a new pattern instead) (default: 0.80; HIDDEN-CHURN-003)
 	ConsolidateTimeoutMs                int     // CONSOLIDATE_TIMEOUT_MS — server-side deadline for a full /v1/memory/consolidate cycle, DETACHED from caller cancellation so a client timeout can't abort it mid-cycle. CONSOLIDATE-PERF-001 raised the default 30→60 min: live cycles run ~38 min on an 83k-node graph, so the old 30-min default aborted the manual path mid-ForwardPass leaving partial state (the watchdog path has no deadline and completed). Floor 60000; HIDDEN-CHURN-002. (default: 3600000 = 60 min)
@@ -4157,6 +4159,13 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	dynEdgeIncLookback, err := atoi("DYNAMIC_EDGE_INCREMENTAL_LOOKBACK_HOURS", 6)
+	if err != nil {
+		return Config{}, err
+	}
+	if dynEdgeIncLookback < 0 {
+		return Config{}, errors.New("DYNAMIC_EDGE_INCREMENTAL_LOOKBACK_HOURS must be >= 0")
+	}
 	dynamicEdgeTopK, err := atoi("DYNAMIC_EDGE_TOPK", 10)
 	if err != nil {
 		return Config{}, err
@@ -5422,6 +5431,8 @@ func FromEnv() (Config, error) {
 		HiddenPatternIdentitySimThreshold:   hiddenPatternIdentitySimThreshold,
 		HiddenPatternMemberJaccardThreshold: hiddenPatternMemberJaccardThreshold,
 		HiddenIncrementalEnabled:            getBool("HIDDEN_INCREMENTAL_ENABLED", true),
+		HiddenIncrementalPassesEnabled:      getBool("HIDDEN_INCREMENTAL_PASSES_ENABLED", false),
+		DynamicEdgeIncrementalLookbackHours: dynEdgeIncLookback,
 		HiddenIncrementalAssignSimThreshold: hiddenIncrementalAssignSimThreshold,
 		ConsolidateTimeoutMs:                consolidateTimeoutMs,
 		HiddenThemeTargetRatio:              hiddenThemeTargetRatio,

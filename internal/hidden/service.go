@@ -1480,30 +1480,21 @@ func (s *Service) ForwardPass(ctx context.Context, spaceID string) (*ForwardPass
 // Batched to prevent OOM on large graphs — each batch processes a subset of
 // hidden nodes in its own transaction.
 func (s *Service) forwardPassHiddenLayer(ctx context.Context, spaceID string) (int, error) {
+	// CONSOLIDATE-PERF-002: gated recompute of only changed-input nodes.
+	if s.cfg.HiddenIncrementalPassesEnabled {
+		return s.forwardPassHiddenLayerIncremental(ctx, spaceID)
+	}
 	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer sess.Close(ctx)
 
 	// GraphSAGE-style weighted mean aggregation with embedding combination.
 	// Uses SKIP/LIMIT to process hidden nodes in batches.
+	// CONSOLIDATE-PERF-002: aggregation body shared with the incremental path
+	// (fwdHiddenAggBody) — one source of truth for the math.
 	cypher := `
 MATCH (h:MemoryNode {space_id: $spaceId, layer: 1})
 WITH h ORDER BY h.node_id SKIP $skip LIMIT $limit
-MATCH (b:MemoryNode {space_id: $spaceId, layer: 0})-[r:GENERALIZES]->(h)
-WHERE b.embedding IS NOT NULL
-WITH h, collect({emb: b.embedding, weight: coalesce(r.weight, 1.0)}) AS neighbors
-WHERE size(neighbors) > 0
-WITH h, neighbors,
-     reduce(totalW = 0.0, n IN neighbors | totalW + n.weight) AS totalWeight
-WITH h, neighbors, totalWeight,
-     [i IN range(0, size(h.embedding)-1) |
-       reduce(sum = 0.0, n IN neighbors | sum + n.emb[i] * n.weight) / totalWeight
-     ] AS aggregated
-SET h.message_pass_embedding = [i IN range(0, size(h.embedding)-1) |
-      $alpha * coalesce(h.embedding[i], 0) + $beta * aggregated[i]
-    ],
-    h.last_forward_pass = datetime(),
-    h.aggregation_count = size(neighbors)
-RETURN count(h) AS updated`
+` + fwdHiddenAggBody
 
 	const forwardBatchSize = 50
 	totalUpdated := 0
@@ -1541,6 +1532,10 @@ RETURN count(h) AS updated`
 
 // forwardPassConceptLayer aggregates hidden node embeddings into concept nodes
 func (s *Service) forwardPassConceptLayer(ctx context.Context, spaceID string) (int, error) {
+	// CONSOLIDATE-PERF-002: gated recompute of only changed-input nodes.
+	if s.cfg.HiddenIncrementalPassesEnabled {
+		return s.forwardPassConceptLayerIncremental(ctx, spaceID)
+	}
 	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer sess.Close(ctx)
 
@@ -1550,25 +1545,7 @@ func (s *Service) forwardPassConceptLayer(ctx context.Context, spaceID string) (
 MATCH (c:MemoryNode {space_id: $spaceId})
 WHERE c.layer >= 2
 WITH c ORDER BY c.node_id SKIP $skip LIMIT $limit
-MATCH (h:MemoryNode {space_id: $spaceId, layer: 1})-[r:ABSTRACTS_TO]->(c)
-WHERE h.message_pass_embedding IS NOT NULL OR h.embedding IS NOT NULL
-WITH c, collect({
-  emb: coalesce(h.message_pass_embedding, h.embedding),
-  weight: coalesce(r.weight, 1.0)
-}) AS neighbors
-WHERE size(neighbors) > 0
-WITH c, neighbors,
-     reduce(totalW = 0.0, n IN neighbors | totalW + n.weight) AS totalWeight
-WITH c, neighbors, totalWeight,
-     [i IN range(0, size(c.embedding)-1) |
-       reduce(sum = 0.0, n IN neighbors | sum + n.emb[i] * n.weight) / totalWeight
-     ] AS aggregated
-SET c.message_pass_embedding = [i IN range(0, size(c.embedding)-1) |
-      $alpha * coalesce(c.embedding[i], 0) + $beta * aggregated[i]
-    ],
-    c.last_forward_pass = datetime(),
-    c.aggregation_count = size(neighbors)
-RETURN count(c) AS updated`
+` + fwdConceptAggBody
 
 	const conceptBatchSize = 50
 	totalUpdated := 0
@@ -1613,6 +1590,17 @@ func (s *Service) BackwardPass(ctx context.Context, spaceID string) (*BackwardPa
 	start := time.Now()
 	result := &BackwardPassResult{}
 
+	// CONSOLIDATE-PERF-002: gated recompute of only changed-input nodes.
+	if s.cfg.HiddenIncrementalPassesEnabled {
+		updated, err := s.backwardPassIncremental(ctx, spaceID)
+		if err != nil {
+			return nil, err
+		}
+		result.HiddenNodesUpdated = updated
+		result.Duration = time.Since(start)
+		return result, nil
+	}
+
 	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer sess.Close(ctx)
 
@@ -1621,31 +1609,7 @@ func (s *Service) BackwardPass(ctx context.Context, spaceID string) (*BackwardPa
 	cypher := `
 MATCH (h:MemoryNode {space_id: $spaceId, layer: 1})
 WITH h ORDER BY h.node_id SKIP $skip LIMIT $limit
-OPTIONAL MATCH (h)-[rUp:ABSTRACTS_TO]->(c:MemoryNode)
-WHERE c.layer >= 2 AND (c.message_pass_embedding IS NOT NULL OR c.embedding IS NOT NULL)
-WITH h, collect(coalesce(c.message_pass_embedding, c.embedding)) AS conceptEmbs
-OPTIONAL MATCH (b:MemoryNode {space_id: $spaceId, layer: 0})-[rDown:GENERALIZES]->(h)
-WHERE b.embedding IS NOT NULL
-WITH h, conceptEmbs, collect(b.embedding) AS baseEmbs
-WHERE size(conceptEmbs) > 0 OR size(baseEmbs) > 0
-WITH h, conceptEmbs, baseEmbs,
-     CASE WHEN size(conceptEmbs) > 0 THEN
-       [i IN range(0, size(h.embedding)-1) |
-         reduce(sum = 0.0, e IN conceptEmbs | sum + e[i]) / size(conceptEmbs)
-       ]
-     ELSE null END AS conceptSignal,
-     CASE WHEN size(baseEmbs) > 0 THEN
-       [i IN range(0, size(h.embedding)-1) |
-         reduce(sum = 0.0, e IN baseEmbs | sum + e[i]) / size(baseEmbs)
-       ]
-     ELSE null END AS baseSignal
-SET h.message_pass_embedding = [i IN range(0, size(h.embedding)-1) |
-      $selfW * coalesce(h.embedding[i], 0) +
-      $baseW * coalesce(baseSignal[i], h.embedding[i]) +
-      $concW * coalesce(conceptSignal[i], h.embedding[i])
-    ],
-    h.last_backward_pass = datetime()
-RETURN count(h) AS updated`
+` + backwardAggBody
 
 	const backwardBatchSize = 50
 	totalUpdated := 0
@@ -3118,9 +3082,19 @@ func (s *Service) CreateDynamicEdges(ctx context.Context, spaceID string) (int, 
 	// structural GENERALIZES/ABSTRACTS_TO membership edges) — else L1/L2 concept
 	// nodes, which have many member edges, would always exceed the cap and be
 	// excluded, defeating the whole point of connecting the concept layers.
+	// CONSOLIDATE-PERF-002: when incremental passes are on and a lookback is
+	// configured, seed only nodes created/updated within the window — existing
+	// nodes' neighbourhoods barely move cycle-to-cycle, and edges MERGE so an
+	// over-wide window only wastes work. 0 = full sweep (legacy).
+	seedRecency := ""
+	if s.cfg.HiddenIncrementalPassesEnabled && s.cfg.DynamicEdgeIncrementalLookbackHours > 0 {
+		seedRecency = `
+  AND (a.created_at >= $since OR a.updated_at >= $since)`
+	}
+
 	findPairsCypher := `
 MATCH (a:MemoryNode {space_id: $spaceId})
-WHERE a.layer >= $minLayer AND a.embedding IS NOT NULL
+WHERE a.layer >= $minLayer AND a.embedding IS NOT NULL` + seedRecency + `
   AND COUNT { (a)-[:ANALOGOUS_TO|CONTRASTS_WITH|COMPOSES_WITH|INFLUENCES|SPECIALIZES|GENERALIZES_TO|BRIDGES]-() } < $degreeCap
 CALL db.index.vector.queryNodes('memNodeEmbedding', $fetchK, a.embedding) YIELD node AS b, score
 WITH a, b, score
@@ -3142,16 +3116,20 @@ RETURN a.node_id AS sourceId, b.node_id AS targetId,
        sim
 LIMIT $maxEdges`
 
+	pairParams := map[string]any{
+		"spaceId":      spaceID,
+		"degreeCap":    s.cfg.DynamicEdgeDegreeCap,
+		"minLayer":     minLayer,
+		"fetchK":       topK * oversample,
+		"topK":         topK,
+		"simThreshold": simThreshold,
+		"maxEdges":     500000, // global safety cap; the per-node topK is the real bound
+	}
+	if seedRecency != "" {
+		pairParams["since"] = time.Now().UTC().Add(-time.Duration(s.cfg.DynamicEdgeIncrementalLookbackHours) * time.Hour)
+	}
 	pairs, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
-		res, err := tx.Run(ctx, findPairsCypher, map[string]any{
-			"spaceId":      spaceID,
-			"degreeCap":    s.cfg.DynamicEdgeDegreeCap,
-			"minLayer":     minLayer,
-			"fetchK":       topK * oversample,
-			"topK":         topK,
-			"simThreshold": simThreshold,
-			"maxEdges":     500000, // global safety cap; the per-node topK is the real bound
-		})
+		res, err := tx.Run(ctx, findPairsCypher, pairParams)
 		if err != nil {
 			return nil, err
 		}
