@@ -30,3 +30,15 @@ func TestGuardrailProducer_MaxConcurrentFloor(t *testing.T) {
 		t.Error("expected error for GUARDRAIL_PRODUCER_MAX_CONCURRENT=0, got nil")
 	}
 }
+
+func TestGuardrailIncludeCorrections_Default(t *testing.T) {
+	setMinimalEnv(t)
+	t.Setenv("GUARDRAIL_INCLUDE_CORRECTIONS", "")
+	cfg, err := FromEnv()
+	if err != nil {
+		t.Fatalf("FromEnv() error: %v", err)
+	}
+	if cfg.GuardrailIncludeCorrections {
+		t.Error("GuardrailIncludeCorrections default = true, want false (flip after live smoke)")
+	}
+}

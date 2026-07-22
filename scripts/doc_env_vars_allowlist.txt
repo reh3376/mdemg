@@ -77,3 +77,5 @@ SYNERGY_MAX_HOOK_TOKENS    # same
 SYNERGY_CRON_INTERVAL      # same
 SYNERGY_CRON_ENABLED       # same
 SIDECAR_HOST            # CLAUDE.md governance note: deliberate negative mention (the fixed code-comment bug; real: NEURAL_HOST)
+NEURAL_DEVICE           # real: pydantic env_prefix "NEURAL_" + field device (never appears literally)
+NEURAL_LOG_LEVEL        # real: pydantic env_prefix "NEURAL_" + field log_level (never appears literally)
