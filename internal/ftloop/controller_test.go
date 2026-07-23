@@ -131,3 +131,19 @@ func TestController_DiskFloorBlocks(t *testing.T) {
 		t.Error("no stage command should run below the disk floor")
 	}
 }
+
+// FTLOOP-DRILL-001: tool resolution must survive the launchd minimal PATH
+// (the dockerbin class) — override wins, then PATH, then well-known bins.
+func TestResolveTool(t *testing.T) {
+	if got := resolveTool("anything", "/explicit/override"); got != "/explicit/override" {
+		t.Errorf("override: got %q", got)
+	}
+	// "sh" is always on PATH — LookPath branch returns an absolute path.
+	if got := resolveTool("sh", ""); got == "sh" {
+		t.Errorf("PATH resolution failed for sh: got bare name")
+	}
+	// A nonexistent tool falls through to the bare name (execCmd surfaces the error).
+	if got := resolveTool("definitely-not-a-real-tool-xyz", ""); got != "definitely-not-a-real-tool-xyz" {
+		t.Errorf("fallthrough: got %q", got)
+	}
+}

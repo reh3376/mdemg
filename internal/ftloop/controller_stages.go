@@ -146,6 +146,26 @@ func (c *Controller) stageTrain(ctx context.Context, work, versionedDir string) 
 	return adapterDir, nil
 }
 
+// resolveTool finds an external tool robustly under the launchd minimal PATH
+// (the NOSILENT-001 dockerbin class — FTLOOP-DRILL-001 caught the convert
+// stage failing on exactly this): explicit override → PATH → well-known
+// homebrew/local bins → bare name (execCmd surfaces a clear error).
+func resolveTool(name, override string) string {
+	if override != "" {
+		return override
+	}
+	if p, err := exec.LookPath(name); err == nil {
+		return p
+	}
+	for _, dir := range []string{"/opt/homebrew/bin", "/usr/local/bin"} {
+		cand := filepath.Join(dir, name)
+		if _, err := os.Stat(cand); err == nil {
+			return cand
+		}
+	}
+	return name
+}
+
 // stageConvert: fuse --dequantize (E6-14) → convert_hf_to_gguf f16 →
 // llama-quantize Q5_K_M → the candidate GGUF (E6-4).
 func (c *Controller) stageConvert(ctx context.Context, work, adapterDir string) (string, error) {
@@ -159,15 +179,12 @@ func (c *Controller) stageConvert(ctx context.Context, work, adapterDir string) 
 			"--adapter-path", adapterDir, "--save-path", fusedBF16, "--dequantize"}); err != nil {
 		return "", err
 	}
-	conv, err := exec.LookPath("convert_hf_to_gguf.py")
-	if err != nil {
-		conv = "convert_hf_to_gguf.py" // fall through; execCmd will surface a clear error
-	}
+	conv := resolveTool("convert_hf_to_gguf.py", c.cfg.ConvertScript)
 	if _, err := c.runCmd(ctx, "convert-gguf", c.cfg.RepoDir, py,
 		[]string{conv, fusedBF16, "--outtype", "f16", "--outfile", f16}); err != nil {
 		return "", err
 	}
-	if _, err := c.runCmd(ctx, "convert-quantize", c.cfg.RepoDir, "llama-quantize",
+	if _, err := c.runCmd(ctx, "convert-quantize", c.cfg.RepoDir, resolveTool("llama-quantize", ""),
 		[]string{f16, candidate, "Q5_K_M"}); err != nil {
 		return "", err
 	}
@@ -185,7 +202,7 @@ func (c *Controller) stageGate(ctx context.Context, work, candidate string) erro
 	report := filepath.Join(work, "gate-report.json")
 
 	// Start a side-port llama-server for the candidate; stop it on return.
-	srv := exec.CommandContext(ctx, "llama-server", "--model", candidate,
+	srv := exec.CommandContext(ctx, resolveTool("llama-server", ""), "--model", candidate,
 		"--port", strconv.Itoa(port), "--host", "127.0.0.1",
 		"--ctx-size", "8192", "--parallel", "1", "--jinja") //nolint:gosec // G204: controller-constructed
 	srv.Dir = c.cfg.RepoDir

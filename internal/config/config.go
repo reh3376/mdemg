@@ -1356,6 +1356,7 @@ type Config struct {
 	FtLoopExportSinceDays int     // FT_LOOP_EXPORT_SINCE_DAYS — export window for the curate input (default: 7)
 	FtLoopGateTaskFilter  string  // FT_LOOP_GATE_TASK_FILTER — optional run_benchmark --task-filter to scope the gate (default: empty = all tasks)
 	FtLoopGateMinScore    float64 // FT_LOOP_GATE_MIN_SCORE — minimum aggregate benchmark score for the gate to PASS (default: 0.80, matches UBENCH min_aggregate_weighted_score)
+	FtLoopConvertScript   string  // FT_LOOP_CONVERT_SCRIPT — explicit convert_hf_to_gguf.py path; empty = PATH → /opt/homebrew/bin → /usr/local/bin (FTLOOP-DRILL-001: launchd minimal PATH broke the bare LookPath)
 
 	// MAINT-LIVE-001 — maintenance liveness (only-ever-dry-runs detection).
 	MaintLiveAlertEnabled bool // MAINT_LIVE_ALERT_ENABLED — enable the maintenance_no_live_run rule (default: true)
@@ -6125,6 +6126,7 @@ func FromEnv() (Config, error) {
 		FtLoopExportSinceDays:               ftLoopExportSinceDays,
 		FtLoopGateTaskFilter:                ftLoopGateTaskFilter,
 		FtLoopGateMinScore:                  ftLoopGateMinScore,
+		FtLoopConvertScript:   get("FT_LOOP_CONVERT_SCRIPT", ""),
 		MaintLiveAlertEnabled:               maintLiveAlertEnabled,
 		MaintLiveLookbackDays:               maintLiveLookbackDays,
 		JobBackupStalenessHours:             jobBackupStalenessHours,
