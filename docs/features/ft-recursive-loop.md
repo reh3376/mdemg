@@ -133,3 +133,60 @@ suppression held, and the lease released cleanly. 14 findings are ledgered in
 - **FT-RECURSIVE-004 (Phase 9)** — drift monitoring + the issue filer.
 - Prerequisite, separate: **GUARDRAIL-PRODUCER-001** — `guardrail.evaluate` has
   only 3 production rows (no live producer); it cannot be retrained until one exists.
+
+## Phase 7 (FT-RECURSIVE-003, 2026-07-23) — promotion executor, canary, auto-rollback, autonomy policy
+
+Promotion is real, three-layer defended, and policy-autonomous. All flags
+code-default OFF; the dev `.env` enables after each epic's live smoke.
+
+**Serving indirection (E2):** llama-server serves through ONE symlink
+(`FT_LOOP_SERVING_SYMLINK`, `.local-models/serving/current.gguf`).
+`SwapServing` = atomic retarget + kickstart + health-wait with fail-closed
+auto-revert. `ft_model_versions` (first writer) records every swap
+(active/superseded/rolled_back). Operator surface: `mdemg model swap
+--target --yes` / `mdemg model rollback --yes`.
+
+**The ONE promotion flow (E3/E6):** `ftloop.PromoteCycle` — pre-swap canary
+→ fail-closed swap → ledger + version rows — shared by `ft-loop promote`
+(operator) and the controller's auto path. A failed swap records
+`rolled_back|promote_failed` with serving auto-restored.
+
+**Three-layer defense:**
+1. *Pre-swap canary* (E4, `FT_LOOP_CANARY_*`): deterministic first-per-task
+   probe slice of the pinned eval replayed against production AND the
+   candidate on the gate side-port; STRUCTURAL divergence (error /
+   truncated-where-production-finished / empty / JSON-shape) blocks
+   promotion with ZERO production restarts. Probes production itself fails
+   don't count against the candidate.
+2. *Fail-closed swap* (E2): unhealthy-after-swap auto-restores the previous
+   target.
+3. *Post-swap tripwire* (E5, `FT_LOOP_TRIPWIRE_*`): supervised loop watches
+   the caller-cancellation-filtered real error rate for
+   `FT_LOOP_CANARY_WINDOW_MIN` after a promotion; threshold + volume floor
+   → automatic rollback + HIGH alert.
+
+**Autonomy (E6):** `FT_LOOP_AUTO_PROMOTE_AFTER` (default 3; 0 = never) —
+the controller tick auto-promotes `promote_pending` cycles once that many
+OPERATOR-confirmed promotions exist (`decided_by=auto` on the ledger).
+Tick-based, so a restart with a pending cycle can't wedge autonomy.
+`[AMD-6]` resolved single-actor: promotion executes ONLY via
+controller/CLI; `promote_candidate` joins the RSIC reversible taxonomy
+(snapshot = the superseded version row) but the dispatcher gets no second
+executor and it stays out of `AllowedLLMActions`.
+
+**Class-5 escalation (E7, `FT_LOOP_ISSUE_*`):** repeated failure
+fingerprints (stage + volatile-token-normalized signature) → CapabilityGap
+(internal/gaps) + fingerprint-labeled GitHub issue via `gh`;
+recurrence = comment, never a duplicate; every filing reports jobhealth
+`ft-issue-filer`.
+
+**Drill pre-work closed (E1):** `training_readiness_stale` suppresses while
+the compute lease is held (`mdemg_ftloop_lease_held` gauge, 60s republish);
+fuse has its own ledger stage.
+
+**Live evidence (all same-day drills):** bad candidate canary-blocked with
+prod pid unchanged; bad candidate (canary off) swap-reverted in 2m with a
+truthful ledger; tripwire tripped at 15.2% (5/33) and rolled back
+autonomously; zero-human promotion (policy 2/2 → canary 8/8 → swap →
+`promoted|promote_auto|auto`); issue #538 filed + recurrence-commented +
+closed. Serving ended every drill healthy on the canonical model.
