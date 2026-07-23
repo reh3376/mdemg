@@ -9,11 +9,11 @@ import (
 func TestDecide_TruthTable(t *testing.T) {
 	const interval = 168 * time.Hour
 	cases := []struct {
-		name                            string
-		enabled, hasOpen, hasLast       bool
-		lastAge                         time.Duration
-		fresh, minFresh                 float64
-		want                            Decision
+		name                      string
+		enabled, hasOpen, hasLast bool
+		lastAge                   time.Duration
+		fresh, minFresh           float64
+		want                      Decision
 	}{
 		{"open cycle bars everything", true, true, true, 1000 * time.Hour, 1.0, 0.3, DecideSuppressOpenCycle},
 		{"open bars even when disabled", false, true, false, 0, 1.0, 0.3, DecideSuppressOpenCycle},

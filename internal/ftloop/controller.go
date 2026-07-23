@@ -44,21 +44,21 @@ type ControllerConfig struct {
 	SpaceID         string
 
 	// Epic-6 pipeline wiring (the proven curate→train→convert→gate commands).
-	WorkDir         string // per-cycle artifact root
-	BaseModel       string // dense base model dir (relative to RepoDir or absolute)
-	BaseSHA         string // base config.json SHA pin (train_ft --expected-sha256)
-	UaitsSpec       string // paradigm_router curation spec (relative to RepoDir)
-	BenchmarkConfig string // gate benchmark config yaml (relative to RepoDir)
-	LoraRank        int
-	LoraAlpha       int
-	GatePort        int     // side-port for serving the candidate during the gate
-	ExportSinceDays int     // export window for the curate input
-	GateTaskFilter  string  // optional run_benchmark --task-filter
-	AutoPromoteAfter int    // FT_LOOP_AUTO_PROMOTE_AFTER (0 = never auto)
+	WorkDir          string // per-cycle artifact root
+	BaseModel        string // dense base model dir (relative to RepoDir or absolute)
+	BaseSHA          string // base config.json SHA pin (train_ft --expected-sha256)
+	UaitsSpec        string // paradigm_router curation spec (relative to RepoDir)
+	BenchmarkConfig  string // gate benchmark config yaml (relative to RepoDir)
+	LoraRank         int
+	LoraAlpha        int
+	GatePort         int             // side-port for serving the candidate during the gate
+	ExportSinceDays  int             // export window for the curate input
+	GateTaskFilter   string          // optional run_benchmark --task-filter
+	AutoPromoteAfter int             // FT_LOOP_AUTO_PROMOTE_AFTER (0 = never auto)
 	Promotion        PromotionConfig // the shared canary+swap flow config (E6)
-	ConvertScript   string  // explicit convert_hf_to_gguf.py path override (FT_LOOP_CONVERT_SCRIPT; empty = resolveTool chain)
-	GateMinScore    float64 // minimum aggregate benchmark score to PASS
-	MdemgBin        string  // path to the mdemg binary (for `mdemg data export`)
+	ConvertScript    string          // explicit convert_hf_to_gguf.py path override (FT_LOOP_CONVERT_SCRIPT; empty = resolveTool chain)
+	GateMinScore     float64         // minimum aggregate benchmark score to PASS
+	MdemgBin         string          // path to the mdemg binary (for `mdemg data export`)
 }
 
 // Controller orchestrates a recursive-retrain cycle.
@@ -66,6 +66,7 @@ type Controller struct {
 	pool     *pgxpool.Pool
 	quiescer Quiescer
 	disp     *alert.Dispatcher
+	issueFiler *IssueFiler // E7 class-5 escalator (nil-safe)
 	cfg      ControllerConfig
 	now      func() time.Time
 	// runCmd runs one subprocess (bin + args in dir) and returns its combined
@@ -111,6 +112,9 @@ func (c *Controller) Run(ctx context.Context) error {
 
 // tick picks up a freshly-triggered cycle (if any) and runs it.
 func (c *Controller) tick(ctx context.Context) {
+	// FT-RECURSIVE-003 E7: class-5 sweep (rate-limited internally; nil-safe).
+	c.issueFiler.Sweep(ctx)
+
 	open, err := tsdb.OpenCycle(ctx, c.pool)
 	if err != nil {
 		slog.Warn("ft-loop controller: ledger query failed", "error", err)
@@ -318,3 +322,6 @@ func setLeaseHeldGauge(v float64) {
 		m.FtLoopLeaseHeld().Set(v)
 	}
 }
+
+// SetIssueFiler attaches the class-5 escalator (FT-RECURSIVE-003 E7).
+func (c *Controller) SetIssueFiler(f *IssueFiler) { c.issueFiler = f }

@@ -2232,6 +2232,27 @@ func (s *Server) StartSupervisedBackground() {
 					ModelVersion:  s.cfg.FtLoopModelVersion,
 				},
 			})
+		// FT-RECURSIVE-003 E7: class-5 escalator (repeated failure
+		// fingerprints → CapabilityGap + fingerprint-idempotent GitHub issue).
+		if s.cfg.FtLoopIssueFilerEnabled {
+			var gapSink ftloop.GapSink
+			if s.gapDetector != nil {
+				gapSink = s.gapDetector.GetStore()
+			}
+			filer := ftloop.NewIssueFiler(s.tsdbClient.Pool(), ftloop.IssueFilerConfig{
+				Enabled:         true,
+				RepeatThreshold: s.cfg.FtLoopIssueRepeatThreshold,
+				LookbackDays:    s.cfg.FtLoopIssueLookbackDays,
+				Repo:            s.cfg.FtLoopIssueRepo,
+				TokenPath:       s.cfg.FtLoopIssueTokenPath,
+				SweepMinutes:    s.cfg.FtLoopIssueSweepMin,
+			}, gapSink, func(ctx context.Context, jobName string, success bool, latencyMs int64, errMsg string) {
+				ev := tsdb.JobEventRow{JobName: jobName, SpaceID: s.cfg.RSICWatchdogSpaceID,
+					InstanceID: s.cfg.InstanceID, Success: success, LatencyMS: latencyMs, ErrorMessage: errMsg}
+				jobhealth.ReportWithService(ctx, s.tsdbClient.Pool(), s.alertDispatcher, ev, "ft-loop")
+			})
+			ctrl.SetIssueFiler(filer)
+		}
 		s.goSupervised("ft-loop-controller", ctrl.Run)
 
 		// FT-RECURSIVE-003 E5: post-swap tripwire (auto-rollback on elevated
