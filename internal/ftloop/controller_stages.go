@@ -205,7 +205,7 @@ func (c *Controller) stageConvert(ctx context.Context, work, fusedBF16 string) (
 // stageGate serves the candidate on a side-port, runs run_benchmark against it,
 // and passes only if the aggregate score ≥ GateMinScore with real (non-zero)
 // calls — the no-zero-call discipline from the run_record (E6-3).
-func (c *Controller) stageGate(ctx context.Context, work, candidate string) error {
+func (c *Controller) stageGate(ctx context.Context, work, candidate string) (float64, error) {
 	port := c.cfg.GatePort
 	report := filepath.Join(work, "gate-report.json")
 
@@ -215,7 +215,7 @@ func (c *Controller) stageGate(ctx context.Context, work, candidate string) erro
 		"--ctx-size", "8192", "--parallel", "1", "--jinja") //nolint:gosec // G204: controller-constructed
 	srv.Dir = c.cfg.RepoDir
 	if err := srv.Start(); err != nil {
-		return fmt.Errorf("gate: start candidate server: %w", err)
+		return 0, fmt.Errorf("gate: start candidate server: %w", err)
 	}
 	defer func() {
 		if srv.Process != nil {
@@ -226,7 +226,7 @@ func (c *Controller) stageGate(ctx context.Context, work, candidate string) erro
 
 	// Readiness = /health (NOT /v1/models — it answers before the model loads).
 	if err := waitHealth(ctx, fmt.Sprintf("http://127.0.0.1:%d/health", port), 120*time.Second); err != nil {
-		return fmt.Errorf("gate: candidate server not ready: %w", err)
+		return 0, fmt.Errorf("gate: candidate server not ready: %w", err)
 	}
 
 	args := []string{"-m", "neural.benchmarks.run_benchmark",
@@ -238,20 +238,20 @@ func (c *Controller) stageGate(ctx context.Context, work, candidate string) erro
 		args = append(args, "--task-filter", c.cfg.GateTaskFilter)
 	}
 	if _, err := c.runCmd(ctx, "gate-benchmark", c.cfg.RepoDir, c.resolvePython(), args); err != nil {
-		return err
+		return 0, err
 	}
 
 	score, truncated, err := readGateReport(report)
 	if err != nil {
-		return fmt.Errorf("gate: %w", err)
+		return 0, fmt.Errorf("gate: %w", err)
 	}
 	if truncated > 0 {
-		return fmt.Errorf("gate FAIL: %d truncated rows (no-zero-call/truncation discipline)", truncated)
+		return 0, fmt.Errorf("gate FAIL: %d truncated rows (no-zero-call/truncation discipline)", truncated)
 	}
 	if score < c.cfg.GateMinScore {
-		return fmt.Errorf("gate FAIL: aggregate %.4f < floor %.4f", score, c.cfg.GateMinScore)
+		return 0, fmt.Errorf("gate FAIL: aggregate %.4f < floor %.4f", score, c.cfg.GateMinScore)
 	}
-	return nil
+	return score, nil
 }
 
 // --- helpers ---

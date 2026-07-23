@@ -182,13 +182,14 @@ func (c *Controller) runCycle(ctx context.Context, cycleID, modelVersion string)
 		run    func() error
 	}
 	var inputDir, versionedDir, adapterDir, fusedDir, candidate string
+	var gateScore float64
 	stages := []stage{
 		{tsdb.FtCycleCurating, "export", func() (err error) { inputDir, err = c.stageExport(ctx, work); return }},
 		{tsdb.FtCycleCurating, "curate", func() (err error) { versionedDir, err = c.stageCurate(ctx, cycleID, work, inputDir); return }},
 		{tsdb.FtCycleTraining, "train", func() (err error) { adapterDir, err = c.stageTrain(ctx, work, versionedDir); return }},
 		{tsdb.FtCycleGating, "fuse", func() (err error) { fusedDir, err = c.stageFuse(ctx, work, adapterDir); return }},
 		{tsdb.FtCycleGating, "convert", func() (err error) { candidate, err = c.stageConvert(ctx, work, fusedDir); return }},
-		{tsdb.FtCycleGating, "gate", func() error { return c.stageGate(ctx, work, candidate) }},
+		{tsdb.FtCycleGating, "gate", func() (err error) { gateScore, err = c.stageGate(ctx, work, candidate); return }},
 	}
 
 	for _, st := range stages {
@@ -210,7 +211,7 @@ func (c *Controller) runCycle(ctx context.Context, cycleID, modelVersion string)
 	// candidate path is recorded so `mdemg ft-loop promote` knows what to swap.
 	c.record(ctx, tsdb.FtCycleEvent{
 		CycleID: cycleID, ModelVersion: modelVersion, Status: tsdb.FtCyclePromotePending, Stage: "gate",
-		EvalResults: map[string]any{"candidate_gguf": candidate},
+		EvalResults: map[string]any{"candidate_gguf": candidate, "gate_score": gateScore},
 	})
 	slog.Info("ft-loop cycle reached promote_pending — operator confirm required",
 		"cycle_id", cycleID, "model_version", modelVersion, "candidate", candidate)
