@@ -54,6 +54,8 @@ type ControllerConfig struct {
 	GatePort        int     // side-port for serving the candidate during the gate
 	ExportSinceDays int     // export window for the curate input
 	GateTaskFilter  string  // optional run_benchmark --task-filter
+	AutoPromoteAfter int    // FT_LOOP_AUTO_PROMOTE_AFTER (0 = never auto)
+	Promotion        PromotionConfig // the shared canary+swap flow config (E6)
 	ConvertScript   string  // explicit convert_hf_to_gguf.py path override (FT_LOOP_CONVERT_SCRIPT; empty = resolveTool chain)
 	GateMinScore    float64 // minimum aggregate benchmark score to PASS
 	MdemgBin        string  // path to the mdemg binary (for `mdemg data export`)
@@ -114,14 +116,61 @@ func (c *Controller) tick(ctx context.Context) {
 		slog.Warn("ft-loop controller: ledger query failed", "error", err)
 		return
 	}
+	if open == nil {
+		return
+	}
+	// FT-RECURSIVE-003 E6: promote_pending is policy-evaluated on EVERY tick
+	// (not just at end-of-run) — a restart with a pending cycle must not
+	// wedge autonomy; the ledger is the single source of truth.
+	if open.Status == tsdb.FtCyclePromotePending {
+		c.maybeAutoPromote(ctx, open.CycleID, open.ModelVersion)
+		return
+	}
 	// Only act on a freshly-triggered cycle. A cycle already in curating/
 	// training/gating means a run is in flight (this process, or a crashed one
-	// the lease will let us reclaim on its expiry); promote_pending awaits the
-	// operator.
-	if open == nil || open.Status != tsdb.FtCycleTriggered {
+	// the lease will let us reclaim on its expiry).
+	if open.Status != tsdb.FtCycleTriggered {
 		return
 	}
 	c.runCycle(ctx, open.CycleID, open.ModelVersion)
+}
+
+// maybeAutoPromote applies the auto-promote-after-N policy (spec §5 fork 3)
+// to a promote_pending cycle: with AutoPromoteAfter > 0 and at least that
+// many OPERATOR-confirmed promotions in the ledger, run the ONE promotion
+// flow (canary-gated, fail-closed) with decidedBy=auto. Otherwise the cycle
+// stays pending for the operator. Logs once per tick at Debug when waiting.
+func (c *Controller) maybeAutoPromote(ctx context.Context, cycleID, modelVersion string) {
+	if c.cfg.AutoPromoteAfter <= 0 || c.pool == nil {
+		return // never-auto (0) or no ledger — operator-only
+	}
+	confirms, err := tsdb.OperatorConfirmedPromotions(ctx, c.pool)
+	if err != nil {
+		slog.Warn("ft-loop auto-promote: confirm-count query failed — leaving promote_pending", "error", err)
+		return
+	}
+	if confirms < c.cfg.AutoPromoteAfter {
+		slog.Debug("ft-loop auto-promote: policy not satisfied",
+			"operator_confirms", confirms, "required", c.cfg.AutoPromoteAfter)
+		return
+	}
+	slog.Info("ft-loop auto-promote: policy satisfied — promoting",
+		"cycle_id", cycleID, "operator_confirms", confirms, "required", c.cfg.AutoPromoteAfter)
+	res, perr := PromoteCycle(ctx, c.pool, c.cfg.Promotion, cycleID,
+		fmt.Sprintf("auto-promote (policy: %d operator confirms >= %d)", confirms, c.cfg.AutoPromoteAfter),
+		"auto")
+	if perr != nil {
+		slog.Error("ft-loop auto-promote failed (cycle recorded rolled_back; serving safe)", "error", perr)
+		if c.disp != nil {
+			c.disp.SendAlert(ctx, "ft-loop-auto-promote", "FT auto-promote failed",
+				fmt.Sprintf("cycle=%s: %v", cycleID, perr), alert.SeverityHigh)
+		}
+		return
+	}
+	if c.disp != nil {
+		c.disp.SendAlert(ctx, "ft-loop-auto-promote", "FT cycle auto-promoted",
+			fmt.Sprintf("cycle %s now serving %s", cycleID, res.Target), alert.SeverityMedium)
+	}
 }
 
 // runCycle drives one cycle through the pipeline, holding the lease + quiesce.
@@ -207,12 +256,13 @@ func (c *Controller) runCycle(ctx context.Context, cycleID, modelVersion string)
 		}
 	}
 
-	// PASS → promote_pending (operator confirms; auto-promote is Phase 7). The
-	// candidate path is recorded so `mdemg ft-loop promote` knows what to swap.
+	// PASS → promote_pending. The candidate path is recorded so promotion
+	// (operator CLI or the auto path below) knows what to swap.
 	c.record(ctx, tsdb.FtCycleEvent{
 		CycleID: cycleID, ModelVersion: modelVersion, Status: tsdb.FtCyclePromotePending, Stage: "gate",
 		EvalResults: map[string]any{"candidate_gguf": candidate, "gate_score": gateScore},
 	})
+
 	slog.Info("ft-loop cycle reached promote_pending — operator confirm required",
 		"cycle_id", cycleID, "model_version", modelVersion, "candidate", candidate)
 }

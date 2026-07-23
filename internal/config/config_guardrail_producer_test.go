@@ -42,3 +42,23 @@ func TestGuardrailIncludeCorrections_Default(t *testing.T) {
 		t.Error("GuardrailIncludeCorrections default = true, want false (flip after live smoke)")
 	}
 }
+
+func TestFtLoopAutoPromoteAfter_Default(t *testing.T) {
+	setMinimalEnv(t)
+	t.Setenv("FT_LOOP_AUTO_PROMOTE_AFTER", "")
+	cfg, err := FromEnv()
+	if err != nil {
+		t.Fatalf("FromEnv() error: %v", err)
+	}
+	if cfg.FtLoopAutoPromoteAfter != 3 {
+		t.Errorf("FtLoopAutoPromoteAfter = %d, want 3 (spec §5 fork 3)", cfg.FtLoopAutoPromoteAfter)
+	}
+	t.Setenv("FT_LOOP_AUTO_PROMOTE_AFTER", "0")
+	cfg, err = FromEnv()
+	if err != nil {
+		t.Fatalf("FromEnv() error: %v", err)
+	}
+	if cfg.FtLoopAutoPromoteAfter != 0 {
+		t.Error("0 must be accepted (never-auto)")
+	}
+}

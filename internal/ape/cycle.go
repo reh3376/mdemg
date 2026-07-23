@@ -664,6 +664,16 @@ func isReversibleAction(actionType string) bool {
 	switch actionType {
 	case "tombstone_stale", "graduate_volatile":
 		return true
+	case "promote_candidate":
+		// FT-RECURSIVE-003 E6 [AMD-6]: promotion is a reversible class-3
+		// mutation whose snapshot IS the superseded ft_model_versions row
+		// (restored via SwapServing — drilled live in E3/E5). NOTE: promotion
+		// executes ONLY through the ftloop controller / CLI (single-actor
+		// decision) — this classification exists so the taxonomy is complete
+		// and any future RSIC dispatch of it is treated as reversible; the
+		// dispatcher has NO promote executor and the action must stay OUT of
+		// AllowedLLMActions (deterministic class — RSIC-LLM-ALERT-GUARD-001).
+		return true
 	default:
 		return false
 	}

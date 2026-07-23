@@ -158,3 +158,19 @@ func recordSwapVersions(ctx context.Context, cfg config.Config, res ftloop.SwapR
 		fmt.Printf("WARN: ft_model_versions record failed: %v\n", err)
 	}
 }
+
+// promotionConfigFromEnv mirrors config into the shared promotion flow's
+// config (the ControllerConfig pattern).
+func promotionConfigFromEnv(cfg config.Config, repoDir string) ftloop.PromotionConfig {
+	return ftloop.PromotionConfig{
+		Serving:       servingConfigFromEnv(cfg, repoDir),
+		CanaryEnabled: cfg.FtLoopCanaryEnabled,
+		CanaryProbes:  cfg.FtLoopCanaryProbes,
+		CanaryCount:   cfg.FtLoopCanaryProbeCount,
+		CanaryProdURL: cfg.FtLoopCanaryProdURL,
+		GatePort:      cfg.FtLoopGatePort,
+		RepoDir:       repoDir,
+		BaseModel:     cfg.FtLoopBaseModel,
+		ModelVersion:  cfg.FtLoopModelVersion,
+	}
+}

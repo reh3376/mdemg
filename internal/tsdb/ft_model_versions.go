@@ -126,3 +126,18 @@ func LLMCallStatsSince(ctx context.Context, pool ftCycleQuerier, since time.Time
 	}
 	return total, realErrors, nil
 }
+
+// OperatorConfirmedPromotions counts DISTINCT cycles promoted by an explicit
+// operator decision — the FT_LOOP_AUTO_PROMOTE_AFTER policy input
+// (FT-RECURSIVE-003 E6; spec §5 fork 3: auto only after N human confirms).
+func OperatorConfirmedPromotions(ctx context.Context, pool ftCycleQuerier) (int, error) {
+	row := pool.QueryRow(ctx, `
+		SELECT count(DISTINCT cycle_id) FROM ft_training_cycles
+		WHERE status = 'promoted'
+		  AND eval_results->>'operator_decision' IN ('operator', 'confirm')`) // 'confirm' = the pre-E6 CLI event form
+	var n int
+	if err := row.Scan(&n); err != nil {
+		return 0, err
+	}
+	return n, nil
+}

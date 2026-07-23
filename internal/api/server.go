@@ -2214,6 +2214,23 @@ func (s *Server) StartSupervisedBackground() {
 				ConvertScript:   s.cfg.FtLoopConvertScript,
 				GateMinScore:    s.cfg.FtLoopGateMinScore,
 				MdemgBin:        resolveMdemgBin(),
+				AutoPromoteAfter: s.cfg.FtLoopAutoPromoteAfter,
+				Promotion: ftloop.PromotionConfig{
+					Serving: ftloop.ServingConfig{
+						SymlinkPath:   ftServingLink(repoDir, s.cfg.FtLoopServingSymlink),
+						PlistLabel:    s.cfg.FtLoopServingPlistLabel,
+						HealthURL:     s.cfg.FtLoopServingHealthURL,
+						HealthTimeout: time.Duration(s.cfg.FtLoopSwapHealthTimeoutSec) * time.Second,
+					},
+					CanaryEnabled: s.cfg.FtLoopCanaryEnabled,
+					CanaryProbes:  s.cfg.FtLoopCanaryProbes,
+					CanaryCount:   s.cfg.FtLoopCanaryProbeCount,
+					CanaryProdURL: s.cfg.FtLoopCanaryProdURL,
+					GatePort:      s.cfg.FtLoopGatePort,
+					RepoDir:       repoDir,
+					BaseModel:     s.cfg.FtLoopBaseModel,
+					ModelVersion:  s.cfg.FtLoopModelVersion,
+				},
 			})
 		s.goSupervised("ft-loop-controller", ctrl.Run)
 
@@ -2221,10 +2238,7 @@ func (s *Server) StartSupervisedBackground() {
 		// real-error rate inside the canary window). Separate flag — the
 		// watcher only ever acts inside a window opened by a promotion.
 		if s.cfg.FtLoopTripwireEnabled {
-			servingLink := s.cfg.FtLoopServingSymlink
-			if !filepath.IsAbs(servingLink) {
-				servingLink = filepath.Join(repoDir, servingLink)
-			}
+			servingLink := ftServingLink(repoDir, s.cfg.FtLoopServingSymlink)
 			tw := ftloop.NewTripwire(s.tsdbClient.Pool(), ftloop.TripwireConfig{
 				Enabled:   true,
 				Window:    time.Duration(s.cfg.FtLoopCanaryWindowMin) * time.Minute,
@@ -3482,4 +3496,12 @@ func (s *Server) CircuitBreaker(service string) *circuitbreaker.Breaker {
 		return nil
 	}
 	return s.cbRegistry.Get(service)
+}
+
+// ftServingLink resolves the serving symlink to an absolute path.
+func ftServingLink(repoDir, link string) string {
+	if filepath.IsAbs(link) {
+		return link
+	}
+	return filepath.Join(repoDir, link)
 }
