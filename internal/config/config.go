@@ -1356,6 +1356,8 @@ type Config struct {
 	FtLoopExportSinceDays int     // FT_LOOP_EXPORT_SINCE_DAYS — export window for the curate input (default: 7)
 	FtLoopGateTaskFilter  string  // FT_LOOP_GATE_TASK_FILTER — optional run_benchmark --task-filter to scope the gate (default: empty = all tasks)
 	FtLoopGateMinScore    float64 // FT_LOOP_GATE_MIN_SCORE — minimum aggregate benchmark score for the gate to PASS (default: 0.80, matches UBENCH min_aggregate_weighted_score)
+	FtLoopStalenessDays int     // FT_LOOP_STALENESS_DAYS — ft_loop_never_ran fires when the cycle ledger has no events within this (default: 14; rule wired only when FT_LOOP_ENABLED)
+	FtDriftMargin       float64 // FT_DRIFT_MARGIN — ft_production_drift fires when the latest benchmark aggregate is more than this below the active version's score (default: 0.05)
 	FtLoopIssueFilerEnabled   bool   // FT_LOOP_ISSUE_FILER_ENABLED — class-5 escalator: repeated failure fingerprints → CapabilityGap + GitHub issue (default: false; flip after live smoke)
 	FtLoopIssueRepeatThreshold int   // FT_LOOP_ISSUE_REPEAT_THRESHOLD — distinct failed cycles on one fingerprint before filing (default: 2)
 	FtLoopIssueLookbackDays    int   // FT_LOOP_ISSUE_LOOKBACK_DAYS — fingerprint clustering window (default: 30)
@@ -5111,6 +5113,20 @@ func FromEnv() (Config, error) {
 	if graphHealthScoreFloor < 0 || graphHealthScoreFloor > 1 {
 		return Config{}, errors.New("GRAPH_HEALTH_SCORE_FLOOR must be in [0,1]")
 	}
+	ftLoopStalenessDays, err := atoi("FT_LOOP_STALENESS_DAYS", 14)
+	if err != nil {
+		return Config{}, err
+	}
+	if ftLoopStalenessDays < 1 {
+		return Config{}, errors.New("FT_LOOP_STALENESS_DAYS must be >= 1")
+	}
+	ftDriftMargin, err := atof("FT_DRIFT_MARGIN", 0.05)
+	if err != nil {
+		return Config{}, err
+	}
+	if ftDriftMargin <= 0 || ftDriftMargin > 1 {
+		return Config{}, errors.New("FT_DRIFT_MARGIN must be in (0, 1]")
+	}
 	issueRepeatThreshold, err := atoi("FT_LOOP_ISSUE_REPEAT_THRESHOLD", 2)
 	if err != nil {
 		return Config{}, err
@@ -6217,6 +6233,8 @@ func FromEnv() (Config, error) {
 		FtLoopGateTaskFilter:                ftLoopGateTaskFilter,
 		FtLoopGateMinScore:                  ftLoopGateMinScore,
 		FtLoopConvertScript:   get("FT_LOOP_CONVERT_SCRIPT", ""),
+		FtLoopStalenessDays: ftLoopStalenessDays,
+		FtDriftMargin:       ftDriftMargin,
 		FtLoopIssueFilerEnabled:    getBool("FT_LOOP_ISSUE_FILER_ENABLED", false),
 		FtLoopIssueRepeatThreshold: issueRepeatThreshold,
 		FtLoopIssueLookbackDays:    issueLookbackDays,

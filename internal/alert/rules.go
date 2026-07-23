@@ -924,3 +924,62 @@ func Neo4jCPURule(thresholdPercent float64) AlertRule {
 		Enabled:   true,
 	}
 }
+
+// FtLoopNeverRanRule fires when the recursive-retrain actuator is enabled
+// but the cycle ledger has seen NO events within the staleness window — the
+// "loop silently dormant" guarantee (FT-RECURSIVE-004 E1; SPEC §3 Monitor).
+// Purpose-specific rule over ft_training_cycles (the FT-BENCH-REFRESH-001
+// lesson: tables not written by Go scheduled jobs get their own rule, never
+// forced through scheduled_job_events). Idle-safe: aggregate + COALESCE
+// always returns one row; 999 when the ledger is empty. The caller wires it
+// ONLY when FT_LOOP_ENABLED — a disabled actuator must not nag.
+func FtLoopNeverRanRule(stalenessDays int) AlertRule {
+	if stalenessDays <= 0 {
+		stalenessDays = 14
+	}
+	return AlertRule{
+		ID:          "ft_loop_never_ran",
+		Title:       "MDEMG FT Loop Has Not Run",
+		Service:     "ft-loop-staleness",
+		Severity:    SeverityMedium,
+		Interval:    time.Hour,
+		ForDuration: 5 * time.Minute,
+		QuerySQL: `SELECT COALESCE(
+			    EXTRACT(EPOCH FROM (now() - MAX(time))) / 86400.0, 999.0) AS stale_days
+			FROM ft_training_cycles`,
+		Threshold: float64(stalenessDays),
+		Operator:  "gt",
+		Enabled:   true,
+	}
+}
+
+// FtProductionDriftRule fires when the latest benchmark aggregate has
+// fallen more than margin below the ACTIVE model version's recorded score
+// (FT-RECURSIVE-004 E2; SPEC §3 Monitor). DH-004 no-data gates: an active
+// score <= 0 or an empty benchmark_runs yields 0 (no drift) — never a
+// false fire from missing data. The scalar reads avoid the ORDER BY…LIMIT 1
+// literal via MAX(completed_at) correlation (idle-safe under COALESCE).
+func FtProductionDriftRule(margin float64) AlertRule {
+	if margin <= 0 {
+		margin = 0.05
+	}
+	return AlertRule{
+		ID:          "ft_production_drift",
+		Title:       "MDEMG FT Production Drift",
+		Service:     "ft-production-drift",
+		Severity:    SeverityHigh,
+		Interval:    time.Hour,
+		ForDuration: 5 * time.Minute,
+		QuerySQL: `SELECT CASE
+			WHEN COALESCE((SELECT MAX(overall_score) FROM ft_model_versions WHERE status = 'active'), 0) <= 0 THEN 0
+			WHEN (SELECT MAX(completed_at) FROM benchmark_runs) IS NULL THEN 0
+			ELSE GREATEST(0,
+			    COALESCE((SELECT MAX(overall_score) FROM ft_model_versions WHERE status = 'active'), 0)
+			  - COALESCE((SELECT MAX(aggregate_weighted_score) FROM benchmark_runs
+			              WHERE completed_at = (SELECT MAX(completed_at) FROM benchmark_runs)), 0))
+			END AS drift`,
+		Threshold: margin,
+		Operator:  "gt",
+		Enabled:   true,
+	}
+}
