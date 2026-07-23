@@ -112,3 +112,17 @@ func nullIfEmpty(s string) any {
 	}
 	return s
 }
+
+// LLMCallStatsSince returns total LLM calls and REAL errors (caller-
+// cancellation-filtered per the LLM-HEALTH-INVESTIGATION-001 contract)
+// recorded since t — the post-swap tripwire's signal (FT-RECURSIVE-003 E5).
+func LLMCallStatsSince(ctx context.Context, pool ftCycleQuerier, since time.Time) (total, realErrors int64, err error) {
+	row := pool.QueryRow(ctx, `
+		SELECT count(*),
+		       count(*) FILTER (WHERE error <> '' AND error NOT LIKE 'caller_canceled:%')
+		FROM llm_interactions WHERE time >= $1`, since)
+	if err := row.Scan(&total, &realErrors); err != nil {
+		return 0, 0, err
+	}
+	return total, realErrors, nil
+}

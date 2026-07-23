@@ -2216,6 +2216,37 @@ func (s *Server) StartSupervisedBackground() {
 				MdemgBin:        resolveMdemgBin(),
 			})
 		s.goSupervised("ft-loop-controller", ctrl.Run)
+
+		// FT-RECURSIVE-003 E5: post-swap tripwire (auto-rollback on elevated
+		// real-error rate inside the canary window). Separate flag — the
+		// watcher only ever acts inside a window opened by a promotion.
+		if s.cfg.FtLoopTripwireEnabled {
+			servingLink := s.cfg.FtLoopServingSymlink
+			if !filepath.IsAbs(servingLink) {
+				servingLink = filepath.Join(repoDir, servingLink)
+			}
+			tw := ftloop.NewTripwire(s.tsdbClient.Pool(), ftloop.TripwireConfig{
+				Enabled:   true,
+				Window:    time.Duration(s.cfg.FtLoopCanaryWindowMin) * time.Minute,
+				ErrorRate: s.cfg.FtLoopTripwireErrorRate,
+				MinCalls:  s.cfg.FtLoopTripwireMinCalls,
+				PollSec:   s.cfg.FtLoopTripwirePollSec,
+				Serving: ftloop.ServingConfig{
+					SymlinkPath:   servingLink,
+					PlistLabel:    s.cfg.FtLoopServingPlistLabel,
+					HealthURL:     s.cfg.FtLoopServingHealthURL,
+					HealthTimeout: time.Duration(s.cfg.FtLoopSwapHealthTimeoutSec) * time.Second,
+				},
+			}, func(title, detail string) {
+				if s.alertDispatcher != nil {
+					s.alertDispatcher.Send(context.Background(), alert.Alert{
+						Service: "ft-loop-tripwire", Severity: alert.SeverityHigh,
+						Title: title, Message: detail,
+					})
+				}
+			})
+			s.goSupervised("ft-loop-tripwire", tw.Run)
+		}
 	}
 }
 

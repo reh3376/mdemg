@@ -1356,6 +1356,11 @@ type Config struct {
 	FtLoopExportSinceDays int     // FT_LOOP_EXPORT_SINCE_DAYS — export window for the curate input (default: 7)
 	FtLoopGateTaskFilter  string  // FT_LOOP_GATE_TASK_FILTER — optional run_benchmark --task-filter to scope the gate (default: empty = all tasks)
 	FtLoopGateMinScore    float64 // FT_LOOP_GATE_MIN_SCORE — minimum aggregate benchmark score for the gate to PASS (default: 0.80, matches UBENCH min_aggregate_weighted_score)
+	FtLoopTripwireEnabled   bool    // FT_LOOP_TRIPWIRE_ENABLED — post-swap elevated-error auto-rollback watcher (default: false; flip after live smoke)
+	FtLoopCanaryWindowMin   int     // FT_LOOP_CANARY_WINDOW_MIN — minutes after a promotion the tripwire watches (default: 60)
+	FtLoopTripwireErrorRate float64 // FT_LOOP_TRIPWIRE_ERROR_RATE — real-error fraction (caller-cancellation-filtered) that trips auto-rollback (default: 0.20)
+	FtLoopTripwireMinCalls  int     // FT_LOOP_TRIPWIRE_MIN_CALLS — call-volume floor before the rate can trip (default: 10; the RSIC_LLM_ERROR_MIN_COUNT precedent)
+	FtLoopTripwirePollSec   int     // FT_LOOP_TRIPWIRE_POLL_SEC — watcher poll cadence (default: 60)
 	FtLoopCanaryEnabled    bool   // FT_LOOP_CANARY_ENABLED — pre-swap held-call replay gate on ft-loop promote (default: false; flip after live smoke)
 	FtLoopCanaryProbes     string // FT_LOOP_CANARY_PROBES — jsonl probe corpus for the canary (default: training_data/eval/valid_clean.jsonl — the [AMD-2]-pinned eval)
 	FtLoopCanaryProbeCount int    // FT_LOOP_CANARY_PROBE_COUNT — probes replayed (first-per-task, deterministic; default: 8)
@@ -5099,6 +5104,34 @@ func FromEnv() (Config, error) {
 	if graphHealthScoreFloor < 0 || graphHealthScoreFloor > 1 {
 		return Config{}, errors.New("GRAPH_HEALTH_SCORE_FLOOR must be in [0,1]")
 	}
+	canaryWindowMin, err := atoi("FT_LOOP_CANARY_WINDOW_MIN", 60)
+	if err != nil {
+		return Config{}, err
+	}
+	if canaryWindowMin < 1 {
+		return Config{}, errors.New("FT_LOOP_CANARY_WINDOW_MIN must be >= 1")
+	}
+	tripwireErrorRate, err := atof("FT_LOOP_TRIPWIRE_ERROR_RATE", 0.20)
+	if err != nil {
+		return Config{}, err
+	}
+	if tripwireErrorRate <= 0 || tripwireErrorRate > 1 {
+		return Config{}, errors.New("FT_LOOP_TRIPWIRE_ERROR_RATE must be in (0, 1]")
+	}
+	tripwireMinCalls, err := atoi("FT_LOOP_TRIPWIRE_MIN_CALLS", 10)
+	if err != nil {
+		return Config{}, err
+	}
+	if tripwireMinCalls < 1 {
+		return Config{}, errors.New("FT_LOOP_TRIPWIRE_MIN_CALLS must be >= 1")
+	}
+	tripwirePollSec, err := atoi("FT_LOOP_TRIPWIRE_POLL_SEC", 60)
+	if err != nil {
+		return Config{}, err
+	}
+	if tripwirePollSec < 5 {
+		return Config{}, errors.New("FT_LOOP_TRIPWIRE_POLL_SEC must be >= 5")
+	}
 	canaryProbeCount, err := atoi("FT_LOOP_CANARY_PROBE_COUNT", 8)
 	if err != nil {
 		return Config{}, err
@@ -6149,6 +6182,11 @@ func FromEnv() (Config, error) {
 		FtLoopGateTaskFilter:                ftLoopGateTaskFilter,
 		FtLoopGateMinScore:                  ftLoopGateMinScore,
 		FtLoopConvertScript:   get("FT_LOOP_CONVERT_SCRIPT", ""),
+		FtLoopTripwireEnabled:   getBool("FT_LOOP_TRIPWIRE_ENABLED", false),
+		FtLoopCanaryWindowMin:   canaryWindowMin,
+		FtLoopTripwireErrorRate: tripwireErrorRate,
+		FtLoopTripwireMinCalls:  tripwireMinCalls,
+		FtLoopTripwirePollSec:   tripwirePollSec,
 		FtLoopCanaryEnabled:    getBool("FT_LOOP_CANARY_ENABLED", false),
 		FtLoopCanaryProbes:     get("FT_LOOP_CANARY_PROBES", "training_data/eval/valid_clean.jsonl"),
 		FtLoopCanaryProbeCount: canaryProbeCount,
