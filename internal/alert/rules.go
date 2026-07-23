@@ -335,8 +335,20 @@ func ReadinessStalenessRule(stalenessMin int) AlertRule {
 		Severity:    SeverityMedium,
 		Interval:    60 * time.Second,
 		ForDuration: 5 * time.Minute,
-		QuerySQL: `SELECT COALESCE(
-			    EXTRACT(EPOCH FROM (now() - MAX(time))) / 60.0, 1000000) AS stale_minutes
+		// FT-RECURSIVE-003 E1 (FTLOOP-DRILL-001 finding): while the recursive-
+		// retrain compute lease is held, RSIC is deliberately quiesced and the
+		// readiness heartbeat SHOULD pause — a held lease within the last 5
+		// minutes suppresses the rule (staleness reads 0). MAX over the window
+		// (idle-safe COALESCE, no ORDER BY…LIMIT 1 — the TSDB-CONSUME-001
+		// contract).
+		QuerySQL: `SELECT CASE WHEN COALESCE((
+			    SELECT MAX(value) FROM metric_samples
+			    WHERE metric_name = 'mdemg_ftloop_lease_held'
+			      AND time > now() - interval '5 minutes'), 0) >= 1
+			THEN 0
+			ELSE COALESCE(
+			    EXTRACT(EPOCH FROM (now() - MAX(time))) / 60.0, 1000000)
+			END AS stale_minutes
 			FROM metric_samples
 			WHERE metric_name = 'mdemg_rsic_readiness_assessed'
 			  AND metric_type = 'gauge'

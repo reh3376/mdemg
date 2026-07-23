@@ -19,6 +19,7 @@ import (
 
 	"mdemg/internal/alert"
 	"mdemg/internal/jobhealth"
+	"mdemg/internal/metrics"
 	"mdemg/internal/tsdb"
 )
 
@@ -141,6 +142,26 @@ func (c *Controller) runCycle(ctx context.Context, cycleID, modelVersion string)
 		slog.Info("ft-loop controller: lease unavailable, skipping", "error", err)
 		return
 	}
+	// FT-RECURSIVE-003 E1: publish lease state so the readiness-staleness rule
+	// can suppress during a legitimate retrain (the heartbeat SHOULD pause
+	// while RSIC is quiesced). The rule trusts only a recent sample, and a
+	// single stage (train) runs for hours — so a ticker republishes for the
+	// cycle's whole duration; cleared on exit.
+	setLeaseHeldGauge(1)
+	leaseTickDone := make(chan struct{})
+	go func() {
+		t := time.NewTicker(60 * time.Second)
+		defer t.Stop()
+		for {
+			select {
+			case <-leaseTickDone:
+				return
+			case <-t.C:
+				setLeaseHeldGauge(1)
+			}
+		}
+	}()
+	defer func() { close(leaseTickDone); setLeaseHeldGauge(0) }()
 	defer func() { _ = lease.Release() }()
 
 	// Quiesce RSIC for the lease window.
@@ -160,12 +181,13 @@ func (c *Controller) runCycle(ctx context.Context, cycleID, modelVersion string)
 		name   string
 		run    func() error
 	}
-	var inputDir, versionedDir, adapterDir, candidate string
+	var inputDir, versionedDir, adapterDir, fusedDir, candidate string
 	stages := []stage{
 		{tsdb.FtCycleCurating, "export", func() (err error) { inputDir, err = c.stageExport(ctx, work); return }},
 		{tsdb.FtCycleCurating, "curate", func() (err error) { versionedDir, err = c.stageCurate(ctx, cycleID, work, inputDir); return }},
 		{tsdb.FtCycleTraining, "train", func() (err error) { adapterDir, err = c.stageTrain(ctx, work, versionedDir); return }},
-		{tsdb.FtCycleGating, "convert", func() (err error) { candidate, err = c.stageConvert(ctx, work, adapterDir); return }},
+		{tsdb.FtCycleGating, "fuse", func() (err error) { fusedDir, err = c.stageFuse(ctx, work, adapterDir); return }},
+		{tsdb.FtCycleGating, "convert", func() (err error) { candidate, err = c.stageConvert(ctx, work, fusedDir); return }},
 		{tsdb.FtCycleGating, "gate", func() error { return c.stageGate(ctx, work, candidate) }},
 	}
 
@@ -236,4 +258,12 @@ func tail(b []byte, n int) string {
 		return string(b)
 	}
 	return "…" + string(b[len(b)-n:])
+}
+
+// setLeaseHeldGauge publishes the compute-lease state (FT-RECURSIVE-003 E1).
+// Nil-safe when no metrics registry is wired (tests, CLI one-shots).
+func setLeaseHeldGauge(v float64) {
+	if m := metrics.Metrics(); m != nil && m.FtLoopLeaseHeld != nil {
+		m.FtLoopLeaseHeld().Set(v)
+	}
 }

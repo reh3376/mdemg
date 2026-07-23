@@ -166,19 +166,27 @@ func resolveTool(name, override string) string {
 	return name
 }
 
-// stageConvert: fuse --dequantize (E6-14) → convert_hf_to_gguf f16 →
-// llama-quantize Q5_K_M → the candidate GGUF (E6-4).
-func (c *Controller) stageConvert(ctx context.Context, work, adapterDir string) (string, error) {
+// stageFuse: mlx_lm.fuse --dequantize (E6-14) → bf16 HF dir. Split from
+// stageConvert per the FTLOOP-DRILL-001 finding (fuse was invisible inside
+// the previous combined stage's ledger window).
+func (c *Controller) stageFuse(ctx context.Context, work, adapterDir string) (string, error) {
 	fusedBF16 := filepath.Join(work, "fused-bf16")
-	f16 := filepath.Join(work, "candidate-f16.gguf")
-	candidate := filepath.Join(work, "candidate-Q5_K_M.gguf")
 	py := c.resolvePython()
-
 	if _, err := c.runCmd(ctx, "convert-fuse", c.cfg.RepoDir, py,
 		[]string{"-m", "mlx_lm.fuse", "--model", c.abs(c.cfg.BaseModel),
 			"--adapter-path", adapterDir, "--save-path", fusedBF16, "--dequantize"}); err != nil {
 		return "", err
 	}
+	return fusedBF16, nil
+}
+
+// stageConvert: convert_hf_to_gguf f16 → llama-quantize Q5_K_M → the
+// candidate GGUF (E6-4).
+func (c *Controller) stageConvert(ctx context.Context, work, fusedBF16 string) (string, error) {
+	f16 := filepath.Join(work, "candidate-f16.gguf")
+	candidate := filepath.Join(work, "candidate-Q5_K_M.gguf")
+	py := c.resolvePython()
+
 	conv := resolveTool("convert_hf_to_gguf.py", c.cfg.ConvertScript)
 	if _, err := c.runCmd(ctx, "convert-gguf", c.cfg.RepoDir, py,
 		[]string{conv, fusedBF16, "--outtype", "f16", "--outfile", f16}); err != nil {
