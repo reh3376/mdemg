@@ -2255,6 +2255,28 @@ func (s *Server) StartSupervisedBackground() {
 		}
 		s.goSupervised("ft-loop-controller", ctrl.Run)
 
+		// FT-RECURSIVE-004 E4: scheduled benchmark refresh (feeds
+		// ft_production_drift + keeps ft_benchmark_stale green). Independent
+		// of FtLoopEnabled — model-quality freshness matters regardless.
+		if s.cfg.FtBenchScheduleEnabled {
+			bench := ftloop.NewBenchScheduler(s.tsdbClient.Pool(), ftloop.BenchScheduleConfig{
+				Enabled:         true,
+				IntervalDays:    s.cfg.FtBenchScheduleDays,
+				InitialDelayMin: s.cfg.FtBenchScheduleInitialDelayMin,
+				RepoDir:         repoDir,
+				PythonBin:       filepath.Join(repoDir, "neural", ".venv", "bin", "python"),
+				ConfigYAML:      s.cfg.FtLoopBenchmarkConfig,
+				BaseURL:         s.cfg.FtLoopCanaryProdURL,
+				ModelName:       s.cfg.FtLoopModelVersion,
+				RowsPerSpec:     s.cfg.FtBenchScheduleRowsPerSpec,
+			}, func(ctx context.Context, jobName string, success bool, latencyMs int64, errMsg string) {
+				ev := tsdb.JobEventRow{JobName: jobName, SpaceID: s.cfg.RSICWatchdogSpaceID,
+					InstanceID: s.cfg.InstanceID, Success: success, LatencyMS: latencyMs, ErrorMessage: errMsg}
+				jobhealth.ReportWithService(ctx, s.tsdbClient.Pool(), s.alertDispatcher, ev, "ft-benchmark")
+			})
+			s.goSupervised("scheduled-ft-benchmark", bench.Run)
+		}
+
 		// FT-RECURSIVE-003 E5: post-swap tripwire (auto-rollback on elevated
 		// real-error rate inside the canary window). Separate flag — the
 		// watcher only ever acts inside a window opened by a promotion.

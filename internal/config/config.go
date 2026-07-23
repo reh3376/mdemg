@@ -1356,6 +1356,10 @@ type Config struct {
 	FtLoopExportSinceDays int     // FT_LOOP_EXPORT_SINCE_DAYS — export window for the curate input (default: 7)
 	FtLoopGateTaskFilter  string  // FT_LOOP_GATE_TASK_FILTER — optional run_benchmark --task-filter to scope the gate (default: empty = all tasks)
 	FtLoopGateMinScore    float64 // FT_LOOP_GATE_MIN_SCORE — minimum aggregate benchmark score for the gate to PASS (default: 0.80, matches UBENCH min_aggregate_weighted_score)
+	FtBenchScheduleEnabled       bool // FT_BENCH_SCHEDULE_ENABLED — supervised loop runs the benchmark refresh recipe on schedule (default: false — a run saturates llama-server ~12 min; operator picks the window)
+	FtBenchScheduleDays          int  // FT_BENCH_SCHEDULE_DAYS — refresh when the latest benchmark is at least this old (default: 7, matches ft_benchmark_stale)
+	FtBenchScheduleInitialDelayMin int // FT_BENCH_SCHEDULE_INITIAL_DELAY_MIN — never run at boot (default: 30)
+	FtBenchScheduleRowsPerSpec   int  // FT_BENCH_SCHEDULE_ROWS_PER_SPEC — refresh scope (default: 5 — the FT-BENCH-REFRESH-001 calibration)
 	FtLoopStalenessDays int     // FT_LOOP_STALENESS_DAYS — ft_loop_never_ran fires when the cycle ledger has no events within this (default: 14; rule wired only when FT_LOOP_ENABLED)
 	FtDriftMargin       float64 // FT_DRIFT_MARGIN — ft_production_drift fires when the latest benchmark aggregate is more than this below the active version's score (default: 0.05)
 	FtLoopIssueFilerEnabled   bool   // FT_LOOP_ISSUE_FILER_ENABLED — class-5 escalator: repeated failure fingerprints → CapabilityGap + GitHub issue (default: false; flip after live smoke)
@@ -5113,6 +5117,27 @@ func FromEnv() (Config, error) {
 	if graphHealthScoreFloor < 0 || graphHealthScoreFloor > 1 {
 		return Config{}, errors.New("GRAPH_HEALTH_SCORE_FLOOR must be in [0,1]")
 	}
+	ftBenchScheduleDays, err := atoi("FT_BENCH_SCHEDULE_DAYS", 7)
+	if err != nil {
+		return Config{}, err
+	}
+	if ftBenchScheduleDays < 1 {
+		return Config{}, errors.New("FT_BENCH_SCHEDULE_DAYS must be >= 1")
+	}
+	ftBenchScheduleInitialDelay, err := atoi("FT_BENCH_SCHEDULE_INITIAL_DELAY_MIN", 30)
+	if err != nil {
+		return Config{}, err
+	}
+	if ftBenchScheduleInitialDelay < 1 {
+		return Config{}, errors.New("FT_BENCH_SCHEDULE_INITIAL_DELAY_MIN must be >= 1")
+	}
+	ftBenchScheduleRows, err := atoi("FT_BENCH_SCHEDULE_ROWS_PER_SPEC", 5)
+	if err != nil {
+		return Config{}, err
+	}
+	if ftBenchScheduleRows < 1 {
+		return Config{}, errors.New("FT_BENCH_SCHEDULE_ROWS_PER_SPEC must be >= 1")
+	}
 	ftLoopStalenessDays, err := atoi("FT_LOOP_STALENESS_DAYS", 14)
 	if err != nil {
 		return Config{}, err
@@ -6233,6 +6258,10 @@ func FromEnv() (Config, error) {
 		FtLoopGateTaskFilter:                ftLoopGateTaskFilter,
 		FtLoopGateMinScore:                  ftLoopGateMinScore,
 		FtLoopConvertScript:   get("FT_LOOP_CONVERT_SCRIPT", ""),
+		FtBenchScheduleEnabled:         getBool("FT_BENCH_SCHEDULE_ENABLED", false),
+		FtBenchScheduleDays:            ftBenchScheduleDays,
+		FtBenchScheduleInitialDelayMin: ftBenchScheduleInitialDelay,
+		FtBenchScheduleRowsPerSpec:     ftBenchScheduleRows,
 		FtLoopStalenessDays: ftLoopStalenessDays,
 		FtDriftMargin:       ftDriftMargin,
 		FtLoopIssueFilerEnabled:    getBool("FT_LOOP_ISSUE_FILER_ENABLED", false),
