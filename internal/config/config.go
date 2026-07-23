@@ -1356,6 +1356,10 @@ type Config struct {
 	FtLoopExportSinceDays int     // FT_LOOP_EXPORT_SINCE_DAYS — export window for the curate input (default: 7)
 	FtLoopGateTaskFilter  string  // FT_LOOP_GATE_TASK_FILTER — optional run_benchmark --task-filter to scope the gate (default: empty = all tasks)
 	FtLoopGateMinScore    float64 // FT_LOOP_GATE_MIN_SCORE — minimum aggregate benchmark score for the gate to PASS (default: 0.80, matches UBENCH min_aggregate_weighted_score)
+	FtLoopServingSymlink       string // FT_LOOP_SERVING_SYMLINK — serving indirection symlink the plist points at (default: .local-models/serving/current.gguf; FT-RECURSIVE-003 E2)
+	FtLoopServingPlistLabel    string // FT_LOOP_SERVING_PLIST_LABEL — LaunchAgent label kickstarted on swap (default: com.mdemg.llama-server)
+	FtLoopServingHealthURL     string // FT_LOOP_SERVING_HEALTH_URL — health probe after swap (default: http://127.0.0.1:8102/health)
+	FtLoopSwapHealthTimeoutSec int    // FT_LOOP_SWAP_HEALTH_TIMEOUT_SEC — fail-closed revert if the swapped model is not healthy within this (default: 120, floor 10)
 	FtLoopConvertScript   string  // FT_LOOP_CONVERT_SCRIPT — explicit convert_hf_to_gguf.py path; empty = PATH → /opt/homebrew/bin → /usr/local/bin (FTLOOP-DRILL-001: launchd minimal PATH broke the bare LookPath)
 
 	// MAINT-LIVE-001 — maintenance liveness (only-ever-dry-runs detection).
@@ -5091,6 +5095,13 @@ func FromEnv() (Config, error) {
 	if graphHealthScoreFloor < 0 || graphHealthScoreFloor > 1 {
 		return Config{}, errors.New("GRAPH_HEALTH_SCORE_FLOOR must be in [0,1]")
 	}
+	swapHealthTimeout, err := atoi("FT_LOOP_SWAP_HEALTH_TIMEOUT_SEC", 120)
+	if err != nil {
+		return Config{}, err
+	}
+	if swapHealthTimeout < 10 {
+		return Config{}, errors.New("FT_LOOP_SWAP_HEALTH_TIMEOUT_SEC must be >= 10")
+	}
 	ftReadinessStalenessMin, err := atoi("FT_READINESS_STALENESS_MIN", 30)
 	if err != nil {
 		return Config{}, err
@@ -6127,6 +6138,10 @@ func FromEnv() (Config, error) {
 		FtLoopGateTaskFilter:                ftLoopGateTaskFilter,
 		FtLoopGateMinScore:                  ftLoopGateMinScore,
 		FtLoopConvertScript:   get("FT_LOOP_CONVERT_SCRIPT", ""),
+		FtLoopServingSymlink:       get("FT_LOOP_SERVING_SYMLINK", ".local-models/serving/current.gguf"),
+		FtLoopServingPlistLabel:    get("FT_LOOP_SERVING_PLIST_LABEL", "com.mdemg.llama-server"),
+		FtLoopServingHealthURL:     get("FT_LOOP_SERVING_HEALTH_URL", "http://127.0.0.1:8102/health"),
+		FtLoopSwapHealthTimeoutSec: swapHealthTimeout,
 		MaintLiveAlertEnabled:               maintLiveAlertEnabled,
 		MaintLiveLookbackDays:               maintLiveLookbackDays,
 		JobBackupStalenessHours:             jobBackupStalenessHours,
