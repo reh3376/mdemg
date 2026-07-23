@@ -20,7 +20,7 @@
   },
   "config": {
     "timeout_ms": 15000,
-    "sha256": "b7cb9a40a00bbe1847cda3aaa2ae44d163f75906a37e03e6ad16e2c000bf0c1a"
+    "sha256": "bd625331008426e60e6bdfda82074558983978aa1f9c779939843507e8cf6c3e"
   },
   "variables": {
     "test_space": "demo"
@@ -58,5 +58,41 @@
         "expected": "string"
       }
     ]
-  }
+  },
+  "variants": [
+    {
+      "name": "forwarded_toggles_accepted",
+      "description": "INGEST-TRIGGER-FORWARD-001: the four pointer-bool toggles (include_md/include_ts/include_py/archive_deleted) are honored request fields \u2014 accepted with dry_run and a job is created. Forwarding to CLI argv is pinned unit-side (TestBuildIngestConfigFromRequest_PointerBools); this contract locks the request schema.",
+      "request": {
+        "body": {
+          "include_md": false,
+          "include_ts": true,
+          "include_py": false,
+          "archive_deleted": false,
+          "dry_run": true
+        }
+      },
+      "expected": {
+        "status": [
+          200,
+          202
+        ],
+        "body_assertions": [
+          {
+            "path": "$.job_id",
+            "op": "exists"
+          },
+          {
+            "path": "$.status",
+            "op": "one_of",
+            "expected": [
+              "pending",
+              "queued",
+              "running"
+            ]
+          }
+        ]
+      }
+    }
+  ]
 }
