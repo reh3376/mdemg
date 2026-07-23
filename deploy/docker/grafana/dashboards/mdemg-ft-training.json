@@ -29,7 +29,7 @@
       },
       "options": {
         "mode": "html",
-        "content": "## FT Pipeline Dashboard\n\n**Live sections:** LLM interaction collection (V0002), Phase 10 benchmark history (V0012 `benchmark_runs`/`benchmark_results`), LLM endpoint health (V0018, Phase 13.5 watchdog).\n\n**TSDB-CONSUME-001 (2026-06-11):** the Model Version Timeline, Benchmark Scores, Training Cycle History, and Exogenous Ratio panels were **removed** — they read `ft_model_versions` / `ft_benchmarks` / `ft_training_cycles`, which have **no writer** (0 rows ever). The tables remain: they are the designated sinks for the FT recursive-retraining loop (FT Phases 6/7/9 — NOT STARTED; trigger: FT-CLASSIFY-002). Restore the panels from git history when that loop ships writers."
+        "content": "## FT Pipeline Dashboard\n\n**Live sections:** LLM interaction collection (V0002), Phase 10 benchmark history (V0012 `benchmark_runs`/`benchmark_results`), LLM endpoint health (V0018, Phase 13.5 watchdog).\n\n**TSDB-CONSUME-001 (2026-06-11):** the Model Version Timeline, Benchmark Scores, Training Cycle History, and Exogenous Ratio panels were **removed** \u2014 they read `ft_model_versions` / `ft_benchmarks` / `ft_training_cycles`, which have **no writer** (0 rows ever). The tables remain: they are the designated sinks for the FT recursive-retraining loop (FT Phases 6/7/9 \u2014 NOT STARTED; trigger: FT-CLASSIFY-002). Restore the panels from git history when that loop ships writers."
       },
       "fieldConfig": {
         "defaults": {},
@@ -143,9 +143,9 @@
     },
     {
       "id": 10,
-      "title": "Phase 10 Benchmark — Per-Task Pass Rate (latest run)",
+      "title": "Phase 10 Benchmark \u2014 Per-Task Pass Rate (latest run)",
       "type": "table",
-      "description": "Reads benchmark_results (V0012). Score = mean of deterministic reward_vector entries across N runs per task, for the most recent run_id. See adjacent 'Latest Benchmark Age' panel for freshness — FT-BENCH-REFRESH-001 wired a staleness gauge + alert so operators know when this table is drifting stale.",
+      "description": "Reads benchmark_results (V0012). Score = mean of deterministic reward_vector entries across N runs per task, for the most recent run_id. See adjacent 'Latest Benchmark Age' panel for freshness \u2014 FT-BENCH-REFRESH-001 wired a staleness gauge + alert so operators know when this table is drifting stale.",
       "gridPos": {
         "h": 9,
         "w": 12,
@@ -207,9 +207,9 @@
     },
     {
       "id": 11,
-      "title": "Phase 10 Benchmark — Per-Task Reward Variance (stddev)",
+      "title": "Phase 10 Benchmark \u2014 Per-Task Reward Variance (stddev)",
       "type": "bargauge",
-      "description": "Reads benchmark_results (V0012). Stddev of the per-run scalar reward across N runs for each task in the most recent benchmark — Phase 11 GRPO uses this as advantage-normalization denominator.",
+      "description": "Reads benchmark_results (V0012). Stddev of the per-run scalar reward across N runs for each task in the most recent benchmark \u2014 Phase 11 GRPO uses this as advantage-normalization denominator.",
       "gridPos": {
         "h": 9,
         "w": 12,
@@ -261,7 +261,7 @@
     },
     {
       "id": 12,
-      "title": "Phase 10 Benchmark — Stagnation Flag (latest)",
+      "title": "Phase 10 Benchmark \u2014 Stagnation Flag (latest)",
       "type": "stat",
       "description": "Reads benchmark_runs.stagnation_flag for the most recent run. Phase 10 informational-only; becomes blocking in Phase 11 once benchmark_runs count >= 3.",
       "gridPos": {
@@ -332,7 +332,7 @@
     },
     {
       "id": 13,
-      "title": "Phase 10 Benchmark — Aggregate Weighted Score (history)",
+      "title": "Phase 10 Benchmark \u2014 Aggregate Weighted Score (history)",
       "type": "timeseries",
       "description": "Reads benchmark_runs.aggregate_weighted_score over time. Group-weighted score (T:0.50 / C:0.35 / J:0.15). Stagnation threshold = |delta| < 0.005 across last 3.",
       "gridPos": {
@@ -423,7 +423,7 @@
           "noValue": "No HITL grades in window"
         }
       },
-      "description": "Average HITL gold_score across llm:* call-site datasets (review_grades, HITL-REVIEW-001). Replaces the writerless 'Entropy Health' panel, which read llm_interactions.quality — a column that was NULL on all 91,468 rows ever ('populated post-hoc by annotation job' — the job was never built; the honest producer is HITL grading). Sparse until review cadence picks up; 'No HITL grades in window' is the truthful empty state."
+      "description": "Average HITL gold_score across llm:* call-site datasets (review_grades, HITL-REVIEW-001). Replaces the writerless 'Entropy Health' panel, which read llm_interactions.quality \u2014 a column that was NULL on all 91,468 rows ever ('populated post-hoc by annotation job' \u2014 the job was never built; the honest producer is HITL grading). Sparse until review cadence picks up; 'No HITL grades in window' is the truthful empty state."
     },
     {
       "id": 14,
@@ -442,7 +442,7 @@
       "id": 15,
       "type": "timeseries",
       "title": "LLM endpoint state (0=up, 1=degraded, 2=down)",
-      "description": "Continuous watchdog state gauge. DASHBOARD-TRUTH-002 E9 (2026-07-20): now reads mdemg_mlx_health_state from metric_samples (continuous, emitted every 5s by the supervised watchdog) instead of the transition-log llm_endpoint_health_events (which returned zero rows during steady-state UP → panel read 'No data' for 15+ days on a healthy endpoint). Transition events are now overlaid as annotations, so you see both the continuous state AND transition markers.",
+      "description": "Continuous watchdog state gauge. DASHBOARD-TRUTH-002 E9 (2026-07-20): now reads mdemg_mlx_health_state from metric_samples (continuous, emitted every 5s by the supervised watchdog) instead of the transition-log llm_endpoint_health_events (which returned zero rows during steady-state UP \u2192 panel read 'No data' for 15+ days on a healthy endpoint). Transition events are now overlaid as annotations, so you see both the continuous state AND transition markers.",
       "datasource": {
         "type": "postgres",
         "uid": "timescaledb"
@@ -456,7 +456,7 @@
       "targets": [
         {
           "refId": "A",
-          "rawSql": "-- DASHBOARD-TRUTH-002 E9: continuous gauge (not transition log) — panel is 'No data'-free in steady-state UP.\nSELECT time,\n       value,\n       COALESCE(labels->>'endpoint_url', 'llm-endpoint') AS metric\nFROM metric_samples\nWHERE metric_name = 'mdemg_mlx_health_state'\n  AND metric_type = 'gauge'\n  AND $__timeFilter(time)\nORDER BY time",
+          "rawSql": "-- DASHBOARD-TRUTH-002 E9: continuous gauge (not transition log) \u2014 panel is 'No data'-free in steady-state UP.\nSELECT time,\n       value,\n       COALESCE(labels->>'endpoint_url', 'llm-endpoint') AS metric\nFROM metric_samples\nWHERE metric_name = 'mdemg_mlx_health_state'\n  AND metric_type = 'gauge'\n  AND $__timeFilter(time)\nORDER BY time",
           "format": "time_series"
         }
       ],
@@ -508,7 +508,7 @@
       "id": 16,
       "type": "stat",
       "title": "State transitions in window",
-      "description": "Count of watchdog state changes (up↔degraded↔down) in selected time range. Steady state should be 0; transitions indicate endpoint instability.",
+      "description": "Count of watchdog state changes (up\u2194degraded\u2194down) in selected time range. Steady state should be 0; transitions indicate endpoint instability.",
       "datasource": {
         "type": "postgres",
         "uid": "timescaledb"
@@ -606,7 +606,7 @@
       "id": 18,
       "type": "table",
       "title": "Recent watchdog events (last 30)",
-      "description": "Forensic view: when did each transition happen, what error triggered it, what was the state machine doing. probe_recovery rows mark down→up healing events; fast_fail_burst rows mark llmclient short-circuit windows. DASHBOARD-TRUTH-002 E10 (2026-07-20): dropped the $__timeFilter — this is a RARE-event stream (12 lifetime events on mdemg-dev, newest ~15 days ago) so a narrow dashboard time range showed 'No data'. Now always shows the last 30 events regardless of range.",
+      "description": "Forensic view: when did each transition happen, what error triggered it, what was the state machine doing. probe_recovery rows mark down\u2192up healing events; fast_fail_burst rows mark llmclient short-circuit windows. DASHBOARD-TRUTH-002 E10 (2026-07-20): dropped the $__timeFilter \u2014 this is a RARE-event stream (12 lifetime events on mdemg-dev, newest ~15 days ago) so a narrow dashboard time range showed 'No data'. Now always shows the last 30 events regardless of range.",
       "datasource": {
         "type": "postgres",
         "uid": "timescaledb"
@@ -622,6 +622,118 @@
           "refId": "A",
           "rawSql": "-- DASHBOARD-TRUTH-002 E10: no time-window filter (rare-event stream; newest event may be >30d ago).\nSELECT recorded_at AS \"time\", endpoint_url, event_kind, from_state, to_state, state_numeric, consecutive_failures, burst_short_circuits, LEFT(COALESCE(error_message, ''), 120) AS error FROM llm_endpoint_health_events ORDER BY recorded_at DESC LIMIT 30",
           "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 26,
+      "type": "stat",
+      "title": "Production Drift (active score \u2212 latest benchmark)",
+      "description": "FT-RECURSIVE-004 E2: GREATEST(0, active ft_model_versions score \u2212 latest benchmark aggregate). 0 = no drift (or no-data gate). Alert ft_production_drift fires above the margin (default 0.05).",
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 0,
+        "y": 54
+      },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 4,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.02
+              },
+              {
+                "color": "red",
+                "value": 0.05
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "timescaledb"
+          },
+          "format": "table",
+          "rawSql": "SELECT CASE WHEN COALESCE((SELECT MAX(overall_score) FROM ft_model_versions WHERE status = 'active'), 0) <= 0 THEN 0 WHEN (SELECT MAX(completed_at) FROM benchmark_runs) IS NULL THEN 0 ELSE GREATEST(0, COALESCE((SELECT MAX(overall_score) FROM ft_model_versions WHERE status = 'active'), 0) - COALESCE((SELECT MAX(aggregate_weighted_score) FROM benchmark_runs WHERE completed_at = (SELECT MAX(completed_at) FROM benchmark_runs)), 0)) END AS drift",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 27,
+      "type": "table",
+      "title": "Model Versions (ft_model_versions)",
+      "description": "FT-RECURSIVE-003/004 reader-writer pair: every serving swap records a row (active/superseded/rolled_back).",
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 10,
+        "x": 6,
+        "y": 54
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "timescaledb"
+          },
+          "format": "table",
+          "rawSql": "SELECT deployed_at, version, status, round(COALESCE(overall_score,0)::numeric,4) AS score, training_cycle FROM ft_model_versions ORDER BY deployed_at DESC LIMIT 20",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 28,
+      "type": "table",
+      "title": "Retrain Cycle Ledger (latest status per cycle)",
+      "description": "FT-RECURSIVE-002+ event-sourced ledger \u2014 latest event per cycle via DISTINCT ON (never raw event-row counts; the ledger-semantics rule).",
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 16,
+        "y": 54
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "timescaledb"
+          },
+          "format": "table",
+          "rawSql": "WITH latest AS (SELECT DISTINCT ON (cycle_id) cycle_id, status, COALESCE(stage,'') AS stage, time FROM ft_training_cycles ORDER BY cycle_id, time DESC) SELECT time, cycle_id, status, stage FROM latest ORDER BY time DESC LIMIT 20",
+          "refId": "A"
         }
       ]
     }
