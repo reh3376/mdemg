@@ -151,3 +151,11 @@ func TestResolveTool(t *testing.T) {
 		t.Errorf("fallthrough: got %q", got)
 	}
 }
+
+// FT-RECURSIVE-003 E6: auto-promote policy pins — 0 = never auto; the
+// threshold compares OPERATOR-confirmed promotions only.
+func TestAutoPromotePolicyConfig(t *testing.T) {
+	if (ControllerConfig{}).AutoPromoteAfter != 0 {
+		t.Error("zero-value config must mean never-auto")
+	}
+}

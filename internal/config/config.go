@@ -1356,6 +1356,13 @@ type Config struct {
 	FtLoopExportSinceDays int     // FT_LOOP_EXPORT_SINCE_DAYS — export window for the curate input (default: 7)
 	FtLoopGateTaskFilter  string  // FT_LOOP_GATE_TASK_FILTER — optional run_benchmark --task-filter to scope the gate (default: empty = all tasks)
 	FtLoopGateMinScore    float64 // FT_LOOP_GATE_MIN_SCORE — minimum aggregate benchmark score for the gate to PASS (default: 0.80, matches UBENCH min_aggregate_weighted_score)
+	FtLoopIssueFilerEnabled   bool   // FT_LOOP_ISSUE_FILER_ENABLED — class-5 escalator: repeated failure fingerprints → CapabilityGap + GitHub issue (default: false; flip after live smoke)
+	FtLoopIssueRepeatThreshold int   // FT_LOOP_ISSUE_REPEAT_THRESHOLD — distinct failed cycles on one fingerprint before filing (default: 2)
+	FtLoopIssueLookbackDays    int   // FT_LOOP_ISSUE_LOOKBACK_DAYS — fingerprint clustering window (default: 30)
+	FtLoopIssueRepo            string // FT_LOOP_ISSUE_REPO — target repo for gh issue create (default: reh3376/mdemg)
+	FtLoopIssueTokenPath       string // FT_LOOP_ISSUE_TOKEN_PATH — optional fine-grained PAT file (issues:write); empty = ambient gh auth
+	FtLoopIssueSweepMin        int   // FT_LOOP_ISSUE_SWEEP_MIN — min minutes between ledger sweeps (default: 10)
+	FtLoopAutoPromoteAfter  int     // FT_LOOP_AUTO_PROMOTE_AFTER — auto-promote (canary-gated) once this many OPERATOR-confirmed promotions exist; 0 = never auto (operator-only forever) (default: 3 — spec §5 fork 3)
 	FtLoopTripwireEnabled   bool    // FT_LOOP_TRIPWIRE_ENABLED — post-swap elevated-error auto-rollback watcher (default: false; flip after live smoke)
 	FtLoopCanaryWindowMin   int     // FT_LOOP_CANARY_WINDOW_MIN — minutes after a promotion the tripwire watches (default: 60)
 	FtLoopTripwireErrorRate float64 // FT_LOOP_TRIPWIRE_ERROR_RATE — real-error fraction (caller-cancellation-filtered) that trips auto-rollback (default: 0.20)
@@ -5104,6 +5111,34 @@ func FromEnv() (Config, error) {
 	if graphHealthScoreFloor < 0 || graphHealthScoreFloor > 1 {
 		return Config{}, errors.New("GRAPH_HEALTH_SCORE_FLOOR must be in [0,1]")
 	}
+	issueRepeatThreshold, err := atoi("FT_LOOP_ISSUE_REPEAT_THRESHOLD", 2)
+	if err != nil {
+		return Config{}, err
+	}
+	if issueRepeatThreshold < 1 {
+		return Config{}, errors.New("FT_LOOP_ISSUE_REPEAT_THRESHOLD must be >= 1")
+	}
+	issueLookbackDays, err := atoi("FT_LOOP_ISSUE_LOOKBACK_DAYS", 30)
+	if err != nil {
+		return Config{}, err
+	}
+	if issueLookbackDays < 1 {
+		return Config{}, errors.New("FT_LOOP_ISSUE_LOOKBACK_DAYS must be >= 1")
+	}
+	issueSweepMin, err := atoi("FT_LOOP_ISSUE_SWEEP_MIN", 10)
+	if err != nil {
+		return Config{}, err
+	}
+	if issueSweepMin < 1 {
+		return Config{}, errors.New("FT_LOOP_ISSUE_SWEEP_MIN must be >= 1")
+	}
+	autoPromoteAfter, err := atoi("FT_LOOP_AUTO_PROMOTE_AFTER", 3)
+	if err != nil {
+		return Config{}, err
+	}
+	if autoPromoteAfter < 0 {
+		return Config{}, errors.New("FT_LOOP_AUTO_PROMOTE_AFTER must be >= 0")
+	}
 	canaryWindowMin, err := atoi("FT_LOOP_CANARY_WINDOW_MIN", 60)
 	if err != nil {
 		return Config{}, err
@@ -6182,6 +6217,13 @@ func FromEnv() (Config, error) {
 		FtLoopGateTaskFilter:                ftLoopGateTaskFilter,
 		FtLoopGateMinScore:                  ftLoopGateMinScore,
 		FtLoopConvertScript:   get("FT_LOOP_CONVERT_SCRIPT", ""),
+		FtLoopIssueFilerEnabled:    getBool("FT_LOOP_ISSUE_FILER_ENABLED", false),
+		FtLoopIssueRepeatThreshold: issueRepeatThreshold,
+		FtLoopIssueLookbackDays:    issueLookbackDays,
+		FtLoopIssueRepo:            get("FT_LOOP_ISSUE_REPO", "reh3376/mdemg"),
+		FtLoopIssueTokenPath:       get("FT_LOOP_ISSUE_TOKEN_PATH", ""),
+		FtLoopIssueSweepMin:        issueSweepMin,
+		FtLoopAutoPromoteAfter:  autoPromoteAfter,
 		FtLoopTripwireEnabled:   getBool("FT_LOOP_TRIPWIRE_ENABLED", false),
 		FtLoopCanaryWindowMin:   canaryWindowMin,
 		FtLoopTripwireErrorRate: tripwireErrorRate,
