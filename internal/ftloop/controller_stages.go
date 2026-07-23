@@ -166,19 +166,27 @@ func resolveTool(name, override string) string {
 	return name
 }
 
-// stageConvert: fuse --dequantize (E6-14) → convert_hf_to_gguf f16 →
-// llama-quantize Q5_K_M → the candidate GGUF (E6-4).
-func (c *Controller) stageConvert(ctx context.Context, work, adapterDir string) (string, error) {
+// stageFuse: mlx_lm.fuse --dequantize (E6-14) → bf16 HF dir. Split from
+// stageConvert per the FTLOOP-DRILL-001 finding (fuse was invisible inside
+// the previous combined stage's ledger window).
+func (c *Controller) stageFuse(ctx context.Context, work, adapterDir string) (string, error) {
 	fusedBF16 := filepath.Join(work, "fused-bf16")
-	f16 := filepath.Join(work, "candidate-f16.gguf")
-	candidate := filepath.Join(work, "candidate-Q5_K_M.gguf")
 	py := c.resolvePython()
-
 	if _, err := c.runCmd(ctx, "convert-fuse", c.cfg.RepoDir, py,
 		[]string{"-m", "mlx_lm.fuse", "--model", c.abs(c.cfg.BaseModel),
 			"--adapter-path", adapterDir, "--save-path", fusedBF16, "--dequantize"}); err != nil {
 		return "", err
 	}
+	return fusedBF16, nil
+}
+
+// stageConvert: convert_hf_to_gguf f16 → llama-quantize Q5_K_M → the
+// candidate GGUF (E6-4).
+func (c *Controller) stageConvert(ctx context.Context, work, fusedBF16 string) (string, error) {
+	f16 := filepath.Join(work, "candidate-f16.gguf")
+	candidate := filepath.Join(work, "candidate-Q5_K_M.gguf")
+	py := c.resolvePython()
+
 	conv := resolveTool("convert_hf_to_gguf.py", c.cfg.ConvertScript)
 	if _, err := c.runCmd(ctx, "convert-gguf", c.cfg.RepoDir, py,
 		[]string{conv, fusedBF16, "--outtype", "f16", "--outfile", f16}); err != nil {
@@ -197,29 +205,16 @@ func (c *Controller) stageConvert(ctx context.Context, work, adapterDir string) 
 // stageGate serves the candidate on a side-port, runs run_benchmark against it,
 // and passes only if the aggregate score ≥ GateMinScore with real (non-zero)
 // calls — the no-zero-call discipline from the run_record (E6-3).
-func (c *Controller) stageGate(ctx context.Context, work, candidate string) error {
+func (c *Controller) stageGate(ctx context.Context, work, candidate string) (float64, error) {
 	port := c.cfg.GatePort
 	report := filepath.Join(work, "gate-report.json")
 
 	// Start a side-port llama-server for the candidate; stop it on return.
-	srv := exec.CommandContext(ctx, resolveTool("llama-server", ""), "--model", candidate,
-		"--port", strconv.Itoa(port), "--host", "127.0.0.1",
-		"--ctx-size", "8192", "--parallel", "1", "--jinja") //nolint:gosec // G204: controller-constructed
-	srv.Dir = c.cfg.RepoDir
-	if err := srv.Start(); err != nil {
-		return fmt.Errorf("gate: start candidate server: %w", err)
+	stop, err := StartCandidateServer(ctx, c.cfg.RepoDir, candidate, port)
+	if err != nil {
+		return 0, fmt.Errorf("gate: %w", err)
 	}
-	defer func() {
-		if srv.Process != nil {
-			_ = srv.Process.Kill()
-			_, _ = srv.Process.Wait()
-		}
-	}()
-
-	// Readiness = /health (NOT /v1/models — it answers before the model loads).
-	if err := waitHealth(ctx, fmt.Sprintf("http://127.0.0.1:%d/health", port), 120*time.Second); err != nil {
-		return fmt.Errorf("gate: candidate server not ready: %w", err)
-	}
+	defer stop()
 
 	args := []string{"-m", "neural.benchmarks.run_benchmark",
 		"--config", c.abs(c.cfg.BenchmarkConfig),
@@ -230,20 +225,20 @@ func (c *Controller) stageGate(ctx context.Context, work, candidate string) erro
 		args = append(args, "--task-filter", c.cfg.GateTaskFilter)
 	}
 	if _, err := c.runCmd(ctx, "gate-benchmark", c.cfg.RepoDir, c.resolvePython(), args); err != nil {
-		return err
+		return 0, err
 	}
 
 	score, truncated, err := readGateReport(report)
 	if err != nil {
-		return fmt.Errorf("gate: %w", err)
+		return 0, fmt.Errorf("gate: %w", err)
 	}
 	if truncated > 0 {
-		return fmt.Errorf("gate FAIL: %d truncated rows (no-zero-call/truncation discipline)", truncated)
+		return 0, fmt.Errorf("gate FAIL: %d truncated rows (no-zero-call/truncation discipline)", truncated)
 	}
 	if score < c.cfg.GateMinScore {
-		return fmt.Errorf("gate FAIL: aggregate %.4f < floor %.4f", score, c.cfg.GateMinScore)
+		return 0, fmt.Errorf("gate FAIL: aggregate %.4f < floor %.4f", score, c.cfg.GateMinScore)
 	}
-	return nil
+	return score, nil
 }
 
 // --- helpers ---
@@ -314,4 +309,29 @@ func findFile(root, name string) (string, error) {
 		return "", fmt.Errorf("file %q not found under %s", name, root)
 	}
 	return found, nil
+}
+
+// StartCandidateServer boots a side-port llama-server for a candidate GGUF
+// and waits for /health (NOT /v1/models — it answers before the model
+// loads). Shared by the gate stage and the pre-swap canary (E4). The
+// returned stop func kills the server and reaps it.
+func StartCandidateServer(ctx context.Context, repoDir, candidate string, port int) (func(), error) {
+	srv := exec.CommandContext(ctx, resolveTool("llama-server", ""), "--model", candidate,
+		"--port", strconv.Itoa(port), "--host", "127.0.0.1",
+		"--ctx-size", "8192", "--parallel", "1", "--jinja") //nolint:gosec // G204: controller-constructed
+	srv.Dir = repoDir
+	if err := srv.Start(); err != nil {
+		return nil, fmt.Errorf("start candidate server: %w", err)
+	}
+	stop := func() {
+		if srv.Process != nil {
+			_ = srv.Process.Kill()
+			_, _ = srv.Process.Wait()
+		}
+	}
+	if err := waitHealth(ctx, fmt.Sprintf("http://127.0.0.1:%d/health", port), 120*time.Second); err != nil {
+		stop()
+		return nil, fmt.Errorf("candidate server not ready: %w", err)
+	}
+	return stop, nil
 }

@@ -272,6 +272,8 @@ type StandardMetrics struct {
 	JiminyWarmDebounced func(spaceID string) *Counter
 	// GUARDRAIL-PRODUCER-001: async producer outcomes (queued/dropped/disabled).
 	GuardrailProducer func(status string) *Counter
+	// FT-RECURSIVE-003 E1: lease-held gauge (republished each controller poll).
+	FtLoopLeaseHeld func() *Gauge
 	JiminyLatestAge     func(spaceID string) *Gauge
 	JiminyLatestServed  func(spaceID string) *Counter
 
@@ -828,6 +830,9 @@ func NewStandardMetrics(r *Registry) *StandardMetrics {
 	m.GuardrailProducer = func(status string) *Counter {
 		return r.NewCounter("guardrail_producer_total", "Guardrail async producer requests by outcome",
 			map[string]string{"status": status})
+	}
+	m.FtLoopLeaseHeld = func() *Gauge {
+		return r.NewGauge("ftloop_lease_held", "1 while the recursive-retrain compute lease is held (suppresses training_readiness_stale)", nil)
 	}
 	m.JiminyLatestAge = func(spaceID string) *Gauge {
 		return r.NewGauge("jiminy_latest_age_ms", "Age of latest pre-computed guidance in ms",

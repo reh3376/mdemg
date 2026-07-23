@@ -366,3 +366,20 @@ func TestEmergenceCycleRules(t *testing.T) {
 		t.Errorf("custom params not applied")
 	}
 }
+
+// FT-RECURSIVE-003 E1: the readiness-staleness rule suppresses while the
+// recursive-retrain compute lease is held (FTLOOP-DRILL-001 finding — the
+// heartbeat SHOULD pause during a legitimate quiesce).
+func TestReadinessStalenessRule_LeaseAware(t *testing.T) {
+	r := ReadinessStalenessRule(30)
+	for _, want := range []string{
+		"mdemg_ftloop_lease_held",
+		"interval '5 minutes'",
+		"THEN 0",
+		"mdemg_rsic_readiness_assessed",
+	} {
+		if !strings.Contains(r.QuerySQL, want) {
+			t.Errorf("rule SQL missing %q", want)
+		}
+	}
+}

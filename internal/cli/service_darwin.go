@@ -154,12 +154,17 @@ func resolveLlamaServerBin() (string, bool) {
 }
 
 // resolveMDEMGModelPath returns the model path for the llama-server plist.
-// Order: MDEMG_MODEL_PATH env override, then the canonical Phase 13.5 GGUF
-// produced by the conversion pipeline. llama-server takes a `.gguf` filepath
-// (not a HF-style directory), so the default targets the Q5_K_M build.
+// Order: MDEMG_MODEL_PATH env override → the FT-RECURSIVE-003 serving
+// indirection symlink when it exists (promotion/rollback retarget it without
+// touching the plist) → the canonical Phase 13.5 GGUF. llama-server takes a
+// `.gguf` filepath (not a HF-style directory).
 func resolveMDEMGModelPath(projectDir string) string {
 	if env := os.Getenv("MDEMG_MODEL_PATH"); env != "" {
 		return env
+	}
+	serving := filepath.Join(projectDir, ".local-models", "serving", "current.gguf")
+	if _, err := os.Lstat(serving); err == nil {
+		return serving
 	}
 	return filepath.Join(projectDir, ".local-models", "mdemg-llm-v1-gguf", "mdemg-llm-v1.Q5_K_M.gguf")
 }

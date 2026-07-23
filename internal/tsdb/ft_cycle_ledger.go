@@ -260,3 +260,25 @@ func LastCycleStart(ctx context.Context, pool ftCycleQuerier) (time.Time, bool, 
 	}
 	return *t, true, nil
 }
+
+// CycleCandidatePath returns the candidate GGUF path recorded on the cycle's
+// promote_pending event (FT-RECURSIVE-003 E3 — the promotion executor's
+// swap target), plus the gate score when present.
+func CycleCandidatePath(ctx context.Context, pool ftCycleQuerier, cycleID string) (path string, gateScore float64, err error) {
+	if pool == nil {
+		return "", 0, errors.New("ft_training_cycles: no pool")
+	}
+	row := pool.QueryRow(ctx, `
+		SELECT COALESCE(eval_results->>'candidate_gguf', ''),
+		       COALESCE((eval_results->>'gate_score')::float8, 0)
+		FROM ft_training_cycles
+		WHERE cycle_id = $1 AND status = 'promote_pending'
+		ORDER BY time DESC LIMIT 1`, cycleID)
+	if scanErr := row.Scan(&path, &gateScore); scanErr != nil {
+		if scanErr.Error() == "no rows in result set" {
+			return "", 0, nil
+		}
+		return "", 0, scanErr
+	}
+	return path, gateScore, nil
+}

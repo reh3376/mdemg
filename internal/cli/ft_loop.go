@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	"mdemg/internal/alert"
 	"mdemg/internal/config"
 	"mdemg/internal/jobhealth"
+	"mdemg/internal/ftloop"
 	"mdemg/internal/tsdb"
 )
 
@@ -94,28 +96,135 @@ flow; this records the operator decision in the ft_training_cycles ledger.`,
 			if modelVersion == "" {
 				modelVersion = "mdemg-llm-v1"
 			}
-			ev := tsdb.FtCycleEvent{
-				CycleID:      cycleID,
-				ModelVersion: modelVersion,
-				EvalResults:  map[string]any{"operator_decision": "confirm", "reason": reason},
-			}
 			if reject {
-				ev.Status = tsdb.FtCycleRolledBack
-				ev.Stage = "operator_reject"
-				ev.Error = reason
-				ev.EvalResults["operator_decision"] = "reject"
-			} else {
-				ev.Status = tsdb.FtCyclePromoted
-				ev.Stage = "operator_confirm"
-			}
-			if err := tsdb.RecordCycleEvent(ctx, pool, ev); err != nil {
-				return fmt.Errorf("record decision: %w", err)
-			}
-			if reject {
+				ev := tsdb.FtCycleEvent{
+					CycleID: cycleID, ModelVersion: modelVersion,
+					Status: tsdb.FtCycleRolledBack, Stage: "operator_reject", Error: reason,
+					EvalResults: map[string]any{"operator_decision": "reject", "reason": reason},
+				}
+				if err := tsdb.RecordCycleEvent(ctx, pool, ev); err != nil {
+					return fmt.Errorf("record decision: %w", err)
+				}
 				fmt.Printf("cycle %s rejected (rolled_back). reason: %s\n", cycleID, reason)
-			} else {
-				fmt.Printf("cycle %s confirmed (promoted). Perform the GGUF symlink swap + llama-server restart to serve the new model.\n", cycleID)
+				return nil
 			}
+
+			// FT-RECURSIVE-003 E3: --confirm performs the REAL promotion —
+			// fail-closed serving swap to the cycle's candidate, then the
+			// ledger + ft_model_versions records. A failed swap auto-restores
+			// serving (SwapServing) and records the cycle rolled_back.
+			candidate, gateScore, err := tsdb.CycleCandidatePath(ctx, pool, cycleID)
+			if err != nil {
+				return fmt.Errorf("read candidate path: %w", err)
+			}
+			if candidate == "" {
+				return fmt.Errorf("cycle %s has no candidate_gguf recorded — pre-E3 cycle; promote manually via 'mdemg model swap'", cycleID)
+			}
+			cfg, err := loadConfig()
+			if err != nil {
+				return err
+			}
+			repoDir, _ := os.Getwd()
+			sc := servingConfigFromEnv(cfg, repoDir)
+
+			// FT-RECURSIVE-003 E4: pre-swap canary — held-call replay against
+			// the candidate on the gate side-port. Divergence blocks promotion
+			// WITHOUT touching production serving (strictly better than the
+			// swap-then-revert path: zero production restarts on a bad
+			// candidate that fails structurally).
+			if cfg.FtLoopCanaryEnabled {
+				canCtx, cancelCan := context.WithTimeout(context.Background(), 20*time.Minute)
+				stop, serr := ftloop.StartCandidateServer(canCtx, repoDir, candidate, cfg.FtLoopGatePort)
+				if serr != nil {
+					cancelCan()
+					recFail := func(reason string) {
+						rctx, rcancel := context.WithTimeout(context.Background(), 30*time.Second)
+						defer rcancel()
+						_ = tsdb.RecordCycleEvent(rctx, pool, tsdb.FtCycleEvent{
+							CycleID: cycleID, ModelVersion: modelVersion,
+							Status: tsdb.FtCycleRolledBack, Stage: "canary_failed", Error: reason,
+							EvalResults: map[string]any{"operator_decision": "confirm"},
+						})
+					}
+					recFail("candidate would not serve: " + serr.Error())
+					return fmt.Errorf("canary: candidate would not serve (production untouched): %w", serr)
+				}
+				probes := cfg.FtLoopCanaryProbes
+				if !filepath.IsAbs(probes) {
+					probes = filepath.Join(repoDir, probes)
+				}
+				canRes, cerr := ftloop.RunCanary(canCtx, ftloop.CanaryConfig{
+					ProbesPath:  probes,
+					ProbeCount:  cfg.FtLoopCanaryProbeCount,
+					ProdBaseURL: cfg.FtLoopCanaryProdURL,
+					CandBaseURL: fmt.Sprintf("http://127.0.0.1:%d/v1", cfg.FtLoopGatePort),
+				})
+				stop()
+				cancelCan()
+				if cerr != nil {
+					return fmt.Errorf("canary replay failed (promotion aborted, production untouched): %w", cerr)
+				}
+				if !canRes.Pass() {
+					rctx, rcancel := context.WithTimeout(context.Background(), 30*time.Second)
+					_ = tsdb.RecordCycleEvent(rctx, pool, tsdb.FtCycleEvent{
+						CycleID: cycleID, ModelVersion: modelVersion,
+						Status: tsdb.FtCycleRolledBack, Stage: "canary_failed",
+						Error: strings.Join(canRes.Divergences, "; "),
+						EvalResults: map[string]any{"operator_decision": "confirm", "canary_probes": canRes.Probes},
+					})
+					rcancel()
+					return fmt.Errorf("canary DIVERGED (%d/%d probes; production untouched): %s",
+						len(canRes.Divergences), canRes.Probes, strings.Join(canRes.Divergences, "; "))
+				}
+				fmt.Printf("canary passed: %d probes, 0 divergences\n", canRes.Probes)
+			}
+
+			swapCtx, cancelSwap := context.WithTimeout(context.Background(), 10*time.Minute)
+			defer cancelSwap()
+			res, swapErr := ftloop.SwapServing(swapCtx, sc, candidate)
+			// Drill-caught (FT-RECURSIVE-003 E3): the outer command ctx (15s)
+			// is long dead after a multi-minute swap — post-swap ledger and
+			// version writes get their own fresh context.
+			recCtx, cancelRec := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancelRec()
+			if swapErr != nil {
+				_ = tsdb.RecordCycleEvent(recCtx, pool, tsdb.FtCycleEvent{
+					CycleID: cycleID, ModelVersion: modelVersion,
+					Status: tsdb.FtCycleRolledBack, Stage: "promote_failed", Error: swapErr.Error(),
+					EvalResults: map[string]any{"operator_decision": "confirm", "swap_reverted": res.Reverted},
+				})
+				return fmt.Errorf("promotion swap failed (serving restored=%v): %w", res.Reverted, swapErr)
+			}
+
+			ev := tsdb.FtCycleEvent{
+				CycleID: cycleID, ModelVersion: modelVersion,
+				Status: tsdb.FtCyclePromoted, Stage: "operator_confirm",
+				EvalResults: map[string]any{
+					"operator_decision": "confirm", "reason": reason,
+					"swap_previous": res.Previous, "swap_target": res.Target,
+				},
+			}
+			if err := tsdb.RecordCycleEvent(recCtx, pool, ev); err != nil {
+				return fmt.Errorf("record decision (swap ALREADY performed): %w", err)
+			}
+
+			if active, aerr := tsdb.ActiveModelVersion(recCtx, pool); aerr == nil && active != nil && active.ModelPath != res.Target {
+				_ = tsdb.MarkModelVersionStatus(recCtx, pool, active.Version, tsdb.ModelVersionSuperseded)
+			}
+			shortCycle := cycleID
+			if len(shortCycle) > 8 {
+				shortCycle = shortCycle[:8]
+			}
+			if err := tsdb.RecordModelVersion(recCtx, pool, tsdb.ModelVersionRow{
+				Version: modelVersion + "-" + shortCycle, ModelPath: res.Target,
+				BaseModel: cfg.FtLoopBaseModel, TrainingCycle: cycleID,
+				OverallScore: gateScore, Status: tsdb.ModelVersionActive,
+				Notes: "promoted via ft-loop promote --confirm",
+			}); err != nil {
+				fmt.Printf("WARN: ft_model_versions record failed: %v\n", err)
+			}
+			fmt.Printf("cycle %s PROMOTED and serving: %s (gate %.4f; previous %s)\n",
+				cycleID, res.Target, gateScore, res.Previous)
 			return nil
 		},
 	}

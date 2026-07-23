@@ -52,6 +52,8 @@ match the v1 production reality (Ollama Library, reh3376/mdemg-llm-v1, the
 	cmd.AddCommand(newModelRemoveCmd())
 	cmd.AddCommand(newModelWhereCmd())
 	cmd.AddCommand(newModelRunCmd())
+	cmd.AddCommand(newModelSwapCmd())
+	cmd.AddCommand(newModelRollbackCmd())
 	return cmd
 }
 

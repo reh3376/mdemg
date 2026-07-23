@@ -80,7 +80,11 @@ func TestStageCommands_Construction(t *testing.T) {
 	if err != nil {
 		t.Fatalf("train: %v", err)
 	}
-	if _, err := c.stageConvert(ctx, work, adapter); err != nil {
+	fused, err := c.stageFuse(ctx, work, adapter)
+	if err != nil {
+		t.Fatalf("fuse: %v", err)
+	}
+	if _, err := c.stageConvert(ctx, work, fused); err != nil {
 		t.Fatalf("convert: %v", err)
 	}
 
