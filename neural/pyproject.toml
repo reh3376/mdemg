@@ -25,6 +25,7 @@ training = [
     # persistence (psycopg v3; soft-import in code, declared here because the
     # training extra is where benchmark tooling deps live).
     "psycopg[binary]>=3.1",
+    "gguf>=0.10",
 ]
 lora = [
     "mlx-lm>=0.20.0",
