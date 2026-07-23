@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"time"
+	"unicode/utf8"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"mdemg/internal/circuitbreaker"
@@ -179,15 +180,26 @@ func (g *GuardrailService) Validate(ctx context.Context, req ValidateRequest) (*
 	return buildResponse(llmResult, constraints), nil
 }
 
-// truncateString truncates a string to maxLen characters, appending "..." if truncated.
+// truncateString truncates a string to at most maxLen BYTES, appending "..."
+// when truncated. The cut always lands on a rune boundary — a mid-rune byte
+// slice produced invalid UTF-8 (e.g. a split '→' U+2192) that poisoned an
+// llm_interactions flush batch (SQLSTATE 22021, TSDB-WRITER-UTF8-001).
 func truncateString(s string, maxLen int) string {
 	if len(s) <= maxLen {
 		return s
 	}
 	if maxLen < 4 {
-		return s[:maxLen]
+		cut := maxLen
+		for cut > 0 && !utf8.RuneStart(s[cut]) {
+			cut--
+		}
+		return s[:cut]
 	}
-	return s[:maxLen-3] + "..."
+	cut := maxLen - 3
+	for cut > 0 && !utf8.RuneStart(s[cut]) {
+		cut--
+	}
+	return s[:cut] + "..."
 }
 
 // buildConstraintMap creates a lookup map from constraint node_id to constraintMatch.

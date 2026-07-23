@@ -2211,6 +2211,7 @@ func (s *Server) StartSupervisedBackground() {
 				GatePort:        s.cfg.FtLoopGatePort,
 				ExportSinceDays: s.cfg.FtLoopExportSinceDays,
 				GateTaskFilter:  s.cfg.FtLoopGateTaskFilter,
+				ConvertScript:   s.cfg.FtLoopConvertScript,
 				GateMinScore:    s.cfg.FtLoopGateMinScore,
 				MdemgBin:        resolveMdemgBin(),
 			})

@@ -351,14 +351,18 @@ func (c *Client) recordInteraction(ctx context.Context, messages []Message, resp
 		}
 	}
 
+	// TSDB-WRITER-UTF8-001: postgres rejects invalid UTF-8 on ANY text column
+	// and one poisoned row fails the whole flush batch (10 rows dropped live,
+	// 2026-07-22). The recorder is the single chokepoint for every producer —
+	// sanitize here so no upstream byte-boundary truncation can poison it.
 	rec := InteractionRecord{
 		Time:         time.Now(),
 		TaskName:     c.taskName,
 		SpaceID:      c.spaceID,
 		InstanceID:   defaultInstanceID,
-		SystemPrompt: system,
-		UserPrompt:   user,
-		Response:     response,
+		SystemPrompt: strings.ToValidUTF8(system, "\uFFFD"),
+		UserPrompt:   strings.ToValidUTF8(user, "\uFFFD"),
+		Response:     strings.ToValidUTF8(response, "\uFFFD"),
 		LatencyMs:    latencyMs,
 		TokensIn:     tokensIn,
 		TokensOut:    tokensOut,

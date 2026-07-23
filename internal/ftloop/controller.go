@@ -53,6 +53,7 @@ type ControllerConfig struct {
 	GatePort        int     // side-port for serving the candidate during the gate
 	ExportSinceDays int     // export window for the curate input
 	GateTaskFilter  string  // optional run_benchmark --task-filter
+	ConvertScript   string  // explicit convert_hf_to_gguf.py path override (FT_LOOP_CONVERT_SCRIPT; empty = resolveTool chain)
 	GateMinScore    float64 // minimum aggregate benchmark score to PASS
 	MdemgBin        string  // path to the mdemg binary (for `mdemg data export`)
 }
