@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -125,6 +126,58 @@ flow; this records the operator decision in the ft_training_cycles ledger.`,
 			}
 			repoDir, _ := os.Getwd()
 			sc := servingConfigFromEnv(cfg, repoDir)
+
+			// FT-RECURSIVE-003 E4: pre-swap canary — held-call replay against
+			// the candidate on the gate side-port. Divergence blocks promotion
+			// WITHOUT touching production serving (strictly better than the
+			// swap-then-revert path: zero production restarts on a bad
+			// candidate that fails structurally).
+			if cfg.FtLoopCanaryEnabled {
+				canCtx, cancelCan := context.WithTimeout(context.Background(), 20*time.Minute)
+				stop, serr := ftloop.StartCandidateServer(canCtx, repoDir, candidate, cfg.FtLoopGatePort)
+				if serr != nil {
+					cancelCan()
+					recFail := func(reason string) {
+						rctx, rcancel := context.WithTimeout(context.Background(), 30*time.Second)
+						defer rcancel()
+						_ = tsdb.RecordCycleEvent(rctx, pool, tsdb.FtCycleEvent{
+							CycleID: cycleID, ModelVersion: modelVersion,
+							Status: tsdb.FtCycleRolledBack, Stage: "canary_failed", Error: reason,
+							EvalResults: map[string]any{"operator_decision": "confirm"},
+						})
+					}
+					recFail("candidate would not serve: " + serr.Error())
+					return fmt.Errorf("canary: candidate would not serve (production untouched): %w", serr)
+				}
+				probes := cfg.FtLoopCanaryProbes
+				if !filepath.IsAbs(probes) {
+					probes = filepath.Join(repoDir, probes)
+				}
+				canRes, cerr := ftloop.RunCanary(canCtx, ftloop.CanaryConfig{
+					ProbesPath:  probes,
+					ProbeCount:  cfg.FtLoopCanaryProbeCount,
+					ProdBaseURL: cfg.FtLoopCanaryProdURL,
+					CandBaseURL: fmt.Sprintf("http://127.0.0.1:%d/v1", cfg.FtLoopGatePort),
+				})
+				stop()
+				cancelCan()
+				if cerr != nil {
+					return fmt.Errorf("canary replay failed (promotion aborted, production untouched): %w", cerr)
+				}
+				if !canRes.Pass() {
+					rctx, rcancel := context.WithTimeout(context.Background(), 30*time.Second)
+					_ = tsdb.RecordCycleEvent(rctx, pool, tsdb.FtCycleEvent{
+						CycleID: cycleID, ModelVersion: modelVersion,
+						Status: tsdb.FtCycleRolledBack, Stage: "canary_failed",
+						Error: strings.Join(canRes.Divergences, "; "),
+						EvalResults: map[string]any{"operator_decision": "confirm", "canary_probes": canRes.Probes},
+					})
+					rcancel()
+					return fmt.Errorf("canary DIVERGED (%d/%d probes; production untouched): %s",
+						len(canRes.Divergences), canRes.Probes, strings.Join(canRes.Divergences, "; "))
+				}
+				fmt.Printf("canary passed: %d probes, 0 divergences\n", canRes.Probes)
+			}
 
 			swapCtx, cancelSwap := context.WithTimeout(context.Background(), 10*time.Minute)
 			defer cancelSwap()

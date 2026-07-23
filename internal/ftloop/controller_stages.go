@@ -210,24 +210,11 @@ func (c *Controller) stageGate(ctx context.Context, work, candidate string) (flo
 	report := filepath.Join(work, "gate-report.json")
 
 	// Start a side-port llama-server for the candidate; stop it on return.
-	srv := exec.CommandContext(ctx, resolveTool("llama-server", ""), "--model", candidate,
-		"--port", strconv.Itoa(port), "--host", "127.0.0.1",
-		"--ctx-size", "8192", "--parallel", "1", "--jinja") //nolint:gosec // G204: controller-constructed
-	srv.Dir = c.cfg.RepoDir
-	if err := srv.Start(); err != nil {
-		return 0, fmt.Errorf("gate: start candidate server: %w", err)
+	stop, err := StartCandidateServer(ctx, c.cfg.RepoDir, candidate, port)
+	if err != nil {
+		return 0, fmt.Errorf("gate: %w", err)
 	}
-	defer func() {
-		if srv.Process != nil {
-			_ = srv.Process.Kill()
-			_, _ = srv.Process.Wait()
-		}
-	}()
-
-	// Readiness = /health (NOT /v1/models — it answers before the model loads).
-	if err := waitHealth(ctx, fmt.Sprintf("http://127.0.0.1:%d/health", port), 120*time.Second); err != nil {
-		return 0, fmt.Errorf("gate: candidate server not ready: %w", err)
-	}
+	defer stop()
 
 	args := []string{"-m", "neural.benchmarks.run_benchmark",
 		"--config", c.abs(c.cfg.BenchmarkConfig),
@@ -322,4 +309,29 @@ func findFile(root, name string) (string, error) {
 		return "", fmt.Errorf("file %q not found under %s", name, root)
 	}
 	return found, nil
+}
+
+// StartCandidateServer boots a side-port llama-server for a candidate GGUF
+// and waits for /health (NOT /v1/models — it answers before the model
+// loads). Shared by the gate stage and the pre-swap canary (E4). The
+// returned stop func kills the server and reaps it.
+func StartCandidateServer(ctx context.Context, repoDir, candidate string, port int) (func(), error) {
+	srv := exec.CommandContext(ctx, resolveTool("llama-server", ""), "--model", candidate,
+		"--port", strconv.Itoa(port), "--host", "127.0.0.1",
+		"--ctx-size", "8192", "--parallel", "1", "--jinja") //nolint:gosec // G204: controller-constructed
+	srv.Dir = repoDir
+	if err := srv.Start(); err != nil {
+		return nil, fmt.Errorf("start candidate server: %w", err)
+	}
+	stop := func() {
+		if srv.Process != nil {
+			_ = srv.Process.Kill()
+			_, _ = srv.Process.Wait()
+		}
+	}
+	if err := waitHealth(ctx, fmt.Sprintf("http://127.0.0.1:%d/health", port), 120*time.Second); err != nil {
+		stop()
+		return nil, fmt.Errorf("candidate server not ready: %w", err)
+	}
+	return stop, nil
 }
