@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"mdemg/internal/sanitize"
 	"net/http"
 	"strings"
 
@@ -195,11 +196,7 @@ func (s *Server) handleListSkills(w http.ResponseWriter, r *http.Request) {
 				sd.obsCount++
 				// Use first ~100 chars of content as description if not set
 				if sd.desc == "" && content != "" {
-					desc := content
-					if len(desc) > 100 {
-						desc = desc[:100] + "..."
-					}
-					sd.desc = desc
+					sd.desc = sanitize.CutRuneSafeSuffix(content, 100, "...")
 				}
 			} else if len(parts) == 3 && parts[2] != "" {
 				sd.sections[parts[2]] = true

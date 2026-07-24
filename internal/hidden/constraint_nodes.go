@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"mdemg/internal/sanitize"
 	"regexp"
 	"strings"
 	"time"
@@ -373,9 +374,7 @@ func extractConstraintLabel(content string) string {
 	if idx := strings.IndexAny(name, ".\n"); idx > 0 {
 		name = name[:idx]
 	}
-	if len(name) > 120 {
-		name = name[:120]
-	}
+	name = sanitize.CutRuneSafe(name, 120)
 	return strings.TrimSpace(name)
 }
 

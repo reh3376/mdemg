@@ -7,8 +7,8 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"mdemg/internal/sanitize"
 	"time"
-	"unicode/utf8"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"mdemg/internal/circuitbreaker"
@@ -189,17 +189,9 @@ func truncateString(s string, maxLen int) string {
 		return s
 	}
 	if maxLen < 4 {
-		cut := maxLen
-		for cut > 0 && !utf8.RuneStart(s[cut]) {
-			cut--
-		}
-		return s[:cut]
+		return sanitize.CutRuneSafe(s, maxLen)
 	}
-	cut := maxLen - 3
-	for cut > 0 && !utf8.RuneStart(s[cut]) {
-		cut--
-	}
-	return s[:cut] + "..."
+	return sanitize.CutRuneSafeSuffix(s, maxLen-3, "...")
 }
 
 // buildConstraintMap creates a lookup map from constraint node_id to constraintMatch.

@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"mdemg/internal/sanitize"
 	"strings"
 	"time"
 
@@ -34,8 +35,8 @@ type InterviewPrompt struct {
 	GapID       string    `json:"gap_id"`
 	GapType     GapType   `json:"gap_type"`
 	Question    string    `json:"question"`
-	Context     string    `json:"context"`      // Background context for the question
-	Suggestions []string  `json:"suggestions"`  // Suggested answer approaches
+	Context     string    `json:"context"`     // Background context for the question
+	Suggestions []string  `json:"suggestions"` // Suggested answer approaches
 	Priority    float64   `json:"priority"`
 	CreatedAt   time.Time `json:"created_at"`
 	Status      string    `json:"status"` // pending, answered, skipped
@@ -44,21 +45,21 @@ type InterviewPrompt struct {
 
 // InterviewResult captures the outcome of an interview session
 type InterviewResult struct {
-	TotalGapsAnalyzed   int               `json:"total_gaps_analyzed"`
-	PromptsGenerated    int               `json:"prompts_generated"`
-	HighPriorityCount   int               `json:"high_priority_count"`
-	GapsByType          map[string]int    `json:"gaps_by_type"`
-	Prompts             []InterviewPrompt `json:"prompts"`
-	ProcessedAt         time.Time         `json:"processed_at"`
-	NextScheduledAt     time.Time         `json:"next_scheduled_at"`
+	TotalGapsAnalyzed int               `json:"total_gaps_analyzed"`
+	PromptsGenerated  int               `json:"prompts_generated"`
+	HighPriorityCount int               `json:"high_priority_count"`
+	GapsByType        map[string]int    `json:"gaps_by_type"`
+	Prompts           []InterviewPrompt `json:"prompts"`
+	ProcessedAt       time.Time         `json:"processed_at"`
+	NextScheduledAt   time.Time         `json:"next_scheduled_at"`
 }
 
 // InterviewConfig configures the interview process
 type InterviewConfig struct {
-	MaxPromptsPerRun    int     // Maximum prompts to generate per run (default: 10)
-	MinPriority         float64 // Minimum priority to consider (default: 0.3)
-	MinOccurrenceCount  int     // Minimum occurrences to interview about (default: 3)
-	IncludeAddressed    bool    // Include addressed gaps for re-verification (default: false)
+	MaxPromptsPerRun   int     // Maximum prompts to generate per run (default: 10)
+	MinPriority        float64 // Minimum priority to consider (default: 0.3)
+	MinOccurrenceCount int     // Minimum occurrences to interview about (default: 3)
+	IncludeAddressed   bool    // Include addressed gaps for re-verification (default: false)
 }
 
 // DefaultInterviewConfig returns default configuration
@@ -221,10 +222,7 @@ func (i *GapInterviewer) generateReasoningPrompt(gap CapabilityGap) (question, c
 
 // generateQueryPatternPrompt creates prompts for recurring poor-performing queries
 func (i *GapInterviewer) generateQueryPatternPrompt(gap CapabilityGap) (question, context string, suggestions []string) {
-	patterns := strings.Join(gap.Evidence, ", ")
-	if len(patterns) > 200 {
-		patterns = patterns[:200] + "..."
-	}
+	patterns := sanitize.CutRuneSafeSuffix(strings.Join(gap.Evidence, ", "), 200, "...")
 
 	question = fmt.Sprintf("Why do queries containing these patterns consistently return poor results: %s?", patterns)
 

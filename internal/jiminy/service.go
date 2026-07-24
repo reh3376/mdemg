@@ -10,7 +10,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"unicode/utf8"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"github.com/nrednav/cuid2"
@@ -2400,13 +2399,7 @@ func truncateBytes(s string, max int) string {
 	if max <= 0 || len(s) <= max {
 		return s
 	}
-	const marker = "…[truncated]"
-	cut := max
-	// Back off to a valid UTF-8 boundary so we never split a multibyte rune.
-	for cut > 0 && !utf8.RuneStart(s[cut]) {
-		cut--
-	}
-	return s[:cut] + marker
+	return sanitize.CutRuneSafeSuffix(s, max, "…[truncated]")
 }
 
 // SetWarmStore sets the warm store reference for trust-based invalidation (B7).

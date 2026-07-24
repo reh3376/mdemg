@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"math"
 	"math/rand/v2"
+	"mdemg/internal/sanitize"
 	"net/http"
 	"strconv"
 	"strings"
@@ -24,11 +25,11 @@ import (
 type contextKey string
 
 const (
-	ctxKeyGuidanceID    contextKey = "llm_guidance_id"
-	ctxKeySourcePath    contextKey = "llm_source_path"
-	ctxKeyRetrievalCtx  contextKey = "llm_retrieval_ctx"
-	ctxKeySessionID     contextKey = "llm_session_id"
-	ctxKeySpaceID       contextKey = "llm_space_id"
+	ctxKeyGuidanceID   contextKey = "llm_guidance_id"
+	ctxKeySourcePath   contextKey = "llm_source_path"
+	ctxKeyRetrievalCtx contextKey = "llm_retrieval_ctx"
+	ctxKeySessionID    contextKey = "llm_session_id"
+	ctxKeySpaceID      contextKey = "llm_space_id"
 )
 
 // WithGuidanceID returns a context carrying a guidance_id for interaction logging.
@@ -708,8 +709,5 @@ func (c *Client) doOllamaRequest(ctx context.Context, messages []Message, opts C
 
 // TruncateForLog truncates a string for error log messages.
 func TruncateForLog(s string, maxLen int) string {
-	if len(s) <= maxLen {
-		return s
-	}
-	return s[:maxLen] + "..."
+	return sanitize.CutRuneSafeSuffix(s, maxLen, "...")
 }

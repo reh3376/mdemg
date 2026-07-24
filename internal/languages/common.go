@@ -1,6 +1,7 @@
 package languages
 
 import (
+	"mdemg/internal/sanitize"
 	"os"
 	"regexp"
 	"strings"
@@ -98,7 +99,7 @@ func TruncateContent(content string, maxLen int) string {
 // TruncateContentWithInfo truncates content to maxLen and reports whether truncation occurred.
 func TruncateContentWithInfo(content string, maxLen int) (string, bool) {
 	if len(content) > maxLen {
-		return content[:maxLen] + "\n... [truncated]", true
+		return sanitize.CutRuneSafeSuffix(content, maxLen, "\n... [truncated]"), true
 	}
 	return content, false
 }

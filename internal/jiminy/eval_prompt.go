@@ -133,7 +133,7 @@ func truncateForPrompt(s string, maxLen int) string {
 	if maxLen <= 0 || len(s) <= maxLen {
 		return s
 	}
-	return s[:maxLen] + "..."
+	return sanitize.CutRuneSafeSuffix(s, maxLen, "...")
 }
 
 // parseEvalResponse parses the LLM JSON response into an llmEvalResult.

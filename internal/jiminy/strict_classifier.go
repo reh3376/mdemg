@@ -3,6 +3,7 @@ package jiminy
 import (
 	"context"
 	"fmt"
+	"mdemg/internal/sanitize"
 	"strings"
 )
 
@@ -82,9 +83,7 @@ func (c *StrictClassifier) Classify(ctx context.Context, req ClassifyRequest) (C
 	if len(violatedCodes) > 0 || len(denialReasons) > 0 {
 		reason := fmt.Sprintf("Constraint violation (%s): %s",
 			maxEscLevel, strings.Join(denialReasons, "; "))
-		if len(reason) > 500 {
-			reason = reason[:500] + "..."
-		}
+		reason = sanitize.CutRuneSafeSuffix(reason, 500, "...")
 		return ClassifyResponse{
 			Verdict:         "deny",
 			DenialReason:    reason,

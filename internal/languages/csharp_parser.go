@@ -1,6 +1,7 @@
 package languages
 
 import (
+	"mdemg/internal/sanitize"
 	"fmt"
 	"path/filepath"
 	"regexp"
@@ -453,10 +454,7 @@ func (p *CSharpParser) extractSymbols(content string) []Symbol {
 
 			// Check for constants (const keyword)
 			if matches := constPattern.FindStringSubmatch(trimmed); matches != nil {
-				valueStr := CleanValue(matches[3])
-				if len(valueStr) > 100 {
-					valueStr = valueStr[:100] + "..."
-				}
+				valueStr := sanitize.CutRuneSafeSuffix(CleanValue(matches[3]), 100, "...")
 				exported := p.hasAccessMod(trimmed, "public") || p.hasAccessMod(trimmed, "internal")
 				symbols = append(symbols, Symbol{
 					Name:           matches[2],
@@ -474,10 +472,7 @@ func (p *CSharpParser) extractSymbols(content string) []Symbol {
 
 			// Check for static readonly with initializer
 			if matches := staticReadonlyPattern.FindStringSubmatch(trimmed); matches != nil {
-				valueStr := CleanValue(matches[3])
-				if len(valueStr) > 100 {
-					valueStr = valueStr[:100] + "..."
-				}
+				valueStr := sanitize.CutRuneSafeSuffix(CleanValue(matches[3]), 100, "...")
 				exported := p.hasAccessMod(trimmed, "public") || p.hasAccessMod(trimmed, "internal")
 				symbols = append(symbols, Symbol{
 					Name:           matches[2],
@@ -562,10 +557,7 @@ func (p *CSharpParser) extractSymbols(content string) []Symbol {
 				params := matches[3]
 				// Exclude false positives: keywords that look like method names
 				if !p.isKeyword(methodName) {
-					signature := fmt.Sprintf("%s %s(%s)", returnType, methodName, params)
-					if len(signature) > 150 {
-						signature = signature[:150] + "..."
-					}
+					signature := sanitize.CutRuneSafeSuffix(fmt.Sprintf("%s %s(%s)", returnType, methodName, params), 150, "...")
 					exported := p.hasAccessMod(trimmed, "public") || p.hasAccessMod(trimmed, "internal")
 					symbols = append(symbols, Symbol{
 						Name:           methodName,

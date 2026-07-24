@@ -4,6 +4,7 @@ package encoding
 
 import (
 	"encoding/json"
+	"mdemg/internal/sanitize"
 	"strings"
 )
 
@@ -115,15 +116,15 @@ func TruncateAtWord(s string, maxLen int) string {
 		return s
 	}
 	if maxLen < 4 {
-		return s[:maxLen]
+		return sanitize.CutRuneSafe(s, maxLen)
 	}
-	// Find the last space before the limit
+	// Find the last space before the limit (an ASCII-space index is always a
+	// rune boundary; only the no-space fallback needs boundary backing).
 	cut := maxLen - 3
-	idx := strings.LastIndex(s[:cut], " ")
-	if idx > 0 {
-		cut = idx
+	if idx := strings.LastIndex(s[:cut], " "); idx > 0 {
+		return s[:idx] + "..."
 	}
-	return s[:cut] + "..."
+	return sanitize.CutRuneSafeSuffix(s, cut, "...")
 }
 
 // CompressSection applies telegraphic compression then truncates at maxLen.

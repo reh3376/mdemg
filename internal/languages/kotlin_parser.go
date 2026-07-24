@@ -2,6 +2,7 @@ package languages
 
 import (
 	"fmt"
+	"mdemg/internal/sanitize"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -229,8 +230,8 @@ func (p *KotlinParser) extractSymbols(content string) []Symbol {
 
 	// Scope tracking
 	type scopeEntry struct {
-		name string
-		kind string // "class", "interface", "enum", "object", "companion"
+		name  string
+		kind  string // "class", "interface", "enum", "object", "companion"
 		depth int
 	}
 	var scopeStack []scopeEntry
@@ -432,10 +433,7 @@ func (p *KotlinParser) extractSymbols(content string) []Symbol {
 
 			// Check for const val (constant)
 			if matches := constValPattern.FindStringSubmatch(trimmed); matches != nil {
-				valueStr := CleanValue(matches[2])
-				if len(valueStr) > 100 {
-					valueStr = valueStr[:100] + "..."
-				}
+				valueStr := sanitize.CutRuneSafeSuffix(CleanValue(matches[2]), 100, "...")
 				sym := Symbol{
 					Name:     matches[1],
 					Type:     "constant",
@@ -456,10 +454,7 @@ func (p *KotlinParser) extractSymbols(content string) []Symbol {
 			// Check for top-level val/var (only at brace depth 0 and not inside parens)
 			if braceDepth == 0 && parenDepth == 0 {
 				if matches := topLevelValPattern.FindStringSubmatch(trimmed); matches != nil {
-					valueStr := CleanValue(matches[2])
-					if len(valueStr) > 100 {
-						valueStr = valueStr[:100] + "..."
-					}
+					valueStr := sanitize.CutRuneSafeSuffix(CleanValue(matches[2]), 100, "...")
 					sym := Symbol{
 						Name:     matches[1],
 						Type:     "constant",
@@ -493,9 +488,7 @@ func (p *KotlinParser) extractSymbols(content string) []Symbol {
 				if returnType != "" {
 					signature = fmt.Sprintf("fun %s(%s): %s", funcName, params, returnType)
 				}
-				if len(signature) > 150 {
-					signature = signature[:150] + "..."
-				}
+				signature = sanitize.CutRuneSafeSuffix(signature, 150, "...")
 
 				sym := Symbol{
 					Name:           funcName,

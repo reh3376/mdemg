@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"mdemg/internal/sanitize"
 	"strings"
 	"time"
 
@@ -111,7 +112,7 @@ func printCleanResult(r *tsdb.CleanResult) {
 				detail = fmt.Sprintf("response_len=%d", p.ResponseLen)
 			}
 			if len(detail) > 40 {
-				detail = detail[:37] + "..."
+				detail = sanitize.CutRuneSafeSuffix(detail, 37, "...")
 			}
 			fmt.Printf("  %-12s %-28s %-20s %s\n",
 				p.Category, p.TaskName, p.Time.Format("2006-01-02 15:04:05"), detail)

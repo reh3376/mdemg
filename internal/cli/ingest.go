@@ -9,6 +9,7 @@ import (
 	"io"
 	"log"
 	"log/slog"
+	"mdemg/internal/sanitize"
 	"net/http"
 	"os"
 	"os/exec"
@@ -18,6 +19,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"unicode/utf8"
 
 	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
@@ -1399,9 +1401,7 @@ func parseConfigFile(root, path string) *codeElement {
 	name := filepath.Base(path)
 	contentStr := string(content)
 
-	if len(contentStr) > 4000 {
-		contentStr = contentStr[:4000] + "... [truncated]"
-	}
+	contentStr = sanitize.CutRuneSafeSuffix(contentStr, 4000, "... [truncated]")
 
 	var summary strings.Builder
 	summary.WriteString(fmt.Sprintf("Configuration file: %s. ", name))
@@ -1511,7 +1511,8 @@ func titleCase(s string) string {
 	if s == "" {
 		return ""
 	}
-	return strings.ToUpper(s[:1]) + s[1:]
+	r, size := utf8.DecodeRuneInString(s)
+	return strings.ToUpper(string(r)) + s[size:]
 }
 
 func generateSummary(elem codeElement) string {
@@ -1621,10 +1622,7 @@ func generateSummary(elem codeElement) string {
 	if len(elem.Symbols) > 0 {
 		for _, s := range elem.Symbols {
 			if s.DocComment != "" && s.Exported && s.Name == elem.Name {
-				comment := strings.TrimSpace(s.DocComment)
-				if len(comment) > 400 {
-					comment = comment[:400]
-				}
+				comment := sanitize.CutRuneSafe(strings.TrimSpace(s.DocComment), 400)
 				summary.WriteString(". " + comment)
 				break
 			}

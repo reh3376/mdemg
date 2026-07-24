@@ -2,6 +2,7 @@ package jiminy
 
 import (
 	"fmt"
+	"mdemg/internal/sanitize"
 	"strings"
 )
 
@@ -285,10 +286,7 @@ func compactAnnotationValue(val string) string {
 	if idx := strings.LastIndex(val[:min(len(val), 15)], "-"); idx > 6 {
 		return val[:idx]
 	}
-	if len(val) > 15 {
-		return val[:15]
-	}
-	return val
+	return sanitize.CutRuneSafe(val, 15)
 }
 
 // formatT2 formats a guidance item as T2 (telegraphic NL, ~50-100 tokens).
@@ -446,7 +444,7 @@ func telegraphicCompress(text string) string {
 
 	// Limit length
 	if len(compressed) > 200 {
-		compressed = compressed[:200]
+		compressed = sanitize.CutRuneSafe(compressed, 200)
 		if idx := strings.LastIndex(compressed, " "); idx > 150 {
 			compressed = compressed[:idx]
 		}
@@ -457,8 +455,5 @@ func telegraphicCompress(text string) string {
 
 // truncateContent truncates content to maxLen for fallback coding.
 func truncateContent(content string, maxLen int) string {
-	if len(content) <= maxLen {
-		return content
-	}
-	return content[:maxLen]
+	return sanitize.CutRuneSafe(content, maxLen)
 }

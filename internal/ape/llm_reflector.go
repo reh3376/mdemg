@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"mdemg/internal/sanitize"
 	"strings"
 	"time"
 	"unicode"
@@ -196,9 +197,7 @@ func sanitizeLLMInput(s string, maxLen int) string {
 	s = clean.String()
 
 	// Truncate
-	if maxLen > 0 && len(s) > maxLen {
-		s = s[:maxLen] + "…"
-	}
+	s = sanitize.CutRuneSafeSuffix(s, maxLen, "…")
 	return s
 }
 
@@ -317,7 +316,7 @@ func (lr *LLMReflector) buildUserPrompt(report *SelfAssessmentReport) string {
 			const marker = "\n…[truncated to prompt budget]"
 			maxChars := budget*23/10 - len(marker) // reserve room for the marker
 			if maxChars > 0 && len(out) > maxChars {
-				out = out[:maxChars] + marker
+				out = sanitize.CutRuneSafeSuffix(out, maxChars, marker)
 				truncatedAssessment = true
 			}
 		}

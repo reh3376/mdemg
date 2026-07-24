@@ -12,6 +12,7 @@ package tsdb
 import (
 	"context"
 	"log/slog"
+	"mdemg/internal/sanitize"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -91,9 +92,7 @@ func (w *LLMEndpointHealthWriter) Record(ev LLMEndpointHealthEvent) {
 	if ev.EventID == "" {
 		ev.EventID = cuid2.Generate()
 	}
-	if len(ev.ErrorMessage) > 500 {
-		ev.ErrorMessage = ev.ErrorMessage[:500]
-	}
+	ev.ErrorMessage = sanitize.CutRuneSafe(ev.ErrorMessage, 500)
 	w.mu.Lock()
 	w.buffer = append(w.buffer, ev)
 	w.mu.Unlock()

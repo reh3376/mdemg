@@ -1,6 +1,7 @@
 package conversation
 
 import (
+	"mdemg/internal/sanitize"
 	"regexp"
 	"strings"
 )
@@ -21,7 +22,7 @@ type DetectedConstraint struct {
 
 // ConstraintDetector scans observation content for commitment/prohibition patterns.
 type ConstraintDetector struct {
-	patterns     map[string][]constraintPattern
+	patterns      map[string][]constraintPattern
 	minConfidence float64
 }
 
@@ -185,8 +186,6 @@ func extractConstraintName(content string) string {
 	if idx := strings.IndexAny(name, ".\n"); idx > 0 {
 		name = name[:idx]
 	}
-	if len(name) > 120 {
-		name = name[:120] + "..."
-	}
+	name = sanitize.CutRuneSafeSuffix(name, 120, "...")
 	return strings.TrimSpace(name)
 }

@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"log/slog"
+	"mdemg/internal/sanitize"
 	"sync/atomic"
 	"time"
 
@@ -165,21 +166,21 @@ type StandardMetrics struct {
 	RSICSnapshotCreated func(action string) *Counter
 
 	// RSIC health sub-scores (published after each assessment)
-	RSICHealthOverall    func(spaceID string) *Gauge
+	RSICHealthOverall func(spaceID string) *Gauge
 	// RSICReadinessAssessed is a heartbeat set to 1 each time the RSIC
 	// training-readiness assessment query SUCCEEDS (SF-1, FT-RECURSIVE-001).
 	// Its sample freshness backs the training_readiness_stale alert rule: a
 	// silent readiness-query failure stops the heartbeat and the loop goes
 	// dormant — the rule catches that absence.
 	RSICReadinessAssessed func(spaceID string) *Gauge
-	RSICHealthRetrieval  func(spaceID string) *Gauge
-	RSICHealthMemory     func(spaceID string) *Gauge
-	RSICHealthEdge       func(spaceID string) *Gauge
-	RSICHealthTask       func(spaceID string) *Gauge
-	RSICHealthGuidance   func(spaceID string) *Gauge
-	RSICHealthProtocol   func(spaceID string) *Gauge
-	RSICHealthSynergy    func(spaceID string) *Gauge
-	RSICHealthConfidence func(spaceID string) *Gauge
+	RSICHealthRetrieval   func(spaceID string) *Gauge
+	RSICHealthMemory      func(spaceID string) *Gauge
+	RSICHealthEdge        func(spaceID string) *Gauge
+	RSICHealthTask        func(spaceID string) *Gauge
+	RSICHealthGuidance    func(spaceID string) *Gauge
+	RSICHealthProtocol    func(spaceID string) *Gauge
+	RSICHealthSynergy     func(spaceID string) *Gauge
+	RSICHealthConfidence  func(spaceID string) *Gauge
 
 	// RSIC per-dimension data-sufficiency confidence (DH-005). Published
 	// alongside the score gauges above so operators can distinguish "this
@@ -255,13 +256,13 @@ type StandardMetrics struct {
 	// what Lever A directly moves).
 	JiminySurfacedActionableFraction  func(spaceID string) *Gauge
 	JiminySurfacedAbstractionFraction func(spaceID string) *Gauge
-	JiminySourceDiversity         func(spaceID string) *Gauge
-	JiminyTotalIssued             func(spaceID string) *Gauge
-	JiminyTotalFollowed           func(spaceID string) *Gauge
-	JiminyTotalPartialCompliance  func(spaceID string) *Gauge
-	JiminyTotalIgnored            func(spaceID string) *Gauge
-	JiminyTotalContradicted       func(spaceID string) *Gauge
-	CompactEventTimestamp         func(spaceID string) *Gauge
+	JiminySourceDiversity             func(spaceID string) *Gauge
+	JiminyTotalIssued                 func(spaceID string) *Gauge
+	JiminyTotalFollowed               func(spaceID string) *Gauge
+	JiminyTotalPartialCompliance      func(spaceID string) *Gauge
+	JiminyTotalIgnored                func(spaceID string) *Gauge
+	JiminyTotalContradicted           func(spaceID string) *Gauge
+	CompactEventTimestamp             func(spaceID string) *Gauge
 
 	// Jiminy Guide + Warm metrics (event-driven pre-computation)
 	JiminyGuideCalls    func(spaceID string) *Counter
@@ -273,9 +274,9 @@ type StandardMetrics struct {
 	// GUARDRAIL-PRODUCER-001: async producer outcomes (queued/dropped/disabled).
 	GuardrailProducer func(status string) *Counter
 	// FT-RECURSIVE-003 E1: lease-held gauge (republished each controller poll).
-	FtLoopLeaseHeld func() *Gauge
-	JiminyLatestAge     func(spaceID string) *Gauge
-	JiminyLatestServed  func(spaceID string) *Counter
+	FtLoopLeaseHeld    func() *Gauge
+	JiminyLatestAge    func(spaceID string) *Gauge
+	JiminyLatestServed func(spaceID string) *Counter
 
 	// Phase 11.6.3 — MLX Watchdog. State + fast-fail + transition metrics for
 	// the goroutine in internal/mlxprobe and the gate in internal/llmclient.
@@ -931,10 +932,7 @@ func normalizePath(path string) string {
 	// /v1/plugins/{name} -> /v1/plugins/:name
 
 	// Simple normalization: truncate at known dynamic segments
-	if len(path) > 50 {
-		return path[:50] + "..."
-	}
-	return path
+	return sanitize.CutRuneSafeSuffix(path, 50, "...")
 }
 
 // CollectRateLimitMetrics updates rate limit metrics from the ratelimit package.

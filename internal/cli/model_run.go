@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mdemg/internal/sanitize"
 	"net/http"
 	"os"
 	"strings"
@@ -184,10 +185,7 @@ func callChat(ctx context.Context, endpoint string, body chatRequest, timeout ti
 // truncateRunBody bounds error/log body strings. Named to avoid colliding
 // with a same-named helper in data.go.
 func truncateRunBody(s string, max int) string {
-	if len(s) <= max {
-		return s
-	}
-	return s[:max] + "...(truncated)"
+	return sanitize.CutRuneSafeSuffix(s, max, "...(truncated)")
 }
 
 // runModelRun is the command entry point.
