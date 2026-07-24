@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mdemg/internal/sanitize"
 	"net/http"
 	"os"
 	"os/exec"
@@ -506,7 +507,7 @@ func truncate(s string, maxLen int) string {
 	if len(s) <= maxLen {
 		return s
 	}
-	return s[:maxLen-3] + "..."
+	return sanitize.CutRuneSafeSuffix(s, maxLen-3, "...")
 }
 
 func deref(s *string, fallback string) string {

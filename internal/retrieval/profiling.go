@@ -3,6 +3,7 @@ package retrieval
 import (
 	"context"
 	"log/slog"
+	"mdemg/internal/sanitize"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -125,10 +126,7 @@ func compactCypher(cypher string) string {
 	}
 	result := strings.Join(parts, " ")
 	// Truncate very long queries
-	if len(result) > 200 {
-		return result[:200] + "..."
-	}
-	return result
+	return sanitize.CutRuneSafeSuffix(result, 200, "...")
 }
 
 func max(a, b int64) int64 {

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mdemg/internal/sanitize"
 	"net/http"
 	"time"
 
@@ -147,10 +148,7 @@ func runDemo(endpoint string) error {
 			fmt.Println("    No results (embedding provider may not be configured)")
 		}
 		for j, node := range result.Nodes {
-			content := node.Content
-			if len(content) > 80 {
-				content = content[:80] + "..."
-			}
+			content := sanitize.CutRuneSafeSuffix(node.Content, 80, "...")
 			fmt.Printf("    %d. [%.3f] %s\n", j+1, node.Score, content)
 		}
 		fmt.Println()

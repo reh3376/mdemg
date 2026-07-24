@@ -15,6 +15,7 @@ import (
 	"container/list"
 	"crypto/sha256"
 	"encoding/hex"
+	"mdemg/internal/sanitize"
 	"strings"
 	"sync"
 
@@ -86,10 +87,7 @@ func hashAction(guidanceID, actionSummary string) string {
 // body dumps from bloating the draft columns.
 func clipContent(s string, maxLen int) string {
 	s = strings.TrimSpace(s)
-	if maxLen <= 0 || len(s) <= maxLen {
-		return s
-	}
-	return s[:maxLen]
+	return sanitize.CutRuneSafe(s, maxLen)
 }
 
 // buildContradictedDraft renders the (Incorrect, Correct) pair the operator

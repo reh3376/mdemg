@@ -14,6 +14,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"log/slog"
+	"mdemg/internal/sanitize"
 	"os"
 	"os/exec"
 	"regexp"
@@ -76,9 +77,7 @@ func normalizeSignature(stage, errText string) string {
 	sig = pathRe.ReplaceAllString(sig, "<path>")
 	sig = hexRunRe.ReplaceAllString(sig, "<hex>")
 	sig = digitRunRe.ReplaceAllString(sig, "<n>")
-	if len(sig) > 160 {
-		sig = sig[:160]
-	}
+	sig = sanitize.CutRuneSafe(sig, 160)
 	return stage + "|" + strings.TrimSpace(sig)
 }
 
@@ -300,12 +299,5 @@ func (f *IssueFiler) execGh(ctx context.Context, args ...string) (string, error)
 
 func truncateForTitle(s string) string {
 	s = strings.ReplaceAll(s, "\n", " ")
-	if len(s) > 80 {
-		cut := 80
-		for cut > 0 && s[cut]&0xC0 == 0x80 { // rune-safe (TSDB-WRITER-UTF8-001 class)
-			cut--
-		}
-		return s[:cut] + "…"
-	}
-	return s
+	return sanitize.CutRuneSafeSuffix(s, 80, "…")
 }

@@ -2,6 +2,7 @@ package languages
 
 import (
 	"fmt"
+	"mdemg/internal/sanitize"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -298,16 +299,13 @@ func (p *CudaParser) extractSymbols(content string) []Symbol {
 
 		// Check for __host__ __device__
 		if matches := hostDevicePattern.FindStringSubmatch(line); matches != nil {
-			signature := fmt.Sprintf("__host__ __device__ %s %s(%s)", matches[1], matches[2], matches[3])
-			if len(signature) > 150 {
-				signature = signature[:150] + "..."
-			}
+			signature := sanitize.CutRuneSafeSuffix(fmt.Sprintf("__host__ __device__ %s %s(%s)", matches[1], matches[2], matches[3]), 150, "...")
 			symbols = append(symbols, Symbol{
 				Name:           matches[2],
 				Type:           "function",
 				Signature:      signature,
 				TypeAnnotation: matches[1],
-				Line:     lineNum,
+				Line:           lineNum,
 				Exported:       true,
 				Language:       "cuda",
 			})
@@ -317,10 +315,7 @@ func (p *CudaParser) extractSymbols(content string) []Symbol {
 		// Check for __device__ function (but not __host__ __device__)
 		if !strings.Contains(line, "__host__") {
 			if matches := devicePattern.FindStringSubmatch(line); matches != nil {
-				signature := fmt.Sprintf("__device__ %s %s(%s)", matches[1], matches[2], matches[3])
-				if len(signature) > 150 {
-					signature = signature[:150] + "..."
-				}
+				signature := sanitize.CutRuneSafeSuffix(fmt.Sprintf("__device__ %s %s(%s)", matches[1], matches[2], matches[3]), 150, "...")
 				symbols = append(symbols, Symbol{
 					Name:           matches[2],
 					Type:           "device_function",
@@ -340,7 +335,7 @@ func (p *CudaParser) extractSymbols(content string) []Symbol {
 				Name:           matches[2],
 				Type:           "variable",
 				TypeAnnotation: matches[1] + " __shared__",
-				Line:     lineNum,
+				Line:           lineNum,
 				Exported:       false,
 				Language:       "cuda",
 			})
@@ -350,13 +345,13 @@ func (p *CudaParser) extractSymbols(content string) []Symbol {
 		// Check for #define
 		if matches := definePattern.FindStringSubmatch(line); matches != nil {
 			symbols = append(symbols, Symbol{
-				Name:       matches[1],
-				Type:       "macro",
-				Value:      CleanValue(matches[2]),
-				RawValue:   matches[2],
-				Line: lineNum,
-				Exported:   true,
-				Language:   "cuda",
+				Name:     matches[1],
+				Type:     "macro",
+				Value:    CleanValue(matches[2]),
+				RawValue: matches[2],
+				Line:     lineNum,
+				Exported: true,
+				Language: "cuda",
 			})
 			continue
 		}
@@ -364,13 +359,13 @@ func (p *CudaParser) extractSymbols(content string) []Symbol {
 		// Check for const
 		if matches := constPattern.FindStringSubmatch(line); matches != nil {
 			symbols = append(symbols, Symbol{
-				Name:       matches[1],
-				Type:       "constant",
-				Value:      CleanValue(matches[2]),
-				RawValue:   matches[2],
-				Line: lineNum,
-				Exported:   true,
-				Language:   "cuda",
+				Name:     matches[1],
+				Type:     "constant",
+				Value:    CleanValue(matches[2]),
+				RawValue: matches[2],
+				Line:     lineNum,
+				Exported: true,
+				Language: "cuda",
 			})
 		}
 	}

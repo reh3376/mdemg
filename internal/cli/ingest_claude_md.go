@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"mdemg/internal/sanitize"
 	"net/http"
 	"net/url"
 	"os"
@@ -88,12 +89,12 @@ func expandHome(path string) string {
 }
 
 type nodeMetaResponse struct {
-	NodeID      string  `json:"node_id"`
-	ContentHash string  `json:"content_hash"`
-	FileSize    int64   `json:"file_size"`
-	LineCount   int     `json:"line_count"`
-	Status      string  `json:"status"`
-	Error       string  `json:"error,omitempty"`
+	NodeID      string `json:"node_id"`
+	ContentHash string `json:"content_hash"`
+	FileSize    int64  `json:"file_size"`
+	LineCount   int    `json:"line_count"`
+	Status      string `json:"status"`
+	Error       string `json:"error,omitempty"`
 }
 
 type ingestClaudeMDConfig struct {
@@ -532,10 +533,7 @@ func ingestClaudeMDFile(client *http.Client, endpoint, spaceID, path, content,
 	contentHash string, fileSize int64, lineCount int, tags []string) error {
 
 	// Build a summary from the first 200 chars
-	summary := content
-	if len(summary) > 200 {
-		summary = summary[:200] + "..."
-	}
+	summary := sanitize.CutRuneSafeSuffix(content, 200, "...")
 
 	payload := map[string]any{
 		"space_id":     spaceID,

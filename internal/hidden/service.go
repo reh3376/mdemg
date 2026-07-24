@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"mdemg/internal/sanitize"
 	"strings"
 	"sync"
 	"time"
@@ -3399,9 +3400,7 @@ LIMIT 20`
 		// Fallback: mechanical intersection name
 		if l5Name == "" {
 			l5Name = "Emergent: " + strings.Join(names, " ∩ ")
-			if len(l5Name) > 200 {
-				l5Name = l5Name[:200]
-			}
+			l5Name = sanitize.CutRuneSafe(l5Name, 200)
 		}
 
 		// Create L5 node + ABSTRACTS_TO edges from members

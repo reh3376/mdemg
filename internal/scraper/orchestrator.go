@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"mdemg/internal/sanitize"
 	"net/url"
 	"strings"
 	"time"
@@ -222,10 +223,7 @@ func (o *Orchestrator) RunJob(ctx context.Context, queueJob *jobs.Job, req Scrap
 // saveObservation converts a plugin observation to ScrapedContent and persists it.
 func (o *Orchestrator) saveObservation(ctx context.Context, jobID, pageURL string, obs *pb.Observation, targetSpaceID string) {
 	content := obs.Content
-	preview := content
-	if len(preview) > 500 {
-		preview = preview[:500] + "..."
-	}
+	preview := sanitize.CutRuneSafeSuffix(content, 500, "...")
 
 	qualityScore := 0.0
 	if v, ok := obs.Metadata["quality_score"]; ok {

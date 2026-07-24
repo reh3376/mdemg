@@ -2,6 +2,7 @@ package languages
 
 import (
 	"fmt"
+	"mdemg/internal/sanitize"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -379,10 +380,7 @@ func (p *CppParser) extractSymbols(content string) []Symbol {
 				continue
 			}
 
-			signature := fmt.Sprintf("%s %s(%s)", returnType, funcName, params)
-			if len(signature) > 150 {
-				signature = signature[:150] + "..."
-			}
+			signature := sanitize.CutRuneSafeSuffix(fmt.Sprintf("%s %s(%s)", returnType, funcName, params), 150, "...")
 
 			symbols = append(symbols, Symbol{
 				Name:           funcName,

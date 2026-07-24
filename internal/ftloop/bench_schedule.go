@@ -11,6 +11,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"mdemg/internal/sanitize"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -21,9 +22,9 @@ import (
 
 // BenchScheduleConfig controls the scheduled benchmark.
 type BenchScheduleConfig struct {
-	Enabled         bool   // FT_BENCH_SCHEDULE_ENABLED
-	IntervalDays    int    // FT_BENCH_SCHEDULE_DAYS (default 7 — matches the staleness rule)
-	InitialDelayMin int    // FT_BENCH_SCHEDULE_INITIAL_DELAY_MIN (default 30 — never at boot)
+	Enabled         bool // FT_BENCH_SCHEDULE_ENABLED
+	IntervalDays    int  // FT_BENCH_SCHEDULE_DAYS (default 7 — matches the staleness rule)
+	InitialDelayMin int  // FT_BENCH_SCHEDULE_INITIAL_DELAY_MIN (default 30 — never at boot)
 	RepoDir         string
 	PythonBin       string // resolved venv python (resolvePython pattern)
 	ConfigYAML      string // benchmark config (repo-relative ok)
@@ -159,10 +160,7 @@ func (b *BenchScheduler) execCmd(ctx context.Context, name string, args []string
 	cmd.Dir = b.cfg.RepoDir
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		tail := string(out)
-		if len(tail) > 400 {
-			tail = tail[len(tail)-400:]
-		}
+		tail := sanitize.TailRuneSafe(string(out), 400)
 		return fmt.Errorf("%w (output tail: %s)", err, strings.TrimSpace(tail))
 	}
 	return nil

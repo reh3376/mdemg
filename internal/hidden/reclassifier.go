@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math/rand/v2"
+	"mdemg/internal/sanitize"
 	"sort"
 	"strings"
 	"time"
@@ -351,9 +352,7 @@ func (r *Reclassifier) proposeSubCategories(ctx context.Context, category string
 		category, totalCount, len(summaries))
 	for i, s := range summaries {
 		// Truncate individual summaries to keep prompt reasonable
-		if len(s) > 200 {
-			s = s[:200] + "..."
-		}
+		s = sanitize.CutRuneSafeSuffix(s, 200, "...")
 		fmt.Fprintf(&sb, "[%d] %s\n", i+1, s)
 	}
 
@@ -421,9 +420,7 @@ func (r *Reclassifier) proposeSubCategories(ctx context.Context, category string
 		sc.Name = strings.ReplaceAll(sc.Name, ".", "_")
 		sc.Name = strings.ReplaceAll(sc.Name, "/", "_")
 		sc.Name = strings.ReplaceAll(sc.Name, " ", "_")
-		if len(sc.Name) > 50 {
-			sc.Name = sc.Name[:50]
-		}
+		sc.Name = sanitize.CutRuneSafe(sc.Name, 50)
 		if sc.Name == "" || seen[sc.Name] {
 			continue
 		}

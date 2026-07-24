@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"mdemg/internal/sanitize"
 	"os"
 	"strings"
 	"time"
@@ -98,11 +99,7 @@ func (c *CachedEmbedder) Embed(ctx context.Context, text string) ([]float32, err
 	// Check cache first
 	if cached, found := c.cache.Get(cacheKey); found {
 		if c.debug {
-			truncated := text
-			if len(text) > 50 {
-				truncated = text[:50] + "..."
-			}
-			slog.Debug("embedding cache hit", "text", truncated, "cache_size", c.cache.Len())
+			slog.Debug("embedding cache hit", "text", sanitize.CutRuneSafeSuffix(text, 50, "..."), "cache_size", c.cache.Len())
 		}
 		c.recordEvent(ctx, text, true, 0)
 		return cached, nil
@@ -110,11 +107,7 @@ func (c *CachedEmbedder) Embed(ctx context.Context, text string) ([]float32, err
 
 	// Cache miss - call underlying embedder
 	if c.debug {
-		truncated := text
-		if len(text) > 50 {
-			truncated = text[:50] + "..."
-		}
-		slog.Debug("embedding cache miss", "text", truncated, "cache_size", c.cache.Len())
+		slog.Debug("embedding cache miss", "text", sanitize.CutRuneSafeSuffix(text, 50, "..."), "cache_size", c.cache.Len())
 	}
 
 	start := time.Now()

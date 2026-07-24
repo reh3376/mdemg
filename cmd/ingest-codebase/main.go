@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"mdemg/internal/sanitize"
 	"net/http"
 	"os"
 	"os/exec"
@@ -21,31 +22,31 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
-	"mdemg/internal/languages"
 	"mdemg/internal/config"
+	"mdemg/internal/languages"
 	"mdemg/internal/summarize"
 )
 
 var (
-	codebasePath   = flag.String("path", "", "Path to codebase to ingest")
-	spaceID        = flag.String("space-id", "codebase", "MDEMG space ID")
-	mdemgEndpoint  = flag.String("endpoint", "", "MDEMG endpoint (default: from LISTEN_ADDR in .env)")
-	batchSize      = flag.Int("batch", 100, "Batch size for ingestion (default: 100, optimal for ~15/s per worker)")
-	workers        = flag.Int("workers", 4, "Number of parallel workers (default: 4)")
-	timeout        = flag.Int("timeout", 300, "HTTP timeout in seconds (default: 300)")
-	delay          = flag.Int("delay", 50, "Delay between batches in ms (default: 50)")
-	maxRetries     = flag.Int("retries", 3, "Max retries per batch on failure (default: 3)")
-	retryDelay     = flag.Int("retry-delay", 2000, "Initial retry delay in ms, doubles each retry (default: 2000)")
-	consolidate    = flag.Bool("consolidate", true, "Run consolidation after ingestion")
-	dryRun         = flag.Bool("dry-run", false, "Print what would be ingested without actually doing it")
-	verbose        = flag.Bool("verbose", false, "Verbose output")
-	excludeDirs    = flag.String("exclude", ".git,vendor,node_modules,.worktrees", "Comma-separated directories to exclude")
-	includeTests   = flag.Bool("include-tests", false, "Include test files (*_test.go, *.test.ts, *.spec.ts)")
-	includeMd      = flag.Bool("include-md", true, "Include markdown files (*.md)")
-	includeTS      = flag.Bool("include-ts", true, "Include TypeScript/JavaScript files (*.ts, *.tsx, *.js, *.jsx)")
-	includePy      = flag.Bool("include-py", true, "Include Python files (*.py)")
-	includeJava    = flag.Bool("include-java", true, "Include Java files (*.java)")
-	includeRust    = flag.Bool("include-rust", true, "Include Rust files (*.rs)")
+	codebasePath    = flag.String("path", "", "Path to codebase to ingest")
+	spaceID         = flag.String("space-id", "codebase", "MDEMG space ID")
+	mdemgEndpoint   = flag.String("endpoint", "", "MDEMG endpoint (default: from LISTEN_ADDR in .env)")
+	batchSize       = flag.Int("batch", 100, "Batch size for ingestion (default: 100, optimal for ~15/s per worker)")
+	workers         = flag.Int("workers", 4, "Number of parallel workers (default: 4)")
+	timeout         = flag.Int("timeout", 300, "HTTP timeout in seconds (default: 300)")
+	delay           = flag.Int("delay", 50, "Delay between batches in ms (default: 50)")
+	maxRetries      = flag.Int("retries", 3, "Max retries per batch on failure (default: 3)")
+	retryDelay      = flag.Int("retry-delay", 2000, "Initial retry delay in ms, doubles each retry (default: 2000)")
+	consolidate     = flag.Bool("consolidate", true, "Run consolidation after ingestion")
+	dryRun          = flag.Bool("dry-run", false, "Print what would be ingested without actually doing it")
+	verbose         = flag.Bool("verbose", false, "Verbose output")
+	excludeDirs     = flag.String("exclude", ".git,vendor,node_modules,.worktrees", "Comma-separated directories to exclude")
+	includeTests    = flag.Bool("include-tests", false, "Include test files (*_test.go, *.test.ts, *.spec.ts)")
+	includeMd       = flag.Bool("include-md", true, "Include markdown files (*.md)")
+	includeTS       = flag.Bool("include-ts", true, "Include TypeScript/JavaScript files (*.ts, *.tsx, *.js, *.jsx)")
+	includePy       = flag.Bool("include-py", true, "Include Python files (*.py)")
+	includeJava     = flag.Bool("include-java", true, "Include Java files (*.java)")
+	includeRust     = flag.Bool("include-rust", true, "Include Rust files (*.rs)")
 	includePHP      = flag.Bool("include-php", true, "Include PHP files (*.php)")
 	includeGraphQL  = flag.Bool("include-graphql", true, "Include GraphQL files (*.graphql, *.gql)")
 	includeLua      = flag.Bool("include-lua", true, "Include Lua files (*.lua)")
@@ -53,12 +54,12 @@ var (
 	includeOpenAPI  = flag.Bool("include-openapi", true, "Include OpenAPI/Swagger files")
 	includeScraper  = flag.Bool("include-scraper-markdown", true, "Include scraper markdown files")
 	limitElements   = flag.Int("limit", 0, "Limit number of elements to ingest (0 = no limit)")
-	extractSymbols = flag.Bool("extract-symbols", true, "Extract code symbols (constants, functions, classes) for evidence-locked retrieval")
-	incremental    = flag.Bool("incremental", false, "Only ingest files changed since last commit (uses git diff)")
-	sinceCommit    = flag.String("since", "HEAD~1", "Git commit to compare against for incremental mode (default: HEAD~1)")
-	archiveDeleted = flag.Bool("archive-deleted", true, "Archive nodes for deleted files in incremental mode")
-	quiet          = flag.Bool("quiet", false, "Suppress all non-error output")
-	logFile        = flag.String("log-file", "", "Write logs to file instead of stderr")
+	extractSymbols  = flag.Bool("extract-symbols", true, "Extract code symbols (constants, functions, classes) for evidence-locked retrieval")
+	incremental     = flag.Bool("incremental", false, "Only ingest files changed since last commit (uses git diff)")
+	sinceCommit     = flag.String("since", "HEAD~1", "Git commit to compare against for incremental mode (default: HEAD~1)")
+	archiveDeleted  = flag.Bool("archive-deleted", true, "Archive nodes for deleted files in incremental mode")
+	quiet           = flag.Bool("quiet", false, "Suppress all non-error output")
+	logFile         = flag.String("log-file", "", "Write logs to file instead of stderr")
 
 	// LLM summary options
 	llmSummary         = flag.Bool("llm-summary", false, "Use LLM to generate semantic summaries (requires OPENAI_API_KEY)")
@@ -73,7 +74,7 @@ var (
 	listLanguages = flag.Bool("list-languages", false, "List supported languages and exit")
 
 	// Phase 2.5: Performance guards for large repos
-	maxFileSize       = flag.Int("max-file-size", 1048576, "Max file size in bytes to process (default: 1MB)")
+	maxFileSize        = flag.Int("max-file-size", 1048576, "Max file size in bytes to process (default: 1MB)")
 	maxElementsPerFile = flag.Int("max-elements-per-file", 500, "Max elements to extract per file (default: 500)")
 	maxSymbolsPerFile  = flag.Int("max-symbols-per-file", 1000, "Max symbols to extract per file (default: 1000)")
 	preset             = flag.String("preset", "", "Exclusion preset: default, ml_cuda, web_monorepo")
@@ -104,8 +105,8 @@ type BatchIngestItem struct {
 type IngestSymbol struct {
 	Name           string `json:"name"`
 	Type           string `json:"type"`
-	Line           int    `json:"line"`                      // 1-indexed line number (UPTS standard)
-	LineEnd        int    `json:"line_end,omitempty"`        // End line for multi-line symbols
+	Line           int    `json:"line"`               // 1-indexed line number (UPTS standard)
+	LineEnd        int    `json:"line_end,omitempty"` // End line for multi-line symbols
 	Exported       bool   `json:"exported"`
 	Parent         string `json:"parent,omitempty"`
 	Signature      string `json:"signature,omitempty"`
@@ -121,7 +122,7 @@ type CodeElement struct {
 	Kind     string
 	Path     string
 	Content  string
-	Summary  string         // Brief summary for reranking (generated from docstrings/comments)
+	Summary  string // Brief summary for reranking (generated from docstrings/comments)
 	Package  string
 	FilePath string
 	Tags     []string
@@ -1106,9 +1107,7 @@ func parseConfigFile(root, path string) *CodeElement {
 	contentStr := string(content)
 
 	// Truncate if too long
-	if len(contentStr) > 4000 {
-		contentStr = contentStr[:4000] + "... [truncated]"
-	}
+	contentStr = sanitize.CutRuneSafeSuffix(contentStr, 4000, "... [truncated]")
 
 	// Build summary based on file type
 	var summary strings.Builder
@@ -1205,7 +1204,6 @@ func parseEnvFile(root, path string) *CodeElement {
 		Concerns: concerns,
 	}
 }
-
 
 // generateSummaryAdapter adapts generateSummary for use with the summarize package.
 // This allows the LLM summarize service to fall back to structural summaries.

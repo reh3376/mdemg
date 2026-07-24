@@ -104,10 +104,8 @@ func SanitizeUserContext(input string, maxLen int) string {
 
 	result := strings.Join(out, "\n")
 
-	// --- Length truncation ---
-	if maxLen > 0 && len(result) > maxLen {
-		result = result[:maxLen] + "..."
-	}
+	// --- Length truncation (rune-safe: never split a multi-byte rune) ---
+	result = CutRuneSafeSuffix(result, maxLen, "...")
 
 	return result
 }

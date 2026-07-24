@@ -2,6 +2,7 @@ package languages
 
 import (
 	"fmt"
+	"mdemg/internal/sanitize"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -187,11 +188,11 @@ func (p *PythonParser) extractSymbols(content string) []Symbol {
 				// Don't capture if it matches class pattern
 				if !classPattern.MatchString(trimmedLine) {
 					sym := Symbol{
-						Name:       matches[1],
-						Type:       "type",
-						Line: lineNum,
-						Exported:   !strings.HasPrefix(matches[1], "_"),
-						Language:   "python",
+						Name:     matches[1],
+						Type:     "type",
+						Line:     lineNum,
+						Exported: !strings.HasPrefix(matches[1], "_"),
+						Language: "python",
 					}
 					symbols = append(symbols, sym)
 					pendingDecorators = nil
@@ -208,13 +209,13 @@ func (p *PythonParser) extractSymbols(content string) []Symbol {
 					continue
 				}
 				sym := Symbol{
-					Name:       matches[1],
-					Type:       "constant",
-					Value:      CleanValue(matches[2]),
-					RawValue:   matches[2],
-					Line: lineNum,
-					Exported:   true,
-					Language:   "python",
+					Name:     matches[1],
+					Type:     "constant",
+					Value:    CleanValue(matches[2]),
+					RawValue: matches[2],
+					Line:     lineNum,
+					Exported: true,
+					Language: "python",
 				}
 				symbols = append(symbols, sym)
 				pendingDecorators = nil
@@ -226,13 +227,13 @@ func (p *PythonParser) extractSymbols(content string) []Symbol {
 					continue
 				}
 				sym := Symbol{
-					Name:       matches[1],
-					Type:       "constant",
-					Value:      CleanValue(matches[2]),
-					RawValue:   matches[2],
-					Line: lineNum,
-					Exported:   false,
-					Language:   "python",
+					Name:     matches[1],
+					Type:     "constant",
+					Value:    CleanValue(matches[2]),
+					RawValue: matches[2],
+					Line:     lineNum,
+					Exported: false,
+					Language: "python",
 				}
 				symbols = append(symbols, sym)
 				pendingDecorators = nil
@@ -267,7 +268,7 @@ func (p *PythonParser) extractSymbols(content string) []Symbol {
 				Type:       symType,
 				Parent:     baseClasses,
 				DocComment: docComment,
-				Line: lineNum,
+				Line:       lineNum,
 				Exported:   !strings.HasPrefix(className, "_"),
 				Language:   "python",
 			}
@@ -324,7 +325,7 @@ func (p *PythonParser) extractSymbols(content string) []Symbol {
 				Signature:      sig,
 				TypeAnnotation: returnType,
 				DocComment:     docComment,
-				Line:     lineNum,
+				Line:           lineNum,
 				Exported:       !strings.HasPrefix(funcName, "_"),
 				Language:       "python",
 			}
@@ -417,10 +418,7 @@ func extractClassContent(content, className, moduleName string) string {
 	}
 
 	if len(docLines) > 0 {
-		docstring := strings.Join(docLines, " ")
-		if len(docstring) > 500 {
-			docstring = docstring[:500] + "..."
-		}
+		docstring := sanitize.CutRuneSafeSuffix(strings.Join(docLines, " "), 500, "...")
 		result.WriteString(fmt.Sprintf("Description: %s\n", docstring))
 	}
 

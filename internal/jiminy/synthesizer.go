@@ -45,10 +45,7 @@ func boundDirectivePrompt(prompt string, maxPromptTokens int) string {
 		return prompt
 	}
 	maxChars := maxPromptTokens * 4
-	if len(prompt) > maxChars {
-		return prompt[:maxChars] + "\n…[bounded]"
-	}
-	return prompt
+	return sanitize.CutRuneSafeSuffix(prompt, maxChars, "\n…[bounded]")
 }
 
 // NewGuidanceSynthesizer creates a new GuidanceSynthesizer.

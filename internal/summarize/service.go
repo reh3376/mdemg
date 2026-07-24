@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"mdemg/internal/sanitize"
 	"strings"
 	"sync"
 	"time"
@@ -344,10 +345,7 @@ Code elements to summarize:
 		}
 
 		// Include truncated content (first 1500 chars to stay within token limits)
-		content := elem.Content
-		if len(content) > 1500 {
-			content = content[:1500] + "\n... [truncated]"
-		}
+		content := sanitize.CutRuneSafeSuffix(elem.Content, 1500, "\n... [truncated]")
 		sb.WriteString(fmt.Sprintf("Content:\n%s\n", content))
 	}
 

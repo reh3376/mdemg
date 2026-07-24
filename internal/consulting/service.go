@@ -6,6 +6,7 @@ package consulting
 import (
 	"context"
 	"fmt"
+	"mdemg/internal/sanitize"
 	"strings"
 	"sync"
 
@@ -51,8 +52,8 @@ const (
 // independently (e.g. stricter conflict detection) without affecting the others.
 const (
 	defaultConstraintScoreFloor = config.DefaultConsultingConstraintScoreFloor // result→constraint (outer gate)
-	defaultAuthorityScoreFloor  = config.DefaultConsultingAuthorityScoreFloor   // keyword/name classifier inner gate
-	defaultConflictScoreFloor   = config.DefaultConsultingConflictScoreFloor    // conflict/contradiction detection
+	defaultAuthorityScoreFloor  = config.DefaultConsultingAuthorityScoreFloor  // keyword/name classifier inner gate
+	defaultConflictScoreFloor   = config.DefaultConsultingConflictScoreFloor   // conflict/contradiction detection
 )
 
 // constraintFloor / authorityFloor / conflictFloor resolve the config-driven
@@ -129,10 +130,10 @@ type Service struct {
 	retriever            Retriever
 	embedder             embeddings.Embedder
 	symbolStore          SymbolLookup
-	conceptFetcher       ConceptFetcher       // Optional: if nil, uses internal fetchRelatedConcepts
-	synthesizer          Synthesizer          // Optional: if nil, LLM synthesis is skipped (Phase 101)
-	intentTranslator     IntentTranslator     // Optional: if nil, intent translation is skipped (Phase 102)
-	constraintClassifier constraintClassifierIface // Optional: if nil, uses keyword-based fallback (Phase AR-3)
+	conceptFetcher       ConceptFetcher                // Optional: if nil, uses internal fetchRelatedConcepts
+	synthesizer          Synthesizer                   // Optional: if nil, LLM synthesis is skipped (Phase 101)
+	intentTranslator     IntentTranslator              // Optional: if nil, intent translation is skipped (Phase 102)
+	constraintClassifier constraintClassifierIface     // Optional: if nil, uses keyword-based fallback (Phase AR-3)
 	conflictTracker      *conversation.ConflictTracker // Phase 12 Epic 6: optional divergence-recorder hook
 }
 
@@ -495,9 +496,9 @@ func (s *Service) formatSuggestionContent(suggType models.SuggestionType, r mode
 		return ""
 	}
 
-	// Truncate long content
+	// Bound long content (rune-safe)
 	if len(content) > 500 {
-		content = content[:497] + "..."
+		content = sanitize.CutRuneSafeSuffix(content, 497, "...")
 	}
 
 	switch suggType {
@@ -525,12 +526,8 @@ func (s *Service) deduplicateSuggestions(suggestions []models.Suggestion) []mode
 	var unique []models.Suggestion
 
 	for _, sugg := range suggestions {
-		// Create a simple key from first 50 chars of content
-		key := sugg.Content
-		if len(key) > 50 {
-			key = key[:50]
-		}
-		key = strings.ToLower(key)
+		// Create a simple key from the first 50 bytes of content (rune-safe)
+		key := strings.ToLower(sanitize.CutRuneSafe(sugg.Content, 50))
 
 		if !seen[key] {
 			seen[key] = true
@@ -957,9 +954,9 @@ func (s *Service) formatProactiveSuggestionContent(suggType models.SuggestionTyp
 		return ""
 	}
 
-	// Truncate long content
+	// Bound long content (rune-safe)
 	if len(content) > 500 {
-		content = content[:497] + "..."
+		content = sanitize.CutRuneSafeSuffix(content, 497, "...")
 	}
 
 	// Find the most relevant trigger for context

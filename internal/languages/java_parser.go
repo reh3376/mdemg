@@ -2,6 +2,7 @@ package languages
 
 import (
 	"fmt"
+	"mdemg/internal/sanitize"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -310,9 +311,7 @@ func (p *JavaParser) extractSymbols(content string) []Symbol {
 		// Check for constants (public static final)
 		if matches := constPattern.FindStringSubmatch(line); matches != nil {
 			valueStr := strings.TrimSpace(matches[3])
-			if len(valueStr) > 100 {
-				valueStr = valueStr[:100] + "..."
-			}
+			valueStr = sanitize.CutRuneSafeSuffix(valueStr, 100, "...")
 			parent := ""
 			if len(scopeStack) > 0 {
 				parent = scopeStack[len(scopeStack)-1]
@@ -358,9 +357,7 @@ func (p *JavaParser) extractSymbols(content string) []Symbol {
 			if returnType != "" && returnType != methodName {
 				signature = fmt.Sprintf("%s %s(%s)", returnType, methodName, params)
 			}
-			if len(signature) > 150 {
-				signature = signature[:150] + "..."
-			}
+			signature = sanitize.CutRuneSafeSuffix(signature, 150, "...")
 
 			symbols = append(symbols, Symbol{
 				Name:           methodName,
