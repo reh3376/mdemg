@@ -383,3 +383,28 @@ func TestReadinessStalenessRule_LeaseAware(t *testing.T) {
 		}
 	}
 }
+
+// FT-RECURSIVE-004: rule-shape pins.
+func TestFtLoopNeverRanRule_Shape(t *testing.T) {
+	r := FtLoopNeverRanRule(14)
+	for _, w := range []string{"ft_training_cycles", "COALESCE", "999.0"} {
+		if !strings.Contains(r.QuerySQL, w) {
+			t.Errorf("missing %q", w)
+		}
+	}
+	if r.Service != "ft-loop-staleness" {
+		t.Errorf("service: %s", r.Service)
+	}
+}
+
+func TestFtProductionDriftRule_NoDataGates(t *testing.T) {
+	r := FtProductionDriftRule(0.05)
+	for _, w := range []string{"status = 'active'", "<= 0 THEN 0", "IS NULL THEN 0", "GREATEST(0"} {
+		if !strings.Contains(r.QuerySQL, w) {
+			t.Errorf("missing no-data gate fragment %q", w)
+		}
+	}
+	if r.Threshold != 0.05 {
+		t.Errorf("threshold: %f", r.Threshold)
+	}
+}

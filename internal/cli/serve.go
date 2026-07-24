@@ -475,6 +475,12 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 			// days" alarm. Reads benchmark_runs directly (not via
 			// scheduled_job_events; the writer is a standalone Python CLI).
 			rules = append(rules, alert.FTBenchmarkStalenessRule(cfg.FTBenchStalenessDays))
+			// FT-RECURSIVE-004: production drift (self-gates on no-data — DH-004)
+			// + the loop-dormant guarantee (only meaningful when the actuator is on).
+			rules = append(rules, alert.FtProductionDriftRule(cfg.FtDriftMargin))
+			if cfg.FtLoopEnabled {
+				rules = append(rules, alert.FtLoopNeverRanRule(cfg.FtLoopStalenessDays))
+			}
 			// HOOKSYNC-001: hook-channel absence detection — sessions active
 			// (post-tool-observe heartbeats) but zero prompt-context fires.
 			if cfg.HookHealthAlertEnabled {

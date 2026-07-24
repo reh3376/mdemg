@@ -88,6 +88,30 @@ func fingerprint(normalized string) string {
 	return fmt.Sprintf("%x", sum[:4])
 }
 
+// sweepQuery clusters failure fingerprints from BOTH terminal failure
+// shapes — status='failed' AND rolled_back events whose stage carries a
+// failure class (FT-RECURSIVE-004 E3) — evaluated on each cycle's LATEST
+// event only (DISTINCT ON: the ledger is event-sourced, and a superseding
+// event ends a cycle's story; reading raw event rows would resurrect
+// neutralized/resolved cycles forever — live-caught during this epic).
+const sweepQuery = `
+		WITH latest AS (
+			SELECT DISTINCT ON (cycle_id)
+			       cycle_id, status, COALESCE(stage,'') AS stage,
+			       COALESCE(error,'') AS error, time
+			FROM ft_training_cycles
+			WHERE time > now() - ($1 || ' days')::interval
+			ORDER BY cycle_id, time DESC
+		)
+		SELECT cycle_id, stage, error, time FROM latest
+		WHERE (status = 'failed'
+		       OR (status = 'rolled_back' AND stage LIKE '%\_failed'))
+		  AND error <> ''
+		ORDER BY time`
+
+// sweepQueryForTest exposes the sweep SQL for shape pins.
+func sweepQueryForTest() string { return sweepQuery }
+
 // failureGroup is one repeated-failure cluster.
 type failureGroup struct {
 	Stage       string
@@ -151,11 +175,11 @@ func (f *IssueFiler) collectGroups(ctx context.Context) ([]failureGroup, error) 
 	if threshold <= 0 {
 		threshold = 2
 	}
-	rows, err := f.pool.Query(ctx, `
-		SELECT cycle_id, COALESCE(stage,''), COALESCE(error,''), time
-		FROM ft_training_cycles
-		WHERE status = 'failed' AND time > now() - ($1 || ' days')::interval
-		ORDER BY time`, fmt.Sprintf("%d", lookback))
+	// FT-RECURSIVE-004 E3 (003's disclosed gap): failure fingerprints also
+	// live in rolled_back-terminal events whose stage carries a failure class
+	// (canary_failed / promote_failed / *_failed) — cluster those too, not
+	// just status='failed'.
+	rows, err := f.pool.Query(ctx, sweepQuery, fmt.Sprintf("%d", lookback))
 	if err != nil {
 		return nil, err
 	}

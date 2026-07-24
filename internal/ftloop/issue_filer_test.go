@@ -38,3 +38,20 @@ func TestTruncateForTitle_RuneSafe(t *testing.T) {
 		t.Error("empty")
 	}
 }
+
+// FT-RECURSIVE-004 E3: the sweep SQL must include rolled_back failure
+// classes (canary_failed/promote_failed), not only status='failed', and
+// must require a non-empty error (neutralized drill events carry stages
+// like e7_drill_neutralized with explanatory text — the error filter plus
+// the _failed suffix keeps them out unless they genuinely match).
+func TestSweepSQL_IncludesRolledBackFailures(t *testing.T) {
+	f := NewIssueFiler(nil, IssueFilerConfig{}, nil, nil)
+	_ = f
+	// Shape-pin on the query text via collectGroups' source.
+	src := sweepQueryForTest()
+	for _, w := range []string{"rolled_back", "%\\_failed", "DISTINCT ON (cycle_id)", "error <> ''"} {
+		if !strings.Contains(src, w) {
+			t.Errorf("sweep SQL missing %q", w)
+		}
+	}
+}

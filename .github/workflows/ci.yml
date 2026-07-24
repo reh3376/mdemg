@@ -364,7 +364,11 @@ jobs:
         # tiktoken: openai_ft_adapter token counting; pyyaml: rl trainer/
         # preflight config loading (lazy imports the dep sweep missed on a
         # fully-provisioned local venv — CI's first run caught it).
-        run: pip install pytest numpy jsonschema cuid2 ruff tiktoken pyyaml
+        # ruff PINNED (FT-RECURSIVE-004 incident): unpinned latest broke a
+        # green branch mid-evening when 0.16.0 shipped new default rules
+        # (300+ pre-existing flags; zero code changes between runs). Bump
+        # deliberately with a fix-the-findings PR, never implicitly.
+        run: pip install pytest numpy jsonschema cuid2 ruff==0.15.22 tiktoken pyyaml
 
       - name: Ruff lint (all of neural/)
         run: ruff check neural/

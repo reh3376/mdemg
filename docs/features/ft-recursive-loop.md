@@ -190,3 +190,29 @@ truthful ledger; tripwire tripped at 15.2% (5/33) and rolled back
 autonomously; zero-human promotion (policy 2/2 → canary 8/8 → swap →
 `promoted|promote_auto|auto`); issue #538 filed + recurrence-commented +
 closed. Serving ended every drill healthy on the canonical model.
+
+## Phase 9 (FT-RECURSIVE-004, 2026-07-23) — drift monitoring: the arc is COMPLETE
+
+- **`ft_loop_never_ran`** (`FT_LOOP_STALENESS_DAYS` 14): the loop-dormant
+  guarantee over `ft_training_cycles`; wired only when `FT_LOOP_ENABLED`.
+- **`ft_production_drift`** (`FT_DRIFT_MARGIN` 0.05, HIGH): active
+  `ft_model_versions` score − latest benchmark aggregate, clamped at 0,
+  DH-004 no-data gates (score ≤ 0 or empty benchmarks never false-fire).
+  Baseline honesty: the active row now carries the BASELINE-RECOMPUTE-001
+  0.8655 (was 0). Live: seeded 0.99 → 0.0712 drift FIRES (the spec's exit
+  criterion); honest baseline → 0.
+- **Scheduled benchmark runner** (`FT_BENCH_SCHEDULE_*`, default off; dev
+  `.env` on after smoke — weekly ~7 min llama saturation): supervised loop
+  runs the refresh recipe (`--apply-tsdb`, rows-per-spec 5) when the latest
+  run exceeds the interval; jobhealth `scheduled-ft-benchmark`. Live: fired
+  autonomously, landed aggregate 0.9156 in 6m59s.
+- **Filer sweep extension**: fingerprints now cluster from each cycle's
+  LATEST event (DISTINCT ON) including `rolled_back` failure stages —
+  raw-event reads would resurrect neutralized cycles forever (live-caught).
+- **Dashboard pairs**: Production Drift stat + Model Versions table +
+  latest-status Cycle Ledger on `mdemg-ft-training`.
+
+With Phases 6a/6b/7/9 shipped, the recursive-retraining loop is fully
+built: capture → readiness → trigger → curate → train → convert → gate →
+(canary-gated, policy-autonomous, fail-closed) promote → tripwire →
+drift-watch → class-5 escalation.
