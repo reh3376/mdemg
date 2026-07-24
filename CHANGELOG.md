@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **JIMINY-ACTIONABILITY-COMPLIANCE-CREDIT-001 A/B verdict: KEEP-ON** (2026-07-24, `docs/development/jiminy-actionability-compliance-credit-001/ab_verdict.md`). 72h window closed at T+69.5h (operator-directed; interim reads frozen 24h+; drill-burst windows excluded from adjusted figures). Both revert-tripwires CLEAR (follow 12.97% ≪ 50%; outcome-sink contradicted UP 12→22; latency burst-adj −13%). Mechanism proven organically: NA emissions 11.6%→38.5% (3.3×), ignored 71.5%→49.6%, 12/12 sampled must_not NA verdicts cite the clause's reasoning verbatim. Predicted 18–25% band missed (12.97%, +3.0pp) — diagnosed as a wrong prediction model (88% of NA routing landed on advisory guidance outside the actionable denominator; followed count scales with surfacing volume rather than staying fixed), not a clause failure. `JIMINY_NONVIOLATION_CREDIT_ENABLED=true` stays in dev `.env`; code default remains false. Recalibrated steady-state expectation ≈13%; passive quiet-window re-read ~2026-07-31.
+
 ### Added
 
 - **Sprint FT-RECURSIVE-004 (Phase 9) — drift monitoring: the recursive-retraining arc is COMPLETE** (2026-07-23). E1 `ft_loop_never_ran` (purpose-specific ledger staleness, wired only when the actuator is on). E2 `ft_production_drift` (active version score − latest benchmark aggregate, margin 0.05, DH-004 no-data gates; **seeded drill FIRED at 0.0712 — the spec's exit criterion**; baseline honesty: active row 0 → 0.8655 per BASELINE-RECOMPUTE-001). E3 filer sweep reads each cycle's LATEST event (DISTINCT ON) incl. rolled_back failure stages — ⚠️ raw event-row reads would resurrect neutralized cycles forever (live-caught in-epic). E4 scheduled benchmark runner (supervised, default-off; live: fired autonomously, 0.9156 in 6m59s via --apply-tsdb, jobhealth green; enabled weekly in dev .env). E5 dashboard reader-writer pairs (drift stat + versions table + latest-status ledger). Phases 6a/6b/7/9 all shipped — the loop runs capture→…→promote→tripwire→drift→escalation end to end. Sprint: `docs/development/ft-recursive-004/`.
