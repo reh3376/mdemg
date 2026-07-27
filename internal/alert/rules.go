@@ -93,38 +93,15 @@ func DefaultRules() []AlertRule {
 		// graph work, and the single-sample read flapped on the 0/burst probe
 		// pattern (7d p50=1, p95=255). Appended in serve.go like the other
 		// config-parameterized rule groups.
-		{
-			ID:          "graph_node_drop",
-			Title:       "MDEMG Significant Node Count Drop",
-			Service:     "graph-health",
-			Severity:    SeverityCritical,
-			Interval:    60 * time.Second,
-			ForDuration: 5 * time.Minute,
-			QuerySQL: `WITH current_val AS (
-				  SELECT DISTINCT ON (labels->>'space_id')
-				    labels->>'space_id' AS space_id, value
-				  FROM metric_samples
-				  WHERE metric_name = 'mdemg_neo4j_graph_nodes'
-				    AND metric_type = 'gauge'
-				    AND time > now() - interval '5 minutes'
-				  ORDER BY labels->>'space_id', time DESC
-				),
-				old_val AS (
-				  SELECT DISTINCT ON (labels->>'space_id')
-				    labels->>'space_id' AS space_id, value
-				  FROM metric_samples
-				  WHERE metric_name = 'mdemg_neo4j_graph_nodes'
-				    AND metric_type = 'gauge'
-				    AND time BETWEEN now() - interval '65 minutes' AND now() - interval '55 minutes'
-				  ORDER BY labels->>'space_id', time DESC
-				)
-				SELECT COALESCE(MAX(o.value - c.value), 0) AS drop_count
-				FROM old_val o JOIN current_val c ON o.space_id = c.space_id
-				WHERE o.value - c.value > 0`,
-			Threshold: 100,
-			Operator:  "gt",
-			Enabled:   true,
-		},
+		// graph_node_drop extracted to GraphNodeDropRule() by NODE-DROP-CALIBRATION-001
+		// (mirror of ORPHAN-ALERT-001): the fixed 100-node threshold was 0.12% of a
+		// mature 84k substrate and 20% of a 500-node scratch space, so every
+		// operator-authorized recluster (routine 5–10% L1 tightening) tripped it as
+		// CRITICAL, while a degenerate scratch space losing 3 nodes tripped it too.
+		// Now split into ratio + absolute rules with a min-node significance floor,
+		// SeverityHigh (was CRITICAL — reserved for data-loss emergencies), and
+		// distinct Services (NOSILENT-001 cooldown-key contract). Appended in
+		// serve.go like the other parameterized rule groups.
 		{
 			ID:          "rate_limiting_active",
 			Title:       "MDEMG High Rate Limit Rejections",
@@ -309,6 +286,99 @@ func OrphanRules(minNodes int, ratioThreshold float64, countThreshold int, healt
 				FROM health h JOIN nodes n ON h.space_id = n.space_id`,
 			Threshold: healthFloor,
 			Operator:  "lt",
+			Enabled:   true,
+		},
+	}
+}
+
+// GraphNodeDropRule returns the split graph_node_drop alerts (NODE-DROP-CALIBRATION-001).
+//
+// Replaces the hardcoded DefaultRules entry that produced chronic false
+// positives:
+//   - Fixed absolute threshold `> 100 nodes` was 0.12% of a mature 84k
+//     substrate and 20% of a 500-node scratch space, so every
+//     operator-authorized recluster tripped it as CRITICAL, and every
+//     tombstone burst on a tiny space tripped it too.
+//   - NO min-node significance floor — degenerate scratch spaces dominated.
+//   - CRITICAL severity was overweight for identity-preserving pattern
+//     cleanup; reserved for actual data-loss emergencies.
+//
+// Both rules join the per-space old vs current node-count gauges, EXCLUDE
+// spaces below `minNodes` (significance floor), and aggregate with
+// COALESCE(MAX(...),0) so they ALWAYS return one non-NULL row (idle-safe,
+// no `ORDER BY … LIMIT 1`, per the TSDB-CONSUME-001 alert-SQL contract).
+// Distinct Services per rule per the NOSILENT-001 cooldown-key contract.
+//
+// The comparison window is 60 min ago (55–65 min band) vs now (last 5 min),
+// preserving the shipped rule's window.
+//
+// minNodes ≤ 0 → 50; ratioThreshold ≤ 0 → 0.10 (10%); absoluteThreshold ≤ 0
+// → 10000 (~10× the largest operator-authorized recluster delta observed
+// on mdemg-dev — catches mass loss on huge substrates where 10% would
+// still be too large in absolute terms).
+func GraphNodeDropRule(minNodes int, ratioThreshold float64, absoluteThreshold int) []AlertRule {
+	if minNodes <= 0 {
+		minNodes = 50
+	}
+	if ratioThreshold <= 0 {
+		ratioThreshold = 0.10
+	}
+	if absoluteThreshold <= 0 {
+		absoluteThreshold = 10000
+	}
+	// Shared CTEs: current + old snapshots by space, joined with the current
+	// node-count gauge to gate on the min-node floor.
+	cte := `WITH current_val AS (
+		  SELECT DISTINCT ON (labels->>'space_id')
+		    labels->>'space_id' AS space_id, value
+		  FROM metric_samples
+		  WHERE metric_name = 'mdemg_neo4j_graph_nodes'
+		    AND metric_type = 'gauge'
+		    AND time > now() - interval '5 minutes'
+		  ORDER BY labels->>'space_id', time DESC
+		),
+		old_val AS (
+		  SELECT DISTINCT ON (labels->>'space_id')
+		    labels->>'space_id' AS space_id, value
+		  FROM metric_samples
+		  WHERE metric_name = 'mdemg_neo4j_graph_nodes'
+		    AND metric_type = 'gauge'
+		    AND time BETWEEN now() - interval '65 minutes' AND now() - interval '55 minutes'
+		  ORDER BY labels->>'space_id', time DESC
+		)`
+	return []AlertRule{
+		{
+			ID:          "graph_node_drop_ratio",
+			Title:       "MDEMG Significant Node Count Drop (Ratio)",
+			Service:     "graph-node-drop-ratio",
+			Severity:    SeverityHigh,
+			Interval:    60 * time.Second,
+			ForDuration: 5 * time.Minute,
+			QuerySQL: cte + fmt.Sprintf(`
+				SELECT COALESCE(MAX(
+				  CASE WHEN c.value >= %d AND o.value > 0 AND o.value > c.value
+				    THEN (o.value - c.value) / o.value ELSE 0 END
+				), 0) AS drop_ratio
+				FROM old_val o JOIN current_val c ON o.space_id = c.space_id`, minNodes),
+			Threshold: ratioThreshold,
+			Operator:  "gt",
+			Enabled:   true,
+		},
+		{
+			ID:          "graph_node_drop_count",
+			Title:       "MDEMG Significant Node Count Drop (Absolute)",
+			Service:     "graph-node-drop-count",
+			Severity:    SeverityHigh,
+			Interval:    60 * time.Second,
+			ForDuration: 5 * time.Minute,
+			QuerySQL: cte + fmt.Sprintf(`
+				SELECT COALESCE(MAX(
+				  CASE WHEN c.value >= %d AND o.value > c.value
+				    THEN (o.value - c.value) ELSE 0 END
+				), 0) AS drop_count
+				FROM old_val o JOIN current_val c ON o.space_id = c.space_id`, minNodes),
+			Threshold: float64(absoluteThreshold),
+			Operator:  "gt",
 			Enabled:   true,
 		},
 	}

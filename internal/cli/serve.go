@@ -496,6 +496,13 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 			rules = append(rules, alert.OrphanRules(
 				cfg.OrphanRatioMinNodes, cfg.OrphanRatioThreshold,
 				cfg.OrphanCountThreshold, cfg.GraphHealthScoreFloor)...)
+			// NODE-DROP-CALIBRATION-001: split graph_node_drop into ratio +
+			// absolute rules with a min-node significance floor and severity
+			// downgrade CRITICAL→HIGH — the old fixed 100-node threshold read
+			// as 0.12% of a mature substrate and fired on every recluster.
+			rules = append(rules, alert.GraphNodeDropRule(
+				cfg.GraphNodeDropMinNodes, cfg.GraphNodeDropRatioThreshold,
+				cfg.GraphNodeDropAbsoluteThreshold)...)
 			// ALERT-TRUTH-001: Neo4j CPU alert with a host-relative, config-driven
 			// threshold over a 5-min windowed AVG (the fixed 80 = % of one core
 			// tripped on normal multi-core consolidation; LIMIT 1 flapped on the

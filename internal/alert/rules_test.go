@@ -152,6 +152,8 @@ func TestDefaultRules_RemovedRulesStayRemoved(t *testing.T) {
 		switch r.ID {
 		case "high_p95_latency", "critical_p99_latency", "neo4j_pool_exhausted":
 			t.Errorf("rule %s was removed by TSDB-CONSUME-001 and must not return", r.ID)
+		case "graph_node_drop":
+			t.Errorf("rule %s was extracted to GraphNodeDropRule() by NODE-DROP-CALIBRATION-001 and must not return in DefaultRules", r.ID)
 		}
 	}
 }
@@ -162,6 +164,7 @@ func allRules() []AlertRule {
 	rules := DefaultRules()
 	rules = append(rules, WeightIntegrityRules(0)...)
 	rules = append(rules, OrphanRules(0, 0, 0, 0)...)
+	rules = append(rules, GraphNodeDropRule(0, 0, 0)...)
 	rules = append(rules, ReadinessStalenessRule(0))
 	rules = append(rules, CoverageRules(0)...)
 	rules = append(rules, MaintenanceLivenessRules(0)...)
@@ -406,5 +409,67 @@ func TestFtProductionDriftRule_NoDataGates(t *testing.T) {
 	}
 	if r.Threshold != 0.05 {
 		t.Errorf("threshold: %f", r.Threshold)
+	}
+}
+
+// NODE-DROP-CALIBRATION-001: split graph_node_drop with min-node floor +
+// ratio + absolute, distinct Services, HIGH severity (was CRITICAL), config
+// defaults matching ORPHAN-ALERT-001 semantics.
+func TestGraphNodeDropRule_Defaults(t *testing.T) {
+	rules := GraphNodeDropRule(0, 0, 0)
+	if len(rules) != 2 {
+		t.Fatalf("expected 2 rules (ratio + absolute), got %d", len(rules))
+	}
+	byID := map[string]AlertRule{}
+	for _, r := range rules {
+		byID[r.ID] = r
+	}
+	ratio, okR := byID["graph_node_drop_ratio"]
+	count, okC := byID["graph_node_drop_count"]
+	if !okR || !okC {
+		t.Fatalf("expected IDs graph_node_drop_ratio + graph_node_drop_count, got %v", byID)
+	}
+	// Defaults: min-node floor 50, ratio 0.10, absolute 10000.
+	if ratio.Threshold != 0.10 {
+		t.Errorf("ratio threshold default: %f (want 0.10)", ratio.Threshold)
+	}
+	if count.Threshold != 10000 {
+		t.Errorf("count threshold default: %f (want 10000)", count.Threshold)
+	}
+	for _, r := range rules {
+		if r.Severity != SeverityHigh {
+			t.Errorf("rule %s severity: %s (want HIGH — CRITICAL is reserved for data-loss)", r.ID, r.Severity)
+		}
+		// Distinct services per NOSILENT-001 cooldown-key contract.
+		if r.Service == "graph-health" {
+			t.Errorf("rule %s must not reuse the old 'graph-health' Service — pick distinct labels", r.ID)
+		}
+		// Min-node significance floor visible in SQL.
+		if !strings.Contains(r.QuerySQL, "c.value >= 50") {
+			t.Errorf("rule %s missing min-node floor 'c.value >= 50': %s", r.ID, r.QuerySQL)
+		}
+		// TSDB-CONSUME-001 idle-safe contract: MAX + COALESCE, no LIMIT 1.
+		if !strings.Contains(r.QuerySQL, "COALESCE(MAX(") {
+			t.Errorf("rule %s must aggregate via COALESCE(MAX(...)) — idle-safe contract", r.ID)
+		}
+	}
+}
+
+func TestGraphNodeDropRule_CustomParams(t *testing.T) {
+	rules := GraphNodeDropRule(100, 0.20, 5000)
+	for _, r := range rules {
+		if !strings.Contains(r.QuerySQL, "c.value >= 100") {
+			t.Errorf("rule %s custom min-nodes 100 not substituted: %s", r.ID, r.QuerySQL)
+		}
+	}
+	byID := map[string]AlertRule{}
+	for _, r := range rules {
+		byID[r.ID] = r
+	}
+	if byID["graph_node_drop_ratio"].Threshold != 0.20 {
+		t.Errorf("custom ratio not applied: %f", byID["graph_node_drop_ratio"].Threshold)
+	}
+	if byID["graph_node_drop_count"].Threshold != 5000 {
+		t.Errorf("custom absolute not applied: %f", byID["graph_node_drop_count"].Threshold)
 	}
 }

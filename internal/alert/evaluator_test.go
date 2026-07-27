@@ -102,8 +102,10 @@ func TestDefaultRules_Count(t *testing.T) {
 	// extracted to the config-parameterized OrphanRules().
 	// 7 → 6 in ALERT-TRUTH-001: neo4j_high_cpu extracted to the config-driven
 	// host-relative Neo4jCPURule().
-	if len(rules) != 6 {
-		t.Errorf("expected 6 default rules, got %d", len(rules))
+	// 6 → 5 in NODE-DROP-CALIBRATION-001: graph_node_drop extracted to the
+	// config-driven, min-node-floored, severity-downgraded GraphNodeDropRule().
+	if len(rules) != 5 {
+		t.Errorf("expected 5 default rules, got %d", len(rules))
 	}
 
 	// Verify all rules are enabled

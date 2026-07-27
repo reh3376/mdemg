@@ -1316,6 +1316,11 @@ type Config struct {
 	OrphanCountThreshold  int     // ORPHAN_COUNT_THRESHOLD — fire High Orphan Count when max live-orphan count among significant spaces exceeds this (default: 1000; above the accepted historical baseline — ratio rule is the scale-aware primary)
 	GraphHealthScoreFloor float64 // GRAPH_HEALTH_SCORE_FLOOR — fire Low Graph Health when the MIN graph-health score among significant spaces drops below this (default: 0.5; same min-node floor as the orphan rules so degenerate 1-2-node test spaces can't trip it)
 
+	// Graph node-drop alert rules (NODE-DROP-CALIBRATION-001) — mirror ORPHAN-ALERT-001
+	GraphNodeDropMinNodes           int     // GRAPH_NODE_DROP_MIN_NODES — minimum current per-space node count for a space to be eligible to fire the node-drop alerts; excludes tiny scratch/test spaces where a 3-node drop reads as 20% loss (default: 50; matches ORPHAN_RATIO_MIN_NODES)
+	GraphNodeDropRatioThreshold     float64 // GRAPH_NODE_DROP_RATIO_THRESHOLD — fire Node Drop (Ratio) when the max drop ratio (old-current)/old among significant spaces exceeds this (default: 0.10 = 10% loss over the ~1h comparison window)
+	GraphNodeDropAbsoluteThreshold  int     // GRAPH_NODE_DROP_ABSOLUTE_THRESHOLD — fire Node Drop (Absolute) when the max absolute drop among significant spaces exceeds this; catches mass loss on huge substrates where 10% would still be too large in absolute terms (default: 10000; ~10× the largest operator-authorized recluster delta observed on mdemg-dev)
+
 	// Neo4j container CPU alert (ALERT-TRUTH-001)
 	Neo4jCPUAlertThresholdPercent float64 // NEO4J_CPU_ALERT_THRESHOLD_PERCENT — fire Neo4j High CPU when the 5-min windowed AVG of mdemg_neo4j_container_cpu_percent exceeds this. docker-stats CPU% is per-single-core, so this is HOST-RELATIVE; default 500 is calibrated above the worst normal-operation 5-min windowed AVG (live 24h max 471, heavy consolidation) so it fires only on genuinely pathological sustained load; lower it on smaller machines (default: 500)
 
@@ -5110,6 +5115,18 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	graphNodeDropMinNodes, err := atoi("GRAPH_NODE_DROP_MIN_NODES", 50)
+	if err != nil {
+		return Config{}, err
+	}
+	graphNodeDropRatioThreshold, err := atof("GRAPH_NODE_DROP_RATIO_THRESHOLD", 0.10)
+	if err != nil {
+		return Config{}, err
+	}
+	graphNodeDropAbsoluteThreshold, err := atoi("GRAPH_NODE_DROP_ABSOLUTE_THRESHOLD", 10000)
+	if err != nil {
+		return Config{}, err
+	}
 	neo4jCPUAlertThresholdPercent, err := atof("NEO4J_CPU_ALERT_THRESHOLD_PERCENT", 500)
 	if err != nil {
 		return Config{}, err
@@ -6231,6 +6248,9 @@ func FromEnv() (Config, error) {
 		Neo4jCPUAlertThresholdPercent:       neo4jCPUAlertThresholdPercent,
 		OrphanCountThreshold:                orphanCountThreshold,
 		GraphHealthScoreFloor:               graphHealthScoreFloor,
+		GraphNodeDropMinNodes:               graphNodeDropMinNodes,
+		GraphNodeDropRatioThreshold:         graphNodeDropRatioThreshold,
+		GraphNodeDropAbsoluteThreshold:      graphNodeDropAbsoluteThreshold,
 		FtReadinessStalenessMin:             ftReadinessStalenessMin,
 		ExportRetentionHours:                exportRetentionHours,
 		TrainingReadinessThreshold:          trainingReadinessThreshold,
