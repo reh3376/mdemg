@@ -2935,6 +2935,9 @@ func (s *Server) Routes() http.Handler {
 	// HITL-REVIEW-001 — review platform (admin-gated; mutates the live substrate).
 	mux.Handle("/v1/review/datasets", scopedHandler(auth.ScopeAdminSpaces, s.handleReviewDatasets))
 	mux.Handle("/v1/review/next", scopedHandler(auth.ScopeAdminSpaces, s.handleReviewNext))
+	// HITL-CURATION-002 E1: bulk-fetch un-graded candidates without the
+	// human-sampler bias — the auto-grader iterates over ALL pending items.
+	mux.Handle("/v1/review/candidates", scopedHandler(auth.ScopeAdminSpaces, s.handleReviewCandidates))
 	mux.Handle("/v1/review/grade", scopedHandler(auth.ScopeAdminSpaces, s.handleReviewGrade))
 	mux.Handle("/v1/review/reverse", scopedHandler(auth.ScopeAdminSpaces, s.handleReviewReverse))
 	mux.HandleFunc("/v1/eventgraph/reinforcement-neighborhood", s.handleEventgraphReinforcementNeighborhood)

@@ -138,6 +138,9 @@ Use "mdemg <command> --help" for more information about a command.`,
 	rootCmd.AddCommand(conceptsCmd)
 	rootCmd.AddCommand(correctionsCmd)
 
+	// HITL-CURATION-002 E1: mdemg review autograde
+	rootCmd.AddCommand(newReviewCmd())
+
 	// Memory & Ingestion
 	ingestCmd := newIngestCmd()
 	ingestCmd.GroupID = "memory"

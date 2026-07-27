@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 
 	"github.com/nrednav/cuid2"
 	"mdemg/internal/review"
@@ -136,6 +137,63 @@ func (s *Server) handleReviewNext(w http.ResponseWriter, r *http.Request) {
 			"auto_label":     item.AutoLabel,
 			"graded_count":   0,
 			"sample_size":    s.cfg.ReviewSampleSize,
+		},
+	})
+}
+
+// GET /v1/review/candidates?dataset_id=&space_id=&limit=N
+// HITL-CURATION-002 E1 — bulk-fetch un-graded candidates WITHOUT the sampler
+// preferring uncertainty-band items. The auto-grader needs deterministic
+// iteration over every pending item, not the one-item-at-a-time human sampler
+// output. Reads through the same FetchCandidates hook the sampler uses, so
+// dataset-specific pending semantics are preserved.
+func (s *Server) handleReviewCandidates(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
+		return
+	}
+	if !s.reviewReady(w) {
+		return
+	}
+	datasetID := r.URL.Query().Get("dataset_id")
+	d, ok := s.reviewRegistry.Get(datasetID)
+	if !ok {
+		writeJSON(w, http.StatusNotFound, map[string]any{"error": "unknown dataset_id"})
+		return
+	}
+	spaceID := r.URL.Query().Get("space_id")
+	if spaceID == "" {
+		spaceID = s.cfg.RSICWatchdogSpaceID
+	}
+	limit := 50
+	if v := r.URL.Query().Get("limit"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 500 {
+			limit = n
+		}
+	}
+	cands, err := d.FetchCandidates(r.Context(), review.CandidateQuery{
+		SpaceID: spaceID, Limit: limit, ExcludeGraded: true,
+	})
+	if err != nil {
+		writeInternalError(w, err, "review fetch candidates")
+		return
+	}
+	rb := d.Rubric()
+	// HITL-CURATION-002 E1: datasets that implement AutogradePromptHinter get
+	// their hint shipped alongside the rubric so the CLI-side autograder can
+	// splice it into the system prompt without needing dataset-specific code.
+	var hint string
+	if h, ok := d.(review.AutogradePromptHinter); ok {
+		hint = h.AutogradePromptHint()
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"data": map[string]any{
+			"dataset_id":            datasetID,
+			"space_id":              spaceID,
+			"rubric":                rb,
+			"items":                 cands,
+			"item_count":            len(cands),
+			"autograde_prompt_hint": hint,
 		},
 	})
 }

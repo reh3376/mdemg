@@ -37,6 +37,39 @@ func (d *contradictedDraftsDataset) Rubric() review.Rubric {
 }
 func (d *contradictedDraftsDataset) Sink() review.ReinforcementSink { return d.sink }
 
+// AutogradePromptHint teaches the autograder what a "durable rule" is vs
+// what it isn't — the ContradictedDraftsRubric anchors describe the SCORE
+// scale but not the TYPOLOGY, and the 2026-07-27 E1 dry-run showed the model
+// scoring a "DATAPRUNE EXECUTED" log line as durable_rule=4/conf=0.90
+// (high-confidence + structurally-wrong). This hint fixes that class.
+// HITL-CURATION-002 E1 prompt tuning; implements review.AutogradePromptHinter.
+func (d *contradictedDraftsDataset) AutogradePromptHint() string {
+	return `You are grading DRAFT CORRECTIONS synthesized from a "contradicted-outcome"
+verdict — i.e. Jiminy issued guidance, the agent's action contradicted it,
+and this draft is a proposed CORRECTION rule capturing the lesson.
+
+A DURABLE RULE describes an INVARIANT the agent should follow in FUTURE
+work: "Always do X", "Never Y", "Prefer Z when W". It is prescriptive,
+context-general, and time-independent.
+
+The following are NOT durable rules — score their durable_rule dimension
+LOW (0-1) EVEN IF they look well-formed:
+  * Bash errors, command output, session traces (e.g. "Bash error in command: ...")
+  * Completion logs (e.g. "EXECUTED: deleted N rows", "Sprint X COMPLETE", "SHIPPED 2026-...")
+  * One-off decisions specific to a single moment ("I chose to skip Y today")
+  * Sprint post-mortems, status updates, milestone announcements
+  * Data dumps, JSON blobs, config snapshots
+  * Content that describes what WAS done, not what SHOULD be done
+
+The Content field is the proposed correction TEXT; the Context field is the
+offending action that triggered the draft. If the Content reads as a rule
+someone would want on their team's checklist, it scores durable_rule HIGH
+(3-4). If it reads as a log line or a session artifact, it scores LOW (0-1).
+
+phrasing_quality is a SEPARATE axis — the item can be a bad rule but well
+phrased, or a good rule needing edits. Do not conflate.`
+}
+
 // FetchCandidates returns pending drafts for the given space, newest first.
 // Reads via the writer so buffered rows are visible (flush-then-query).
 func (d *contradictedDraftsDataset) FetchCandidates(ctx context.Context, q review.CandidateQuery) ([]review.ReviewItem, error) {

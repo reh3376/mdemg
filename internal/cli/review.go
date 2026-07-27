@@ -1,0 +1,322 @@
+package cli
+
+// HITL-CURATION-002 E1 — `mdemg review autograde` CLI.
+//
+// Reads pending candidates from a running mdemg server (POST-restart discovery
+// of the port via the same pattern the other CLI commands use), grades each
+// via a local LLM through the LLMGrader interface, and POSTs the confident
+// verdicts to /v1/review/grade with `reinforce:false`.
+//
+// The load-bearing invariant lives at TWO layers:
+//   1. This CLI ALWAYS sends `reinforce:false` (grep-testable below)
+//   2. Every autograde-authored row's `grader_id` starts with review.AutoGraderPrefix
+//      ("auto:") — the dashboard + curation-stall alert split on this
+//
+// Neither layer can be bypassed without editing this file; both are tested.
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"strings"
+	"time"
+
+	"github.com/spf13/cobra"
+
+	"mdemg/internal/llmclient"
+	"mdemg/internal/review"
+)
+
+func newReviewCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "review",
+		Short: "HITL review datasets — auto-grade + cadence surface",
+		Long: `HITL review utilities. Reads a running mdemg server via HTTP.
+
+Subcommands:
+  autograde   LLM-grade pending items in a dataset; write confident verdicts
+              as auto-grade rows (never reinforces the substrate — operator
+              curation is preserved as the only reinforcement path).
+`,
+	}
+	cmd.AddCommand(newReviewAutogradeCmd())
+	return cmd
+}
+
+func newReviewAutogradeCmd() *cobra.Command {
+	var datasetID, spaceID string
+	var minConfidence float64
+	var limit int
+	var dryRun bool
+	var endpoint string
+	cmd := &cobra.Command{
+		Use:   "autograde",
+		Short: "LLM-grade pending items in a dataset; never reinforces the substrate",
+		Long: `Fetches pending candidates from /v1/review/candidates, grades each via a local
+LLM against the dataset's rubric, and POSTs high-confidence verdicts to
+/v1/review/grade with reinforce:false. Items below the confidence threshold
+are left pending for the operator.
+
+Invariant: auto-grade NEVER triggers the reinforcement side-effect on the
+substrate. Only operator-confirmed grades do that.
+
+  mdemg review autograde --dataset contradicted_drafts --space-id mdemg-dev
+  mdemg review autograde --dataset contradicted_drafts --space-id mdemg-dev --dry-run
+  mdemg review autograde --dataset contradicted_drafts --min-confidence 0.90 --limit 20
+`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if datasetID == "" {
+				return fmt.Errorf("--dataset is required")
+			}
+			if spaceID == "" {
+				spaceID = resolveSpaceID(cmd)
+			}
+			if spaceID == "" {
+				return fmt.Errorf("--space-id is required (no default resolvable)")
+			}
+			if endpoint == "" {
+				endpoint = resolveEndpoint()
+			}
+			return runReviewAutograde(cmd.Context(), autogradeOpts{
+				endpoint:      endpoint,
+				datasetID:     datasetID,
+				spaceID:       spaceID,
+				minConfidence: minConfidence,
+				limit:         limit,
+				dryRun:        dryRun,
+			})
+		},
+	}
+	cmd.Flags().StringVar(&datasetID, "dataset", "", "Review dataset id (e.g. contradicted_drafts)")
+	cmd.Flags().StringVar(&spaceID, "space-id", "", "Space to grade (required if not resolvable)")
+	cmd.Flags().Float64Var(&minConfidence, "min-confidence", 0.80, "Auto-grade only when the model's confidence is >= this (0-1)")
+	cmd.Flags().IntVar(&limit, "limit", 50, "Max pending items to fetch (1-500)")
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Preview mode — grade + display but don't POST")
+	cmd.Flags().StringVar(&endpoint, "endpoint", "", "mdemg server (default: from LISTEN_ADDR in .env)")
+	return cmd
+}
+
+type autogradeOpts struct {
+	endpoint      string
+	datasetID     string
+	spaceID       string
+	minConfidence float64
+	limit         int
+	dryRun        bool
+}
+
+func runReviewAutograde(ctx context.Context, opt autogradeOpts) error {
+	fmt.Println("MDEMG Review Autograde")
+	fmt.Println("======================")
+	fmt.Printf("Dataset:        %s\n", opt.datasetID)
+	fmt.Printf("Space:          %s\n", opt.spaceID)
+	fmt.Printf("Endpoint:       %s\n", opt.endpoint)
+	fmt.Printf("Min confidence: %.2f\n", opt.minConfidence)
+	fmt.Printf("Limit:          %d\n", opt.limit)
+	if opt.dryRun {
+		fmt.Println("Mode:           DRY RUN (no grades will be written)")
+	} else {
+		fmt.Println("Mode:           LIVE (writes review_grades rows with grader_id='auto:...')")
+		fmt.Println("                Reinforcement: NEVER (invariant — operator-only)")
+	}
+	fmt.Println()
+
+	// 1. Fetch candidates + rubric + dataset hint via /v1/review/candidates
+	cands, rubric, hint, err := fetchCandidates(ctx, opt.endpoint, opt.datasetID, opt.spaceID, opt.limit)
+	if err != nil {
+		return fmt.Errorf("fetch candidates: %w", err)
+	}
+	fmt.Printf("Fetched %d pending items; rubric %s (%s, %d dims)\n",
+		len(cands), rubric.Version, rubric.Kind, len(rubric.Dimensions))
+	if hint != "" {
+		fmt.Printf("Dataset-hint: %d chars (spliced into system prompt)\n", len(hint))
+	}
+	if len(cands) == 0 {
+		fmt.Println("\nNothing to grade — queue is empty.")
+		return nil
+	}
+
+	// 2. Build the autograder against the local LLM.
+	ag, agLLMModel := buildAutograder(opt.minConfidence)
+	if ag == nil {
+		return fmt.Errorf("autograder init failed (llm client unavailable)")
+	}
+	fmt.Printf("Autograder:     %s\n\n", ag.GraderID())
+
+	// 3. Iterate + grade + persist.
+	var confident, borderline, failed int
+	for i, item := range cands {
+		fmt.Printf("[%d/%d] %s  (content: %.80s...)\n", i+1, len(cands), item.ItemID, item.Content)
+		res, ok, err := ag.GradeWithHint(ctx, opt.datasetID, item, rubric, hint)
+		if err != nil {
+			failed++
+			fmt.Printf("        ERR  %v\n", err)
+			continue
+		}
+		if !ok {
+			borderline++
+			fmt.Printf("        LOW  conf=%.2f (below %.2f) — left pending\n", res.Confidence, opt.minConfidence)
+			continue
+		}
+		confident++
+		fmt.Printf("        AUTO conf=%.2f dims=%v rationale=%q\n",
+			res.Confidence, res.Submission.Dimensions, res.Rationale)
+		if opt.dryRun {
+			continue
+		}
+		if err := postAutoGrade(ctx, opt.endpoint, ag.GraderID(), opt.spaceID, res); err != nil {
+			failed++
+			fmt.Printf("        POST-ERR  %v\n", err)
+			continue
+		}
+	}
+
+	fmt.Println()
+	fmt.Printf("Summary: %d confident-auto | %d borderline (pending) | %d errors\n",
+		confident, borderline, failed)
+	fmt.Printf("Model used: %s\n", agLLMModel)
+	if opt.dryRun {
+		fmt.Println("(dry-run — no writes)")
+	}
+	return nil
+}
+
+// buildAutograder constructs an Autograder wired to the local llm endpoint.
+// Reads LLM_ENDPOINT + LLM_MODEL from env directly (mirrors config.FromEnv
+// defaults for the local-first case) — avoids the full config load that would
+// demand Neo4j creds this CLI doesn't need.
+// Returns (nil, "") when the LLM is unavailable.
+func buildAutograder(minConfidence float64) (*review.Autograder, string) {
+	baseURL := os.Getenv("LLM_ENDPOINT")
+	if baseURL == "" {
+		baseURL = "http://127.0.0.1:8102/v1"
+	}
+	model := os.Getenv("LLM_MODEL")
+	if model == "" {
+		model = "mdemg-llm-v1"
+	}
+	timeoutMs := 60000
+	llm := llmclient.New(llmclient.Config{
+		Provider:  "openai", // openai-compat protocol; local llama-server
+		Model:     model,
+		BaseURL:   baseURL,
+		TimeoutMs: timeoutMs,
+	}).WithContext("review.autograde", "")
+	adapter := &llmGraderAdapter{c: llm, model: model}
+	ag := review.NewAutograder(review.AutograderConfig{
+		LLM:           adapter,
+		ModelID:       model,
+		BinarySHA:     shortBinarySHA(),
+		MinConfidence: minConfidence,
+	})
+	return ag, model
+}
+
+// llmGraderAdapter satisfies review.LLMGrader against llmclient.Client. Uses
+// Complete (not CompleteWithUsage) — we don't need token usage here.
+type llmGraderAdapter struct {
+	c     *llmclient.Client
+	model string
+}
+
+func (a *llmGraderAdapter) CompleteJSON(ctx context.Context, sys, usr string, maxTokens int) (string, error) {
+	msgs := []llmclient.Message{
+		{Role: "system", Content: sys},
+		{Role: "user", Content: usr},
+	}
+	temperature := 0.0
+	return a.c.Complete(ctx, msgs, llmclient.CompleteOpts{
+		MaxTokens:   maxTokens,
+		Temperature: &temperature,
+	})
+}
+
+// shortBinarySHA returns a short identifier for the current mdemg binary, for
+// embedding in grader_id. Falls back to "dev" when unavailable.
+func shortBinarySHA() string {
+	// Prefer an env-injected value (a release build can set MDEMG_BUILD_SHA).
+	if v := os.Getenv("MDEMG_BUILD_SHA"); v != "" {
+		if len(v) > 7 {
+			return v[:7]
+		}
+		return v
+	}
+	return "dev"
+}
+
+// fetchCandidates GETs /v1/review/candidates. Returns ([]ReviewItem, Rubric,
+// autograde_prompt_hint, error). The hint is empty for datasets that don't
+// implement AutogradePromptHinter — the autograder falls through to the
+// generic prompt in that case.
+func fetchCandidates(ctx context.Context, endpoint, datasetID, spaceID string, limit int) ([]review.ReviewItem, review.Rubric, string, error) {
+	url := fmt.Sprintf("%s/v1/review/candidates?dataset_id=%s&space_id=%s&limit=%d",
+		strings.TrimSuffix(endpoint, "/"), datasetID, spaceID, limit)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, review.Rubric{}, "", err
+	}
+	resp, err := (&http.Client{Timeout: 30 * time.Second}).Do(req)
+	if err != nil {
+		return nil, review.Rubric{}, "", err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode/100 != 2 {
+		return nil, review.Rubric{}, "", fmt.Errorf("candidates: HTTP %d: %s", resp.StatusCode, string(body))
+	}
+	var out struct {
+		Data struct {
+			Items  []review.ReviewItem `json:"items"`
+			Rubric review.Rubric       `json:"rubric"`
+			Hint   string              `json:"autograde_prompt_hint"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &out); err != nil {
+		return nil, review.Rubric{}, "", fmt.Errorf("unmarshal candidates: %w (body=%.200s)", err, string(body))
+	}
+	return out.Data.Items, out.Data.Rubric, out.Data.Hint, nil
+}
+
+// postAutoGrade POSTs the auto-grade to /v1/review/grade. The invariant:
+// reinforce is ALWAYS false — never mutate the substrate from an auto-grade.
+func postAutoGrade(ctx context.Context, endpoint, graderID, spaceID string, res review.GradeResult) error {
+	reinforceFalse := false
+	body := map[string]any{
+		"dataset_id": res.Submission.DatasetID,
+		"item_id":    res.Submission.ItemID,
+		"space_id":   spaceID,
+		"grader_id":  graderID,
+		"dimensions": res.Submission.Dimensions,
+		"reinforce":  &reinforceFalse,
+	}
+	b, err := json.Marshal(body)
+	if err != nil {
+		return err
+	}
+	url := strings.TrimSuffix(endpoint, "/") + "/v1/review/grade"
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(b))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := (&http.Client{Timeout: 30 * time.Second}).Do(req)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	rb, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode == http.StatusConflict {
+		// Item was already graded (idempotency 409). Not an error for autograde —
+		// the operator's grade is preferred; move on.
+		return nil
+	}
+	if resp.StatusCode/100 != 2 {
+		return fmt.Errorf("grade POST: HTTP %d: %s", resp.StatusCode, string(rb))
+	}
+	return nil
+}
+
