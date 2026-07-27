@@ -839,7 +839,7 @@ def main():
                             "--space-id", SPACE_ID,
                             "--incremental",
                             "--consolidate",
-                            ".",
+                            "--path", ".",
                         ],
                         stdout=log_fd,
                         stderr=log_fd,
