@@ -44,7 +44,127 @@ Subcommands:
 `,
 	}
 	cmd.AddCommand(newReviewAutogradeCmd())
+	cmd.AddCommand(newReviewCadenceCmd())
 	return cmd
+}
+
+// HITL-CURATION-002 E3: `mdemg review cadence` produces a compact operator
+// prompt of what's waiting in the HITL queue. Designed to be run periodically
+// (via cron / launchd / manual) — the output is a self-contained "what needs
+// your attention this week" digest. Reads /v1/review/datasets for pending
+// counts across every registered dataset; JSON mode is machine-readable for
+// dashboards/alert bodies.
+func newReviewCadenceCmd() *cobra.Command {
+	var endpoint, outFormat string
+	cmd := &cobra.Command{
+		Use:   "cadence",
+		Short: "Produce a weekly HITL cadence summary — what's waiting for the operator",
+		Long: `Reads the running mdemg server's review datasets and renders a compact
+summary of what needs the operator's attention. Text format is human-readable;
+JSON is machine-readable for scheduler hooks / alert bodies.
+
+  mdemg review cadence                        # text summary to stdout
+  mdemg review cadence --out-format json      # JSON
+`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if endpoint == "" {
+				endpoint = resolveEndpoint()
+			}
+			return runReviewCadence(cmd.Context(), endpoint, outFormat)
+		},
+	}
+	cmd.Flags().StringVar(&endpoint, "endpoint", "", "mdemg server (default: from LISTEN_ADDR in .env)")
+	cmd.Flags().StringVar(&outFormat, "out-format", "text", "Output format: text or json")
+	return cmd
+}
+
+type cadenceDatasetRow struct {
+	DatasetID      string `json:"dataset_id"`
+	DisplayName    string `json:"display_name"`
+	PendingCount   int    `json:"pending_count"`
+	RubricVersion  string `json:"rubric_version"`
+}
+
+type cadenceSummary struct {
+	GeneratedAt   string              `json:"generated_at"`
+	TotalPending  int                 `json:"total_pending"`
+	Datasets      []cadenceDatasetRow `json:"datasets"`
+	Actionable    bool                `json:"actionable"` // true if any pending; false if all-clear
+}
+
+func runReviewCadence(ctx context.Context, endpoint, outFormat string) error {
+	url := strings.TrimSuffix(endpoint, "/") + "/v1/review/datasets"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return err
+	}
+	resp, err := (&http.Client{Timeout: 30 * time.Second}).Do(req)
+	if err != nil {
+		return fmt.Errorf("cadence: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode/100 != 2 {
+		return fmt.Errorf("cadence: HTTP %d: %s", resp.StatusCode, string(body))
+	}
+	var out struct {
+		Data struct {
+			Datasets []struct {
+				DatasetID      string `json:"id"` // endpoint returns `id`, not `dataset_id`
+				DisplayName    string `json:"display_name"`
+				RubricVersion  string `json:"rubric_version"`
+				CandidateCount int    `json:"candidate_count"`
+			} `json:"datasets"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &out); err != nil {
+		return fmt.Errorf("cadence: unmarshal: %w", err)
+	}
+	summary := cadenceSummary{GeneratedAt: time.Now().UTC().Format(time.RFC3339)}
+	for _, d := range out.Data.Datasets {
+		if d.CandidateCount <= 0 {
+			continue
+		}
+		summary.Datasets = append(summary.Datasets, cadenceDatasetRow{
+			DatasetID: d.DatasetID, DisplayName: d.DisplayName,
+			PendingCount: d.CandidateCount, RubricVersion: d.RubricVersion,
+		})
+		summary.TotalPending += d.CandidateCount
+	}
+	summary.Actionable = summary.TotalPending > 0
+	return renderCadence(summary, outFormat)
+}
+
+func renderCadence(s cadenceSummary, outFormat string) error {
+	if outFormat == "json" {
+		b, err := json.MarshalIndent(s, "", "  ")
+		if err != nil {
+			return err
+		}
+		fmt.Println(string(b))
+		return nil
+	}
+	// Text format
+	fmt.Println("MDEMG HITL Cadence Summary")
+	fmt.Println("==========================")
+	fmt.Printf("Generated: %s\n\n", s.GeneratedAt)
+	if !s.Actionable {
+		fmt.Println("✓ HITL queue is empty — no operator action required this cycle.")
+		return nil
+	}
+	fmt.Printf("%d item(s) pending across %d dataset(s):\n\n", s.TotalPending, len(s.Datasets))
+	for _, d := range s.Datasets {
+		fmt.Printf("  • %-45s  %4d pending  (rubric %s)\n", d.DisplayName, d.PendingCount, d.RubricVersion)
+		fmt.Printf("    dataset_id: %s\n", d.DatasetID)
+	}
+	fmt.Println()
+	fmt.Println("Review at: http://localhost:9999/ui/#review")
+	fmt.Println()
+	fmt.Println("Automation options:")
+	fmt.Println("  - mdemg review autograde --dataset <id> --space-id <space> --dry-run")
+	fmt.Println("    → LLM-graded confidence pass; auto-grade rows for confident verdicts,")
+	fmt.Println("      operator handles the low-confidence remainder.")
+	return nil
 }
 
 func newReviewAutogradeCmd() *cobra.Command {
