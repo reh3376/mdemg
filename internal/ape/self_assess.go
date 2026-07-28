@@ -248,6 +248,12 @@ func (a *Assessor) Assess(ctx context.Context, spaceID string, tier CycleTier) (
 		} else {
 			slog.Warn("RSIC assess: training readiness query failed", "error", dErr)
 		}
+		// DRIFT-TRIGGER-001: production drift signal for reflect pattern 31.
+		if drift, dErr := a.datasetProvider.ProductionDrift(ctx); dErr == nil {
+			report.ProductionDrift = drift
+		} else {
+			slog.Warn("RSIC assess: production drift query failed", "error", dErr)
+		}
 	}
 
 	// 6. Weighted overall (single source: ComputeOverallHealthWith + cfg weights)

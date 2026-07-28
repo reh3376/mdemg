@@ -226,6 +226,7 @@ func (lr *LLMReflector) buildUserPrompt(report *SelfAssessmentReport) string {
 		sanitized.RetrievalDataset = nil
 		sanitized.EmbeddingDataset = nil
 		sanitized.TrainingReadiness = nil
+		sanitized.ProductionDrift = nil // DRIFT-TRIGGER-001
 	}
 
 	// Current assessment — compact JSON saves ~40% tokens vs indented
