@@ -1054,6 +1054,50 @@ func FtProductionDriftRule(margin float64) AlertRule {
 	}
 }
 
+// HeuristicShareRule fires when the fraction of constraint_outcomes rows
+// classified via the heuristic fallback path (classifier_source='heuristic')
+// exceeds a threshold over the lookback window. Detects LLM-saturation
+// bursts — the pattern surfaced by the CLASSIFIER-CONSISTENCY-001
+// investigation, where a 2026-07-21 multi-sprint day pushed the classifier's
+// heuristic fallback to 35% for the day (baseline 0-1%). The fix for the
+// UNDERLYING cause is LLM-HEALTH-CANCELLATION-ALERT-001; this rule is the
+// durable observability layer that surfaces WHEN the class recurs.
+//
+// Idle-safe per TSDB-CONSUME-001 contract: COALESCE + NULLIF around the
+// denominator so an empty window returns 0 (not divide-by-zero) and always
+// exactly one non-NULL row. Distinct Service "heuristic-share" per
+// NOSILENT-001. Severity MEDIUM (surfaces the fact; doesn't demand action —
+// a heavy-work day may legitimately produce the burst). ForDuration 6h so
+// it doesn't flap on a moderate spike.
+//
+// threshold ≤ 0 → 0.05 (5% — 5× baseline; well above the noise floor);
+// lookbackHours ≤ 0 → 24.
+func HeuristicShareRule(threshold float64, lookbackHours int) AlertRule {
+	if threshold <= 0 {
+		threshold = 0.05
+	}
+	if lookbackHours <= 0 {
+		lookbackHours = 24
+	}
+	return AlertRule{
+		ID:          "heuristic_share_high",
+		Title:       "MDEMG Classifier Heuristic Fallback Share High",
+		Service:     "heuristic-share",
+		Severity:    SeverityMedium,
+		Interval:    5 * time.Minute,
+		ForDuration: 6 * time.Hour,
+		QuerySQL: fmt.Sprintf(`SELECT COALESCE(
+			  count(*) FILTER (WHERE classifier_source = 'heuristic')::float
+			  / NULLIF(count(*), 0),
+			0) AS heuristic_share
+			FROM constraint_outcomes
+			WHERE time > now() - interval '%d hours'`, lookbackHours),
+		Threshold: threshold,
+		Operator:  "gt",
+		Enabled:   true,
+	}
+}
+
 // HITLCurationStalledRule fires when the HITL queue has been accumulating
 // pending items for a week WITHOUT any operator grades (grader_id NOT LIKE
 // 'auto:%'). Diagnoses the exact symptom HITL-CURATION-002 was written to

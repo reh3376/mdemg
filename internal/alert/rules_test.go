@@ -166,6 +166,7 @@ func allRules() []AlertRule {
 	rules = append(rules, OrphanRules(0, 0, 0, 0)...)
 	rules = append(rules, GraphNodeDropRule(0, 0, 0)...)
 	rules = append(rules, HITLCurationStalledRule(0, 0))
+	rules = append(rules, HeuristicShareRule(0, 0))
 	rules = append(rules, ReadinessStalenessRule(0))
 	rules = append(rules, CoverageRules(0)...)
 	rules = append(rules, MaintenanceLivenessRules(0)...)
@@ -490,6 +491,61 @@ func TestHITLCurationStalledRule_Defaults(t *testing.T) {
 	// not fire.
 	if r.ForDuration.Hours() < 12 {
 		t.Errorf("ForDuration=%s too short — will flap on a slow curation week", r.ForDuration)
+	}
+}
+
+// CLASSIFIER-CONSISTENCY-001: HeuristicShareRule fires when the fraction
+// of constraint_outcomes classified via the jiminy heuristic fallback
+// exceeds threshold over the lookback. Investigation surfaced a 2026-07-21
+// multi-sprint-day burst at 35% (baseline 0-1%) — this rule is the durable
+// observability for the class LLM-HEALTH-CANCELLATION-ALERT-001 fixes.
+func TestHeuristicShareRule_Defaults(t *testing.T) {
+	r := HeuristicShareRule(0, 0)
+	if r.ID != "heuristic_share_high" {
+		t.Errorf("id: %s", r.ID)
+	}
+	if r.Service != "heuristic-share" {
+		t.Errorf("service: %s (NOSILENT-001 cooldown-key contract — must be distinct)", r.Service)
+	}
+	if r.Severity != SeverityMedium {
+		t.Errorf("severity: %s (want MEDIUM — surfaces the class, doesn't demand action)", r.Severity)
+	}
+	if r.Threshold != 0.05 {
+		t.Errorf("default threshold: %f (want 0.05 = 5%%)", r.Threshold)
+	}
+	if r.Operator != "gt" {
+		t.Errorf("operator: %s", r.Operator)
+	}
+	// Idle-safe contract (TSDB-CONSUME-001): COALESCE + NULLIF, no LIMIT 1.
+	if !strings.Contains(r.QuerySQL, "COALESCE(") {
+		t.Errorf("query must use COALESCE for idle-safe non-NULL row; got: %s", r.QuerySQL)
+	}
+	if !strings.Contains(r.QuerySQL, "NULLIF(count(*), 0)") {
+		t.Errorf("query must guard against divide-by-zero via NULLIF; got: %s", r.QuerySQL)
+	}
+	if strings.Contains(r.QuerySQL, "LIMIT 1") {
+		t.Errorf("query must not use LIMIT 1 (TSDB-CONSUME-001 anti-pattern); got: %s", r.QuerySQL)
+	}
+	// Reads constraint_outcomes; filters on classifier_source='heuristic'.
+	if !strings.Contains(r.QuerySQL, "constraint_outcomes") {
+		t.Errorf("query must read constraint_outcomes; got: %s", r.QuerySQL)
+	}
+	if !strings.Contains(r.QuerySQL, "classifier_source = 'heuristic'") {
+		t.Errorf("query must FILTER on classifier_source='heuristic'; got: %s", r.QuerySQL)
+	}
+	// ForDuration prevents flap on moderate spikes.
+	if r.ForDuration.Hours() < 4 {
+		t.Errorf("ForDuration=%s too short — will flap on moderate spikes", r.ForDuration)
+	}
+}
+
+func TestHeuristicShareRule_CustomParams(t *testing.T) {
+	r := HeuristicShareRule(0.15, 48)
+	if r.Threshold != 0.15 {
+		t.Errorf("threshold: %f", r.Threshold)
+	}
+	if !strings.Contains(r.QuerySQL, "48 hours") {
+		t.Errorf("lookback 48h not substituted; got: %s", r.QuerySQL)
 	}
 }
 
