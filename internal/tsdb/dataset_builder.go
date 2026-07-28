@@ -17,6 +17,12 @@ type DatasetProvider interface {
 	EmbeddingCoverage(ctx context.Context, spaceID string, window time.Duration) (*EmbeddingCoverageSummary, error)
 	MetricTrend(ctx context.Context, spaceID, metricName string, window time.Duration) (*MetricTrend, error)
 	TrainingDataReadiness(ctx context.Context) (*TrainingDataReadiness, error)
+	// ProductionDrift returns the current drift between the ACTIVE model
+	// version's recorded score and the LATEST benchmark aggregate. Mirrors
+	// the exact math of alert.FtProductionDriftRule — single source of truth
+	// for the threshold semantics. HasActive/HasBench distinguish "no data"
+	// from "delta zero." DRIFT-TRIGGER-001.
+	ProductionDrift(ctx context.Context) (*ProductionDriftSummary, error)
 	// GuidanceEffectiveness returns the windowed guidance follow-rate computed
 	// from the constraint_outcomes TSDB sink — the SAME source + math as the
 	// mdemg-jiminy dashboard panels (followed=1.0, partial_compliance=0.5).
@@ -105,6 +111,24 @@ type TaskReadiness struct {
 // TrainingDataReadiness holds readiness assessments across all tasks.
 type TrainingDataReadiness struct {
 	Tasks []TaskReadiness `json:"tasks"`
+}
+
+// ProductionDriftSummary carries the same numbers alert.FtProductionDriftRule
+// computes, but exposes the intermediate values (not just the floored delta)
+// so the RSIC reflector can log meaningful descriptions.
+//
+// Delta = max(0, ActiveScore - LatestBenchScore). A negative raw delta
+// (bench BETTER than active) is floored at 0 — no drift. HasActive/HasBench
+// distinguish "no data" (both false = no ACTIVE model yet OR no benchmarks
+// yet) from a genuine zero-delta reading. LatestBenchAt is UTC.
+// DRIFT-TRIGGER-001.
+type ProductionDriftSummary struct {
+	Delta             float64   `json:"delta"`
+	ActiveScore       float64   `json:"active_score"`
+	LatestBenchScore  float64   `json:"latest_bench_score"`
+	LatestBenchAt     time.Time `json:"latest_bench_at,omitzero"`
+	HasActive         bool      `json:"has_active"`
+	HasBench          bool      `json:"has_bench"`
 }
 
 // DefaultReadinessThreshold is the minimum rows per task to consider ready.
@@ -563,4 +587,52 @@ func evaluateReadinessGates(totalRows, errorCount, hasSystemPrompt, threshold in
 				totalRows-hasSystemPrompt, totalRows))
 	}
 	return false, reasons
+}
+
+// ProductionDrift returns the current drift signal — the delta between the
+// ACTIVE model version's recorded score and the LATEST benchmark aggregate.
+// DRIFT-TRIGGER-001.
+//
+// Math mirrors alert.FtProductionDriftRule (single source of truth for the
+// threshold semantics): Delta = max(0, ActiveScore - LatestBenchScore); a
+// bench BETTER than active reads as no drift (Delta=0). HasActive/HasBench
+// let the caller distinguish "no data" from "delta genuinely zero" — the
+// alert rule floors to 0 in both cases, but the reflect pattern must only
+// fire when both signals are present (else it fires spuriously on empty
+// state).
+//
+// Reads only ft_model_versions (active row) and benchmark_runs (latest row).
+// Neither is a hypertable, so no time-window handling.
+func (b *DatasetBuilder) ProductionDrift(ctx context.Context) (*ProductionDriftSummary, error) {
+	// Single query joining the two scalar reads. Aggregates only — no LIMIT 1
+	// (TSDB-CONSUME-001 contract). Nulls when the source row is absent.
+	const q = `SELECT
+		(SELECT MAX(overall_score) FROM ft_model_versions WHERE status = 'active') AS active_score,
+		(SELECT MAX(aggregate_weighted_score) FROM benchmark_runs
+		   WHERE completed_at = (SELECT MAX(completed_at) FROM benchmark_runs)) AS latest_bench_score,
+		(SELECT MAX(completed_at) FROM benchmark_runs) AS latest_bench_at`
+	var active, bench *float64
+	var benchAt *time.Time
+	if err := b.pool.QueryRow(ctx, q).Scan(&active, &bench, &benchAt); err != nil {
+		return nil, fmt.Errorf("dataset_builder: production_drift: %w", err)
+	}
+	sum := &ProductionDriftSummary{
+		HasActive: active != nil && *active > 0,
+		HasBench:  bench != nil,
+	}
+	if sum.HasActive {
+		sum.ActiveScore = *active
+	}
+	if sum.HasBench {
+		sum.LatestBenchScore = *bench
+		if benchAt != nil {
+			sum.LatestBenchAt = *benchAt
+		}
+	}
+	if sum.HasActive && sum.HasBench {
+		if d := sum.ActiveScore - sum.LatestBenchScore; d > 0 {
+			sum.Delta = d
+		}
+	}
+	return sum, nil
 }

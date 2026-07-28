@@ -2,6 +2,7 @@ package ape
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -34,6 +35,10 @@ func (m *mockDatasetProvider) MetricTrend(_ context.Context, _ string, metricNam
 }
 
 func (m *mockDatasetProvider) TrainingDataReadiness(_ context.Context) (*tsdb.TrainingDataReadiness, error) {
+	return nil, nil
+}
+
+func (m *mockDatasetProvider) ProductionDrift(_ context.Context) (*tsdb.ProductionDriftSummary, error) {
 	return nil, nil
 }
 
@@ -471,6 +476,129 @@ func TestReflect_TrustTrajectoryDecline_Stable(t *testing.T) {
 	for _, i := range insights {
 		if i.PatternID == "trust_trajectory_decline" {
 			t.Error("trust_trajectory_decline should not trigger with stable trust")
+		}
+	}
+}
+
+// ─── Pattern 31: Production Drift Detected (DRIFT-TRIGGER-001) ───
+
+// findInsight returns the first insight with the given pattern id (or nil).
+func findInsight(insights []ReflectionInsight, patternID string) *ReflectionInsight {
+	for i := range insights {
+		if insights[i].PatternID == patternID {
+			return &insights[i]
+		}
+	}
+	return nil
+}
+
+func TestReflect_ProductionDriftDetected_Fires(t *testing.T) {
+	cfg := config.Config{FtDriftMargin: 0.05}
+	r := NewReflector(cfg, nil)
+	r.SetDatasetProvider(&mockDatasetProvider{})
+	report := &SelfAssessmentReport{
+		SpaceID: "test",
+		ProductionDrift: &tsdb.ProductionDriftSummary{
+			HasActive: true, HasBench: true,
+			ActiveScore: 0.90, LatestBenchScore: 0.80, Delta: 0.10,
+		},
+	}
+	insights, _ := r.Reflect(context.Background(), report)
+	got := findInsight(insights, "production_drift_detected")
+	if got == nil {
+		t.Fatalf("expected production_drift_detected insight; got: %v", insights)
+	}
+	if got.RecommendedAction != "trigger_training_pipeline" {
+		t.Errorf("recommended action must be trigger_training_pipeline (wires to actuator gate); got %q", got.RecommendedAction)
+	}
+	if got.Value != 0.10 {
+		t.Errorf("value=%v want 0.10", got.Value)
+	}
+	if got.Threshold != 0.05 {
+		t.Errorf("threshold must be FtDriftMargin (single source of truth with alert rule); got %v", got.Threshold)
+	}
+	// Description carries both scores + margin — self-explanatory for operator.
+	if !strings.Contains(got.Description, "0.9000") || !strings.Contains(got.Description, "0.8000") {
+		t.Errorf("description must include active + bench scores; got: %s", got.Description)
+	}
+}
+
+// The three suppression conditions: no-active, no-bench, delta below margin.
+// Each MUST prevent the insight from firing — spurious fires would open
+// unnecessary retrain cycles once the actuator is enabled.
+func TestReflect_ProductionDriftDetected_DoesNotFire_NoData(t *testing.T) {
+	cfg := config.Config{FtDriftMargin: 0.05}
+	r := NewReflector(cfg, nil)
+	r.SetDatasetProvider(&mockDatasetProvider{})
+
+	// (a) drift struct absent entirely (dataset provider returned nil)
+	report := &SelfAssessmentReport{SpaceID: "test", ProductionDrift: nil}
+	insights, _ := r.Reflect(context.Background(), report)
+	if findInsight(insights, "production_drift_detected") != nil {
+		t.Error("nil ProductionDrift must not fire the pattern")
+	}
+
+	// (b) has_active=false — no active model yet (fresh install)
+	report = &SelfAssessmentReport{SpaceID: "test", ProductionDrift: &tsdb.ProductionDriftSummary{
+		HasActive: false, HasBench: true, LatestBenchScore: 0.80, Delta: 0.90,
+	}}
+	insights, _ = r.Reflect(context.Background(), report)
+	if findInsight(insights, "production_drift_detected") != nil {
+		t.Error("has_active=false must not fire (no active model to be drifted against)")
+	}
+
+	// (c) has_bench=false — no benchmarks yet
+	report = &SelfAssessmentReport{SpaceID: "test", ProductionDrift: &tsdb.ProductionDriftSummary{
+		HasActive: true, HasBench: false, ActiveScore: 0.90, Delta: 0.90,
+	}}
+	insights, _ = r.Reflect(context.Background(), report)
+	if findInsight(insights, "production_drift_detected") != nil {
+		t.Error("has_bench=false must not fire (no benchmark to measure drift against)")
+	}
+}
+
+func TestReflect_ProductionDriftDetected_DoesNotFire_BelowMargin(t *testing.T) {
+	cfg := config.Config{FtDriftMargin: 0.05}
+	r := NewReflector(cfg, nil)
+	r.SetDatasetProvider(&mockDatasetProvider{})
+	// Delta exactly AT margin → should NOT fire (strict >).
+	for _, delta := range []float64{0.0, 0.03, 0.05} {
+		report := &SelfAssessmentReport{SpaceID: "test", ProductionDrift: &tsdb.ProductionDriftSummary{
+			HasActive: true, HasBench: true,
+			ActiveScore: 0.85, LatestBenchScore: 0.85 - delta, Delta: delta,
+		}}
+		insights, _ := r.Reflect(context.Background(), report)
+		if got := findInsight(insights, "production_drift_detected"); got != nil {
+			t.Errorf("delta=%v (<=margin) must not fire; got: %+v", delta, got)
+		}
+	}
+}
+
+// TestReflect_ProductionDriftDetected_UsesConfigMargin: pin that the pattern
+// reads r.cfg.FtDriftMargin (not a hardcoded literal) — else the pattern and
+// the alert rule can drift apart.
+func TestReflect_ProductionDriftDetected_UsesConfigMargin(t *testing.T) {
+	// Custom stricter margin — same delta must fire under 0.05 but NOT under 0.20.
+	tests := []struct {
+		margin  float64
+		delta   float64
+		wantFire bool
+	}{
+		{0.05, 0.10, true},
+		{0.20, 0.10, false},
+		{0.20, 0.25, true},
+	}
+	for _, tc := range tests {
+		cfg := config.Config{FtDriftMargin: tc.margin}
+		r := NewReflector(cfg, nil)
+		r.SetDatasetProvider(&mockDatasetProvider{})
+		report := &SelfAssessmentReport{SpaceID: "test", ProductionDrift: &tsdb.ProductionDriftSummary{
+			HasActive: true, HasBench: true, ActiveScore: 0.9, LatestBenchScore: 0.9 - tc.delta, Delta: tc.delta,
+		}}
+		insights, _ := r.Reflect(context.Background(), report)
+		got := findInsight(insights, "production_drift_detected") != nil
+		if got != tc.wantFire {
+			t.Errorf("margin=%v delta=%v: got fire=%v want %v", tc.margin, tc.delta, got, tc.wantFire)
 		}
 	}
 }

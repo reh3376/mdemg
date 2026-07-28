@@ -188,6 +188,11 @@ type SelfAssessmentReport struct {
 	RetrievalDataset  *tsdb.RetrievalQualitySummary  `json:"retrieval_dataset,omitempty"`
 	EmbeddingDataset  *tsdb.EmbeddingCoverageSummary `json:"embedding_dataset,omitempty"`
 	TrainingReadiness *tsdb.TrainingDataReadiness    `json:"training_readiness,omitempty"`
+	// DRIFT-TRIGGER-001: the drift signal — enables the reflect pattern to
+	// emit trigger_training_pipeline when the active model has degraded
+	// relative to the latest benchmark. Mirrors alert.FtProductionDriftRule
+	// math via the shared DatasetProvider.ProductionDrift path.
+	ProductionDrift   *tsdb.ProductionDriftSummary   `json:"production_drift,omitempty"`
 }
 
 // ───────────── Reflection ─────────────

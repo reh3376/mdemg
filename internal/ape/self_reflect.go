@@ -566,6 +566,37 @@ func (r *Reflector) Reflect(ctx context.Context, report *SelfAssessmentReport) (
 		}
 	}
 
+	// 31. Production drift detected: the active model has degraded relative
+	// to the latest benchmark by more than FT_DRIFT_MARGIN. Emits the SAME
+	// trigger_training_pipeline action as pattern 29 — so drift becomes a
+	// valid reason to open a retrain cycle, subject to the shipped Gate
+	// (interval / single-flight / freshness / FT_LOOP_ENABLED). The
+	// downstream deduplicateInsights (task_dispatch) collapses when both 29
+	// and 31 fire on the same cycle. DRIFT-TRIGGER-001.
+	//
+	// HasActive/HasBench gate against "no data" firing (the alert rule floors
+	// to 0 in that case, but for insights we must not fire spuriously).
+	// Threshold reads the SAME r.cfg.FtDriftMargin the alert rule uses —
+	// single source of truth so both signals agree on when "drift" happens.
+	if report.ProductionDrift != nil && report.ProductionDrift.HasActive &&
+		report.ProductionDrift.HasBench &&
+		report.ProductionDrift.Delta > r.cfg.FtDriftMargin {
+		insights = append(insights, ReflectionInsight{
+			PatternID: "production_drift_detected",
+			Severity:  SeverityMedium,
+			Description: fmt.Sprintf(
+				"Production drift %.4f (active %.4f, latest bench %.4f) exceeds margin %.4f",
+				report.ProductionDrift.Delta,
+				report.ProductionDrift.ActiveScore,
+				report.ProductionDrift.LatestBenchScore,
+				r.cfg.FtDriftMargin),
+			RecommendedAction: "trigger_training_pipeline",
+			Metric:            "ft_production_drift",
+			Value:             report.ProductionDrift.Delta,
+			Threshold:         r.cfg.FtDriftMargin,
+		})
+	}
+
 	// 30. Trust trajectory decline: 24h slope < -0.01
 	if r.datasetProvider != nil {
 		trustTrend, tErr := r.datasetProvider.MetricTrend(ctx, report.SpaceID, "mdemg_j17_avg_trust_score", 24*time.Hour)

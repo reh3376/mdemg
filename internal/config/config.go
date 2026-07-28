@@ -1325,6 +1325,10 @@ type Config struct {
 	HITLCurationStallMinPending  int // HITL_CURATION_STALL_MIN_PENDING — fire hitl_curation_stalled when contradicted_correction_drafts.pending count is >= this AND no operator grades in the lookback window (default: 5)
 	HITLCurationStallLookbackHrs int // HITL_CURATION_STALL_LOOKBACK_HOURS — operator-grade lookback window; fires only when there have been zero operator-authored review_grades in this window (default: 168 = 7 days; won't flap on a slow curation week)
 
+	// Classifier heuristic-share alert (CLASSIFIER-CONSISTENCY-001)
+	HeuristicShareThreshold     float64 // HEURISTIC_SHARE_THRESHOLD — fire heuristic_share_high when the fraction of constraint_outcomes classified via the heuristic fallback exceeds this over the lookback window; detects LLM-saturation bursts (default: 0.05 = 5%, ~5× baseline)
+	HeuristicShareLookbackHours int     // HEURISTIC_SHARE_LOOKBACK_HOURS — lookback window for the heuristic-share fraction (default: 24 hours)
+
 	// Neo4j container CPU alert (ALERT-TRUTH-001)
 	Neo4jCPUAlertThresholdPercent float64 // NEO4J_CPU_ALERT_THRESHOLD_PERCENT — fire Neo4j High CPU when the 5-min windowed AVG of mdemg_neo4j_container_cpu_percent exceeds this. docker-stats CPU% is per-single-core, so this is HOST-RELATIVE; default 500 is calibrated above the worst normal-operation 5-min windowed AVG (live 24h max 471, heavy consolidation) so it fires only on genuinely pathological sustained load; lower it on smaller machines (default: 500)
 
@@ -5139,6 +5143,14 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	heuristicShareThreshold, err := atof("HEURISTIC_SHARE_THRESHOLD", 0.05)
+	if err != nil {
+		return Config{}, err
+	}
+	heuristicShareLookbackHours, err := atoi("HEURISTIC_SHARE_LOOKBACK_HOURS", 24)
+	if err != nil {
+		return Config{}, err
+	}
 	neo4jCPUAlertThresholdPercent, err := atof("NEO4J_CPU_ALERT_THRESHOLD_PERCENT", 500)
 	if err != nil {
 		return Config{}, err
@@ -6265,6 +6277,8 @@ func FromEnv() (Config, error) {
 		GraphNodeDropAbsoluteThreshold:      graphNodeDropAbsoluteThreshold,
 		HITLCurationStallMinPending:         hitlCurationStallMinPending,
 		HITLCurationStallLookbackHrs:        hitlCurationStallLookbackHrs,
+		HeuristicShareThreshold:             heuristicShareThreshold,
+		HeuristicShareLookbackHours:         heuristicShareLookbackHours,
 		FtReadinessStalenessMin:             ftReadinessStalenessMin,
 		ExportRetentionHours:                exportRetentionHours,
 		TrainingReadinessThreshold:          trainingReadinessThreshold,
