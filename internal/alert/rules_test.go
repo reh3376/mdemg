@@ -165,6 +165,7 @@ func allRules() []AlertRule {
 	rules = append(rules, WeightIntegrityRules(0)...)
 	rules = append(rules, OrphanRules(0, 0, 0, 0)...)
 	rules = append(rules, GraphNodeDropRule(0, 0, 0)...)
+	rules = append(rules, HITLCurationStalledRule(0, 0))
 	rules = append(rules, ReadinessStalenessRule(0))
 	rules = append(rules, CoverageRules(0)...)
 	rules = append(rules, MaintenanceLivenessRules(0)...)
@@ -452,6 +453,53 @@ func TestGraphNodeDropRule_Defaults(t *testing.T) {
 		if !strings.Contains(r.QuerySQL, "COALESCE(MAX(") {
 			t.Errorf("rule %s must aggregate via COALESCE(MAX(...)) — idle-safe contract", r.ID)
 		}
+	}
+}
+
+// HITL-CURATION-002 E4: hitl_curation_stalled fires only when BOTH the pending
+// queue is above minPending AND there are zero operator grades in the window.
+// The autograde grader_id starts with "auto:" and must be EXCLUDED from the
+// operator-count — else the sprint's own auto-clear would suppress the alert.
+func TestHITLCurationStalledRule_Defaults(t *testing.T) {
+	r := HITLCurationStalledRule(0, 0)
+	if r.ID != "hitl_curation_stalled" {
+		t.Errorf("id: %s", r.ID)
+	}
+	if r.Service != "hitl-curation" {
+		t.Errorf("service: %s (NOSILENT-001 cooldown-key contract — must be distinct)", r.Service)
+	}
+	if r.Severity != SeverityMedium {
+		t.Errorf("severity: %s (stall is not an emergency; MEDIUM)", r.Severity)
+	}
+	// Must exclude auto-grades — else the sprint's own auto-clear suppresses
+	// the stall alert.
+	if !strings.Contains(r.QuerySQL, "grader_id NOT LIKE 'auto:%'") {
+		t.Errorf("query MUST exclude auto:* grader_id from the operator-graded count; got: %s", r.QuerySQL)
+	}
+	// Idle-safe contract (TSDB-CONSUME-001): COALESCE, no LIMIT 1.
+	if !strings.Contains(r.QuerySQL, "COALESCE(") {
+		t.Errorf("query must use COALESCE for idle-safe non-NULL row; got: %s", r.QuerySQL)
+	}
+	if strings.Contains(r.QuerySQL, "LIMIT 1") {
+		t.Errorf("query must not use LIMIT 1 (TSDB-CONSUME-001 anti-pattern); got: %s", r.QuerySQL)
+	}
+	if r.Threshold != 5 {
+		t.Errorf("default min-pending threshold: %f (want 5)", r.Threshold)
+	}
+	// ForDuration guards against a slow week — a single-day silence must
+	// not fire.
+	if r.ForDuration.Hours() < 12 {
+		t.Errorf("ForDuration=%s too short — will flap on a slow curation week", r.ForDuration)
+	}
+}
+
+func TestHITLCurationStalledRule_CustomParams(t *testing.T) {
+	r := HITLCurationStalledRule(10, 336)
+	if r.Threshold != 10 {
+		t.Errorf("threshold: %f", r.Threshold)
+	}
+	if !strings.Contains(r.QuerySQL, "336 hours") {
+		t.Errorf("lookback 336h not substituted; got: %s", r.QuerySQL)
 	}
 }
 

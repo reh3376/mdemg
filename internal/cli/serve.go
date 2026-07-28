@@ -503,6 +503,11 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 			rules = append(rules, alert.GraphNodeDropRule(
 				cfg.GraphNodeDropMinNodes, cfg.GraphNodeDropRatioThreshold,
 				cfg.GraphNodeDropAbsoluteThreshold)...)
+			// HITL-CURATION-002 E4: fire when the HITL queue is accumulating
+			// without operator attention — the exact stall pattern this sprint
+			// was written to prevent.
+			rules = append(rules, alert.HITLCurationStalledRule(
+				cfg.HITLCurationStallMinPending, cfg.HITLCurationStallLookbackHrs))
 			// ALERT-TRUTH-001: Neo4j CPU alert with a host-relative, config-driven
 			// threshold over a 5-min windowed AVG (the fixed 80 = % of one core
 			// tripped on normal multi-core consolidation; LIMIT 1 flapped on the
