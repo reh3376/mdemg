@@ -79,3 +79,4 @@ SYNERGY_CRON_ENABLED       # same
 SIDECAR_HOST            # CLAUDE.md governance note: deliberate negative mention (the fixed code-comment bug; real: NEURAL_HOST)
 NEURAL_DEVICE           # real: pydantic env_prefix "NEURAL_" + field device (never appears literally)
 NEURAL_LOG_LEVEL        # real: pydantic env_prefix "NEURAL_" + field log_level (never appears literally)
+DEEP_DIVE_2026          # HITL-CURATION-002 pin cites the Q4 scoping doc DEEP_DIVE_2026-07-27.md; the regex over-matches its date-shaped prefix
