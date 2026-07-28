@@ -1505,6 +1505,14 @@
       "notes": "Prometheus exposition endpoint; no scrape configured (Grafana provisioned against TSDB - see mdemg-graph-topology.json:454 \"no Prometheus scrape endpoint on mdemg\"). Ops surface.",
       "uats_specs": []
     },
+    "/v1/review/candidates": {
+      "consumers": [
+        "cli:mdemg review autograde"
+      ],
+      "disposition": "IN_USE",
+      "notes": "HITL-CURATION-002 E1: bulk-fetch un-graded review candidates WITHOUT the human-sampler bias. The autograder needs deterministic iteration over EVERY pending item, not the one-at-a-time /v1/review/next sampler output. Also carries the optional autograde_prompt_hint from datasets implementing review.AutogradePromptHinter.",
+      "uats_specs": []
+    },
     "/v1/review/datasets": {
       "consumers": [
         "ui:api.js"

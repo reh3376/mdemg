@@ -1053,3 +1053,57 @@ func FtProductionDriftRule(margin float64) AlertRule {
 		Enabled:   true,
 	}
 }
+
+// HITLCurationStalledRule fires when the HITL queue has been accumulating
+// pending items for a week WITHOUT any operator grades (grader_id NOT LIKE
+// 'auto:%'). Diagnoses the exact symptom HITL-CURATION-002 was written to
+// prevent: the loop is producing draft/audit rows, autograde may be clearing
+// the easy majority, but the operator hasn't spent attention on the queue
+// so no substrate reinforcement flows and the retrain corpus stagnates.
+//
+// Fires only when BOTH conditions hold (the "stall" pattern):
+//   - unresolved pending items ≥ minPending (default 5)
+//   - operator-graded rows in the last 7d == 0 (auto: prefix EXCLUDED)
+//
+// Idle-safe per TSDB-CONSUME-001 contract: COALESCE(...,0) on the counts;
+// no ORDER BY … LIMIT 1; always returns exactly one non-NULL row.
+// Distinct Service "hitl-curation" per NOSILENT-001 cooldown-key.
+//
+// The pending-count source is the RSIC watchdog space's contradicted_drafts
+// (highest-signal live producer that HITL-CURATION-002's contradicted-bridge
+// path feeds); other queues are separately monitored. Because the queue count
+// is queried from review_grades (indirectly, by "not-yet-graded" semantics),
+// this rule catches BOTH auto-clear failure AND operator-attention failure.
+func HITLCurationStalledRule(minPending, lookbackHours int) AlertRule {
+	if minPending <= 0 {
+		minPending = 5
+	}
+	if lookbackHours <= 0 {
+		lookbackHours = 168 // 7 days
+	}
+	return AlertRule{
+		ID:          "hitl_curation_stalled",
+		Title:       "MDEMG HITL Curation Stalled",
+		Service:     "hitl-curation",
+		Severity:    SeverityMedium,
+		Interval:    time.Hour,
+		ForDuration: 24 * time.Hour, // won't flap on a slow curation week
+		// Counts pending contradicted_correction_drafts and 7d operator grades.
+		// Firing requires BOTH: pending >= minPending AND operator_grades == 0.
+		// The CASE produces the pending count only when the operator side is
+		// silent; otherwise 0 (no fire). Idle-safe (COALESCE + no LIMIT 1).
+		QuerySQL: fmt.Sprintf(`
+			SELECT COALESCE(
+			  CASE
+			    WHEN (SELECT count(*) FROM review_grades
+			          WHERE grader_id NOT LIKE 'auto:%%'
+			            AND time > now() - interval '%d hours') = 0
+			    THEN (SELECT count(*) FROM contradicted_correction_drafts
+			          WHERE status = 'pending')
+			    ELSE 0
+			  END, 0) AS stall_signal`, lookbackHours),
+		Threshold: float64(minPending),
+		Operator:  "gt",
+		Enabled:   true,
+	}
+}

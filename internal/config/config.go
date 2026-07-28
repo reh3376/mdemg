@@ -1321,6 +1321,10 @@ type Config struct {
 	GraphNodeDropRatioThreshold     float64 // GRAPH_NODE_DROP_RATIO_THRESHOLD — fire Node Drop (Ratio) when the max drop ratio (old-current)/old among significant spaces exceeds this (default: 0.10 = 10% loss over the ~1h comparison window)
 	GraphNodeDropAbsoluteThreshold  int     // GRAPH_NODE_DROP_ABSOLUTE_THRESHOLD — fire Node Drop (Absolute) when the max absolute drop among significant spaces exceeds this; catches mass loss on huge substrates where 10% would still be too large in absolute terms (default: 10000; ~10× the largest operator-authorized recluster delta observed on mdemg-dev)
 
+	// HITL curation-stall alert (HITL-CURATION-002 E4)
+	HITLCurationStallMinPending  int // HITL_CURATION_STALL_MIN_PENDING — fire hitl_curation_stalled when contradicted_correction_drafts.pending count is >= this AND no operator grades in the lookback window (default: 5)
+	HITLCurationStallLookbackHrs int // HITL_CURATION_STALL_LOOKBACK_HOURS — operator-grade lookback window; fires only when there have been zero operator-authored review_grades in this window (default: 168 = 7 days; won't flap on a slow curation week)
+
 	// Neo4j container CPU alert (ALERT-TRUTH-001)
 	Neo4jCPUAlertThresholdPercent float64 // NEO4J_CPU_ALERT_THRESHOLD_PERCENT — fire Neo4j High CPU when the 5-min windowed AVG of mdemg_neo4j_container_cpu_percent exceeds this. docker-stats CPU% is per-single-core, so this is HOST-RELATIVE; default 500 is calibrated above the worst normal-operation 5-min windowed AVG (live 24h max 471, heavy consolidation) so it fires only on genuinely pathological sustained load; lower it on smaller machines (default: 500)
 
@@ -5127,6 +5131,14 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	hitlCurationStallMinPending, err := atoi("HITL_CURATION_STALL_MIN_PENDING", 5)
+	if err != nil {
+		return Config{}, err
+	}
+	hitlCurationStallLookbackHrs, err := atoi("HITL_CURATION_STALL_LOOKBACK_HOURS", 168)
+	if err != nil {
+		return Config{}, err
+	}
 	neo4jCPUAlertThresholdPercent, err := atof("NEO4J_CPU_ALERT_THRESHOLD_PERCENT", 500)
 	if err != nil {
 		return Config{}, err
@@ -6251,6 +6263,8 @@ func FromEnv() (Config, error) {
 		GraphNodeDropMinNodes:               graphNodeDropMinNodes,
 		GraphNodeDropRatioThreshold:         graphNodeDropRatioThreshold,
 		GraphNodeDropAbsoluteThreshold:      graphNodeDropAbsoluteThreshold,
+		HITLCurationStallMinPending:         hitlCurationStallMinPending,
+		HITLCurationStallLookbackHrs:        hitlCurationStallLookbackHrs,
 		FtReadinessStalenessMin:             ftReadinessStalenessMin,
 		ExportRetentionHours:                exportRetentionHours,
 		TrainingReadinessThreshold:          trainingReadinessThreshold,
