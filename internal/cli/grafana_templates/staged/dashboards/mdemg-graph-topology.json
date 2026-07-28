@@ -1,0 +1,911 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "gnetId": null,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [
+    {
+      "title": "Dashboards",
+      "type": "dashboards",
+      "tags": [
+        "mdemg"
+      ],
+      "icon": "external link",
+      "asDropdown": true
+    }
+  ],
+  "panels": [
+    {
+      "title": "Layer & Edge Legend",
+      "type": "text",
+      "gridPos": {
+        "h": 3,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "options": {
+        "mode": "html",
+        "content": "<div style=\"display:flex;gap:32px;flex-wrap:wrap;padding:4px 8px;font-size:12px;line-height:1.8\">\n  <div><strong>Node Layers:</strong>\n    <span style=\"color:#5794F2\">\u25cf</span> L0/L1 Raw/Obs &nbsp;\n    <span style=\"color:#73BF69\">\u25cf</span> L2 Concepts &nbsp;\n    <span style=\"color:#FADE2A\">\u25cf</span> L3 Abstractions &nbsp;\n    <span style=\"color:#FF9830\">\u25cf</span> L4 Meta &nbsp;\n    <span style=\"color:#F2495C\">\u25cf</span> L5 Paradigms\n  </div>\n  <div><strong>Edge Types:</strong>\n    <span style=\"color:#B877D9\">\u2014</span> Structural &nbsp;\n    <span style=\"color:#8AB8FF\">\u2014</span> Learned &nbsp;\n    <span style=\"color:#FF9830\">\u2014</span> Causal &nbsp;\n    <span style=\"color:#FF6EB4\">\u2014</span> Cross-domain &nbsp;\n    <span style=\"color:#8F8F8F\">\u2014</span> Association &nbsp;\n    <span style=\"color:#73BF69\">\u2014</span> Code &nbsp;\n    <span style=\"color:#FADE2A\">\u2014</span> Compositional &nbsp;\n    <span style=\"color:#6ED0E0\">\u2014</span> Provenance &nbsp;\n    <span style=\"color:#F2495C\">\u2014</span> Contrast\n  </div>\n  <div><em>Scroll to zoom \u2022 Drag to pan \u2022 Click node for details</em></div>\n</div>"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    },
+    {
+      "title": "",
+      "type": "text",
+      "transparent": true,
+      "gridPos": {
+        "h": 2,
+        "w": 24,
+        "x": 0,
+        "y": 3
+      },
+      "options": {
+        "mode": "html",
+        "content": "<div style=\"padding:6px 12px;font-size:13px;color:#aaa;display:flex;justify-content:space-between\"><span>Viewing page <strong style=\"color:#fff\">${page}</strong> &mdash; <strong style=\"color:#fff\">${page_size}</strong> nodes per page. Use the <em>Page</em> field above to navigate.</span><span style=\"color:#73BF69\">Sorted by connectivity (most edges first)</span></div>"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    },
+    {
+      "title": "Layer Topology",
+      "type": "row",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 5
+      },
+      "collapsed": false
+    },
+    {
+      "title": "Layer Topology \u2014 3D",
+      "description": "3D graph topology with layers stacked vertically. Nodes colored by layer, edges show cross-layer connections. Scroll to zoom, drag to rotate, click node to inspect.",
+      "type": "text",
+      "gridPos": {
+        "h": 22,
+        "w": 24,
+        "x": 0,
+        "y": 6
+      },
+      "options": {
+        "mode": "html",
+        "content": "<iframe src=\"http://${instance}/viz/topology?space_id=${space_id}&layers=${layers:csv}&page=${page}&page_size=${page_size}\" style=\"width:100%;height:100%;min-height:700px;border:none;border-radius:4px\" allow=\"fullscreen\"></iframe>"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    },
+    {
+      "title": "Layer Topology \u2014 2D",
+      "type": "row",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 28
+      },
+      "collapsed": true,
+      "panels": [
+        {
+          "title": "Layer Topology (2D)",
+          "description": "Flat 2D force-directed graph. Use the 3D view above for cross-layer edge visibility.",
+          "type": "nodeGraph",
+          "gridPos": {
+            "h": 18,
+            "w": 24,
+            "x": 0,
+            "y": 29
+          },
+          "datasource": {
+            "type": "hamedkarbasi93-nodegraphapi-datasource",
+            "uid": "mdemg-nodegraph"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "queryText": "space_id=${space_id}&layers=${layers:csv}&focus_nodes=${focus_nodes:csv}&show_hidden=${show_hidden}&page=${page}&page_size=${page_size}"
+            }
+          ],
+          "transformations": [],
+          "options": {
+            "nodes": {},
+            "edges": {},
+            "nodeGraph": {
+              "layoutAlgorithm": "force",
+              "zoomMode": "greedy"
+            }
+          },
+          "fieldConfig": {
+            "defaults": {},
+            "overrides": []
+          }
+        }
+      ]
+    },
+    {
+      "title": "Exploration",
+      "type": "row",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 29
+      },
+      "collapsed": true,
+      "panels": [
+        {
+          "title": "How to Explore",
+          "type": "text",
+          "gridPos": {
+            "h": 2,
+            "w": 24,
+            "x": 0,
+            "y": 30
+          },
+          "options": {
+            "mode": "html",
+            "content": "<div style=\"padding:8px 12px;font-size:13px;color:#aaa\"><strong>Neighborhood Explorer</strong> \u2014 Select one or more <em>Focus Node(s)</em> from the variable bar above to explore their connections. Use <em>Edge Types</em> to filter relationship categories and <em>Hop Depth</em> to control traversal distance (1-3 hops). The graph shows all reachable nodes with force-directed layout.</div>"
+          },
+          "fieldConfig": {
+            "defaults": {},
+            "overrides": []
+          }
+        },
+        {
+          "title": "Neighborhood Explorer",
+          "description": "Multi-hop neighborhood around the selected Focus Node(s). Shows reachable nodes within the configured Hop Depth, filtered by Edge Types, with force-directed layout.",
+          "type": "nodeGraph",
+          "gridPos": {
+            "h": 14,
+            "w": 24,
+            "x": 0,
+            "y": 27
+          },
+          "datasource": {
+            "type": "hamedkarbasi93-nodegraphapi-datasource",
+            "uid": "mdemg-nodegraph"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "queryText": "type=neighborhood&space_id=${space_id}&node_id=${focus_nodes:csv}&edge_types=${edge_types:csv}&hop_depth=${hop_depth}&page_size=${page_size}"
+            }
+          ],
+          "transformations": [],
+          "options": {
+            "nodes": {},
+            "edges": {},
+            "nodeGraph": {
+              "layoutAlgorithm": "force",
+              "zoomMode": "greedy"
+            }
+          },
+          "fieldConfig": {
+            "defaults": {},
+            "overrides": []
+          }
+        }
+      ]
+    },
+    {
+      "title": "Concept Details",
+      "type": "row",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 30
+      },
+      "collapsed": false
+    },
+    {
+      "title": "Recent Concept Emergence",
+      "description": "Concepts created in the last 24 hours within selected layers, ordered by creation time.",
+      "type": "table",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 31
+      },
+      "datasource": {
+        "type": "kniepdennis-neo4j-datasource",
+        "uid": "neo4j"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "cypherQuery": "MATCH (n:MemoryNode {space_id: '$space_id'}) WHERE n.layer IN [${layers:raw}] AND n.created_at IS NOT NULL AND n.created_at >= datetime() - duration('P1D') RETURN COALESCE(n.name, n.summary, 'unnamed') AS Name, n.layer AS Layer, n.created_at AS Created, size([(n)-[]-() | 1]) AS Edges ORDER BY n.created_at DESC LIMIT 20",
+          "Format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Layer"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 60
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "blue",
+                      "value": null
+                    },
+                    {
+                      "color": "green",
+                      "value": 2
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 3
+                    },
+                    {
+                      "color": "orange",
+                      "value": 4
+                    },
+                    {
+                      "color": "red",
+                      "value": 5
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "custom.displayMode",
+                "value": "color-background-solid"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Edges"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 60
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Name"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 280
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "title": "Top Activated Concepts",
+      "description": "Concepts within selected layers ranked by activation score. High activation indicates recently and frequently accessed knowledge.",
+      "type": "table",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 31
+      },
+      "datasource": {
+        "type": "kniepdennis-neo4j-datasource",
+        "uid": "neo4j"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "cypherQuery": "MATCH (n:MemoryNode {space_id: '$space_id'}) WHERE n.layer IN [${layers:raw}] RETURN COALESCE(n.name, n.summary, 'unnamed') AS Name, n.layer AS Layer, round(COALESCE(n.activation, 0.0) * 1000) / 1000 AS Activation, n.last_activated AS `Last Active`, size([(n)-[]-() | 1]) AS Edges ORDER BY n.activation DESC LIMIT 20",
+          "Format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Layer"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 60
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "blue",
+                      "value": null
+                    },
+                    {
+                      "color": "green",
+                      "value": 2
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 3
+                    },
+                    {
+                      "color": "orange",
+                      "value": 4
+                    },
+                    {
+                      "color": "red",
+                      "value": 5
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "custom.displayMode",
+                "value": "color-background-solid"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Activation"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "blue",
+                      "value": null
+                    },
+                    {
+                      "color": "green",
+                      "value": 0.3
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 0.6
+                    },
+                    {
+                      "color": "orange",
+                      "value": 0.8
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "custom.displayMode",
+                "value": "color-background-solid"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Name"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 280
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Edges"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 60
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "title": "Reinforcement Events (EVENTGRAPH-001)",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 39
+      }
+    },
+    {
+      "title": "Reinforcement Event Rate (events/min)",
+      "description": "Hebbian co-activation events written to TSDB reinforcement_events. Top series: rolling rate (events/min) over 5-minute buckets. Bottom series: split by created_new_edge (new connections formed vs existing connections strengthened). Source: V0022 reinforcement_events hypertable. Operator-facing Prometheus counters (rows_enqueued_total, rows_dropped_total, flush_failure_total) are exposed via /v1/metrics/snapshot for ops scripts; the panel uses TSDB directly because this Grafana instance is configured against timescaledb (no Prometheus scrape endpoint on mdemg).",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 40
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT time_bucket('1 minute', recorded_at) AS time, count(*) AS \"events/min (total)\" FROM reinforcement_events WHERE space_id = '$space_id' AND $__timeFilter(recorded_at) GROUP BY 1 ORDER BY 1",
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "rawSql": "SELECT time_bucket('1 minute', recorded_at) AS time, count(*) FILTER (WHERE created_new_edge) AS \"new edges/min\", count(*) FILTER (WHERE NOT created_new_edge) AS \"strengthened/min\" FROM reinforcement_events WHERE space_id = '$space_id' AND $__timeFilter(recorded_at) GROUP BY 1 ORDER BY 1",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "rows dropped/min (buffer FIFO eviction)"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "orange"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "flush failures/min"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    }
+  ],
+  "schemaVersion": 39,
+  "style": "dark",
+  "tags": [
+    "mdemg",
+    "topology"
+  ],
+  "templating": {
+    "list": [
+      {
+        "allValue": "",
+        "current": {
+          "selected": false,
+          "text": "localhost:9999",
+          "value": "localhost:9999"
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "timescaledb"
+        },
+        "definition": "SELECT DISTINCT labels->>'instance' AS __value, labels->>'instance' AS __text FROM metric_samples WHERE labels->>'instance' IS NOT NULL AND time > now() - interval '24 hours' ORDER BY 1",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Instance",
+        "multi": false,
+        "name": "instance",
+        "options": [],
+        "query": "SELECT DISTINCT labels->>'instance' AS __value, labels->>'instance' AS __text FROM metric_samples WHERE labels->>'instance' IS NOT NULL AND time > now() - interval '24 hours' ORDER BY 1",
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allValue": "",
+        "current": {
+          "selected": false,
+          "text": "mdemg-dev",
+          "value": "mdemg-dev"
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "timescaledb"
+        },
+        "definition": "SELECT DISTINCT space_id FROM metric_samples WHERE time > now() - interval '24 hours' AND ($instance = '' OR labels->>'instance' = '$instance') ORDER BY 1",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Space ID",
+        "multi": false,
+        "name": "space_id",
+        "options": [],
+        "query": "SELECT DISTINCT space_id FROM metric_samples WHERE time > now() - interval '24 hours' AND ($instance = '' OR labels->>'instance' = '$instance') ORDER BY 1",
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "name": "layers",
+        "label": "Layers",
+        "type": "custom",
+        "multi": true,
+        "includeAll": true,
+        "allValue": "0,1,2,3,4,5",
+        "query": "0 : L0 (Raw),1 : L1 (Obs),2 : L2 (Concepts),3 : L3 (Abstractions),4 : L4 (Meta),5 : L5 (Paradigms)",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "options": [
+          {
+            "text": "All",
+            "value": "$__all",
+            "selected": true
+          },
+          {
+            "text": "L0 (Raw)",
+            "value": "0",
+            "selected": false
+          },
+          {
+            "text": "L1 (Obs)",
+            "value": "1",
+            "selected": false
+          },
+          {
+            "text": "L2 (Concepts)",
+            "value": "2",
+            "selected": false
+          },
+          {
+            "text": "L3 (Abstractions)",
+            "value": "3",
+            "selected": false
+          },
+          {
+            "text": "L4 (Meta)",
+            "value": "4",
+            "selected": false
+          },
+          {
+            "text": "L5 (Paradigms)",
+            "value": "5",
+            "selected": false
+          }
+        ]
+      },
+      {
+        "name": "show_hidden",
+        "label": "Show Hidden",
+        "type": "custom",
+        "query": "false,true",
+        "current": {
+          "text": "false",
+          "value": "false"
+        },
+        "options": [
+          {
+            "text": "false",
+            "value": "false",
+            "selected": true
+          },
+          {
+            "text": "true",
+            "value": "true",
+            "selected": false
+          }
+        ]
+      },
+      {
+        "name": "page_size",
+        "label": "Nodes Per Page",
+        "type": "custom",
+        "query": "100,250,500,1000,2000",
+        "current": {
+          "text": "500",
+          "value": "500"
+        },
+        "options": [
+          {
+            "text": "100",
+            "value": "100",
+            "selected": false
+          },
+          {
+            "text": "250",
+            "value": "250",
+            "selected": false
+          },
+          {
+            "text": "500",
+            "value": "500",
+            "selected": true
+          },
+          {
+            "text": "1000",
+            "value": "1000",
+            "selected": false
+          },
+          {
+            "text": "2000",
+            "value": "2000",
+            "selected": false
+          }
+        ]
+      },
+      {
+        "name": "page",
+        "label": "Page",
+        "type": "textbox",
+        "query": "1",
+        "current": {
+          "text": "1",
+          "value": "1"
+        }
+      },
+      {
+        "name": "focus_nodes",
+        "label": "Focus Node(s)",
+        "type": "query",
+        "multi": true,
+        "includeAll": false,
+        "datasource": {
+          "type": "kniepdennis-neo4j-datasource",
+          "uid": "neo4j"
+        },
+        "query": {
+          "cypherQuery": "MATCH (n:MemoryNode {space_id: '$space_id'}) WHERE n.layer IN [${layers:raw}] RETURN n.node_id AS __value, COALESCE(n.name, n.summary, 'node-' + n.node_id) AS __text ORDER BY n.activation DESC LIMIT 200",
+          "Format": "table"
+        },
+        "refresh": 2,
+        "sort": 0,
+        "current": {
+          "text": "",
+          "value": ""
+        }
+      },
+      {
+        "name": "edge_types",
+        "label": "Edge Types",
+        "type": "custom",
+        "multi": true,
+        "includeAll": true,
+        "allValue": "",
+        "query": "ABSTRACTS_TO,GENERALIZES,GENERALIZES_TO,SPECIALIZES,INSTANTIATES,CO_ACTIVATED_WITH,INFLUENCES,CAUSES,ENABLES,BRIDGES,ANALOGOUS_TO,ASSOCIATED_WITH,TEMPORALLY_ADJACENT,IMPORTS,CALLS,EXTENDS,IMPLEMENTS,DEFINES_SYMBOL,COMPOSES_WITH,THEME_OF,ORIGINATED_FROM,GROUNDED_BY,CONTRASTS_WITH,CONTRADICTS",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "options": [
+          {
+            "text": "All",
+            "value": "$__all",
+            "selected": true
+          },
+          {
+            "text": "ABSTRACTS_TO",
+            "value": "ABSTRACTS_TO",
+            "selected": false
+          },
+          {
+            "text": "GENERALIZES",
+            "value": "GENERALIZES",
+            "selected": false
+          },
+          {
+            "text": "GENERALIZES_TO",
+            "value": "GENERALIZES_TO",
+            "selected": false
+          },
+          {
+            "text": "SPECIALIZES",
+            "value": "SPECIALIZES",
+            "selected": false
+          },
+          {
+            "text": "INSTANTIATES",
+            "value": "INSTANTIATES",
+            "selected": false
+          },
+          {
+            "text": "CO_ACTIVATED_WITH",
+            "value": "CO_ACTIVATED_WITH",
+            "selected": false
+          },
+          {
+            "text": "INFLUENCES",
+            "value": "INFLUENCES",
+            "selected": false
+          },
+          {
+            "text": "CAUSES",
+            "value": "CAUSES",
+            "selected": false
+          },
+          {
+            "text": "ENABLES",
+            "value": "ENABLES",
+            "selected": false
+          },
+          {
+            "text": "BRIDGES",
+            "value": "BRIDGES",
+            "selected": false
+          },
+          {
+            "text": "ANALOGOUS_TO",
+            "value": "ANALOGOUS_TO",
+            "selected": false
+          },
+          {
+            "text": "ASSOCIATED_WITH",
+            "value": "ASSOCIATED_WITH",
+            "selected": false
+          },
+          {
+            "text": "TEMPORALLY_ADJACENT",
+            "value": "TEMPORALLY_ADJACENT",
+            "selected": false
+          },
+          {
+            "text": "IMPORTS",
+            "value": "IMPORTS",
+            "selected": false
+          },
+          {
+            "text": "CALLS",
+            "value": "CALLS",
+            "selected": false
+          },
+          {
+            "text": "EXTENDS",
+            "value": "EXTENDS",
+            "selected": false
+          },
+          {
+            "text": "IMPLEMENTS",
+            "value": "IMPLEMENTS",
+            "selected": false
+          },
+          {
+            "text": "DEFINES_SYMBOL",
+            "value": "DEFINES_SYMBOL",
+            "selected": false
+          },
+          {
+            "text": "COMPOSES_WITH",
+            "value": "COMPOSES_WITH",
+            "selected": false
+          },
+          {
+            "text": "THEME_OF",
+            "value": "THEME_OF",
+            "selected": false
+          },
+          {
+            "text": "ORIGINATED_FROM",
+            "value": "ORIGINATED_FROM",
+            "selected": false
+          },
+          {
+            "text": "GROUNDED_BY",
+            "value": "GROUNDED_BY",
+            "selected": false
+          },
+          {
+            "text": "CONTRASTS_WITH",
+            "value": "CONTRASTS_WITH",
+            "selected": false
+          },
+          {
+            "text": "CONTRADICTS",
+            "value": "CONTRADICTS",
+            "selected": false
+          }
+        ]
+      },
+      {
+        "name": "hop_depth",
+        "label": "Hop Depth",
+        "type": "custom",
+        "query": "1,2,3",
+        "current": {
+          "text": "1",
+          "value": "1"
+        },
+        "options": [
+          {
+            "text": "1",
+            "value": "1",
+            "selected": true
+          },
+          {
+            "text": "2",
+            "value": "2",
+            "selected": false
+          },
+          {
+            "text": "3",
+            "value": "3",
+            "selected": false
+          }
+        ]
+      }
+    ]
+  },
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "MDEMG Graph Topology",
+  "uid": "mdemg-graph-topology",
+  "version": 1
+}

@@ -508,3 +508,24 @@ test-e2e-browser-ui:
 
 # Run all e2e tests
 test-e2e: test-e2e-grafana test-e2e-browser-ui
+
+# ============================================================
+# RELEASE-HYGIENE-001 E2 — Grafana provisioning embed sync
+# ============================================================
+# The canonical Grafana provisioning tree lives at deploy/docker/grafana/.
+# //go:embed can't cross package boundaries or use "..", so we mirror
+# the tree into internal/cli/grafana_templates/staged/ and keep them in
+# sync via `make sync-grafana-embed`. CI runs `make verify-grafana-embed`
+# to fail fast on drift.
+.PHONY: sync-grafana-embed verify-grafana-embed
+sync-grafana-embed:
+	@echo "Syncing internal/cli/grafana_templates/staged from deploy/docker/grafana..."
+	@rm -rf internal/cli/grafana_templates/staged
+	@cp -r deploy/docker/grafana internal/cli/grafana_templates/staged
+	@echo "  done ($$(find internal/cli/grafana_templates/staged -type f | wc -l | tr -d ' ') files)"
+
+verify-grafana-embed:
+	@echo "Verifying internal/cli/grafana_templates/staged matches deploy/docker/grafana..."
+	@diff -qr deploy/docker/grafana internal/cli/grafana_templates/staged \
+		|| (echo ""; echo "DRIFT: run 'make sync-grafana-embed' and commit the result."; exit 1)
+	@echo "  OK — no drift"

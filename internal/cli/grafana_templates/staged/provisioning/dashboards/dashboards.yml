@@ -1,0 +1,18 @@
+# Grafana Dashboard Provisioning
+# Phase 48.5 - Benchmarking & Monitoring
+# Auto-imports dashboards from /etc/grafana/dashboards on startup
+
+apiVersion: 1
+
+providers:
+  - name: 'MDEMG Dashboards'
+    orgId: 1
+    folder: 'MDEMG'
+    folderUid: 'mdemg-folder'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/dashboards
+      foldersFromFilesStructure: false

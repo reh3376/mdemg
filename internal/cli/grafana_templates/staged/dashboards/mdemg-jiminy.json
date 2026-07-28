@@ -1,0 +1,1139 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "gnetId": null,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [
+    {
+      "title": "Dashboards",
+      "type": "dashboards",
+      "tags": [
+        "mdemg"
+      ],
+      "icon": "external link",
+      "asDropdown": true
+    }
+  ],
+  "panels": [
+    {
+      "title": "Guidance Health",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "panels": []
+    },
+    {
+      "title": "Guidance Health",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 0,
+        "y": 1
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_rsic_health_guidance' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "mean"
+          ]
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "noValue": "N/A",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.4
+              },
+              {
+                "color": "green",
+                "value": 0.7
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Follow Rate",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 3,
+        "y": 1
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_jiminy_follow_rate' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "mean"
+          ]
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "noValue": "N/A",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.4
+              },
+              {
+                "color": "green",
+                "value": 0.7
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Constraint Eff. (All-Time)",
+      "description": "Volume-weighted effectiveness across constraints with 5+ outcomes (all time). DASHBOARD-TRUTH-002 E7 (2026-07-20): reads TSDB constraint_outcomes directly (was reading Neo4j gauge which cumulated pre-2026-06-11 heuristic half-credit inflation \u2192 All-Time and Selected Range diverged by up to 0.10 for the same underlying data). Now both panels share source-of-truth AND filter classifier_source IN ('llm','tier1','explicit') to exclude the ~50%25 heuristic-labeled rows. HAVING >= 5 preserves the historical All-Time threshold; Selected Range uses HAVING >= 2 for smaller windows.",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 6,
+        "y": 1
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "-- DASHBOARD-TRUTH-002 E7: unified source-of-truth (was reading pre-fix-inflated Neo4j gauge).\nWITH per_constraint AS (\n  SELECT constraint_id,\n         COUNT(*) AS surfaced,\n         SUM(CASE WHEN outcome_type = 'followed' THEN 1.0 ELSE 0.0 END) AS followed,\n         SUM(CASE WHEN outcome_type = 'partial_compliance' THEN 0.5 ELSE 0.0 END) AS partial_half\n  FROM constraint_outcomes\n  WHERE space_id = '$space_id'\n    AND classifier_source IN ('llm', 'tier1', 'explicit')\n  GROUP BY constraint_id\n  HAVING COUNT(*) >= 5\n)\nSELECT now() AS time,\n       CASE WHEN SUM(surfaced) > 0\n            THEN (SUM(followed) + SUM(partial_half)) / SUM(surfaced)::float\n            ELSE NULL\n       END AS value\nFROM per_constraint",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "noValue": "No Data",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.4
+              },
+              {
+                "color": "green",
+                "value": 0.7
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Constraint Eff. (Selected Range)",
+      "description": "Dynamically computed from constraint_outcomes within the dashboard time range. Volume-weighted across constraints with 5+ outcomes in the selected interval. RE-BASELINE (JIMINY-OUTCOME-002): history before 2026-06-11T19:00Z is heuristic-dominated \u2014 94.9% of Tier-2 classifier calls were context-cancelled and fell back to half-credit partial_compliance verdicts (fixed by SUPERVISOR-002). Not comparable to post-fix LLM-classified data. Rows now carry classifier_source (tier1|llm|heuristic|explicit) to filter the artifact class.",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 9,
+        "y": 1
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "-- DASHBOARD-TRUTH-002 E7: added classifier_source filter for parity with All-Time panel (excludes pre-2026-06-11 heuristic-dominated rows).\nWITH per_constraint AS (\n  SELECT constraint_id,\n         COUNT(*) AS surfaced,\n         SUM(CASE WHEN outcome_type = 'followed' THEN 1.0 ELSE 0.0 END) AS followed,\n         SUM(CASE WHEN outcome_type = 'partial_compliance' THEN 0.5 ELSE 0.0 END) AS partial_half\n  FROM constraint_outcomes\n  WHERE space_id = '$space_id'\n    AND classifier_source IN ('llm', 'tier1', 'explicit')\n    AND $__timeFilter(time)\n  GROUP BY constraint_id\n  HAVING COUNT(*) >= 2\n)\nSELECT now() AS time,\n       CASE WHEN SUM(surfaced) > 0\n            THEN (SUM(followed) + SUM(partial_half)) / SUM(surfaced)::float\n            ELSE NULL\n       END AS value\nFROM per_constraint",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "noValue": "No Data",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.4
+              },
+              {
+                "color": "green",
+                "value": 0.7
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Actionable Compliance Rate",
+      "description": "Compliance rate on ACTIONABLE guidance types (constraint/correction), excluding correctly-ignored advisory abstractions (pattern/learning/concept). JIMINY-ACTIONABILITY-INVERSION-001 discovered this rate reads LOWER than raw follow rate (10% vs 15%) under current architecture \u2014 an emergent effect of (constraint semantics \u00d7 Lever C over-surfacing \u00d7 correct must/should classifier calibration), NOT a defect. The >90% goal ISN'T the right frame \u2014 real actionable rate under Lever C's aggressive constraint-partition biasing has an expected floor around 10-25% (higher once JIMINY-ACTIONABILITY-COMPLIANCE-CREDIT-001's non-violation-credit prompt is enabled \u2014 routes unrelated-context ignored verdicts to not_applicable, predicted lift ~+10pp). WATCH THE TREND OVER 14-DAY WINDOWS, not the absolute value. DASHBOARD-TRUTH-001: not_applicable / blank / unknown excluded from BOTH numerator and denominator. Matches the guidance_should_follow_rate_low alert. Computed from guidance_training_rows in the dashboard time range (followed=1.0, partial_compliance=0.5). Bands: red <0.05 = genuine collapse (matches the alert floor GUIDANCE_SHOULD_FOLLOW_RATE_FLOOR); yellow 0.05-0.18 = pre-flip by-design steady state (~0.10-0.14 live); green \u22650.18 = the non-violation-credit post-flip target zone.",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 12,
+        "y": 1
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT now() AS time, AVG(CASE outcome_type WHEN 'followed' THEN 1.0 WHEN 'partial_compliance' THEN 0.5 ELSE 0.0 END) AS value FROM guidance_training_rows WHERE space_id = '$space_id' AND $__timeFilter(time) AND guidance_type IN ('constraint', 'correction') AND outcome_type IN ('followed', 'partial_compliance', 'ignored', 'contradicted')",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "noValue": "No Data",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.05
+              },
+              {
+                "color": "green",
+                "value": 0.18
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Source Diversity",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 15,
+        "y": 1
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_jiminy_source_diversity' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "mean"
+          ]
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "noValue": "N/A",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.4
+              },
+              {
+                "color": "green",
+                "value": 0.7
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Auto-compact AVG",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 18,
+        "y": 1
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT NOW() AS time, CASE WHEN count(*) > 1 THEN EXTRACT(EPOCH FROM (max(time) - min(time))) / (count(*) - 1) / 60.0 ELSE 0 END AS value FROM metric_samples WHERE metric_name = 'mdemg_compact_event_ts' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time)",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "mean"
+          ]
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "m",
+          "noValue": "N/A",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 120
+              },
+              {
+                "color": "red",
+                "value": 240
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Health Formula",
+      "type": "text",
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 21,
+        "y": 1
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "### Guidance Health\n\n| Weight | Factor |\n|--------|--------|\n| **50%** | Follow Rate |\n| **30%** | Effectiveness |\n| **20%** | Source Diversity |\n\n*Follow Rate = (followed + 0.5 * partial) / total*"
+      }
+    },
+    {
+      "title": "Guidance Activity",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 5
+      },
+      "panels": []
+    },
+    {
+      "title": "Guidance Items With Recorded Outcomes (all-time)",
+      "description": "DASHBOARD-TRUTH-001: this is NOT issuance volume. mdemg_jiminy_guidance_total counts DISTINCT guidance_ids that have at least one GUIDANCE_OUTCOME edge in Neo4j, cumulative over all time (internal/jiminy/stats.go). Guidance issued but never fed back through /v1/jiminy/feedback is invisible here.",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 6
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_jiminy_guidance_total' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "displayName": "Guidance With Recorded Outcomes (all-time)"
+        }
+      }
+    },
+    {
+      "title": "Outcome Distribution",
+      "description": "DASHBOARD-TRUTH-001: honest WINDOWED outcome counts from constraint_outcomes over the dashboard time range. Previously read the mdemg_jiminy_*_total Neo4j gauges, which are lifetime-cumulative AND multi-credit (stats.go: a guidance_id is credited to 'followed' if ANY of its edges is followed) — they showed ~0.73 followed while the honest windowed follow rate was ~0.16.",
+      "type": "piechart",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 6
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT now() AS time, COALESCE(COUNT(*) FILTER (WHERE outcome_type = 'followed'), 0)::float AS value FROM constraint_outcomes WHERE space_id = '$space_id' AND $__timeFilter(time)",
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "rawSql": "SELECT now() AS time, COALESCE(COUNT(*) FILTER (WHERE outcome_type = 'partial_compliance'), 0)::float AS value FROM constraint_outcomes WHERE space_id = '$space_id' AND $__timeFilter(time)",
+          "format": "time_series"
+        },
+        {
+          "refId": "C",
+          "rawSql": "SELECT now() AS time, COALESCE(COUNT(*) FILTER (WHERE outcome_type = 'ignored'), 0)::float AS value FROM constraint_outcomes WHERE space_id = '$space_id' AND $__timeFilter(time)",
+          "format": "time_series"
+        },
+        {
+          "refId": "D",
+          "rawSql": "SELECT now() AS time, COALESCE(COUNT(*) FILTER (WHERE outcome_type = 'contradicted'), 0)::float AS value FROM constraint_outcomes WHERE space_id = '$space_id' AND $__timeFilter(time)",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "pieType": "donut",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "right"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "A"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Followed"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#73BF69",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "B"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Partial Compliance"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#56A64B",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "C"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Ignored"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#FADE2A",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "D"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Contradicted"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#F2495C",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "title": "Effectiveness Trends",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 14
+      },
+      "panels": []
+    },
+    {
+      "title": "Effectiveness Trends",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 15
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_jiminy_follow_rate' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_jiminy_constraint_effectiveness' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series"
+        },
+        {
+          "refId": "C",
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_jiminy_source_diversity' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series"
+        },
+        {
+          "refId": "D",
+          "rawSql": "WITH bucketed AS ( SELECT time_bucket('1 hour', time) AS bucket, constraint_id, COUNT(*) AS surfaced, SUM(CASE WHEN outcome_type = 'followed' THEN 1.0 ELSE 0.0 END) AS followed, SUM(CASE WHEN outcome_type = 'partial_compliance' THEN 0.5 ELSE 0.0 END) AS partial_half FROM constraint_outcomes WHERE space_id = '$space_id' AND $__timeFilter(time) GROUP BY bucket, constraint_id HAVING COUNT(*) >= 2 ) SELECT bucket AS time, CASE WHEN SUM(surfaced) > 0 THEN (SUM(followed) + SUM(partial_half)) / SUM(surfaced)::float ELSE NULL END AS value FROM bucketed GROUP BY bucket ORDER BY bucket",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "A"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Follow Rate"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "B"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Effectiveness (All-Time)"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "C"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Source Diversity"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "D"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Effectiveness (Windowed)"
+              },
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    10,
+                    10
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "description": " RE-BASELINE (JIMINY-OUTCOME-002): history before 2026-06-11T19:00Z is heuristic-dominated \u2014 94.9% of Tier-2 classifier calls were context-cancelled and fell back to half-credit partial_compliance verdicts (fixed by SUPERVISOR-002). Not comparable to post-fix LLM-classified data. Rows now carry classifier_source (tier1|llm|heuristic|explicit) to filter the artifact class."
+    },
+    {
+      "title": "Outcome Trends",
+      "description": "DASHBOARD-TRUTH-001: per-hour WINDOWED outcome counts from constraint_outcomes (time_bucket over the dashboard range). Previously stacked the mdemg_jiminy_*_total Neo4j gauges — lifetime-cumulative multi-credit counters (stats.go), not a trend of outcomes in the interval.",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 15
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT time_bucket('1 hour', time) AS time, COUNT(*)::float AS value FROM constraint_outcomes WHERE space_id = '$space_id' AND $__timeFilter(time) AND outcome_type = 'followed' GROUP BY 1 ORDER BY 1",
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "rawSql": "SELECT time_bucket('1 hour', time) AS time, COUNT(*)::float AS value FROM constraint_outcomes WHERE space_id = '$space_id' AND $__timeFilter(time) AND outcome_type = 'partial_compliance' GROUP BY 1 ORDER BY 1",
+          "format": "time_series"
+        },
+        {
+          "refId": "C",
+          "rawSql": "SELECT time_bucket('1 hour', time) AS time, COUNT(*)::float AS value FROM constraint_outcomes WHERE space_id = '$space_id' AND $__timeFilter(time) AND outcome_type = 'ignored' GROUP BY 1 ORDER BY 1",
+          "format": "time_series"
+        },
+        {
+          "refId": "D",
+          "rawSql": "SELECT time_bucket('1 hour', time) AS time, COUNT(*)::float AS value FROM constraint_outcomes WHERE space_id = '$space_id' AND $__timeFilter(time) AND outcome_type = 'contradicted' GROUP BY 1 ORDER BY 1",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "stacking": {
+              "mode": "normal"
+            },
+            "fillOpacity": 80
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "A"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Followed"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#73BF69",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "B"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Partial Compliance"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#56A64B",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "C"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Ignored"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#FADE2A",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "D"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Contradicted"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#F2495C",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "title": "Constraint Effectiveness",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 23
+      },
+      "panels": []
+    },
+    {
+      "title": "Per-Constraint Effectiveness",
+      "type": "table",
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 24
+      },
+      "datasource": {
+        "type": "kniepdennis-neo4j-datasource",
+        "uid": "neo4j"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "cypherQuery": "MATCH (c:MemoryNode {space_id: '$space_id', role_type: 'constraint'}) OPTIONAL MATCH (c)-[r:GUIDANCE_OUTCOME]-() WITH c.content AS Constraint, count(r) AS Surfaced, count(CASE WHEN r.outcome_type = 'followed' THEN 1 END) AS Followed, count(CASE WHEN r.outcome_type = 'partial_compliance' THEN 1 END) AS Partial, count(CASE WHEN r.outcome_type = 'ignored' THEN 1 END) AS Ignored, count(CASE WHEN r.outcome_type = 'contradicted' THEN 1 END) AS Contradicted WHERE Surfaced > 0 RETURN Constraint, Surfaced, Followed, Partial, Ignored, Contradicted, round((toFloat(Followed) + 0.5 * toFloat(Partial)) / Surfaced * 100) / 100 AS EffRate ORDER BY Surfaced DESC LIMIT 20",
+          "Format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {}
+      }
+    },
+    {
+      "title": "Historical Trends",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 34
+      },
+      "panels": []
+    },
+    {
+      "title": "Guidance Follow Rate Trend",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 35
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT bucket AS time, metric_name AS metric, avg_value AS value FROM metrics_hourly WHERE metric_name IN ('mdemg_jiminy_follow_rate','mdemg_jiminy_constraint_effectiveness','mdemg_jiminy_source_diversity') AND space_id = '$space_id' AND $__timeFilter(bucket) ORDER BY bucket",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "pointSize": 5,
+            "showPoints": "auto"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "mdemg_jiminy_follow_rate"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Follow Rate"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "mdemg_jiminy_constraint_effectiveness"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Constraint Effectiveness"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "mdemg_jiminy_source_diversity"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Source Diversity"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "lastNotNull",
+            "mean",
+            "min",
+            "max"
+          ]
+        }
+      }
+    },
+    {
+      "title": "Surfaced Actionable Fraction (JIMINY-ACTIONABILITY-001)",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 43
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "targets": [
+        {
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name='mdemg_jiminy_surfaced_actionable_fraction' AND metric_type='gauge' AND space_id='$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "A"
+        },
+        {
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name='mdemg_jiminy_surfaced_abstraction_fraction' AND metric_type='gauge' AND space_id='$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "pointSize": 5,
+            "showPoints": "auto"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "A"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Actionable Fraction"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "B"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Abstraction Fraction"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "lastNotNull",
+            "mean",
+            "min",
+            "max"
+          ]
+        }
+      },
+      "description": "Fraction of the surfaced guidance set that is the actionable class (constraint/correction) vs abstraction (pattern/learning/concept). Lever A moves this; target rises toward the actionable class."
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": [
+    "mdemg",
+    "jiminy"
+  ],
+  "refresh": "30s",
+  "templating": {
+    "list": [
+      {
+        "allValue": "",
+        "current": {
+          "selected": false,
+          "text": "localhost:9999",
+          "value": "localhost:9999"
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "timescaledb"
+        },
+        "definition": "SELECT DISTINCT labels->>'instance' AS __value, labels->>'instance' AS __text FROM metric_samples WHERE labels->>'instance' IS NOT NULL AND time > now() - interval '24 hours' ORDER BY 1",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Instance",
+        "multi": false,
+        "name": "instance",
+        "options": [],
+        "query": "SELECT DISTINCT labels->>'instance' AS __value, labels->>'instance' AS __text FROM metric_samples WHERE labels->>'instance' IS NOT NULL AND time > now() - interval '24 hours' ORDER BY 1",
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allValue": "",
+        "current": {
+          "selected": false,
+          "text": "mdemg-dev",
+          "value": "mdemg-dev"
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "timescaledb"
+        },
+        "definition": "SELECT DISTINCT space_id FROM metric_samples WHERE time > now() - interval '24 hours' AND ($instance = '' OR labels->>'instance' = '$instance') ORDER BY 1",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Space ID",
+        "multi": false,
+        "name": "space_id",
+        "options": [],
+        "query": "SELECT DISTINCT space_id FROM metric_samples WHERE time > now() - interval '24 hours' AND ($instance = '' OR labels->>'instance' = '$instance') ORDER BY 1",
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "MDEMG Jiminy Guidance",
+  "uid": "mdemg-jiminy",
+  "version": 1
+}
