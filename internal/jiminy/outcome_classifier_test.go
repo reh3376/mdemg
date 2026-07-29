@@ -386,3 +386,104 @@ func TestNewOutcomeClassifier_NonViolationCredit_Propagates(t *testing.T) {
 		t.Error("flag on/off renders should differ")
 	}
 }
+
+// JIMINY-CLASSIFIER-CONTEXT-001: pin tests
+
+// TestResolveClassifySystemPrompt_ContextMismatch_DefaultOff_ByteIdentical
+// proves that with contextMismatchCredit=false (and nonViolationCredit=false),
+// the resolved prompt is byte-identical to the historical const — ULTS
+// system_prompt_hash pin stays unchanged. Preserving this is why the resolver
+// method is an extension point rather than a mutation of the const.
+func TestResolveClassifySystemPrompt_ContextMismatch_DefaultOff_ByteIdentical(t *testing.T) {
+	oc := &OutcomeClassifier{compressPrompts: false, nonViolationCredit: false, contextMismatchCredit: false}
+	if got := oc.resolveClassifySystemPrompt(); got != classifySystemPrompt {
+		t.Errorf("default-off render (all flags false) is NOT byte-identical to classifySystemPrompt — ULTS hash pin would break.\ngot len=%d, want len=%d", len(got), len(classifySystemPrompt))
+	}
+	oc2 := &OutcomeClassifier{compressPrompts: true, nonViolationCredit: false, contextMismatchCredit: false}
+	if got := oc2.resolveClassifySystemPrompt(); got != classifySystemPromptCompact {
+		t.Errorf("default-off + compressed render is NOT byte-identical to classifySystemPromptCompact")
+	}
+}
+
+// TestResolveClassifySystemPrompt_ContextMismatch_On_Extended proves the
+// flag-on render appends the contextMismatchCreditClause to whichever base
+// prompt is selected.
+func TestResolveClassifySystemPrompt_ContextMismatch_On_Extended(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		compress bool
+		base     string
+	}{
+		{"full", false, classifySystemPrompt},
+		{"compact", true, classifySystemPromptCompact},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			oc := &OutcomeClassifier{compressPrompts: tc.compress, contextMismatchCredit: true}
+			got := oc.resolveClassifySystemPrompt()
+			want := tc.base + contextMismatchCreditClause
+			if got != want {
+				t.Errorf("flag-on render doesn't match base + clause; got len=%d want len=%d", len(got), len(want))
+			}
+			// Content-level assertions on the extension clause.
+			if !strings.Contains(got, "CONTEXT-MISMATCH CREDIT for any constraint type") {
+				t.Error("extended prompt missing the context-mismatch credit header")
+			}
+			if !strings.Contains(got, "\"not_applicable\", NOT \"ignored\"") {
+				t.Error("extended prompt missing the not_applicable-not-ignored routing directive")
+			}
+			// Concrete examples must be present — an abstract rule alone
+			// under-transfers to real cases.
+			if !strings.Contains(got, "read-only Cypher query") {
+				t.Error("extended prompt missing the code-vs-query concrete example")
+			}
+			if !strings.Contains(got, "completion log / session artifact / phase description") {
+				t.Error("extended prompt missing the surface-mismatch fallback example")
+			}
+		})
+	}
+}
+
+// TestResolveClassifySystemPrompt_BothCredits_Both_Appended pins that when
+// both flags are ON, both clauses splice — non-violation FIRST (must_not-
+// specific — narrower), context-mismatch SECOND (general — broader). This
+// ordering documents intent: the specific case is a subset of the general
+// case; combining them is additive, and the LLM sees the specific example
+// before the general rule.
+func TestResolveClassifySystemPrompt_BothCredits_Both_Appended(t *testing.T) {
+	oc := &OutcomeClassifier{
+		compressPrompts:       false,
+		nonViolationCredit:    true,
+		contextMismatchCredit: true,
+	}
+	got := oc.resolveClassifySystemPrompt()
+	want := classifySystemPrompt + nonViolationCreditClause + contextMismatchCreditClause
+	if got != want {
+		t.Errorf("both-flags render doesn't match base + both clauses in expected order.\ngot len=%d want len=%d", len(got), len(want))
+	}
+	// Ordering assertion: non-violation appears BEFORE context-mismatch.
+	nvIdx := strings.Index(got, "NON-VIOLATION CREDIT")
+	cmIdx := strings.Index(got, "CONTEXT-MISMATCH CREDIT")
+	if nvIdx < 0 || cmIdx < 0 {
+		t.Fatalf("both clauses must be present; nvIdx=%d cmIdx=%d", nvIdx, cmIdx)
+	}
+	if nvIdx > cmIdx {
+		t.Errorf("non-violation clause must appear BEFORE context-mismatch clause; nvIdx=%d cmIdx=%d", nvIdx, cmIdx)
+	}
+}
+
+// TestNewOutcomeClassifier_ContextMismatchCredit_Propagates verifies the
+// OutcomeClassifierConfig.ContextMismatchCredit field flows through
+// NewOutcomeClassifier to the internal field.
+func TestNewOutcomeClassifier_ContextMismatchCredit_Propagates(t *testing.T) {
+	off := NewOutcomeClassifier(nil, OutcomeClassifierConfig{ContextMismatchCredit: false})
+	if off.contextMismatchCredit {
+		t.Error("ContextMismatchCredit=false should not propagate to true")
+	}
+	on := NewOutcomeClassifier(nil, OutcomeClassifierConfig{ContextMismatchCredit: true})
+	if !on.contextMismatchCredit {
+		t.Error("ContextMismatchCredit=true should propagate")
+	}
+	if off.resolveClassifySystemPrompt() == on.resolveClassifySystemPrompt() {
+		t.Error("ContextMismatchCredit flag on/off renders should differ")
+	}
+}

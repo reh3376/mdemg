@@ -76,18 +76,64 @@ NON-VIOLATION CREDIT for must_not-type constraints:
 - Example: constraint "never commit to main" + action "committed directly to main" = contradicted.
 This rule reduces false-ignored labels on constraints that don't apply to the specific action being taken.`
 
+// contextMismatchCreditClause is appended to the classifier system prompt
+// when OutcomeClassifierConfig.ContextMismatchCredit is true
+// (JIMINY-CLASSIFIER-CONTEXT-001). Generalizes the non-violation-credit
+// pattern to non-must_not constraints where the rule is durable but doesn't
+// govern the ACTION'S CONTEXT.
+//
+// Evidence base: JIMINY-CEILING-INVESTIGATION-001 sampled 16 high-similarity
+// LLM-classified "ignored" outcomes and hand-categorized them:
+//   - 8/16 (50%): context mismatch (rule doesn't govern action's context)
+//   - 7/16 (44%): surface mismatch (rule is a low-quality auto-* entry)
+//   - 1/16 (6%): classifier misclassification
+//   - 0/16: genuine ignore
+// Predicted lift: 11% follow rate → 35-50% honest follow rate by
+// routing ~50% of current `ignored` verdicts to `not_applicable`
+// (filtered from constraint_outcomes by the shipped service.go writer
+// gate at lines 1730,1762).
+//
+// Default OFF; operator flips JIMINY_CONTEXT_MISMATCH_CREDIT_ENABLED=true
+// in .env after live smoke. Same pattern + gating as
+// nonViolationCreditClause (JIMINY-ACTIONABILITY-COMPLIANCE-CREDIT-001).
+//
+//nolint:gosec // G101 false-positive: "CREDIT" in prose content is not a credential.
+const contextMismatchCreditClause = `
+
+CONTEXT-MISMATCH CREDIT for any constraint type:
+- If a constraint is a durable rule but doesn't GOVERN the action's context, classify as "not_applicable", NOT "ignored".
+- The "context" is the SPACE the rule operates over — git operations, code modification, a specific workflow step, a specific language, etc. When the action is in a DIFFERENT space from the rule's context, the rule doesn't apply.
+- Example: constraint "do not modify code without planning mode" + action "read-only Cypher query" = not_applicable (rule governs code modification; action is a query).
+- Example: constraint "run e2e tests before commit" + action "grep for a string" = not_applicable (rule governs commit-time; action is investigation).
+- Example: constraint "mandatory sprint plan format" + action "post PR comment" = not_applicable (rule governs sprint plans; action is a PR comment).
+- Example: constraint "Go rune-safe string cutting" + action "edit a Python file" = not_applicable (rule is Go-specific; action is Python).
+- ADDITIONALLY: if the constraint text is a completion log / session artifact / phase description (not a rule at all), classify as "not_applicable" regardless of similarity — the classifier is being asked to grade against a non-rule.
+- Use "ignored" ONLY when the constraint DOES govern the action's context AND the agent had opportunity to comply but didn't.
+This rule generalizes non-violation credit to all constraint types where surface similarity fires but context differs.`
+
 // resolveClassifySystemPrompt returns the effective system prompt for tier-2
-// classification. When nonViolationCredit is true, appends the extension
-// clause. Default-off path returns the historical byte-identical prompt.
+// classification. When nonViolationCredit and/or contextMismatchCredit are
+// true, appends the corresponding extension clause(s). Default-off path
+// returns the historical byte-identical prompt (ULTS-CI-001 hash pin).
+//
+// Clause ordering: nonViolationCredit first (must_not-specific — the
+// narrower case), contextMismatchCredit second (general — the broader
+// case). Both compatible: non-violation is a specific example of context
+// mismatch limited to must_not-type rules; combining them is additive.
+// JIMINY-CLASSIFIER-CONTEXT-001.
 func (oc *OutcomeClassifier) resolveClassifySystemPrompt() string {
 	base := classifySystemPrompt
 	if oc.compressPrompts {
 		base = classifySystemPromptCompact
 	}
+	out := base
 	if oc.nonViolationCredit {
-		return base + nonViolationCreditClause
+		out += nonViolationCreditClause
 	}
-	return base
+	if oc.contextMismatchCredit {
+		out += contextMismatchCreditClause
+	}
+	return out
 }
 
 // ollamaClassifySchema is the JSON schema for Ollama grammar-constrained classification.
@@ -113,6 +159,7 @@ type OutcomeClassifier struct {
 	lowThreshold       float64 // below this similarity = sub-LOW band (ignored / not_applicable, see naThreshold) (default: 0.2)
 	naThreshold        float64 // JIMINY-CORPUS-001 Epic 4 relevance gate: below this = not_applicable; [this, low) = ignored. ≤0 disables (whole sub-LOW tail is not_applicable)
 	nonViolationCredit bool    // JIMINY-ACTIONABILITY-COMPLIANCE-CREDIT-001: when true, LLM classifier prompt gets an extended clause telling the LLM to classify must_not-type constraints as not_applicable (not ignored) when the action didn't touch the constraint's mechanism. Routes ~50% of current unrelated-context ignored verdicts to not_applicable, which the shipped writer gate (service.go:1730,1762) filters from constraint_outcomes. Predicted to lift constraint follow rate 10%→~20%. Default false; operator runs 3-day A/B before flipping.
+	contextMismatchCredit bool // JIMINY-CLASSIFIER-CONTEXT-001: generalizes non-violation credit to ANY constraint type where the rule is durable but doesn't govern the action's context (git rule + file-write action, code rule + read-only-query action, workflow-step rule + different-step action, language-specific rule + different-language action, or the "rule" is a session log / phase description not a real rule). Predicted to lift 11% → 35-50%; JIMINY-CEILING-INVESTIGATION-001 evidence base (8/16 samples were context mismatch, 7/16 surface mismatch, 0/16 genuine ignore). Default false; operator flips after live smoke.
 	maxTokens          int     // J14: max tokens for LLM classification
 
 	// G8: circuit breaker for LLM calls
@@ -139,6 +186,7 @@ type OutcomeClassifierConfig struct {
 	CacheSize              int     // J14: LRU cache capacity (default: 256)
 	CompressPrompts        bool    // J17-PC: compress classification prompts to reduce tokens
 	NonViolationCredit     bool    // JIMINY-ACTIONABILITY-COMPLIANCE-CREDIT-001: extend classifier prompt with must_not non-violation credit clause. Default false.
+	ContextMismatchCredit  bool    // JIMINY-CLASSIFIER-CONTEXT-001: extend classifier prompt with generalized context-mismatch credit clause. Default false.
 }
 
 // classifyCacheEntry holds a cached classification result.
@@ -156,7 +204,8 @@ func NewOutcomeClassifier(embedder embeddings.Embedder, cfg OutcomeClassifierCon
 		highThreshold:      cfg.HighThreshold,
 		lowThreshold:       cfg.LowThreshold,
 		maxTokens:          cfg.MaxTokens,
-		nonViolationCredit: cfg.NonViolationCredit,
+		nonViolationCredit:    cfg.NonViolationCredit,
+		contextMismatchCredit: cfg.ContextMismatchCredit,
 		cacheMap:           make(map[string]*list.Element),
 		cacheList:          list.New(),
 	}

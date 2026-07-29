@@ -404,6 +404,7 @@ type Config struct {
 	JiminyOutcomeCacheSize          int     // JIMINY_OUTCOME_CACHE_SIZE — LRU cache capacity (default: 256)
 	JiminyClassifyCompress          bool    // JIMINY_CLASSIFY_COMPRESS — compress outcome classification prompts (default: true)
 	JiminyNonViolationCreditEnabled bool    // JIMINY_NONVIOLATION_CREDIT_ENABLED — extend tier-2 LLM classifier prompt with a "non-violation credit for must_not" clause. Routes unrelated-context ignored verdicts to not_applicable (already filtered from constraint_outcomes by the writer gate). Predicted to lift constraint follow rate 10%→~20% by shrinking the actionable denominator. Default false; operator runs the 3-day A/B recipe (docs/development/jiminy-actionability-compliance-credit-001/ab_recipe.md) before flipping (JIMINY-ACTIONABILITY-COMPLIANCE-CREDIT-001).
+	JiminyContextMismatchCreditEnabled bool // JIMINY_CONTEXT_MISMATCH_CREDIT_ENABLED — extend tier-2 LLM classifier prompt with a generalized "context-mismatch credit" clause (any constraint type, not just must_not). Routes context-mismatched verdicts (git rule + file-write action, code rule + read-only-query action, etc.) to not_applicable. Predicted to lift 11%→35-50% per JIMINY-CEILING-INVESTIGATION-001 evidence (8/16 samples were context mismatch). Default false; operator flips after live smoke (JIMINY-CLASSIFIER-CONTEXT-001).
 	JiminyDedupSimilarityThreshold  float64 // JIMINY_DEDUP_SIMILARITY_THRESHOLD — semantic dedup cosine threshold (default: 0.85)
 	JiminyCorrectionDecayRate       float64 // JIMINY_CORRECTION_DECAY_RATE — time-decay lambda for corrections (default: 0.01)
 	J17TicketCacheSize              int     // J17_TICKET_CACHE_SIZE — max entries in ticket LRU cache (default: 1000)
@@ -2888,6 +2889,7 @@ func FromEnv() (Config, error) {
 	// JIMINY-ACTIONABILITY-COMPLIANCE-CREDIT-001: default OFF; operator flips
 	// after running the 3-day A/B recipe to verify the predicted lift.
 	jiminyNonViolationCreditEnabled := getBool("JIMINY_NONVIOLATION_CREDIT_ENABLED", false)
+	jiminyContextMismatchCreditEnabled := getBool("JIMINY_CONTEXT_MISMATCH_CREDIT_ENABLED", false)
 	jiminyDedupSimilarityThreshold, err := atof("JIMINY_DEDUP_SIMILARITY_THRESHOLD", 0.85)
 	if err != nil {
 		return Config{}, err
@@ -5690,6 +5692,7 @@ func FromEnv() (Config, error) {
 		JiminyOutcomeCacheSize:          jiminyOutcomeCacheSize,
 		JiminyClassifyCompress:          jiminyClassifyCompress,
 		JiminyNonViolationCreditEnabled: jiminyNonViolationCreditEnabled,
+		JiminyContextMismatchCreditEnabled: jiminyContextMismatchCreditEnabled,
 		JiminyDedupSimilarityThreshold:  jiminyDedupSimilarityThreshold,
 		JiminyCorrectionDecayRate:       jiminyCorrectionDecayRate,
 		J17TicketCacheSize:              j17TicketCacheSize,
