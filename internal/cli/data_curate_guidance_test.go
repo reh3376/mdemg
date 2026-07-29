@@ -29,4 +29,12 @@ func TestNewDataCurateGuidanceCmd(t *testing.T) {
 	if cmd.Flags().Lookup("against") == nil {
 		t.Error("missing flag --against (leak-audit)")
 	}
+	// REVIEW-SUGGESTED-GUIDANCE-CONSUME-001: SME-suggestion length gate.
+	msl := cmd.Flags().Lookup("min-suggestion-length")
+	if msl == nil {
+		t.Fatal("missing flag --min-suggestion-length")
+	}
+	if msl.DefValue != "40" {
+		t.Errorf("flag --min-suggestion-length default = %q, want 40", msl.DefValue)
+	}
 }
