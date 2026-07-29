@@ -419,6 +419,15 @@ jobs:
         # visible permanently instead of one-off-census visible.
         run: python3 scripts/verify_route_consumers.py
 
+      - name: Grafana embed drift check (merge-blocking)
+        # RELEASE-HYGIENE-001 E2: internal/cli/grafana_templates/staged/
+        # is a mirror of deploy/docker/grafana/** — //go:embed can't cross
+        # package boundaries, so the staged copy is what gets embedded.
+        # An edit to a dashboard/datasource/alerting file without running
+        # `make sync-grafana-embed` would silently ship a stale embed
+        # to every fresh install. This check fails fast.
+        run: make verify-grafana-embed
+
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:

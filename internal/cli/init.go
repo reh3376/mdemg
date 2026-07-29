@@ -22,6 +22,7 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 	"mdemg/internal/cli/compose_templates"
+	"mdemg/internal/cli/grafana_templates"
 	"mdemg/internal/config"
 )
 
@@ -910,6 +911,22 @@ func runDockerInit(cwd, envPath string, envLines []string, opts config.InitOptio
 		fmt.Println("  Wrote docker-compose.yml to project directory")
 	} else if err == nil {
 		fmt.Println("  Using existing docker-compose.yml")
+	}
+
+	// RELEASE-HYGIENE-001 E2: materialize the Grafana provisioning tree
+	// under ./deploy/docker/grafana/** so the compose template's
+	// cwd-relative mount paths resolve. Without this, fresh Homebrew
+	// installs get a blank Grafana. Idempotent + operator-edit-safe
+	// (files with different content are preserved, not overwritten).
+	written, preserved, gErr := grafana_templates.Materialize(cwd)
+	if gErr != nil {
+		return fmt.Errorf("materialize grafana provisioning: %w", gErr)
+	}
+	if written > 0 {
+		fmt.Printf("  Wrote %d Grafana provisioning file(s) to ./%s/\n", written, grafana_templates.DeployRelPath)
+	}
+	if preserved > 0 {
+		fmt.Printf("  Preserved %d existing Grafana file(s) (operator edits kept)\n", preserved)
 	}
 
 	// Run docker compose up

@@ -2,6 +2,11 @@ name: Docker Publish
 
 on:
   push:
+    # RELEASE-HYGIENE-001 E1: tag triggers publish semver-tagged images
+    # directly (workflow_run:[Release] chain hasn't fired in visible
+    # history — kept as backup). tag pushes DO NOT filter on paths;
+    # every release must produce a docker image.
+    tags: ["v*"]
     branches: [main]
     paths:
       - "cmd/**"

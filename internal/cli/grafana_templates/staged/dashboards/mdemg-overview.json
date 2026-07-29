@@ -1,0 +1,494 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "gnetId": null,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [
+    {
+      "title": "Dashboards",
+      "type": "dashboards",
+      "tags": [
+        "mdemg"
+      ],
+      "icon": "external link",
+      "asDropdown": true
+    }
+  ],
+  "panels": [
+    {
+      "title": "Request Rate",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "targets": [
+        {
+          "rawSql": "SELECT time_bucket('$__interval', time) AS time, SUM(value) / EXTRACT(EPOCH FROM '$__interval'::interval) AS rate FROM metric_samples WHERE metric_name = 'mdemg_http_requests_total' AND metric_type = 'counter' AND space_id = '$space_id' AND $__timeFilter(time) GROUP BY 1 ORDER BY 1",
+          "format": "time_series",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "N/A"
+        }
+      }
+    },
+    {
+      "title": "P95 Latency",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "targets": [
+        {
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_http_request_duration_seconds_p95' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "N/A",
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 60
+              },
+              {
+                "color": "red",
+                "value": 120
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Error Rate",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 0
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "targets": [
+        {
+          "rawSql": "SELECT time_bucket('$__interval', time) AS time, COALESCE(SUM(CASE WHEN metric_name = 'mdemg_http_requests_total' AND labels->>'status' LIKE '5__' THEN value ELSE 0 END) / NULLIF(SUM(CASE WHEN metric_name = 'mdemg_http_requests_total' THEN value ELSE 0 END), 0) * 100, 0) AS value FROM metric_samples WHERE metric_name = 'mdemg_http_requests_total' AND metric_type = 'counter' AND space_id = '$space_id' AND $__timeFilter(time) GROUP BY 1 ORDER BY 1",
+          "format": "time_series",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "N/A",
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.1
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Circuit Breakers",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "targets": [
+        {
+          "rawSql": "SELECT time_bucket('$__interval', time) AS time, COALESCE(COUNT(*) FILTER (WHERE value = 1), 0) AS value FROM metric_samples WHERE metric_name = 'mdemg_circuit_breaker_state' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) GROUP BY 1 ORDER BY 1",
+          "format": "time_series",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "N/A"
+        }
+      }
+    },
+    {
+      "title": "Request Latency Distribution",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 4
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "targets": [
+        {
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_http_request_duration_seconds_p95' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "B"
+        },
+        {
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_http_request_duration_seconds_p99' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "A"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "P50"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "B"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "P95"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "C"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "P99"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "title": "Requests by Status",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 4
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "targets": [
+        {
+          "rawSql": "SELECT time_bucket('$__interval', time) AS time, labels->>'status' AS status, SUM(value) / EXTRACT(EPOCH FROM '$__interval'::interval) AS rate FROM metric_samples WHERE metric_name = 'mdemg_http_requests_total' AND metric_type = 'counter' AND space_id = '$space_id' AND $__timeFilter(time) GROUP BY 1, labels->>'status' ORDER BY 1",
+          "format": "time_series",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Cache Hit Ratios",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 0,
+        "y": 12
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "targets": [
+        {
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_cache_hit_ratio' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 1,
+          "unit": "percentunit",
+          "displayName": "Cache Hit Ratio"
+        }
+      }
+    },
+    {
+      "title": "Retrieval Latency",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 12,
+        "y": 12
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "targets": [
+        {
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_retrieval_latency_seconds_p95' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "displayName": "P95 Retrieval"
+        }
+      }
+    },
+    {
+      "title": "Rate Limit Rejections",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 0,
+        "y": 18
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "targets": [
+        {
+          "rawSql": "SELECT time_bucket('$__interval', time) AS time, SUM(value) / EXTRACT(EPOCH FROM '$__interval'::interval) AS rate FROM metric_samples WHERE metric_name = 'mdemg_rate_limit_rejected_total' AND metric_type = 'counter' AND space_id = '$space_id' AND $__timeFilter(time) GROUP BY 1 ORDER BY 1",
+          "format": "time_series",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "displayName": "Rejections/s"
+        }
+      }
+    },
+    {
+      "title": "Embedding Latency",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 12,
+        "y": 18
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "targets": [
+        {
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_embedding_latency_seconds_p95' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "displayName": "P95 Embedding"
+        }
+      }
+    },
+    {
+      "title": "Historical Trends",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 24
+      },
+      "panels": []
+    },
+    {
+      "title": "90-day Health Trend",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 25
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT bucket AS time, avg_value AS value FROM metrics_hourly WHERE metric_name = 'mdemg_rsic_health_overall' AND space_id = '$space_id' AND $__timeFilter(bucket) ORDER BY bucket",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "displayName": "Overall Health",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "pointSize": 5,
+            "showPoints": "auto"
+          }
+        }
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "lastNotNull",
+            "mean",
+            "min",
+            "max"
+          ]
+        }
+      }
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": [
+    "mdemg",
+    "overview"
+  ],
+  "templating": {
+    "list": [
+      {
+        "allValue": "",
+        "current": {
+          "selected": false,
+          "text": "localhost:9999",
+          "value": "localhost:9999"
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "timescaledb"
+        },
+        "definition": "SELECT DISTINCT labels->>'instance' AS __value, labels->>'instance' AS __text FROM metric_samples WHERE labels->>'instance' IS NOT NULL AND time > now() - interval '24 hours' ORDER BY 1",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Instance",
+        "multi": false,
+        "name": "instance",
+        "options": [],
+        "query": "SELECT DISTINCT labels->>'instance' AS __value, labels->>'instance' AS __text FROM metric_samples WHERE labels->>'instance' IS NOT NULL AND time > now() - interval '24 hours' ORDER BY 1",
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allValue": "",
+        "current": {
+          "selected": false,
+          "text": "mdemg-dev",
+          "value": "mdemg-dev"
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "timescaledb"
+        },
+        "definition": "SELECT DISTINCT space_id FROM metric_samples WHERE time > now() - interval '24 hours' AND ($instance = '' OR labels->>'instance' = '$instance') ORDER BY 1",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Space ID",
+        "multi": false,
+        "name": "space_id",
+        "options": [],
+        "query": "SELECT DISTINCT space_id FROM metric_samples WHERE time > now() - interval '24 hours' AND ($instance = '' OR labels->>'instance' = '$instance') ORDER BY 1",
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "MDEMG Overview",
+  "uid": "mdemg-overview",
+  "version": 1,
+  "refresh": "30s"
+}

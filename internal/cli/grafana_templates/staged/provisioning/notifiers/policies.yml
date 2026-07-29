@@ -1,0 +1,18 @@
+# MDEMG Grafana Notification Policies — DISABLED (SNA-001)
+#
+# The MDEMG server now evaluates all alert rules natively. Grafana notification
+# policies are no longer needed. See contactpoints.yml for details.
+#
+# To re-enable, uncomment the block below:
+#
+# apiVersion: 1
+#
+# policies:
+#   - orgId: 1
+#     receiver: mdemg-webhook
+#     group_by:
+#       - grafana_folder
+#       - alertname
+#     group_wait: 30s
+#     group_interval: 5m
+#     repeat_interval: 4h
