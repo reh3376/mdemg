@@ -1,0 +1,160 @@
+{
+  "tables": {
+    "benchmark_results": {
+      "writers": ["neural/benchmarks/run_benchmark.py (via --apply-tsdb)"],
+      "readers": ["dashboards/mdemg-ft-training.json (per-task benchmark)", "internal/alert/rules.go::FTBenchmarkStalenessRule"],
+      "disposition": "IN_USE",
+      "notes": "Per-row FT benchmark results (n_runs × n_tasks). Populated by Python benchmark runner via BENCH-SIDECAR-APPLY-001; drives the FT dashboard + staleness alert."
+    },
+    "benchmark_runs": {
+      "writers": ["neural/benchmarks/run_benchmark.py"],
+      "readers": ["dashboards/mdemg-ft-training.json (Latest Benchmark Age)", "internal/alert/rules.go::FTBenchmarkStalenessRule", "internal/alert/rules.go::FtProductionDriftRule", "internal/tsdb/dataset_builder.go::ProductionDrift (DRIFT-TRIGGER-001)"],
+      "disposition": "IN_USE",
+      "notes": "One row per benchmark invocation. Feeds staleness alert + FT drift alert + DRIFT-TRIGGER-001's reflect pattern."
+    },
+    "constraint_outcomes": {
+      "writers": ["internal/tsdb/constraint_outcomes_writer.go (buffered)"],
+      "readers": ["dashboards/mdemg-jiminy.json (follow-rate + effectiveness)", "internal/alert/rules.go::HITLCurationStalledRule + ::HeuristicShareRule + ::guidance_should_follow_rate_low"],
+      "disposition": "IN_USE",
+      "notes": "Guidance outcome telemetry — TELEMETRY-ONLY table (retrain consumes guidance_training_rows). See CLASSIFIER-CONSISTENCY-001."
+    },
+    "context_catalog_versions": {
+      "writers": ["internal/hidden/context_catalog_builder.go (V0020)"],
+      "readers": ["internal/retrieval/column_context.go (query-time catalog lookup)"],
+      "disposition": "IN_USE",
+      "notes": "Adaptive Builder version bump per space; consumed by the RRF context column."
+    },
+    "contradicted_correction_drafts": {
+      "writers": ["internal/tsdb/contradicted_drafts_writer.go (buffered, V0030)"],
+      "readers": ["internal/api/contradicted_drafts_dataset.go (HITL dataset)"],
+      "disposition": "IN_USE",
+      "notes": "JIMINY-CONTRADICTED-BRIDGE-001 draft table; feeds the HITL review dataset."
+    },
+    "embedding_events": {
+      "writers": ["internal/tsdb/embedding_events_writer.go (buffered)"],
+      "readers": ["dashboards/mdemg-graph-topology.json", "internal/ape/self_reflect.go::embedding_pipeline_regression check", "internal/ape/self_assess.go::EmbeddingCoverage"],
+      "disposition": "IN_USE",
+      "notes": "Per-embed attribution telemetry (EMBED-CALLSITE-001). 1.6M rows on mdemg-dev."
+    },
+    "ft_benchmarks": {
+      "writers": [],
+      "readers": ["internal/cli/tsdb.go:252 (informational listing only)"],
+      "disposition": "DORMANT_TO_REMOVE",
+      "notes": "SUPERSEDED by benchmark_runs + benchmark_results. Defined in early FT schema (002_ft_schema.sql) as a per-benchmark-run table but never wired to a writer. Removal follow-up: DORMANT-CENSUS-002 disclosed; needs a migration to DROP."
+    },
+    "ft_hitl_decisions": {
+      "writers": [],
+      "readers": ["internal/cli/tsdb.go:253 (informational listing only)", "internal/cli/tsdb.go:275 (space-scoped teardown)"],
+      "disposition": "DORMANT_TO_REMOVE",
+      "notes": "SUPERSEDED by HITL-REVIEW-001's review_grades. Defined in early FT schema (002_ft_schema.sql) but never wired. Removal follow-up: DORMANT-CENSUS-002 disclosed."
+    },
+    "ft_model_versions": {
+      "writers": ["internal/tsdb/ft_model_versions_writer.go (FT-RECURSIVE-003 E2)"],
+      "readers": ["internal/alert/rules.go::FtProductionDriftRule", "internal/tsdb/dataset_builder.go::ProductionDrift", "internal/ftloop/promotion.go", "dashboards/mdemg-ft-training.json (versions table)"],
+      "disposition": "IN_USE",
+      "notes": "Model version ledger + swap/rollback state. Load-bearing for the drift alert + trigger."
+    },
+    "ft_training_cycles": {
+      "writers": ["internal/tsdb/ft_cycle_ledger.go (FT-RECURSIVE-002 V0002)"],
+      "readers": ["internal/ftloop/gate.go::OpenCycle + Evaluate", "internal/alert/rules.go::FtLoopNeverRanRule + HITLCurationStalledRule", "dashboards/mdemg-ft-training.json (latest-status ledger)"],
+      "disposition": "IN_USE",
+      "notes": "Event-sourced retrain-cycle ledger. The single source of truth for 'is a cycle running'."
+    },
+    "guidance_conflicts": {
+      "writers": ["internal/jiminy/conflict_tracker.go (Phase 12 Epic 6 divergence-recorder)"],
+      "readers": ["dashboards/mdemg-jiminy.json (guidance conflicts panel)"],
+      "disposition": "IN_USE",
+      "notes": "Divergence between guidance items; feeds jiminy dashboard. 8.7k rows on mdemg-dev."
+    },
+    "guidance_training_rows": {
+      "writers": ["internal/tsdb/guidance_training_rows_writer.go (JIMINY-RELEVANCE-001)"],
+      "readers": ["internal/cli/data_curate.go (data curate-guidance)", "internal/api/guidance_audit.go (guidance-audit relabel job)", "dashboards/mdemg-jiminy.json (heuristic-fraction gauge)"],
+      "disposition": "IN_USE",
+      "notes": "Retrain evidence corpus for JIMINY guidance. GUIDANCE-AUDIT-001 relabels heuristic rows; data curate-guidance emits the versioned corpus."
+    },
+    "llm_endpoint_health_events": {
+      "writers": ["internal/tsdb/llm_endpoint_health_writer.go"],
+      "readers": ["internal/mlxprobe/watchdog.go (probe state transitions)", "dashboards/mdemg-llm-routing.json (endpoint state panel)"],
+      "disposition": "IN_USE",
+      "notes": "MLX/llama-server health-probe transitions. LOW volume (34 rows on mdemg-dev)."
+    },
+    "llm_interactions": {
+      "writers": ["internal/llmclient/client.go::recordInteraction (every LLM call)"],
+      "readers": ["dashboards/mdemg-llm-routing.json + mdemg-overview.json", "internal/alert/rules.go::llm_error_rate_spike + llm_high_p95 + llm_consecutive_failures", "internal/tsdb/dataset_builder.go::LLMPerformance (RSIC self-reflect)", "internal/api/llm_dataset.go (16 HITL datasets)"],
+      "disposition": "IN_USE",
+      "notes": "Every LLM call recorded. 107k rows on mdemg-dev. Highest-fanout consumer table."
+    },
+    "metric_samples": {
+      "writers": ["internal/metrics/tsdb_flusher.go (60s flush of the registry snapshot)"],
+      "readers": ["dashboards/mdemg-*.json (16 dashboard files reference)", "internal/alert/rules.go (14+ rules query it)", "internal/tsdb/dataset_builder.go::MetricTrend (RSIC trend analysis)"],
+      "disposition": "IN_USE",
+      "notes": "Central metrics hypertable. 80M rows on mdemg-dev; retention/compression via V0025."
+    },
+    "model_install_events": {
+      "writers": ["internal/cli/model_pull.go (MODEL-DIST-001)"],
+      "readers": ["mdemg model verify + list (CLI reads recent installs)"],
+      "disposition": "IN_USE",
+      "notes": "Model pull/verify/remove audit trail. LOW volume (3 rows)."
+    },
+    "reinforcement_events": {
+      "writers": ["internal/tsdb/reinforcement_events_writer.go (buffered, EVENTGRAPH-001 V0022)"],
+      "readers": ["internal/eventgraph/*.go (federation queries)", "internal/api/handlers_eventgraph.go (POST /v1/eventgraph/reinforcement-neighborhood)", "dashboards/mdemg-graph-topology.json (Reinforcement Event Rate)"],
+      "disposition": "IN_USE",
+      "notes": "Hebbian co-activation reinforcement events. 556k rows on mdemg-dev. Feeds event-graph federation."
+    },
+    "retrieval_audit": {
+      "writers": ["internal/tsdb/retrieval_audit_writer.go (Phase 14 Epic 0)"],
+      "readers": ["dashboards/mdemg-overview.json (retrieval latency panels)", "internal/alert/rules.go::RetrieveLatencyRules + ScorerDriftRules"],
+      "disposition": "IN_USE",
+      "notes": "Per-retrieve audit trail with scorer_version + consensus_strength. Feeds scorer-drift tripwires."
+    },
+    "retrieval_events": {
+      "writers": ["internal/tsdb/retrieval_events_writer.go (buffered)"],
+      "readers": ["dashboards/mdemg-overview.json (retrieval activity)"],
+      "disposition": "IN_USE",
+      "notes": "Retrieve activity events; broader companion to retrieval_audit."
+    },
+    "review_grades": {
+      "writers": ["internal/tsdb/review_grades_writer.go (HITL-REVIEW-001)"],
+      "readers": ["internal/api/handlers_review.go::LatestGradeForItem + GradeByID (idempotency + review UI)", "internal/alert/rules.go::HITLCurationStalledRule (excludes auto:% grader_id)"],
+      "disposition": "IN_USE",
+      "notes": "HITL review grade rows. 18 rows on mdemg-dev. WARNING: suggested_guidance column is populated (11%) but has ZERO code consumers — a column-level dormant surface disclosed by DORMANT-CENSUS-002. Field intent is SME corrective-example retrain input but no consumer wired."
+    },
+    "rl_training_runs": {
+      "writers": ["neural/training/rl/trainer.py (Phase 11 GRPO)"],
+      "readers": ["neural/training/rl/regression.py (regression gate)"],
+      "disposition": "IN_USE",
+      "notes": "GRPO training run manifest. 1 row on mdemg-dev; wired but rarely fired (RL runs are infrequent operator-triggered)."
+    },
+    "rl_training_steps": {
+      "writers": ["neural/training/rl/trainer.py (per-step reward/loss)"],
+      "readers": ["neural/training/rl/regression.py + benchmark comparison"],
+      "disposition": "IN_USE",
+      "notes": "Per-step GRPO telemetry. 2 rows on mdemg-dev; wired to run alongside rl_training_runs."
+    },
+    "scheduled_job_events": {
+      "writers": ["internal/jobhealth/jobhealth.go::Report (NOSILENT-001)"],
+      "readers": ["internal/alert/rules.go::scheduled_job_recent_failure + JobStalenessRule + FtLoopNeverRanRule", "internal/api/handlers_jobs.go (mdemg jobs status)"],
+      "disposition": "IN_USE",
+      "notes": "Scheduled/background job success/failure ledger. 1.6k rows on mdemg-dev. Load-bearing for silent-failure prevention."
+    },
+    "sparse_gate_metrics": {
+      "writers": ["internal/retrieval/gate.go (Phase 14 Note 06)"],
+      "readers": ["dashboards/mdemg-overview.json (sparse gate panels)"],
+      "disposition": "IN_USE",
+      "notes": "Per-call sparse-retrieval gate telemetry. 7.2k rows on mdemg-dev."
+    },
+    "uvts_results": {
+      "writers": ["docs/tests/uvts/runners/uvts_runner.py (--persist-tsdb)"],
+      "readers": ["docs/tests/uvts/runners/uvts_ab_compare.py (A/B comparison)"],
+      "disposition": "IN_USE",
+      "notes": "UVTS per-question grades. 488 rows on mdemg-dev."
+    },
+    "uvts_runs": {
+      "writers": ["docs/tests/uvts/runners/uvts_runner.py"],
+      "readers": ["docs/tests/uvts/runners/uvts_ab_compare.py"],
+      "disposition": "IN_USE",
+      "notes": "UVTS run manifest paired with uvts_results."
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{"id":"q01","bucket":"decisions","q":"why did we pivot from MoE to dense LoRA for FT?"}
+{"id":"q02","bucket":"decisions","q":"what did we decide about the auto-grade reinforcement invariant?"}
+{"id":"q03","bucket":"errors","q":"how did we fix the classifier heuristic fallback burst on 2026-07-21?"}
+{"id":"q04","bucket":"errors","q":"why does the pre-bash guard match SQL keywords inside search queries?"}
+{"id":"q05","bucket":"architecture","q":"how does the HITL autograder work end-to-end?"}
+{"id":"q06","bucket":"architecture","q":"how does the ft_production_drift alert connect to cycle-open?"}
+{"id":"q07","bucket":"sprints","q":"what did HITL-CURATION-002 ship?"}
+{"id":"q08","bucket":"sprints","q":"what was the reframe of DRIFT-VALIDATION-001?"}
+{"id":"q09","bucket":"config","q":"default value of FT_DRIFT_MARGIN"}
+{"id":"q10","bucket":"config","q":"how do I enable the recursive-retrain actuator?"}
+{"id":"q11","bucket":"crossref","q":"what consumes the constraint_outcomes table?"}
+{"id":"q12","bucket":"crossref","q":"which sprints modify the Gate.EvaluateTrigger path?"}
+{"id":"q13","bucket":"antipatterns","q":"why must I not use ORDER BY LIMIT 1 in alert rules?"}
+{"id":"q14","bucket":"antipatterns","q":"what are the CUIDv2 rules and why not UUID?"}
+{"id":"q15","bucket":"antipatterns","q":"how should I write a Go-safe multi-byte string cutting for UTF-8?"}
