@@ -1,0 +1,932 @@
+[
+  {
+    "id": "q01",
+    "bucket": "decisions",
+    "q": "why did we pivot from MoE to dense LoRA for FT?",
+    "results": [
+      {
+        "rank": 1,
+        "node_id": "n_e7a290df59943112d10f",
+        "path": "/Users/reh3376/.claude/projects/-Users-reh3376-mdemg/memory/project_phase5_moe_pivot.md",
+        "name": "project_phase5_moe_pivot.md",
+        "layer": 0,
+        "role_type": "leaf",
+        "score": 0.4322087338194251,
+        "vector_sim": 0.7957239151000977,
+        "summary": "---\nname: Phase 5 MoE pivot \u2014 dense Qwen3-14B replaces MoE-Sieve\ndescription: Phase 5 SFT pivoted from MoE-Sieve (Qwen3.6-35B-A3B) to dense Qwen3-14B on 2026-04-22 after Metal 499K cap proved archit..."
+      },
+      {
+        "rank": 2,
+        "node_id": "n_89daeae2f0bf7dfebf06",
+        "path": "/docs/development/ft-lora/phase_5_sft_post.md",
+        "name": "phase_5_sft_post.md",
+        "layer": 0,
+        "role_type": "leaf",
+        "score": 0.331544831674546,
+        "vector_sim": 0.7357597351074219,
+        "summary": "Documentation: phase_5_sft_post.md in docs. Related to: error-handling, logging, caching SEMANTIC: Summarizes the outcome of the Phase 5 SFT execution, reporting a successful fine-tuning of the Qwen3-14B model. Highlights performance metrics, regression gate passes, and discusses pivot decisions under stress limits to improve model accuracy."
+      },
+      {
+        "rank": 3,
+        "node_id": "n_bd08345474b6cde3afa2",
+        "path": "/docs/development/ft-lora/sprint_plan_ft_lora_e.md",
+        "name": "sprint_plan_ft_lora_e.md",
+        "layer": 0,
+        "role_type": "leaf",
+        "score": 0.3070611396804452,
+        "vector_sim": 0.7150769233703613,
+        "summary": "Documentation: sprint_plan_ft_lora_e.md in docs. Related to: logging, temporal, authentication SEMANTIC: Documents the training infrastructure patches for FT-LORA-E, focusing on implementing the MoE-Sieve two-tier invocation for Phase 5 SFT. Key topics include model validation, error handling and logging for training configurations."
+      },
+      {
+        "rank": 4,
+        "node_id": "n_39209c5d5cb7e337ee43",
+        "path": "/docs/development/ft-lora/phase_5_sft_summary.md",
+        "name": "phase_5_sft_summary.md",
+        "layer": 0,
+        "role_type": "leaf",
+        "score": 0.28030102150514724,
+        "vector_sim": 0.7449951171875,
+        "summary": "Documentation: phase_5_sft_summary.md in docs. Related to: logging, caching, temporal SEMANTIC: Executive summary of the Phase 5 SFT, confirming completion with regression gates passed. Provides references to full reports and model metadata post-project, includes insights on adaptations made during the run related to model training strategy."
+      },
+      {
+        "rank": 5,
+        "node_id": "n_532e4c4b1d24f0df5cda",
+        "path": "/docs/development/ft-lora/sprint_plan_ft_lora_phase5.md",
+        "name": "sprint_plan_ft_lora_phase5.md",
+        "layer": 0,
+        "role_type": "leaf",
+        "score": 0.23139875838533044,
+        "vector_sim": 0.7620534896850586,
+        "summary": "Documentation: sprint_plan_ft_lora_phase5.md in docs. Related to: logging, authentication, validation SEMANTIC: Details Phase 5's SFT execution, adjusting training to a single-tier arrangement after abandoning the MoE approach. Key processes involve logging, model validation, and performance tracking against established metrics."
+      }
+    ]
+  },
+  {
+    "id": "q02",
+    "bucket": "decisions",
+    "q": "what did we decide about the auto-grade reinforcement invariant?",
+    "results": [
+      {
+        "rank": 1,
+        "node_id": "flkcc6rpa2mu0ne6rz4ir1ei",
+        "path": "<nil>",
+        "name": "<nil>",
+        "layer": 0,
+        "role_type": "conversation_observation",
+        "score": 0.5061557069420815,
+        "vector_sim": 0.694849967956543,
+        "summary": "CORRECTION REINFORCEMENT: never trust an unordered sample for novelty \u2014 the earlier assumption was wrong and must not recur. Use exact nearest-neighbor ranking."
+      },
+      {
+        "rank": 2,
+        "node_id": "n_6ba2237645201cecb296",
+        "path": "/internal/review/autograder.go",
+        "name": "review",
+        "layer": 0,
+        "role_type": "leaf",
+        "score": 0.015682322904467583,
+        "vector_sim": 0.6831827163696289,
+        "summary": "Package: review. Related to: authentication, error-handling, validation. Key methods: GraderID, Grade, GradeWithHint. Key functions: truncForErr SEMANTIC: Manages LLM-autograded confidence markers for datasets in HITL-REVIEW, ensuring distinctions between human and LLM grades. Key operations involve preventing reinforcement effects and enabling focused human review on borderline cases."
+      },
+      {
+        "rank": 3,
+        "node_id": "n_4fbf11a0ccfbd5e7a3e9",
+        "path": "/internal/review/sink.go#Grade",
+        "name": "Grade",
+        "layer": 0,
+        "role_type": "leaf",
+        "score": 0.013688524253666401,
+        "vector_sim": 0,
+        "summary": "Struct Grade in review. Related to: logging, error-handling, validation. Go struct review.Grade\nGrade is the in-memory representation of a certified review grade \u2014 what the\nplatform passes to a ReinforcementSink SEMANTIC: Defines an in-memory representation of a certified review grade, used to facilitate interactions with a ReinforcementSink. Tracks gold_score and metadata related to graded items. Key attributes include GradeID and GoldDimensions. Relevant terms are review grade, metadata handli"
+      },
+      {
+        "rank": 4,
+        "node_id": "iz7fuv4kx6w3cumxlbf8clc4",
+        "path": "<nil>",
+        "name": "<nil>",
+        "layer": 0,
+        "role_type": "conversation_observation",
+        "score": 0.004098360426723957,
+        "vector_sim": 0.7175164222717285,
+        "summary": "REWARD-CORRECTNESS-002 complete: fixed 3 reward/schema mismatches grading correct responses wrong. (1) hidden.summarize schema object->string (prose, not JSON; 72 rows un-mis-flagged). (2)..."
+      },
+      {
+        "rank": 5,
+        "node_id": "n_2613485bedd5464eeef8",
+        "path": "/docs/development/negfeed-cooler-001/recon_findings.md",
+        "name": "recon_findings.md",
+        "layer": 0,
+        "role_type": "leaf",
+        "score": 0.004032257944345474,
+        "vector_sim": 0.697235107421875,
+        "summary": "Documentation: recon_findings.md in docs. Related to: authentication, authorization, error-handling. # NEGFEED-001 + COOLER-001 Recon (2026-06-13, HEAD post-#456)\n\n3 lanes + orchestrator live verification"
+      }
+    ]
+  },
+  {
+    "id": "q03",
+    "bucket": "errors",
+    "q": "how did we fix the classifier heuristic fallback burst on 2026-07-21?",
+    "results": [
+      {
+        "rank": 1,
+        "node_id": "n_09ef0b0f22100e8bac40",
+        "path": "/docs/development/classifier-consistency-001/post.md",
+        "name": "post.md",
+        "layer": 0,
+        "role_type": "leaf",
+        "score": 0.006948473863303661,
+        "vector_sim": 0.7377238273620605,
+        "summary": "Documentation: post.md in docs. Related to: authorization, error-handling, validation SEMANTIC: Summarizes the findings and retrospective of Sprint CLASSIFIER-CONSISTENCY-001, emphasizing durable observability against LLM saturation. Key points include the relationship between constraint outcomes and training rows, and the alert rule's operational effectiveness during transient burst patterns."
+      },
+      {
+        "rank": 2,
+        "node_id": "n_b9481ec4cfa3d554e460",
+        "path": "/docs/development/classifier-consistency-001/sprint_plan.md",
+        "name": "sprint_plan.md",
+        "layer": 0,
+        "role_type": "leaf",
+        "score": 0.006722771096974611,
+        "vector_sim": 0.7379879951477051,
+        "summary": "Documentation: sprint_plan.md in docs. Related to: error-handling, validation, logging SEMANTIC: Outlines the sprint plan for CLASSIFIER-CONSISTENCY-001, detailing the shipping of a new `HeuristicShareRule` alert. It specifically targets performance thresholds for constraint outcomes under saturation conditions to prevent chronic measurement integrity issues."
+      },
+      {
+        "rank": 3,
+        "node_id": "yd24u84g5ik5e3mg4vwg95m3",
+        "path": "<nil>",
+        "name": "<nil>",
+        "layer": 0,
+        "role_type": "conversation_observation",
+        "score": 0.006228923797607422,
+        "vector_sim": 0.7478947639465332,
+        "summary": "OPEN MUST-FIX DEFECT \u2014 HIDDEN-CHURN-003 (incremental hidden-layer clustering). HIDDEN-CHURN-002 (shipped 2026-06-24) is only a PARTIAL fix: it cut hidden-pattern identity churn from 100% to ~25%..."
+      },
+      {
+        "rank": 4,
+        "node_id": "zwekws8xveqwj5i0tvaxvjcl",
+        "path": "<nil>",
+        "name": "<nil>",
+        "layer": 0,
+        "role_type": "conversation_observation",
+        "score": 0.005788308102637529,
+        "vector_sim": 0.7314515113830566,
+        "summary": "RESOLVED \u2014 HIDDEN-CHURN-003 shipped 2026-06-25, closing the must-fix defect logged earlier (obs ac9kyykvavz7myfc55ru87xy). The hidden-layer ~25% per-cycle identity churn is FIXED: the default..."
+      },
+      {
+        "rank": 5,
+        "node_id": "470fcc73-8830-41c8-a141-35500859d6f9",
+        "path": "<nil>",
+        "name": "ConvTheme-jiminy-guidance-rsic-25",
+        "layer": 1,
+        "role_type": "conversation_theme",
+        "score": 0.005327868741005659,
+        "vector_sim": 0.7648611068725586,
+        "summary": "Observations about jiminy, rows, live, guidance, complete (20 observations)"
+      }
+    ]
+  },
+  {
+    "id": "q04",
+    "bucket": "errors",
+    "q": "why does the pre-bash guard match SQL keywords inside search queries?",
+    "results": [
+      {
+        "rank": 1,
+        "node_id": "n_3e289624486663512c03",
+        "path": "/internal/cli/hook_templates/pre-bash-check.py",
+        "name": "pre-bash-check",
+        "layer": 0,
+        "role_type": "leaf",
+        "score": 0.5053373370319605,
+        "vector_sim": 0.6465997695922852,
+        "summary": "Module: pre-bash-check. Related to: authorization, error-handling, logging. Key functions: _deny, main SEMANTIC: Implements pre-bash checks to prevent the execution of destructive commands without user confirmation. Key methods: _deny (emits deny decision), is_destructive (checks against destructive command patterns). Utilizes error-handling and logging for authorization control."
+      },
+      {
+        "rank": 2,
+        "node_id": "n_46d10b303dd2700d62cf",
+        "path": "/.claude/hooks/pre-bash-check.py",
+        "name": "pre-bash-check",
+        "layer": 0,
+        "role_type": "leaf",
+        "score": 0.5049545466899872,
+        "vector_sim": 0.6428065299987793,
+        "summary": "Module: pre-bash-check. Related to: error-handling, logging, authorization. Key functions: _deny, main SEMANTIC: Pre-execution hook that blocks destructive commands in Bash without user confirmation. Key methods: is_destructive (checks command against dangerous patterns) and _deny (denies command with a reason). Emphasizes error-handling and safety by defaulting to blocking commands when issues occur."
+      },
+      {
+        "rank": 3,
+        "node_id": "n_f15b624ad77515fa8c1f",
+        "path": "/scripts/.venv/lib/python3.14/site-packages/pygments/lexers/sql.py",
+        "name": "sql",
+        "layer": 0,
+        "role_type": "leaf",
+        "score": 0.015362272970378399,
+        "vector_sim": 0.654296875,
+        "summary": "Module: sql. Related to: caching, authentication, authorization. Defines classes: PostgresBase, PostgresLexer, PlPgsqlLexer, and 10 more. Key methods: _get_lexer, send, analyse_text, analyse_text, analyse_text. Key functions: language_callback SEMANTIC: Provides lexers for various SQL dialects to facilitate syntax highlighting. Key classes: PostgresLexer (parses PostgreSQL syntax), SqlLexer (supports ANSI SQL), PsqlRegexLexer (extends functionality for psql commands). Utilizes regex for efficien"
+      },
+      {
+        "rank": 4,
+        "node_id": "n_fb4df24cb23af0a55113",
+        "path": "/deploy/docker/.playwright-venv/lib/python3.12/site-packages/pygments/lexers/sql.py",
+        "name": "sql",
+        "layer": 0,
+        "role_type": "leaf",
+        "score": 0.014824092388153076,
+        "vector_sim": 0.6489362716674805,
+        "summary": "Module: sql. Related to: validation, logging, caching. Defines classes: PostgresBase, PostgresLexer, PlPgsqlLexer, and 10 more. Key methods: _get_lexer, send, analyse_text, analyse_text, analyse_text. Key functions: language_callback SEMANTIC: The sql module contains comprehensive lexers for various SQL dialects, focusing on validation and error-handling. Classes include PostgresLexer and PlPgsqlLexer for PostgreSQL and PL/PgSQL syntax highlighting."
+      },
+      {
+        "rank": 5,
+        "node_id": "4c308792-231a-4884-93aa-078d903d9c05",
+        "path": "<nil>",
+        "name": "ConvTheme-docker-mdemg-command-31",
+        "layer": 1,
+        "role_type": "conversation_theme",
+        "score": 0.006068218033760786,
+        "vector_sim": 0.6752595901489258,
+        "summary": "Error patterns in error, mdemg, command, echo, bash (22 observations)"
+      }
+    ]
+  },
+  {
+    "id": "q05",
+    "bucket": "architecture",
+    "q": "how does the HITL autograder work end-to-end?",
+    "results": [
+      {
+        "rank": 1,
+        "node_id": "n_49d4fe12575c7ade27a5",
+        "path": "/docs/features/hitl-review.md",
+        "name": "hitl-review.md",
+        "layer": 0,
+        "role_type": "leaf",
+        "score": 0.4572336490266025,
+        "vector_sim": 0.7059550285339355,
+        "summary": "Documentation: hitl-review.md in docs. Related to: logging, temporal, authentication. # Human-in-the-Loop Review + Live Reinforcement (HITL-REVIEW-001)\n\n**Status:** shipped SEMANTIC: Implements a human review system for datasets in a standardized manner. Key functionalities: certify (marks datasets as trustworthy), reinforce (allows immediate agent corrections), and capture corrective examples that feed into training loops. Ensures high-quality labels for various datasets."
+      },
+      {
+        "rank": 2,
+        "node_id": "n_65eb9cc68de7751c55d5",
+        "path": "/docs/features/hitl-auto-curation.md",
+        "name": "hitl-auto-curation.md",
+        "layer": 0,
+        "role_type": "leaf",
+        "score": 0.4074237929657102,
+        "vector_sim": 0.7467408180236816,
+        "summary": "Documentation: hitl-auto-curation.md in docs. Related to: error-handling, authentication, authorization SEMANTIC: Describes the functionality of the HITL Auto-Curation layer designed to improve quality control in human-in-the-loop reviews. It details the `Autograder` method for LLM-driven scoring and includes the logic to prevent substrate mutation, highlighting key components like grade results and error validation."
+      },
+      {
+        "rank": 3,
+        "node_id": "n_6ba2237645201cecb296",
+        "path": "/internal/review/autograder.go",
+        "name": "review",
+        "layer": 0,
+        "role_type": "leaf",
+        "score": 0.36403225772082803,
+        "vector_sim": 0.7238140106201172,
+        "summary": "Package: review. Related to: authentication, error-handling, validation. Key methods: GraderID, Grade, GradeWithHint. Key functions: truncForErr SEMANTIC: Manages LLM-autograded confidence markers for datasets in HITL-REVIEW, ensuring distinctions between human and LLM grades. Key operations involve preventing reinforcement effects and enabling focused human review on borderline cases."
+      },
+      {
+        "rank": 4,
+        "node_id": "n_9f13bea665561d711470",
+        "path": "/internal/review/autograder.go#Autograder",
+        "name": "Autograder",
+        "layer": 0,
+        "role_type": "leaf",
+        "score": 0.30684927543625234,
+        "vector_sim": 0.7032418251037598,
+        "summary": "Struct Autograder in review. Related to: authentication, error-handling, validation. Go struct review.Autograder\nAutograder produces confidence-gated GradeSubmissions from ReviewItems by\nprompting an LLM against the dataset's rubric SEMANTIC: Statelessly produces confidence-based GradeSubmissions for datasets by leveraging an LLM against defined rubrics. Utilizes the Grade method to maintain process integrity and error-handling capabilities."
+      },
+      {
+        "rank": 5,
+        "node_id": "n_888a9f204aab3eb00e2a",
+        "path": "/docs/development/hitl-review-001/sprint_plan_hitl_review_001.md",
+        "name": "sprint_plan_hitl_review_001.md",
+        "layer": 0,
+        "role_type": "leaf",
+        "score": 0.2572458633221686,
+        "vector_sim": 0.7128410339355469,
+        "summary": "Documentation: sprint_plan_hitl_review_001.md in docs. Related to: authentication, authorization, error-handling. # Sprint Plan \u2014 HITL-REVIEW-001: A General-Purpose Human-in-the-Loop Dataset Review + Live-Reinforcement Tool\n\n## 1 SEMANTIC: Outlines the sprint plan for enhancing the HITL review tool with new features. Focuses on versioning, schema changes, and integration with the guidance dataset. Key operations include effort estimation, risk assessment, and migration coordination."
+      }
+    ]
+  },
+  {
+    "id": "q06",
+    "bucket": "architecture",
+    "q": "how does the ft_production_drift alert connect to cycle-open?",
+    "results": [
+      {
+        "rank": 1,
+        "node_id": "n_1f1e518573a4aed7912b",
+        "path": "/internal/alert/rules.go#FtProductionDriftRule",
+        "name": "FtProductionDriftRule",
+        "layer": 0,
+        "role_type": "leaf",
+        "score": 0.46640624925494195,
+        "vector_sim": 0.7362895011901855,
+        "summary": "Function FtProductionDriftRule in alert. Related to: validation, logging, caching SEMANTIC: Implements drift detection for production ML models (FT-RECURSIVE-004 E2). Key methods: FtProductionDriftRule (compares current performance against historic benchmarks), guarantees no false positives from missing data. Focuses on model performance validation."
+      },
+      {
+        "rank": 2,
+        "node_id": "n_931f9dbf11411755b428",
+        "path": "/docs/features/drift-triggered-retrain.md",
+        "name": "drift-triggered-retrain.md",
+        "layer": 0,
+        "role_type": "leaf",
+        "score": 0.4103483609855175,
+        "vector_sim": 0.7764053344726562,
+        "summary": "Documentation: drift-triggered-retrain.md in docs. Related to: authorization, error-handling, caching SEMANTIC: Explains the drift-triggered retrain capability implemented as part of DRIFT-TRIGGER-001. It focuses on connecting drift detection with training cycle triggers, leveraging the `DatasetProvider` for automated model updates under specific conditions."
+      },
+      {
+        "rank": 3,
+        "node_id": "n_e4caa4649fd26f84bc99",
+        "path": "/internal/tsdb/dataset_builder.go#ProductionDrift",
+        "name": "ProductionDrift",
+        "layer": 0,
+        "role_type": "leaf",
+        "score": 0.3784722222480923,
+        "vector_sim": 0.715360164642334,
+        "summary": "Function ProductionDrift in tsdb. Related to: authentication, error-handling, validation SEMANTIC: Calculates the production drift signal by comparing the ACTIVE model version's score to the LATEST benchmark aggregate. Key methods: ActiveScore (fetches current active score), LatestBenchScore (retrieves latest benchmark score). Utilizes validation and logging for accurate drift assessment."
+      },
+      {
+        "rank": 4,
+        "node_id": "n_48d3568c92144df4c5bd",
+        "path": "/docs/development/drift-trigger-001/sprint_plan.md",
+        "name": "sprint_plan.md",
+        "layer": 0,
+        "role_type": "leaf",
+        "score": 0.37489069290459154,
+        "vector_sim": 0.7534890174865723,
+        "summary": "Documentation: sprint_plan.md in docs. Related to: authentication, authorization, error-handling SEMANTIC: Sprint planning document for DRIFT-TRIGGER-001 emphasizing an architectural change to connect `ft_production_drift` to the RSIC actuator. Aims to establish a training cycle trigger based on production drift instead of just data availability."
+      },
+      {
+        "rank": 5,
+        "node_id": "46d7af09-51d7-474a-8766-caf79436bdf2",
+        "path": "<nil>",
+        "name": "Concept-L2-go-internal-tsdb-10566",
+        "layer": 2,
+        "role_type": "concept",
+        "score": 0.016346154734492302,
+        "vector_sim": 0.7267966270446777,
+        "summary": "Meta-concept over 3 clusters. Sub-concepts: Pattern of 3 code elements in: alert, tsdb; Pattern of 3 code elements in: q4-frontier-scoping, features, classifier-consistency-001"
+      }
+    ]
+  },
+  {
+    "id": "q07",
+    "bucket": "sprints",
+    "q": "what did HITL-CURATION-002 ship?",
+    "results": [
+      {
+        "rank": 1,
+        "node_id": "n_67b0a45589b50c90bfae",
+        "path": "/docs/development/hitl-curation-002/post.md",
+        "name": "post.md",
+        "layer": 0,
+        "role_type": "leaf",
+        "score": 0.45732041001319884,
+        "vector_sim": 0.7345700263977051,
+        "summary": "Documentation: post.md in docs. Related to: authorization, error-handling, logging SEMANTIC: Summarizes the HITL-CURATION-002 sprint, tracking the development and outcomes of automated grading enhancements. Key operations include the use of `internal/review.Autograder` for consistent scoring and validation of dataset quality, emphasizing error-handling and authentication."
+      },
+      {
+        "rank": 2,
+        "node_id": "tdgq5fiqs6lcl704rd1hz06b",
+        "path": "<nil>",
+        "name": "<nil>",
+        "layer": 0,
+        "role_type": "conversation_observation",
+        "score": 0.4446271747350693,
+        "vector_sim": 0.7279605865478516,
+        "summary": "Build/test succeeded: gh pr comment 544 --body \"$(cat <<'EOF' ## Sprint Summary \u2014 HITL-CURATION-002 (6 epics, this session) Q4-frontier candidate #1 shipped. Six sequential commits under..."
+      },
+      {
+        "rank": 3,
+        "node_id": "n_eec69074aa42ed6a0478",
+        "path": "/docs/development/hitl-curation-002/sprint_plan.md",
+        "name": "sprint_plan.md",
+        "layer": 0,
+        "role_type": "leaf",
+        "score": 0.40718891471624374,
+        "vector_sim": 0.7143540382385254,
+        "summary": "Documentation: sprint_plan.md in docs. Related to: authentication, authorization, error-handling SEMANTIC: Documentation for the Sprint Plan of HITL-CURATION-002 focusing on an auto-curation layer to resolve HITL backlog issues. Concerns include authentication, authorization, and validation to ensure high-quality grading and minimizes risks in training signal integrity."
+      },
+      {
+        "rank": 4,
+        "node_id": "n_65eb9cc68de7751c55d5",
+        "path": "/docs/features/hitl-auto-curation.md",
+        "name": "hitl-auto-curation.md",
+        "layer": 0,
+        "role_type": "leaf",
+        "score": 0.40709178065881135,
+        "vector_sim": 0.719752311706543,
+        "summary": "Documentation: hitl-auto-curation.md in docs. Related to: error-handling, authentication, authorization SEMANTIC: Describes the functionality of the HITL Auto-Curation layer designed to improve quality control in human-in-the-loop reviews. It details the `Autograder` method for LLM-driven scoring and includes the logic to prevent substrate mutation, highlighting key components like grade results and error validation."
+      },
+      {
+        "rank": 5,
+        "node_id": "n_11316acc5df662970fa0",
+        "path": "/internal/alert/rules.go#HITLCurationStalledRule",
+        "name": "HITLCurationStalledRule",
+        "layer": 0,
+        "role_type": "leaf",
+        "score": 0.35527710132300855,
+        "vector_sim": 0.6731963157653809,
+        "summary": "Function HITLCurationStalledRule in alert. Related to: validation, logging, caching. Go function alert.HITLCurationStalledRule\nHITLCurationStalledRule fires when the HITL queue has been accumulating\npending items for a week WITHOUT any operator grades (grader_id NOT LIKE\n'auto:%') SEMANTIC: Identifies stalling in HITL queue with alert HITL-CURATION-002, monitoring for operator engagement. Key methods: HITLCurationStalledRule (assesses pending items and grading activity), ensures operator attenti"
+      }
+    ]
+  },
+  {
+    "id": "q08",
+    "bucket": "sprints",
+    "q": "what was the reframe of DRIFT-VALIDATION-001?",
+    "results": [
+      {
+        "rank": 1,
+        "node_id": "n_48d3568c92144df4c5bd",
+        "path": "/docs/development/drift-trigger-001/sprint_plan.md",
+        "name": "sprint_plan.md",
+        "layer": 0,
+        "role_type": "leaf",
+        "score": 0.40529229594394567,
+        "vector_sim": 0.7430052757263184,
+        "summary": "Documentation: sprint_plan.md in docs. Related to: authentication, authorization, error-handling SEMANTIC: Sprint planning document for DRIFT-TRIGGER-001 emphasizing an architectural change to connect `ft_production_drift` to the RSIC actuator. Aims to establish a training cycle trigger based on production drift instead of just data availability."
+      },
+      {
+        "rank": 2,
+        "node_id": "a7a0dd6d-288a-40b5-a11e-2b13b633acf1",
+        "path": "<nil>",
+        "name": "Test Failure Correction",
+        "layer": 5,
+        "role_type": "emergent_concept",
+        "score": 0.00591700803488493,
+        "vector_sim": 0.7453045845031738,
+        "summary": "Foundational principle: test, failure, never, found (4 themes, L5)"
+      },
+      {
+        "rank": 3,
+        "node_id": "bbf6e2a7-90a9-45f1-b6b5-7ef557363871",
+        "path": "<nil>",
+        "name": "Iterative Error Resolution",
+        "layer": 5,
+        "role_type": "emergent_concept",
+        "score": 0.005825061816722155,
+        "vector_sim": 0.7453045845031738,
+        "summary": "Foundational principle: failure, found, fix, corrections (4 themes, L5)"
+      },
+      {
+        "rank": 4,
+        "node_id": "ab7107a0-64bf-41f2-b76c-7d9480662012",
+        "path": "<nil>",
+        "name": "Test Failure Correction",
+        "layer": 5,
+        "role_type": "emergent_concept",
+        "score": 0.005735930521041155,
+        "vector_sim": 0.7453045845031738,
+        "summary": "Foundational principle: test, failure, never, fix (4 themes, L5)"
+      },
+      {
+        "rank": 5,
+        "node_id": "e513f826-19bc-47ea-a5e6-2949a0a97080",
+        "path": "<nil>",
+        "name": "Test Failure Correction Loop",
+        "layer": 5,
+        "role_type": "emergent_concept",
+        "score": 0.005583639722317457,
+        "vector_sim": 0.7453045845031738,
+        "summary": "Foundational principle: test, never, found, fix (4 themes, L5)"
+      }
+    ]
+  },
+  {
+    "id": "q09",
+    "bucket": "config",
+    "q": "default value of FT_DRIFT_MARGIN",
+    "results": [
+      {
+        "rank": 1,
+        "node_id": "n_1f1e518573a4aed7912b",
+        "path": "/internal/alert/rules.go#FtProductionDriftRule",
+        "name": "FtProductionDriftRule",
+        "layer": 0,
+        "role_type": "leaf",
+        "score": 0.3549180327914655,
+        "vector_sim": 0.722381591796875,
+        "summary": "Function FtProductionDriftRule in alert. Related to: validation, logging, caching SEMANTIC: Implements drift detection for production ML models (FT-RECURSIVE-004 E2). Key methods: FtProductionDriftRule (compares current performance against historic benchmarks), guarantees no false positives from missing data. Focuses on model performance validation."
+      },
+      {
+        "rank": 2,
+        "node_id": "9f55ddef-76ff-49b1-bb01-2e4840e76d4d",
+        "path": "<nil>",
+        "name": "EmergentConcept-L4-error-patterns-1820",
+        "layer": 4,
+        "role_type": "emergent_concept",
+        "score": 0.006068218033760786,
+        "vector_sim": 0.6979517936706543,
+        "summary": "Foundational principle: error, patterns, json, uats (4 themes, L4)"
+      },
+      {
+        "rank": 3,
+        "node_id": "854a1846-9a8e-49d4-8bf2-3b8e0ac5a08d",
+        "path": "<nil>",
+        "name": "EmergentConcept-L3-uats-upts-4582",
+        "layer": 3,
+        "role_type": "emergent_concept",
+        "score": 0.005971582140773535,
+        "vector_sim": 0.6977124214172363,
+        "summary": "Core understanding: uats, upts, uets, error (3 themes, L3)"
+      },
+      {
+        "rank": 4,
+        "node_id": "2351885c-156a-4499-901f-c7dd57218b33",
+        "path": "<nil>",
+        "name": "EmergentConcept-L3-error-patterns-2557",
+        "layer": 3,
+        "role_type": "emergent_concept",
+        "score": 0.005735930521041155,
+        "vector_sim": 0.6940550804138184,
+        "summary": "Core understanding: error, patterns, json, specs (3 themes, L3)"
+      },
+      {
+        "rank": 5,
+        "node_id": "b8778a7e-ee6c-4b9a-806c-31282edf29ab",
+        "path": "<nil>",
+        "name": "EmergentConcept-L3-drift-error-2355",
+        "layer": 3,
+        "role_type": "emergent_concept",
+        "score": 0.005649487022310495,
+        "vector_sim": 0.6940550804138184,
+        "summary": "Core understanding: drift, error, patterns, drifted (3 themes, L3)"
+      }
+    ]
+  },
+  {
+    "id": "q10",
+    "bucket": "config",
+    "q": "how do I enable the recursive-retrain actuator?",
+    "results": [
+      {
+        "rank": 1,
+        "node_id": "cdhqt6c87y7mau97hv1c3uq5",
+        "path": "<nil>",
+        "name": "<nil>",
+        "layer": 0,
+        "role_type": "conversation_observation",
+        "score": 0.5237009599804878,
+        "vector_sim": 0.7205028533935547,
+        "summary": "FT-RECURSIVE-002 Epic 6 Option A: the recursive-retrain controller ran a REAL cycle end-to-end live. Gate opened cycle h1pb0cnya605 on insight #29 (consulting.classify Ready); controller picked it up..."
+      },
+      {
+        "rank": 2,
+        "node_id": "n_1e4135b1c130f2b12595",
+        "path": "/docs/development/ft-recursive-002/post.md",
+        "name": "post.md",
+        "layer": 0,
+        "role_type": "leaf",
+        "score": 0.5233515482395887,
+        "vector_sim": 0.6897411346435547,
+        "summary": "Documentation: post.md in docs. Related to: authorization, error-handling, validation SEMANTIC: Documents the FT-RECURSIVE-002 post-delivery status and actuator activation process. Key points include activation validation, error-handling for `trigger_training_pipeline`, and implementation of stages like export and curate. Focuses on authorization and reliability for automated training pipelines."
+      },
+      {
+        "rank": 3,
+        "node_id": "n_72d3692414bb29c6735b",
+        "path": "/docs/development/ft-recursive-001/SPEC_recursive_retraining_loop.md",
+        "name": "SPEC_recursive_retraining_loop.md",
+        "layer": 0,
+        "role_type": "leaf",
+        "score": 0.5154294837266207,
+        "vector_sim": 0.7184429168701172,
+        "summary": "Documentation: SPEC_recursive_retraining_loop.md in docs. Related to: logging, caching, temporal. # FT Recursive-Retraining Loop \u2014 As-Built Audit + Buildable Spec\n\n**Produced by sprint FT-RECURSIVE-000** (2026-06-11, doc-only \u2014 NO production\ncode ships with this spec) SEMANTIC: Defines the specifications for the FT recursive-retraining loop developed under Sprint FT-RECURSIVE-000, focusing on monitoring and integration. It emphasizes the need for continuous verification and the state of readines"
+      },
+      {
+        "rank": 4,
+        "node_id": "n_9f3d1cfed399957f621f",
+        "path": "/docs/development/ftloop-drill-001/sprint_plan_ftloop_drill_001.md",
+        "name": "sprint_plan_ftloop_drill_001.md",
+        "layer": 0,
+        "role_type": "leaf",
+        "score": 0.030989671126008034,
+        "vector_sim": 0.6753191947937012,
+        "summary": "Documentation: sprint_plan_ftloop_drill_001.md in docs. Related to: logging, authentication, authorization. # Sprint FTLOOP-DRILL-001 \u2014 the enabled tiny-subset drill (FT-RECURSIVE-002's remaining step)\n\n## 1 SEMANTIC: Documents sprint FTLOOP-DRILL-001 focused on executing the FT-RECURSIVE-002's actuator loop. Key sections: Problem Statement (details on assembly execution), Scope (overseeing one autonomous run). Relevant terms include validation, autonomous run, and actuator integration."
+      },
+      {
+        "rank": 5,
+        "node_id": "n_6ca01102acf162f5d9fc",
+        "path": "/docs/development/ft-recursive-002/run_record.md",
+        "name": "run_record.md",
+        "layer": 0,
+        "role_type": "leaf",
+        "score": 0.02364983782172203,
+        "vector_sim": 0.701179027557373,
+        "summary": "Documentation: run_record.md in docs. Related to: error-handling, validation. # FT-RECURSIVE-002 Epic 6 \u2014 Run Record (Option A: orchestration + FAIL-path)\n\n2026-06-29 SEMANTIC: Outlines the first live run of the recursive-retrain controller with an emphasis on error-handling and validation of the FAIL path. Key operations include monitoring the controller's cycle state, handling failed curation tasks, and ensuring robust error logging for troubleshooting."
+      }
+    ]
+  },
+  {
+    "id": "q11",
+    "bucket": "crossref",
+    "q": "what consumes the constraint_outcomes table?",
+    "results": [
+      {
+        "rank": 1,
+        "node_id": "n_be7caf19e5a416996edb",
+        "path": "/internal/tsdb/migrations/011_constraint_outcomes.sql#constraint_outcomes",
+        "name": "constraint_outcomes",
+        "layer": 0,
+        "role_type": "leaf",
+        "score": 0.5573386289179325,
+        "vector_sim": 0.8666043281555176,
+        "summary": "table: constraint_outcomes in database. Related to: error-handling, validation, authentication SEMANTIC: Defines the constraint_outcomes table to store specific outcomes tied to constraints, facilitating effectiveness computation of guidance systems. It records metrics important for validation and authentication. Important terms: 'constraint tracking', 'outcome analysis', 'data validation'."
+      },
+      {
+        "rank": 2,
+        "node_id": "n_568527a9d89d92a5c030",
+        "path": "/internal/tsdb/migrations/011_constraint_outcomes.sql",
+        "name": "011_constraint_outcomes.sql",
+        "layer": 0,
+        "role_type": "leaf",
+        "score": 0.44851828515529635,
+        "vector_sim": 0.811284065246582,
+        "summary": "schema: 011_constraint_outcomes.sql in database. Related to: error-handling, validation, authentication SEMANTIC: Creates the constraint_outcomes table to log outcomes from Jiminy constraints for dynamic effectiveness analysis in Grafana. Key operations include table creation, index creation, and updates for tracking. Search terms: 'constraint outcomes', 'guidance effectiveness', 'event logging'."
+      },
+      {
+        "rank": 3,
+        "node_id": "n_c5e960702a83c32589fa",
+        "path": "/internal/tsdb/migrations/026_constraint_outcomes_classifier_source.sql",
+        "name": "026_constraint_outcomes_classifier_source.sql",
+        "layer": 0,
+        "role_type": "leaf",
+        "score": 0.44846065863966944,
+        "vector_sim": 0.7653374671936035,
+        "summary": "schema: 026_constraint_outcomes_classifier_source.sql in database. Related to: error-handling, validation SEMANTIC: Defines a classifier_source column for tracking mechanisms producing outcome classifications in the constraint_outcomes table. Important for error-handling and validation in evaluations of model performance."
+      },
+      {
+        "rank": 4,
+        "node_id": "n_2c37d2f12de88bc5a13b",
+        "path": "/internal/tsdb/migrations/023_constraint_outcomes_code_index.sql",
+        "name": "023_constraint_outcomes_code_index.sql",
+        "layer": 0,
+        "role_type": "leaf",
+        "score": 0.44835289716720583,
+        "vector_sim": 0.7637357711791992,
+        "summary": "query: 023_constraint_outcomes_code_index.sql in database. Related to: authorization, validation SEMANTIC: Adds a constraint_code index to the constraint_outcomes table for optimizing join queries in the event graph. This is vital for improving search performance in analytic workflows, addressing validation concerns."
+      },
+      {
+        "rank": 5,
+        "node_id": "n_e0c5857ae91edb2fe248",
+        "path": "/internal/tsdb/constraint_outcomes_writer.go#ConstraintOutcomesWriter",
+        "name": "ConstraintOutcomesWriter",
+        "layer": 0,
+        "role_type": "leaf",
+        "score": 0.4313905887305737,
+        "vector_sim": 0.7427372932434082,
+        "summary": "Struct ConstraintOutcomesWriter in tsdb. Related to: validation, logging, authentication. Go struct tsdb.ConstraintOutcomesWriter\nConstraintOutcomesWriter buffers constraint outcome events and flushes them\nto the constraint_outcomes hypertable SEMANTIC: Buffers constraint outcome events for the tsdb package, flushing to the constraint_outcomes hypertable for performance metrics in Grafana. Key operations include managing buffer and handling errors."
+      }
+    ]
+  },
+  {
+    "id": "q12",
+    "bucket": "crossref",
+    "q": "which sprints modify the Gate.EvaluateTrigger path?",
+    "results": [
+      {
+        "rank": 1,
+        "node_id": "n_48d3568c92144df4c5bd",
+        "path": "/docs/development/drift-trigger-001/sprint_plan.md",
+        "name": "sprint_plan.md",
+        "layer": 0,
+        "role_type": "leaf",
+        "score": 0.504098360426724,
+        "vector_sim": 0.7420063018798828,
+        "summary": "Documentation: sprint_plan.md in docs. Related to: authentication, authorization, error-handling SEMANTIC: Sprint planning document for DRIFT-TRIGGER-001 emphasizing an architectural change to connect `ft_production_drift` to the RSIC actuator. Aims to establish a training cycle trigger based on production drift instead of just data availability."
+      },
+      {
+        "rank": 2,
+        "node_id": "n_7fdddb23f27c7a4b0f02",
+        "path": "/docs/development/drift-trigger-001/post.md",
+        "name": "post.md",
+        "layer": 0,
+        "role_type": "leaf",
+        "score": 0.5040322579443455,
+        "vector_sim": 0.7346019744873047,
+        "summary": "Documentation: post.md in docs. Related to: authentication, authorization, error-handling SEMANTIC: Post-sprint documentation for DRIFT-TRIGGER-001 detailing findings from the validation of the `ft_production_drift` trigger chain. Highlights the need to establish a training-cycle trigger based on model performance drift rather than data readiness."
+      },
+      {
+        "rank": 3,
+        "node_id": "n_603c3be63404346ffdb0",
+        "path": "/internal/ftloop/gate.go#EvaluateTrigger",
+        "name": "EvaluateTrigger",
+        "layer": 0,
+        "role_type": "leaf",
+        "score": 0.5039682541973889,
+        "vector_sim": 0.7293462753295898,
+        "summary": "Function EvaluateTrigger in ftloop. Related to: error-handling, logging SEMANTIC: Adapts gate evaluations for consumer-specific string+bool contracts. Utilizes Evaluate to trigger cycles, opening them in the ledger while suppressing alerts for failed attempts. Key for managing trigger logic and preventing false positives."
+      },
+      {
+        "rank": 4,
+        "node_id": "n_931f9dbf11411755b428",
+        "path": "/docs/features/drift-triggered-retrain.md",
+        "name": "drift-triggered-retrain.md",
+        "layer": 0,
+        "role_type": "leaf",
+        "score": 0.50390625,
+        "vector_sim": 0.7273831367492676,
+        "summary": "Documentation: drift-triggered-retrain.md in docs. Related to: authorization, error-handling, caching SEMANTIC: Explains the drift-triggered retrain capability implemented as part of DRIFT-TRIGGER-001. It focuses on connecting drift detection with training cycle triggers, leveraging the `DatasetProvider` for automated model updates under specific conditions."
+      },
+      {
+        "rank": 5,
+        "node_id": "n_05b5e6034036b22ea863",
+        "path": "/internal/ftloop/gate.go",
+        "name": "ftloop",
+        "layer": 0,
+        "role_type": "leaf",
+        "score": 0.5037878789007664,
+        "vector_sim": 0.7268238067626953,
+        "summary": "Package: ftloop. Related to: error-handling, logging. Key methods: EvaluateTrigger, OpenCycle, Evaluate. Key functions: Decide SEMANTIC: Manages the trigger gate for the recursive-retraining actuator, controlling cycle readiness and avoiding spurious triggers. Key methods evaluate cycle conditions based on ledger data. Domain terms: trigger gate, cycle management, readiness signal."
+      }
+    ]
+  },
+  {
+    "id": "q13",
+    "bucket": "antipatterns",
+    "q": "why must I not use ORDER BY LIMIT 1 in alert rules?",
+    "results": [
+      {
+        "rank": 1,
+        "node_id": "q8pdmgf96i2ooebtqo7vnp99",
+        "path": "<nil>",
+        "name": "<nil>",
+        "layer": 0,
+        "role_type": "conversation_observation",
+        "score": 0.4870346233248711,
+        "vector_sim": 0.6983108520507812,
+        "summary": "DIAGNOSIS orphan alerts (candidate ORPHAN-ALERT-001): (1) high_orphan_ratio evaluator rule (alert/rules.go:91, threshold 0.10, ORDER BY ratio DESC LIMIT 1, NO min-node floor) fires on 1-node..."
+      },
+      {
+        "rank": 2,
+        "node_id": "n_d2bcb5cad5f6f2ffa2f2",
+        "path": "/internal/alert/rules.go#OrphanRules",
+        "name": "OrphanRules",
+        "layer": 0,
+        "role_type": "leaf",
+        "score": 0.43542816638946535,
+        "vector_sim": 0.6683998107910156,
+        "summary": "Function OrphanRules in alert. Related to: validation, logging, caching SEMANTIC: Retrieves a set of orphan alerts that enhance graph-health monitoring within the system. It consolidates routine notifications about node statuses and ensures rules are configured to avoid false positives during normal operations."
+      },
+      {
+        "rank": 3,
+        "node_id": "n_b502404d6ac9c2e71bfc",
+        "path": "/internal/alert/rules.go",
+        "name": "alert",
+        "layer": 0,
+        "role_type": "leaf",
+        "score": 0.3827348411083221,
+        "vector_sim": 0.7112579345703125,
+        "summary": "Package: alert. Related to: validation, logging, caching. Key functions: DefaultRules, OrphanRules, GraphNodeDropRule, ReadinessStalenessRule, GuidanceShouldFollowRules SEMANTIC: Defines the Alert package which contains alert rules for operational monitoring. Key constructs include evaluating alerts through TimescaleDB and addressing potential caching and error-handling scenarios for performance metrics."
+      },
+      {
+        "rank": 4,
+        "node_id": "n_fdc62455e3ea0e476e13",
+        "path": "/internal/cli/grafana_templates/staged/provisioning/alerting/alerts.yml",
+        "name": "alerts.yml",
+        "layer": 0,
+        "role_type": "leaf",
+        "score": 0.329925974085927,
+        "vector_sim": 0.6893758773803711,
+        "summary": "yaml-config: alerts.yml in config. Related to: error-handling, validation, logging SEMANTIC: Defines Grafana alerting rules for MDEMG, evaluated by the internal alert evaluator. Maintains 22 rules including latency and health checks, ensuring real-time monitoring and error-handling. Domain terms: alert evaluation, monitoring rules, Grafana integration."
+      },
+      {
+        "rank": 5,
+        "node_id": "n_bb448bd766c14d0fce62",
+        "path": "/internal/alert/rules.go#AlertRule",
+        "name": "AlertRule",
+        "layer": 0,
+        "role_type": "leaf",
+        "score": 0.27035791985690594,
+        "vector_sim": 0.6681714057922363,
+        "summary": "Struct AlertRule in alert. Related to: validation, logging, caching SEMANTIC: Struct definition for AlertRule, which encapsulates properties for server-native alert evaluations. It manages parameters such as thresholds, evaluations intervals, and alert severities, tailored for precise monitoring."
+      }
+    ]
+  },
+  {
+    "id": "q14",
+    "bucket": "antipatterns",
+    "q": "what are the CUIDv2 rules and why not UUID?",
+    "results": [
+      {
+        "rank": 1,
+        "node_id": "b6377dab-6593-4b2b-ad53-3bc24f862a4c",
+        "path": "<nil>",
+        "name": "EmergentConcept-L3-uuid-cuidv2-115",
+        "layer": 3,
+        "role_type": "emergent_concept",
+        "score": 0.5069450596347451,
+        "vector_sim": 0.8581676483154297,
+        "summary": "Core understanding: uuid, cuidv2, new, jiminy (4 themes, L3)"
+      },
+      {
+        "rank": 2,
+        "node_id": "91fdecf8-02bc-4f71-b745-80dfca00b12b",
+        "path": "<nil>",
+        "name": "EmergentConcept-L4-uuid-cuidv2-59",
+        "layer": 4,
+        "role_type": "emergent_concept",
+        "score": 0.5067508188076317,
+        "vector_sim": 0.8581676483154297,
+        "summary": "Foundational principle: uuid, cuidv2, requirement, jiminy (6 themes, L4)"
+      },
+      {
+        "rank": 3,
+        "node_id": "dc651643-eacc-42ff-a6de-7c304ec9d3d8",
+        "path": "<nil>",
+        "name": "EmergentConcept-L3-uuid-cuidv2-114",
+        "layer": 3,
+        "role_type": "emergent_concept",
+        "score": 0.5066183609887958,
+        "vector_sim": 0.8581676483154297,
+        "summary": "Core understanding: uuid, cuidv2, new, jiminy (4 themes, L3)"
+      },
+      {
+        "rank": 4,
+        "node_id": "c631ba5a-14b9-4263-9f87-d6c31506aa7d",
+        "path": "<nil>",
+        "name": "EmergentConcept-L4-requirement-new-77",
+        "layer": 4,
+        "role_type": "emergent_concept",
+        "score": 0.5059170080348849,
+        "vector_sim": 0.8581676483154297,
+        "summary": "Foundational principle: requirement, new, jiminy, uuid (3 themes, L4)"
+      },
+      {
+        "rank": 5,
+        "node_id": "f27cc060-22f5-4858-bdee-ea795e7a572f",
+        "path": "<nil>",
+        "name": "EmergentConcept-L3-uuid-cuidv2-2933",
+        "layer": 3,
+        "role_type": "emergent_concept",
+        "score": 0.5053948694840074,
+        "vector_sim": 0.8575677871704102,
+        "summary": "Core understanding: uuid, cuidv2, jiminy, requirement (7 themes, L3)"
+      }
+    ]
+  },
+  {
+    "id": "q15",
+    "bucket": "antipatterns",
+    "q": "how should I write a Go-safe multi-byte string cutting for UTF-8?",
+    "results": [
+      {
+        "rank": 1,
+        "node_id": "n_8b5e0bc9defe7391f533",
+        "path": "/internal/sanitize/runesafe.go",
+        "name": "sanitize",
+        "layer": 0,
+        "role_type": "leaf",
+        "score": 0.5173218864947557,
+        "vector_sim": 0.7823934555053711,
+        "summary": "Package: sanitize. Related to: error-handling, validation, logging. Key functions: CutRuneSafe, CutRuneSafeSuffix, TailRuneSafe, backToRuneStart SEMANTIC: Offers rune-safe string manipulation primitives, ensuring that string slicing does not compromise multi-byte UTF-8 validity. This package prevents data corruption that can arise from improper truncation in databases."
+      },
+      {
+        "rank": 2,
+        "node_id": "n_4173b5c63185b2ebcb21",
+        "path": "/internal/sanitize/runesafe.go#CutRuneSafe",
+        "name": "CutRuneSafe",
+        "layer": 0,
+        "role_type": "leaf",
+        "score": 0.5072042876854539,
+        "vector_sim": 0.7455377578735352,
+        "summary": "Function CutRuneSafe in sanitize. Related to: error-handling, validation, logging. Go function sanitize.CutRuneSafe\nCutRuneSafe returns s cut to at most maxBytes bytes, never splitting a\nmulti-byte rune SEMANTIC: Returns a string truncated to a maximum byte size without splitting multi-byte runes. This avoids invalid strings during database operations, enhancing error-handling in UTF-8 contexts."
+      },
+      {
+        "rank": 3,
+        "node_id": "n_5c64e033fa085af917d5",
+        "path": "/internal/sanitize/runesafe.go#CutRuneSafeSuffix",
+        "name": "CutRuneSafeSuffix",
+        "layer": 0,
+        "role_type": "leaf",
+        "score": 0.5062686391174793,
+        "vector_sim": 0.736964225769043,
+        "summary": "Function CutRuneSafeSuffix in sanitize. Related to: error-handling, validation, logging SEMANTIC: Cuts strings safely to a specified byte length and appends a suffix if truncated. This aligns with common string manipulation idioms, maintaining clarity in user output without breaking multi-byte characters."
+      },
+      {
+        "rank": 4,
+        "node_id": "n_cfa14ff24d4824b528a2",
+        "path": "/internal/sanitize/runesafe.go#TailRuneSafe",
+        "name": "TailRuneSafe",
+        "layer": 0,
+        "role_type": "leaf",
+        "score": 0.5043650795705616,
+        "vector_sim": 0.7055530548095703,
+        "summary": "Function TailRuneSafe in sanitize. Related to: error-handling, validation, logging. Go function sanitize.TailRuneSafe\nTailRuneSafe returns the last at-most-maxBytes bytes of s, advancing the\nstart forward to a rune boundary (for output-tail capture, e.g SEMANTIC: Retrieves the last segment of a string up to specified bytes while respecting rune boundaries. Useful for capturing command output without risking invalid string formats."
+      },
+      {
+        "rank": 5,
+        "node_id": "n_83391370d3cb5159f770",
+        "path": "/api/devspacepb/devspace.pb.go#String",
+        "name": "String",
+        "layer": 0,
+        "role_type": "leaf",
+        "score": 0.01687638834118843,
+        "vector_sim": 0.7002205848693848,
+        "summary": "Function String in devspacepb. Related to: error-handling, caching SEMANTIC: Provides string representation for DevSpace entities. Key method: String (returns formatted string). Focuses on efficient error-handling and caching strategies."
+      }
+    ]
+  }
+]
