@@ -428,6 +428,16 @@ jobs:
         # to every fresh install. This check fails fast.
         run: make verify-grafana-embed
 
+      - name: TSDB consumer guard (merge-blocking)
+        # DORMANT-CENSUS-002: every declared TSDB table (via a
+        # `CREATE TABLE` in internal/tsdb/migrations/*.sql) must have an
+        # adjudicated entry in docs/api/tsdb_consumer_inventory.json
+        # (writers + readers + disposition). Fails on bidirectional drift
+        # (new table unlisted / inventory entry for removed table) and on
+        # any UNREVIEWED disposition. Extends the DORMANT-CENSUS-001
+        # forcing-function pattern from routes to TSDB tables.
+        run: python3 scripts/verify_tsdb_consumers.py
+
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
