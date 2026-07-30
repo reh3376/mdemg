@@ -588,6 +588,40 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 	}
 	recallLatencyMs := time.Since(recallStart).Milliseconds()
 
+	// RETRIEVAL-LAYER-BALANCE-001: supplementary concrete-recall query merges
+	// role/layer-filtered candidates into the pool BEFORE RRF fusion. Addresses
+	// RQA-001 cluster C — abstract L3+ emergent-concepts dominating the primary
+	// vector recall pool such that concrete L0/L1 rules never reach fusion.
+	// Fail-open (nil on error/disabled); dedup by NodeID so the primary pool's
+	// scores (which reflect full column signal) win over the concrete-recall
+	// VectorSim-only entries. Per-request override via ?concrete=true|false.
+	concreteEnabled := s.cfg.RetrievalConcreteRecallEnabled
+	if req.ConcreteRecallOverridePresent {
+		concreteEnabled = req.ConcreteRecallEnabled
+	}
+	concreteCount := 0
+	var concreteRecallResults []models.RetrieveResult
+	if concreteEnabled {
+		concreteCands := s.fetchConcreteRecall(ctx, spaceIDs, req.QueryEmbedding)
+		if len(concreteCands) > 0 {
+			// Path 1: STASH for post-rerank quota injection. This is the
+			// critical path — Tier-3 smoke revealed the LLM cross-encoder
+			// rerank aggressively demotes concrete L0/L1 candidates below any
+			// topK cut for keyword-shaped queries. The stashed candidates
+			// bypass rerank entirely and are promoted by the quota downstream.
+			concreteRecallResults = ConcreteCandidatesToResults(concreteCands)
+			// Path 2: merge into pre-fusion pool (belt-and-suspenders — most
+			// concretes are already in vector recall; helps in rare cases).
+			vectorCands, concreteCount = mergeConcreteCandidates(vectorCands, concreteCands)
+		}
+		slog.Info("retrieval: concrete-recall executed",
+			"enabled", concreteEnabled,
+			"concrete_returned", len(concreteRecallResults),
+			"concrete_added_to_pool", concreteCount,
+			"pool_size_after", len(vectorCands))
+	}
+	_ = concreteCount // observability handle for future dashboard/telemetry wire
+
 	// Collect BM25 result and fuse
 	var cands []Candidate
 	bm25Count := 0
@@ -928,7 +962,13 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 			Query:      req.QueryText,
 			Candidates: results,
 			TopN:       s.cfg.RerankTopN,
-			ReturnK:    topK,
+			// RETRIEVAL-LAYER-BALANCE-001: when the concrete-quota is enabled,
+			// request more than topK from the reranker so the quota + diversity
+			// filters downstream have a larger candidate pool to reorder + dedup
+			// from. Otherwise the quota is a no-op (rerank returns exactly topK
+			// so a buried concrete is never even visible to the quota). Cap at
+			// RerankTopN so we never exceed the reranker's scored set.
+			ReturnK: rerankReturnK(topK, s.cfg.RetrievalConcreteQuotaEnabled, s.cfg.RerankTopN),
 		})
 		if rerankErr != nil {
 			// Log warning but continue with initial results
@@ -959,6 +999,20 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 			}
 		}
 	}
+
+	// RETRIEVAL-LAYER-BALANCE-001 Epic 2: concrete-layer quota. Live smoke
+	// on E1 (concrete-recall) proved that primary vector recall ALREADY
+	// contains L0/L1 concrete candidates for cluster-C queries — RRF fusion
+	// + rerank just push them below the top-K cut. Reorder here so N slots
+	// are guaranteed to hold concrete results when they exist. Runs BEFORE
+	// the diversity filter so both can compose (quota promotes → diversity
+	// dedups). Config-gated default-off (RETRIEVAL_CONCRETE_QUOTA_ENABLED).
+	results = ApplyConcreteQuotaWithExtra(results, concreteRecallResults, topK, ConcreteQuotaCfg{
+		Enabled:   s.cfg.RetrievalConcreteQuotaEnabled,
+		MinSlots:  s.cfg.RetrievalConcreteQuotaMinSlots,
+		LayerMax:  s.cfg.RetrievalConcreteRecallLayerMax,
+		RoleTypes: parseConcreteRoleTypes(s.cfg.RetrievalConcreteRecallRoleTypes),
+	})
 
 	// RETRIEVAL-DIVERSITY-001: post-rerank near-duplicate suppression.
 	// Runs BEFORE the topK truncation so the filter can pick from a larger
