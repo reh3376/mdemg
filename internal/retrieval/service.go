@@ -960,6 +960,15 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 		}
 	}
 
+	// RETRIEVAL-DIVERSITY-001: post-rerank near-duplicate suppression.
+	// Runs BEFORE the topK truncation so the filter can pick from a larger
+	// candidate pool. Default-off; opt-in via RETRIEVAL_DIVERSITY_ENABLED.
+	results = ApplyDiversityFilter(results, topK, DiversityCfg{
+		Enabled:    s.cfg.RetrievalDiversityEnabled,
+		MaxPerName: s.cfg.RetrievalDiversityMaxPerName,
+		MinOutput:  s.cfg.RetrievalDiversityMinOutput,
+	})
+
 	// Truncate to topK if needed
 	if len(results) > topK {
 		results = results[:topK]

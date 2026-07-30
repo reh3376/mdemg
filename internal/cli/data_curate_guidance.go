@@ -16,13 +16,14 @@ import (
 // can later consume as a file input.
 func newDataCurateGuidanceCmd() *cobra.Command {
 	var (
-		version         string
-		spaceID         string
-		lookbackHours   int
-		minLabelQuality string
-		against         string
-		outDir          string
-		dryRun          bool
+		version             string
+		spaceID             string
+		lookbackHours       int
+		minLabelQuality     string
+		against             string
+		outDir              string
+		dryRun              bool
+		minSuggestionLength int
 	)
 
 	cmd := &cobra.Command{
@@ -44,6 +45,7 @@ manifest's gold_fraction is the signal the retrain FUTURE-TRIGGER reads.`,
 				"--lookback-hours", strconv.Itoa(lookbackHours),
 				"--min-label-quality", minLabelQuality,
 				"--out-dir", outDir,
+				"--min-suggestion-length", strconv.Itoa(minSuggestionLength),
 			}
 			if against != "" {
 				args = append(args, "--against", against)
@@ -67,6 +69,9 @@ manifest's gold_fraction is the signal the retrain FUTURE-TRIGGER reads.`,
 		"Comma-separated JSONL paths to leak-audit the corpus against")
 	cmd.Flags().StringVar(&outDir, "out-dir", "training_data/guidance_corpus", "Output directory")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Compute + print the manifest without writing files")
+	cmd.Flags().IntVar(&minSuggestionLength, "min-suggestion-length", 40,
+		"Min char length for review_grades.suggested_guidance to emit as a synthetic "+
+			"corpus row (filters triage notes). Set 0 to disable.")
 
 	return cmd
 }

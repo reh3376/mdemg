@@ -51,8 +51,27 @@ def _table_exists(cur, name: str) -> bool:
     return bool(cur.fetchone()[0])
 
 
-def fetch_rows(cur, space_id: str | None, lookback_hours: int, have_gold: bool):
-    """Fetch evidence rows, LEFT JOINing review_grades for gold when present."""
+def _column_exists(cur, table: str, column: str) -> bool:
+    cur.execute(
+        "SELECT 1 FROM information_schema.columns "
+        "WHERE table_name = %s AND column_name = %s LIMIT 1",
+        (table, column),
+    )
+    return cur.fetchone() is not None
+
+
+def fetch_rows(cur, space_id: str | None, lookback_hours: int,
+               have_grades: bool, have_gold_outcome: bool):
+    """Fetch evidence rows, LEFT JOINing review_grades when present.
+
+    Two capabilities are decoupled:
+      - have_grades: review_grades table exists → SME suggested_guidance is
+        available (REVIEW-SUGGESTED-GUIDANCE-CONSUME-001).
+      - have_gold_outcome: review_grades.gold_outcome column exists → gold
+        verdict overrides the row's auto-label. The shipped schema stores
+        the gold verdict in gold_dimensions JSONB instead of a scalar
+        column, so this is typically False on production TSDB.
+    """
     where = ["g.time > now() - (%(lb)s || ' hours')::interval"]
     params: dict = {"lb": str(lookback_hours)}
     if space_id:
@@ -60,34 +79,35 @@ def fetch_rows(cur, space_id: str | None, lookback_hours: int, have_gold: bool):
         params["sid"] = space_id
     where_sql = " AND ".join(where)
 
-    if have_gold:
-        # Prefer the latest gold grade's corrected outcome (gold_dimensions ->>
-        # outcome_label_correctness style is HITL's; here we read the gold
-        # outcome if review_grades exposes one, else fall back to the row label).
-        sql = f"""
-            SELECT g.row_id, g.space_id, g.guidance_type, g.guidance_content,
-                   g.action_summary, g.outcome_type, g.classifier_source,
-                   g.source_role_type, g.source_layer, g.similarity,
-                   rg.gold_outcome
-            FROM guidance_training_rows g
+    gold_expr = "rg.gold_outcome" if have_gold_outcome else "NULL"
+
+    if have_grades:
+        sug_select = "rg.suggested_guidance, rg.grade_id"
+        gold_select = "gold_outcome, " if have_gold_outcome else ""
+        join = f"""
             LEFT JOIN LATERAL (
-                SELECT gold_outcome FROM review_grades r
+                SELECT {gold_select}suggested_guidance, grade_id
+                FROM review_grades r
                 WHERE r.dataset_id = 'guidance' AND r.item_id = g.row_id
+                  AND r.reversed = false
                 ORDER BY r.graded_at DESC LIMIT 1
             ) rg ON TRUE
-            WHERE {where_sql}
-            ORDER BY g.time DESC
         """
     else:
-        sql = f"""
-            SELECT g.row_id, g.space_id, g.guidance_type, g.guidance_content,
-                   g.action_summary, g.outcome_type, g.classifier_source,
-                   g.source_role_type, g.source_layer, g.similarity,
-                   NULL AS gold_outcome
-            FROM guidance_training_rows g
-            WHERE {where_sql}
-            ORDER BY g.time DESC
-        """
+        sug_select = "NULL, NULL"
+        join = ""
+
+    sql = f"""
+        SELECT g.row_id, g.space_id, g.guidance_type, g.guidance_content,
+               g.action_summary, g.outcome_type, g.classifier_source,
+               g.source_role_type, g.source_layer, g.similarity,
+               {gold_expr} AS gold_outcome,
+               {sug_select}
+        FROM guidance_training_rows g
+        {join}
+        WHERE {where_sql}
+        ORDER BY g.time DESC
+    """
     cur.execute(sql, params)
     return cur.fetchall()
 
@@ -107,6 +127,11 @@ def main() -> int:
                     default=float(os.environ.get("GUIDANCE_CORPUS_MIN_GOLD_FRACTION", "0.0")))
     ap.add_argument("--out-dir", default="training_data/guidance_corpus")
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--min-suggestion-length", type=int,
+                    default=int(os.environ.get("GUIDANCE_CORPUS_MIN_SUGGESTION_LENGTH", "40")),
+                    help="Min char length for review_grades.suggested_guidance "
+                         "to emit as a synthetic corpus row (filters triage notes). "
+                         "Set 0 to disable.")
     args = ap.parse_args()
 
     try:
@@ -118,8 +143,16 @@ def main() -> int:
     conn = psycopg2.connect(args.tsdb_dsn)
     try:
         cur = conn.cursor()
-        have_gold = _table_exists(cur, "review_grades")
-        rows = fetch_rows(cur, args.space_id, args.lookback_hours, have_gold)
+        have_grades = _table_exists(cur, "review_grades")
+        # The gold verdict is stored in gold_dimensions (JSONB) on the shipped
+        # schema, not in a scalar gold_outcome column. Check for the column
+        # separately so the SME-suggestion path (which needs only review_grades)
+        # keeps working when the gold-outcome column is absent.
+        have_gold_outcome = have_grades and _column_exists(
+            cur, "review_grades", "gold_outcome"
+        )
+        rows = fetch_rows(cur, args.space_id, args.lookback_hours,
+                          have_grades, have_gold_outcome)
     finally:
         conn.close()
 
@@ -130,8 +163,11 @@ def main() -> int:
     gtype_dist: dict[str, int] = {}
     outcome_dist: dict[str, int] = {}
     gold_count = 0
+    sme_suggestions_included = 0
+    sme_suggestions_skipped_short = 0
+    min_sug_len = args.min_suggestion_length
     for (row_id, space_id, gtype, gcontent, action, outcome, clsfr,
-         role, layer, sim, gold_outcome) in rows:
+         role, layer, sim, gold_outcome, suggested_guidance, grade_id) in rows:
         gtype = gtype or ""
         clsfr = clsfr or ""
         if gold_outcome:
@@ -167,6 +203,38 @@ def main() -> int:
         key = f"{gtype}|{final_outcome}"
         gtype_outcome[key] = gtype_outcome.get(key, 0) + 1
 
+        # REVIEW-SUGGESTED-GUIDANCE-CONSUME-001: emit an additional SYNTHETIC
+        # corpus row when the SME authored a "what would have been better
+        # guidance" text alongside their grade. Length-gate rejects operator
+        # triage notes (e.g. "This was a duplicate entry"). Set --min-suggestion-length
+        # 0 to disable the gate.
+        sug = (suggested_guidance or "").strip()
+        if sug:
+            if min_sug_len > 0 and len(sug) < min_sug_len:
+                sme_suggestions_skipped_short += 1
+            else:
+                sme_rec = {
+                    "row_id": f"{row_id}::sme_sug",
+                    "space_id": space_id,
+                    "guidance_type": gtype,
+                    "guidance_content": sug,
+                    "action_summary": action or "",
+                    "outcome": "followed",
+                    "label_source": "sme_suggestion",
+                    "source_role_type": role or "",
+                    "source_layer": layer,
+                    "similarity": sim,
+                    "sme_source_grade_id": grade_id,
+                    "sme_source_row_id": row_id,
+                }
+                records.append(sme_rec)
+                sme_suggestions_included += 1
+                label_breakdown["sme_suggestion"] = label_breakdown.get("sme_suggestion", 0) + 1
+                gtype_dist[gtype] = gtype_dist.get(gtype, 0) + 1
+                outcome_dist["followed"] = outcome_dist.get("followed", 0) + 1
+                sme_key = f"{gtype}|followed"
+                gtype_outcome[sme_key] = gtype_outcome.get(sme_key, 0) + 1
+
     total = len(records)
     gold_fraction = (gold_count / total) if total else 0.0
 
@@ -200,13 +268,17 @@ def main() -> int:
         "lookback_hours": args.lookback_hours,
         "min_label_quality": args.min_label_quality,
         "total_rows": total,
-        "gold_available": have_gold,
+        "gold_available": have_gold_outcome,
+        "grades_available": have_grades,
         "gold_fraction": round(gold_fraction, 4),
         "min_gold_fraction_target": args.min_gold_fraction,
         "label_source_breakdown": label_breakdown,
         "guidance_type_distribution": gtype_dist,
         "outcome_distribution": outcome_dist,
         "guidance_type_x_outcome": gtype_outcome,
+        "sme_suggestions_included": sme_suggestions_included,
+        "sme_suggestions_skipped_short": sme_suggestions_skipped_short,
+        "min_suggestion_length": args.min_suggestion_length,
         "leak_audit": leak_report,
         "corpus_path": str(corpus_path),
         "dry_run": args.dry_run,
