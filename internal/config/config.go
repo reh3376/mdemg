@@ -658,6 +658,14 @@ type Config struct {
 	RetrievalConcreteRecallRoleTypes string  // RETRIEVAL_CONCRETE_RECALL_ROLE_TYPES — comma-separated role_types accepted as "concrete" (default: "leaf,constraint,correction,conversation_observation"; empty = any role_type under LAYER_MAX)
 	RetrievalConcreteQuotaEnabled    bool    // RETRIEVAL_CONCRETE_QUOTA_ENABLED — post-rerank layer-diversity quota (RETRIEVAL-LAYER-BALANCE-001 Epic 2, added after live smoke revealed the E1 pool-inclusion alone doesn't surface concrete candidates — RRF fusion + rerank push them below top-K). Reorders so the first N slots contain L0/L1 concretes when they exist. Composes with the diversity filter. Default false; operator flips after live smoke.
 	RetrievalConcreteQuotaMinSlots   int     // RETRIEVAL_CONCRETE_QUOTA_MIN_SLOTS — guaranteed number of L0/L1 slots in top-K (default: 1)
+	RetrievalReverseRefEnabled       bool    // RETRIEVAL_REVERSE_REF_ENABLED — filesystem-grep for reverse-lookup queries ("what consumes X?") (RETRIEVAL-REVERSE-LOOKUP-001). Extracts candidate symbols from queryText, greps the workspace, injects matching MemoryNodes into the RRF pool via the concrete-quota mechanism. Addresses RQA-001 cluster A. Default false; operator flips after live smoke.
+	RetrievalReverseRefWorkspaceRoot string  // RETRIEVAL_REVERSE_REF_WORKSPACE_ROOT — filesystem root to grep (default: MDEMG_WORKSPACE env, else current working directory). Empty disables reverse-ref.
+	RetrievalReverseRefTopK          int     // RETRIEVAL_REVERSE_REF_TOPK — max grep-matched files injected into the RRF pool (default: 15 — needs runway because many top hits are typically the WRITER/DEFINER files already in the primary pool; the actual CONSUMER files are ranked lower by hit-count)
+	RetrievalReverseRefMinSymbolLen  int     // RETRIEVAL_REVERSE_REF_MIN_SYMBOL_LEN — min length for a query token to be treated as a candidate symbol (default: 5). Below this + the stop-word list, common English words don't trigger grep.
+	RetrievalReverseRefMaxFilesScanned int   // RETRIEVAL_REVERSE_REF_MAX_FILES_SCANNED — safety cap on files scanned per query (default: 5000)
+	RetrievalReverseRefExtensions    string  // RETRIEVAL_REVERSE_REF_EXTENSIONS — comma-separated file extensions allowed (default: ".go,.py,.sql,.md,.yml,.yaml,.json,.ts,.tsx,.js")
+	RetrievalReverseRefExcludeDirs   string  // RETRIEVAL_REVERSE_REF_EXCLUDE_DIRS — comma-separated directory names excluded from the walk (default: "node_modules,.git,.venv,dist,build,vendor,.mypy_cache")
+	RetrievalReverseRefQuotaMinSlots int     // RETRIEVAL_REVERSE_REF_QUOTA_MIN_SLOTS — guaranteed number of reverse-ref slots in top-K (default: 1). Higher values give bigger lift on reverse-lookup queries (q11-shape) but risk regression on non-reverse-lookup queries by displacing natural top-K with grep matches that happen to contain query terms.
 	RetrievalColumnVotingEnabled     bool    // RETRIEVAL_COLUMN_VOTING_ENABLED — route to RRF aggregator instead of linear scorer (default: true after Phase 13.1 embedding-heavy preset passed full 120q A/B with mean +0.023, 30 improvements, 2 boundary regressions)
 	RetrievalGraphTypedEdgesEnabled  bool    // RETRIEVAL_GRAPH_TYPED_EDGES_ENABLED — RRF graph column spreads activation through typed semantic edges (ANALOGOUS_TO/BRIDGES/etc.) via SpreadingActivationWithAttention instead of the CO_ACTIVATED_WITH-only basic spreading (RETRIEVAL-TYPED-EDGES-001/002; default: true — the clean full-120q UVTS A/B passed on a quiet system: +0.001 mean / +0.009 correct-file, 0 regressions, no latency cost, once the semantic edges were grown by the dynamic_edges vector-index rewrite)
 	RetrievalRRFK                    int     // RETRIEVAL_RRF_K — RRF constant `score = w / (k + rank)` (default: 60 per Cormack et al.)
@@ -3511,6 +3519,35 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	// RETRIEVAL-REVERSE-LOOKUP-001: filesystem-grep for reverse-lookup queries.
+	retrievalReverseRefEnabled := getBool("RETRIEVAL_REVERSE_REF_ENABLED", false)
+	retrievalReverseRefWorkspaceRoot := get("RETRIEVAL_REVERSE_REF_WORKSPACE_ROOT",
+		get("MDEMG_WORKSPACE", ""))
+	if retrievalReverseRefWorkspaceRoot == "" {
+		if cwd, cerr := os.Getwd(); cerr == nil {
+			retrievalReverseRefWorkspaceRoot = cwd
+		}
+	}
+	retrievalReverseRefTopK, err := atoi("RETRIEVAL_REVERSE_REF_TOPK", 15)
+	if err != nil {
+		return Config{}, err
+	}
+	retrievalReverseRefMinSymbolLen, err := atoi("RETRIEVAL_REVERSE_REF_MIN_SYMBOL_LEN", 5)
+	if err != nil {
+		return Config{}, err
+	}
+	retrievalReverseRefMaxFilesScanned, err := atoi("RETRIEVAL_REVERSE_REF_MAX_FILES_SCANNED", 5000)
+	if err != nil {
+		return Config{}, err
+	}
+	retrievalReverseRefExtensions := get("RETRIEVAL_REVERSE_REF_EXTENSIONS",
+		".go,.py,.sql,.md,.yml,.yaml,.json,.ts,.tsx,.js")
+	retrievalReverseRefExcludeDirs := get("RETRIEVAL_REVERSE_REF_EXCLUDE_DIRS",
+		"node_modules,.git,.venv,dist,build,vendor,.mypy_cache")
+	retrievalReverseRefQuotaMinSlots, err := atoi("RETRIEVAL_REVERSE_REF_QUOTA_MIN_SLOTS", 3)
+	if err != nil {
+		return Config{}, err
+	}
 	retrievalGraphTypedEdgesEnabled := getBool("RETRIEVAL_GRAPH_TYPED_EDGES_ENABLED", true)
 	retrievalRRFK, err := atoi("RETRIEVAL_RRF_K", 60)
 	if err != nil {
@@ -5953,6 +5990,14 @@ func FromEnv() (Config, error) {
 		RetrievalConcreteRecallRoleTypes: retrievalConcreteRecallRoleTypes,
 		RetrievalConcreteQuotaEnabled:    retrievalConcreteQuotaEnabled,
 		RetrievalConcreteQuotaMinSlots:   retrievalConcreteQuotaMinSlots,
+		RetrievalReverseRefEnabled:       retrievalReverseRefEnabled,
+		RetrievalReverseRefWorkspaceRoot: retrievalReverseRefWorkspaceRoot,
+		RetrievalReverseRefTopK:          retrievalReverseRefTopK,
+		RetrievalReverseRefMinSymbolLen:  retrievalReverseRefMinSymbolLen,
+		RetrievalReverseRefMaxFilesScanned: retrievalReverseRefMaxFilesScanned,
+		RetrievalReverseRefExtensions:    retrievalReverseRefExtensions,
+		RetrievalReverseRefExcludeDirs:   retrievalReverseRefExcludeDirs,
+		RetrievalReverseRefQuotaMinSlots: retrievalReverseRefQuotaMinSlots,
 		RetrievalGraphTypedEdgesEnabled:  retrievalGraphTypedEdgesEnabled,
 		RetrievalRRFK:                    retrievalRRFK,
 		RetrievalColumnTimeoutFrac:       retrievalColumnTimeoutFrac,

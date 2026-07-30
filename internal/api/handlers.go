@@ -502,6 +502,20 @@ func (s *Server) handleRetrieve(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	// RETRIEVAL-REVERSE-LOOKUP-001 — `?reverse_ref=true|false` overrides
+	// RETRIEVAL_REVERSE_REF_ENABLED per-request for live A/B (mirrors ?sparse=).
+	if !req.ReverseRefOverridePresent {
+		if v := r.URL.Query().Get("reverse_ref"); v != "" {
+			switch strings.ToLower(strings.TrimSpace(v)) {
+			case "true", "1", "yes", "on":
+				req.ReverseRefEnabled = true
+				req.ReverseRefOverridePresent = true
+			case "false", "0", "no", "off":
+				req.ReverseRefEnabled = false
+				req.ReverseRefOverridePresent = true
+			}
+		}
+	}
 	// Phase 14.2 Epic 4 — `?strict_context=true` URL param falls back when
 	// JSON body did not set it. Operates on QueryContextFingerprint;
 	// gracefully no-ops when fingerprint is empty.

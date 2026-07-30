@@ -94,6 +94,8 @@ func CacheKey(req models.RetrieveRequest, scorerVersion string) string {
 		StrictContextMode  bool           `json:"sc,omitempty"`
 		ConcreteOverride   bool           `json:"cro,omitempty"` // RETRIEVAL-LAYER-BALANCE-001
 		ConcreteEnabled    bool           `json:"cre,omitempty"` // RETRIEVAL-LAYER-BALANCE-001
+		ReverseRefOverride bool           `json:"rro,omitempty"` // RETRIEVAL-REVERSE-LOOKUP-001
+		ReverseRefEnabled  bool           `json:"rre,omitempty"` // RETRIEVAL-REVERSE-LOOKUP-001
 		ScorerVersion      string         `json:"sv"`
 	}{
 		SpaceID:            req.SpaceID,
@@ -122,6 +124,8 @@ func CacheKey(req models.RetrieveRequest, scorerVersion string) string {
 		StrictContextMode:  req.StrictContextMode,
 		ConcreteOverride:   req.ConcreteRecallOverridePresent,
 		ConcreteEnabled:    req.ConcreteRecallEnabled,
+		ReverseRefOverride: req.ReverseRefOverridePresent,
+		ReverseRefEnabled:  req.ReverseRefEnabled,
 		ScorerVersion:      scorerVersion,
 	}
 

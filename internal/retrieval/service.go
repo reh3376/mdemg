@@ -622,6 +622,21 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 	}
 	_ = concreteCount // observability handle for future dashboard/telemetry wire
 
+	// RETRIEVAL-REVERSE-LOOKUP-001: filesystem-grep for reverse-lookup queries
+	// ("what consumes X?"). Symbols extracted from queryText are grep-matched
+	// against the configured workspace root; matching files' MemoryNodes are
+	// stashed for post-rerank quota injection. Runs alongside concrete-recall;
+	// both feed the same quota promoter. Fail-open (nil on error/disabled).
+	// Per-request override via ?reverse_ref=true|false.
+	reverseRefEnabled := s.cfg.RetrievalReverseRefEnabled
+	if req.ReverseRefOverridePresent {
+		reverseRefEnabled = req.ReverseRefEnabled
+	}
+	var reverseRefResults []models.RetrieveResult
+	if reverseRefEnabled && req.QueryText != "" {
+		reverseRefResults = s.fetchReverseRefResults(ctx, spaceIDs, req.QueryText)
+	}
+
 	// Collect BM25 result and fuse
 	var cands []Candidate
 	bm25Count := 0
@@ -968,7 +983,7 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 			// from. Otherwise the quota is a no-op (rerank returns exactly topK
 			// so a buried concrete is never even visible to the quota). Cap at
 			// RerankTopN so we never exceed the reranker's scored set.
-			ReturnK: rerankReturnK(topK, s.cfg.RetrievalConcreteQuotaEnabled, s.cfg.RerankTopN),
+			ReturnK: rerankReturnK(topK, s.cfg.RetrievalConcreteQuotaEnabled || reverseRefEnabled, s.cfg.RerankTopN),
 		})
 		if rerankErr != nil {
 			// Log warning but continue with initial results
@@ -1012,6 +1027,24 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 		MinSlots:  s.cfg.RetrievalConcreteQuotaMinSlots,
 		LayerMax:  s.cfg.RetrievalConcreteRecallLayerMax,
 		RoleTypes: parseConcreteRoleTypes(s.cfg.RetrievalConcreteRecallRoleTypes),
+	})
+
+	// RETRIEVAL-REVERSE-LOOKUP-001: promote reverse-ref (grep-matched)
+	// candidates into the top-K post-rerank. Same architectural placement
+	// as the concrete-quota — bypasses the LLM cross-encoder for a
+	// candidate class that would otherwise never surface (files whose
+	// bodies reference the query symbol but whose names/summaries don't).
+	// Composes: concrete-quota goes first (L0/L1 rules), reverse-ref second
+	// (grep-matched files), then diversity dedup + topK truncate.
+	// Query-shape gate: only fire the promoter for queries that LOOK LIKE
+	// reverse-lookups ("what consumes X?"). Firing on every query caused a
+	// live-caught regression on q10 (5/5 → 2/5) — the grep-matched
+	// candidates for non-reverse-lookup queries just displaced the natural
+	// top-K with irrelevant hits.
+	reverseRefPromoterEnabled := reverseRefEnabled && IsReverseLookupQuery(req.QueryText)
+	results = ApplyReverseRefQuota(results, reverseRefResults, topK, ReverseRefQuotaCfg{
+		Enabled:  reverseRefPromoterEnabled,
+		MinSlots: s.cfg.RetrievalReverseRefQuotaMinSlots,
 	})
 
 	// RETRIEVAL-DIVERSITY-001: post-rerank near-duplicate suppression.
