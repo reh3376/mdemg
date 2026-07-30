@@ -488,6 +488,20 @@ func (s *Server) handleRetrieve(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	// RETRIEVAL-LAYER-BALANCE-001 — `?concrete=true|false` overrides
+	// RETRIEVAL_CONCRETE_RECALL_ENABLED per-request for live A/B (mirrors ?sparse=).
+	if !req.ConcreteRecallOverridePresent {
+		if v := r.URL.Query().Get("concrete"); v != "" {
+			switch strings.ToLower(strings.TrimSpace(v)) {
+			case "true", "1", "yes", "on":
+				req.ConcreteRecallEnabled = true
+				req.ConcreteRecallOverridePresent = true
+			case "false", "0", "no", "off":
+				req.ConcreteRecallEnabled = false
+				req.ConcreteRecallOverridePresent = true
+			}
+		}
+	}
 	// Phase 14.2 Epic 4 — `?strict_context=true` URL param falls back when
 	// JSON body did not set it. Operates on QueryContextFingerprint;
 	// gracefully no-ops when fingerprint is empty.

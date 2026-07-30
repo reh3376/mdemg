@@ -47,6 +47,13 @@ type RetrieveRequest struct {
 	SparseEnabled         bool    `json:"sparse,omitempty"`                                                   // request-level override for SPARSE_RETRIEVAL_ENABLED
 	SparsePercentile      float64 `json:"sparse_percentile,omitempty" validate:"omitempty,min=0.5,max=0.999"` // request-level override for SPARSE_ACTIVATION_PERCENTILE
 
+	// RETRIEVAL-LAYER-BALANCE-001 — per-request override for the concrete-recall
+	// supplementary vector search. When ConcreteRecallOverridePresent is true,
+	// ConcreteRecallEnabled overrides RETRIEVAL_CONCRETE_RECALL_ENABLED. Set by
+	// the handler from `?concrete=true|false` for live A/B without restart.
+	ConcreteRecallOverridePresent bool `json:"-"`
+	ConcreteRecallEnabled         bool `json:"concrete_recall,omitempty"`
+
 	// Phase 14.1 Epic 2 — Per-category gate dispatch hint. When the gate
 	// fires and this matches a key in `cfg.SparseGateCategoryOverrides`, the
 	// override's MIN_ACTIVE/MAX_ACTIVE/Percentile replace the globals for

@@ -651,6 +651,13 @@ type Config struct {
 	RetrievalDiversityEnabled        bool    // RETRIEVAL_DIVERSITY_ENABLED — post-rerank near-duplicate suppression: drops results whose Name already appears MaxPerName times in the kept set (RETRIEVAL-DIVERSITY-001). Addresses RQA-001 cluster D (~11% of top-5 slots wasted on duplicates). Default false; operator flips after live smoke.
 	RetrievalDiversityMaxPerName     int     // RETRIEVAL_DIVERSITY_MAX_PER_NAME — max results with the same Name allowed in output (default: 1 = strict dedup)
 	RetrievalDiversityMinOutput      int     // RETRIEVAL_DIVERSITY_MIN_OUTPUT — safety-net back-fill: only kicks in when dedup would drop output below this (default: 1 = bare minimum; the sprint's design intent is "prefer diverse coverage over completeness")
+	RetrievalConcreteRecallEnabled   bool    // RETRIEVAL_CONCRETE_RECALL_ENABLED — supplementary role/layer-filtered vector search over the concrete partition, merged into the RRF pool BEFORE fusion (RETRIEVAL-LAYER-BALANCE-001). Addresses RQA-001 cluster C (abstract L3+ emergent-concepts crowd out concrete L0/L1 rules for keyword-shaped queries; live q14 CUIDv2: 15 concrete nodes exist but 0 surface in top-20). Follows the shipped Lever C (JIMINY-ACTIONABILITY-001 E5) pattern. Default false; operator flips after live smoke.
+	RetrievalConcreteRecallTopK      int     // RETRIEVAL_CONCRETE_RECALL_TOPK — max concrete candidates merged into the RRF pool (default: 5)
+	RetrievalConcreteRecallLayerMax  int     // RETRIEVAL_CONCRETE_RECALL_LAYER_MAX — max layer treated as "concrete" (default: 1 = L0 leaf/observation + L1 constraint/correction)
+	RetrievalConcreteRecallSimFloor  float64 // RETRIEVAL_CONCRETE_RECALL_SIM_FLOOR — cosine similarity floor for concrete candidates (default: 0.30, matches Lever C; ⚠️ RRF-SCALE-001-safe: gates on the vector-index cosine sim [0,1] stable, NEVER the RRF Score)
+	RetrievalConcreteRecallRoleTypes string  // RETRIEVAL_CONCRETE_RECALL_ROLE_TYPES — comma-separated role_types accepted as "concrete" (default: "leaf,constraint,correction,conversation_observation"; empty = any role_type under LAYER_MAX)
+	RetrievalConcreteQuotaEnabled    bool    // RETRIEVAL_CONCRETE_QUOTA_ENABLED — post-rerank layer-diversity quota (RETRIEVAL-LAYER-BALANCE-001 Epic 2, added after live smoke revealed the E1 pool-inclusion alone doesn't surface concrete candidates — RRF fusion + rerank push them below top-K). Reorders so the first N slots contain L0/L1 concretes when they exist. Composes with the diversity filter. Default false; operator flips after live smoke.
+	RetrievalConcreteQuotaMinSlots   int     // RETRIEVAL_CONCRETE_QUOTA_MIN_SLOTS — guaranteed number of L0/L1 slots in top-K (default: 1)
 	RetrievalColumnVotingEnabled     bool    // RETRIEVAL_COLUMN_VOTING_ENABLED — route to RRF aggregator instead of linear scorer (default: true after Phase 13.1 embedding-heavy preset passed full 120q A/B with mean +0.023, 30 improvements, 2 boundary regressions)
 	RetrievalGraphTypedEdgesEnabled  bool    // RETRIEVAL_GRAPH_TYPED_EDGES_ENABLED — RRF graph column spreads activation through typed semantic edges (ANALOGOUS_TO/BRIDGES/etc.) via SpreadingActivationWithAttention instead of the CO_ACTIVATED_WITH-only basic spreading (RETRIEVAL-TYPED-EDGES-001/002; default: true — the clean full-120q UVTS A/B passed on a quiet system: +0.001 mean / +0.009 correct-file, 0 regressions, no latency cost, once the semantic edges were grown by the dynamic_edges vector-index rewrite)
 	RetrievalRRFK                    int     // RETRIEVAL_RRF_K — RRF constant `score = w / (k + rank)` (default: 60 per Cormack et al.)
@@ -3483,6 +3490,27 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	// RETRIEVAL-LAYER-BALANCE-001: concrete-recall supplementary vector search.
+	retrievalConcreteRecallEnabled := getBool("RETRIEVAL_CONCRETE_RECALL_ENABLED", false)
+	retrievalConcreteRecallTopK, err := atoi("RETRIEVAL_CONCRETE_RECALL_TOPK", 5)
+	if err != nil {
+		return Config{}, err
+	}
+	retrievalConcreteRecallLayerMax, err := atoi("RETRIEVAL_CONCRETE_RECALL_LAYER_MAX", 1)
+	if err != nil {
+		return Config{}, err
+	}
+	retrievalConcreteRecallSimFloor, err := atof("RETRIEVAL_CONCRETE_RECALL_SIM_FLOOR", 0.30)
+	if err != nil {
+		return Config{}, err
+	}
+	retrievalConcreteRecallRoleTypes := get("RETRIEVAL_CONCRETE_RECALL_ROLE_TYPES",
+		"leaf,constraint,correction,conversation_observation")
+	retrievalConcreteQuotaEnabled := getBool("RETRIEVAL_CONCRETE_QUOTA_ENABLED", false)
+	retrievalConcreteQuotaMinSlots, err := atoi("RETRIEVAL_CONCRETE_QUOTA_MIN_SLOTS", 1)
+	if err != nil {
+		return Config{}, err
+	}
 	retrievalGraphTypedEdgesEnabled := getBool("RETRIEVAL_GRAPH_TYPED_EDGES_ENABLED", true)
 	retrievalRRFK, err := atoi("RETRIEVAL_RRF_K", 60)
 	if err != nil {
@@ -5918,6 +5946,13 @@ func FromEnv() (Config, error) {
 		RetrievalDiversityEnabled:        retrievalDiversityEnabled,
 		RetrievalDiversityMaxPerName:     retrievalDiversityMaxPerName,
 		RetrievalDiversityMinOutput:      retrievalDiversityMinOutput,
+		RetrievalConcreteRecallEnabled:   retrievalConcreteRecallEnabled,
+		RetrievalConcreteRecallTopK:      retrievalConcreteRecallTopK,
+		RetrievalConcreteRecallLayerMax:  retrievalConcreteRecallLayerMax,
+		RetrievalConcreteRecallSimFloor:  retrievalConcreteRecallSimFloor,
+		RetrievalConcreteRecallRoleTypes: retrievalConcreteRecallRoleTypes,
+		RetrievalConcreteQuotaEnabled:    retrievalConcreteQuotaEnabled,
+		RetrievalConcreteQuotaMinSlots:   retrievalConcreteQuotaMinSlots,
 		RetrievalGraphTypedEdgesEnabled:  retrievalGraphTypedEdgesEnabled,
 		RetrievalRRFK:                    retrievalRRFK,
 		RetrievalColumnTimeoutFrac:       retrievalColumnTimeoutFrac,

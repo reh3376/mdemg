@@ -92,6 +92,8 @@ func CacheKey(req models.RetrieveRequest, scorerVersion string) string {
 		ContextFingerprint []uint16       `json:"cf,omitempty"`
 		ContextFPVersion   int            `json:"cv,omitempty"`
 		StrictContextMode  bool           `json:"sc,omitempty"`
+		ConcreteOverride   bool           `json:"cro,omitempty"` // RETRIEVAL-LAYER-BALANCE-001
+		ConcreteEnabled    bool           `json:"cre,omitempty"` // RETRIEVAL-LAYER-BALANCE-001
 		ScorerVersion      string         `json:"sv"`
 	}{
 		SpaceID:            req.SpaceID,
@@ -118,6 +120,8 @@ func CacheKey(req models.RetrieveRequest, scorerVersion string) string {
 		ContextFingerprint: req.QueryContextFingerprint,
 		ContextFPVersion:   req.QueryContextFingerprintVersion,
 		StrictContextMode:  req.StrictContextMode,
+		ConcreteOverride:   req.ConcreteRecallOverridePresent,
+		ConcreteEnabled:    req.ConcreteRecallEnabled,
 		ScorerVersion:      scorerVersion,
 	}
 
