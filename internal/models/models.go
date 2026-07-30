@@ -54,6 +54,13 @@ type RetrieveRequest struct {
 	ConcreteRecallOverridePresent bool `json:"-"`
 	ConcreteRecallEnabled         bool `json:"concrete_recall,omitempty"`
 
+	// RETRIEVAL-REVERSE-LOOKUP-001 — per-request override for the reverse-ref
+	// filesystem-grep. When ReverseRefOverridePresent is true,
+	// ReverseRefEnabled overrides RETRIEVAL_REVERSE_REF_ENABLED. Set by the
+	// handler from `?reverse_ref=true|false` for live A/B without restart.
+	ReverseRefOverridePresent bool `json:"-"`
+	ReverseRefEnabled         bool `json:"reverse_ref,omitempty"`
+
 	// Phase 14.1 Epic 2 — Per-category gate dispatch hint. When the gate
 	// fires and this matches a key in `cfg.SparseGateCategoryOverrides`, the
 	// override's MIN_ACTIVE/MAX_ACTIVE/Percentile replace the globals for

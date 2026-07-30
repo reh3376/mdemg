@@ -28,6 +28,9 @@ var cacheKeyNeutralFields = map[string]string{
 	// RETRIEVAL-LAYER-BALANCE-001: per-request concrete-recall override — IN
 	// the key (turning concrete recall on/off changes the RRF pool → results).
 	"ConcreteRecallOverridePresent": "", "ConcreteRecallEnabled": "",
+	// RETRIEVAL-REVERSE-LOOKUP-001: per-request reverse-ref grep override — IN
+	// the key (turning reverse-ref on/off changes the injected extras).
+	"ReverseRefOverridePresent": "", "ReverseRefEnabled": "",
 	// CONTEXT-LIVE-001: the catalog version drives the cross-version
 	// Jaccard guard — changes the result set. IN the key.
 	"QueryContextFingerprintVersion": "",
