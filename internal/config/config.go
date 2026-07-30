@@ -1492,6 +1492,15 @@ func DefaultConstraintPromotionRejectPatterns() []string {
 		`(?i)^(?:sprint|phase)\s+[#\w./+-]+\s+spec\b`, // "PHASE 105 SPEC: …" design-doc dumps
 		`(?i)^skill:`,        // skill-registry dumps
 		`(?i)^sprint plan\b`, // sprint-plan format/checklist dumps
+		// JIMINY-CORPUS-002: narrative-shaped junk classes the CORPUS-001
+		// patterns missed. Each targets a specific confirmed non-rule surfaced
+		// via `constraint_outcomes` (see the ceiling investigation's top-12
+		// analysis).
+		`(?i)^Session\s+halt\b`,                     // auto-fcb814b48e33 class
+		`(?i)^CRITICAL\s+WORKFLOW\s+VIOLATION\b`,    // auto-015a122bcbb8 class
+		`(?i)^TESTING\s+BLIND\s+SPOT\b`,             // auto-9f5134a1a0c3 class
+		`(?i)\bFoundation\s+document\s+for\s+Phase`, // llm-multi-hop-synthesis class
+		`(?i)^Phase\s+\d+:\s+.*\b(?:analysis|gap analysis|synthesis)\b`, // full-system-gap-analysis class
 	}
 }
 
