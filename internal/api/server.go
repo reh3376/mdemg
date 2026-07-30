@@ -1193,13 +1193,31 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	// B3: Bootstrap codification — codify constraints without codes on startup
 	if cfg.J17BootstrapCodification && jiminySvc != nil {
 		go func() {
-			bctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+			// Constraint bootstrap gets its own ctx (was previously shared —
+			// CORRECTION-CODE-GEN-001 live-caught: sharing a 60s budget with
+			// the correction bootstrap starved the second phase mid-run when
+			// the first phase consumed most of it).
+			bctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 			defer cancel()
 			n, err := jiminySvc.BootstrapCodes(bctx, cfg.J17BootstrapSpaceID)
 			if err != nil {
 				slog.Warn("jiminy: bootstrap codification failed", "error", err)
 			} else if n > 0 {
 				slog.Info("jiminy: bootstrap codification complete", "codified", n)
+			}
+			// CORRECTION-CODE-GEN-001: same shape for role_type='correction' nodes.
+			// Correction nodes didn't carry constraint_code before this sprint;
+			// mdemg-dev had 35 uncoded corrections at ship. Bootstrap runs on
+			// every startup — idempotent (skips nodes that already have codes).
+			// Independent 120s context so its LLM budget isn't drained by
+			// however long the constraint bootstrap took.
+			cctx, ccancel := context.WithTimeout(context.Background(), 120*time.Second)
+			defer ccancel()
+			nCorr, corrErr := jiminySvc.BootstrapCorrectionCodes(cctx, cfg.J17BootstrapSpaceID)
+			if corrErr != nil {
+				slog.Warn("jiminy: bootstrap correction codification failed", "error", corrErr)
+			} else if nCorr > 0 {
+				slog.Info("jiminy: bootstrap correction codification complete", "codified", nCorr)
 				// Clear orphan metrics from pre-bootstrap window
 				if collector := jiminySvc.GetProtocolMetricsCollector(); collector != nil {
 					collector.Reset()

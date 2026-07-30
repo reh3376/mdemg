@@ -1786,18 +1786,20 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 			if len(item.SourceNodes) > 0 {
 				constraintID = item.SourceNodes[0]
 			}
-			// JIMINY-CODE-BACKFILL-001: defensive constraint_code lookup for
-			// the rare case where a constraint-role source node reached the
-			// outcome writer without ConstraintCode populated (Guide()-time
-			// embedding-sim match may have missed for legitimate reasons —
-			// concurrent code assignment, embedder failure, etc.). Narrow-scope
-			// safety net: only queries when guidance_type=constraint AND
-			// ConstraintCode is empty AND we have a source node_id. Empty
-			// constraint_code for non-constraint types (pattern/concept/
-			// learning/decision) is EXPECTED — those items don't map to a
-			// codified constraint (see docs pin).
+			// JIMINY-CODE-BACKFILL-001 + CORRECTION-CODE-GEN-001: defensive
+			// constraint_code lookup for the rare case where a codifiable
+			// source node reached the outcome writer without ConstraintCode
+			// populated (Guide()-time embedding-sim match may have missed for
+			// legitimate reasons — concurrent code assignment, embedder
+			// failure, etc.). Narrow-scope safety net: only queries when
+			// guidance_type IS codifiable (constraint OR correction, post
+			// CORRECTION-CODE-GEN-001) AND ConstraintCode is empty AND we
+			// have a source node_id. Empty codes on non-codifiable types
+			// (pattern/concept/learning/decision/…) are EXPECTED — those
+			// items don't map to a codified rule (see docs pin).
 			constraintCode := item.ConstraintCode
-			if constraintCode == "" && item.Type == GuidanceConstraint && constraintID != "" && s.persistence != nil {
+			if constraintCode == "" && constraintID != "" && s.persistence != nil &&
+				(item.Type == GuidanceConstraint || item.Type == GuidanceCorrection) {
 				constraintCode = s.persistence.FindConstraintCodeForNode(ctx, req.SpaceID, constraintID)
 			}
 			s.outcomeWriter.RecordOutcome(
@@ -2425,6 +2427,89 @@ func (s *Service) SetWarmStore(ws *WarmStore) {
 	s.warmStore = ws
 }
 
+// BootstrapCorrectionCodes codifies all correction-role nodes that lack a
+// constraint_code (CORRECTION-CODE-GEN-001). Mirrors BootstrapCodes exactly
+// but for role_type='correction'. Runs at startup alongside BootstrapCodes
+// so correction-typed guidance items can carry codes into constraint_outcomes.
+func (s *Service) BootstrapCorrectionCodes(ctx context.Context, spaceID string) (int, error) {
+	if s.codeGenerator == nil || s.driver == nil {
+		return 0, nil
+	}
+
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	result, err := sess.Run(ctx,
+		`MATCH (n:MemoryNode {space_id: $spaceId})
+		 WHERE n.role_type = 'correction'
+		   AND (n.constraint_code IS NULL OR n.constraint_code = '')
+		   AND NOT coalesce(n.is_archived, false)
+		 RETURN n.node_id AS nodeId, n.content AS content`,
+		map[string]any{"spaceId": spaceID})
+	if err != nil {
+		return 0, fmt.Errorf("j17: bootstrap correction query: %w", err)
+	}
+
+	type uncoded struct {
+		nodeID  string
+		content string
+	}
+	var items []uncoded
+	for result.Next(ctx) {
+		rec := result.Record()
+		nid, _ := rec.Get("nodeId")
+		cont, _ := rec.Get("content")
+		if nid != nil && cont != nil {
+			items = append(items, uncoded{
+				nodeID:  nid.(string),
+				content: cont.(string),
+			})
+		}
+	}
+	if err := result.Err(); err != nil {
+		return 0, fmt.Errorf("j17: bootstrap correction iterate: %w", err)
+	}
+
+	if len(items) == 0 {
+		return 0, nil
+	}
+
+	codified := 0
+	writeSess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer writeSess.Close(ctx)
+
+	for _, item := range items {
+		code, genErr := s.codeGenerator.GenerateCode(ctx, "correction", item.content)
+		if genErr != nil {
+			slog.Warn("j17: bootstrap correction codegen failed", "node_id", item.nodeID, "error", genErr)
+			continue
+		}
+
+		_, writeErr := writeSess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+			cypher := `MATCH (n:MemoryNode)
+				WHERE n.node_id = $nodeId AND n.space_id = $spaceId
+				  AND n.role_type = 'correction'
+				  AND (n.constraint_code IS NULL OR n.constraint_code = '')
+				SET n.constraint_code = $code,
+					n.constraint_code_assigned_at = datetime(),
+					n.constraint_code_assigned_by = "mdemg-bootstrap-correction"
+				RETURN count(n) AS updated`
+			_, runErr := tx.Run(ctx, cypher, map[string]any{
+				"nodeId":  item.nodeID,
+				"spaceId": spaceID,
+				"code":    code,
+			})
+			return nil, runErr
+		})
+		if writeErr != nil {
+			slog.Warn("j17: bootstrap correction write failed", "node_id", item.nodeID, "error", writeErr)
+			continue
+		}
+		codified++
+	}
+	return codified, nil
+}
+
 // BootstrapCodes codifies all constraints that lack a constraint_code, breaking
 // the cold-start deadlock where no codes → all T3 → no T2 frequency → RSIC never fires.
 func (s *Service) BootstrapCodes(ctx context.Context, spaceID string) (int, error) {
@@ -3046,11 +3131,16 @@ func (s *Service) matchConstraintCodeByEmbedding(ctx context.Context, spaceID st
 	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer sess.Close(ctx) //nolint:errcheck
 
+	// CORRECTION-CODE-GEN-001 widened the role filter: role_type IN
+	// ('constraint', 'correction') so correction-typed guidance items can
+	// match their own correction node's code (near-1.0 sim). Prior to this
+	// sprint corrections carried no codes so the constraint-only filter
+	// was equivalent — post-BootstrapCorrectionCodes it isn't.
 	cypher := `
 	CALL db.index.vector.queryNodes($indexName, 50, $embedding)
 	YIELD node AS c, score AS sim
 	WHERE c.space_id = $spaceId
-	  AND c.role_type = 'constraint'
+	  AND c.role_type IN ['constraint', 'correction']
 	  AND c.constraint_code IS NOT NULL AND c.constraint_code <> ''
 	  AND NOT coalesce(c.is_archived, false)
 	  AND sim >= $threshold
