@@ -104,6 +104,50 @@ func (ps *PersistenceStore) PersistGuidanceOutcome(
 	return nil
 }
 
+// FindConstraintCodeForNode looks up the constraint_code property for a node by
+// its node_id. Returns empty string when the node doesn't exist, isn't role_type
+// = 'constraint', or has no code set. Defensive safety net for the empty-code
+// class in constraint_outcomes (JIMINY-CODE-BACKFILL-001): the Guide()-time
+// embedding-similarity match (JIMINY-OUTCOME-001) SHOULD populate item.
+// ConstraintCode for constraint-typed items, but this lookup covers the edge
+// case where a constraint-role source node reached the outcome writer without
+// its code populated (e.g. concurrent code assignment mid-request).
+//
+// Deliberately narrow: only role_type='constraint' nodes are targeted. Empty
+// codes on non-constraint types (pattern/concept/learning/decision) are
+// EXPECTED — those items don't map to a codified constraint. Correction
+// nodes are excluded because they don't carry codes today
+// (CORRECTION-CODE-GEN-001 follow-up).
+func (ps *PersistenceStore) FindConstraintCodeForNode(ctx context.Context, spaceID, nodeID string) string {
+	if ps == nil || ps.driver == nil || spaceID == "" || nodeID == "" {
+		return ""
+	}
+	sess := ps.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx) //nolint:errcheck
+
+	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, txErr := tx.Run(ctx, `
+			MATCH (c:MemoryNode {space_id: $spaceID, node_id: $nid, role_type: 'constraint'})
+			WHERE c.constraint_code IS NOT NULL AND c.constraint_code <> ''
+			RETURN c.constraint_code AS code
+			LIMIT 1`,
+			map[string]any{"spaceID": spaceID, "nid": nodeID})
+		if txErr != nil {
+			return "", txErr
+		}
+		if !res.Next(ctx) {
+			return "", nil
+		}
+		v, _ := res.Record().Get("code")
+		s, _ := v.(string)
+		return s, nil
+	})
+	if err != nil || result == nil {
+		return ""
+	}
+	return result.(string)
+}
+
 // findConstraintNodeID looks up a constraint node by its constraint_code property.
 // Returns the node_id if found, empty string otherwise.
 func (ps *PersistenceStore) findConstraintNodeID(ctx context.Context, spaceID, constraintCode string) string {
