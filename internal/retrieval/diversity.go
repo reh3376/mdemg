@@ -62,17 +62,14 @@ func ApplyDiversityFilter(results []models.RetrieveResult, topK int, cfg Diversi
 	if minOutput <= 0 {
 		minOutput = 1
 	}
-	// Bound capacity hints by len(results) so an over-large caller-supplied
-	// topK doesn't request an unbounded allocation (CodeQL go/uncontrolled-
-	// allocation-size). The loop is already bounded by len(results) upstream
-	// AND by `len(kept) >= topK` inside — this just tightens the initial hint.
-	sizeHint := topK
-	if sizeHint > len(results) {
-		sizeHint = len(results)
-	}
-	kept := make([]models.RetrieveResult, 0, sizeHint)
-	skipped := make([]models.RetrieveResult, 0)
-	seen := make(map[string]int, sizeHint)
+	// Zero-hint make() — the caller-supplied topK MUST NOT reach a capacity
+	// hint (CodeQL go/uncontrolled-allocation-size). Slice + map grow
+	// dynamically; retrieval typically runs on <100 candidates so the perf
+	// cost is negligible. The loop is bounded by len(results) upstream AND
+	// by `len(kept) >= topK` inside.
+	var kept []models.RetrieveResult
+	var skipped []models.RetrieveResult
+	seen := map[string]int{}
 	for _, r := range results {
 		if len(kept) >= topK {
 			break
