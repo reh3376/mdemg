@@ -397,6 +397,7 @@ type Config struct {
 	// Jiminy J11: Semantic Outcome Classification
 	JiminyOutcomeClassifierEnabled  bool    // JIMINY_OUTCOME_CLASSIFIER_ENABLED — enable semantic classifier (default: true)
 	JiminyOutcomeLLMEnabled         bool    // JIMINY_OUTCOME_LLM_ENABLED — enable LLM Tier 2 classification (default: true)
+	JiminyTier1BypassEnabled        bool    // JIMINY_TIER1_BYPASS_ENABLED — bypass tier1 (embedding-similarity) for the follow/ignore decision, keep it only as a pre-gate for not_applicable (JIMINY-TIER1-BYPASS-001). Addresses JIMINY-CEILING-INVESTIGATION-001 defect B: embedding sim between rule text + action text is functionally blind to follows (1% follow rate on tier1 rows over 102 real-durable-rule events). Default false; operator flips after live smoke.
 	JiminyOutcomeSimilarityHigh     float64 // JIMINY_OUTCOME_SIMILARITY_HIGH — threshold for "followed" (default: 0.55)
 	JiminyOutcomeSimilarityLow      float64 // JIMINY_OUTCOME_SIMILARITY_LOW — threshold for "ignored" (default: 0.20)
 	JiminyOutcomeNotApplicableSim   float64 // JIMINY_OUTCOME_NOT_APPLICABLE_SIMILARITY — relevance gate: below this the guidance did not apply → not_applicable; [this, LOW) is a real "ignored" (default: 0.10; ≤0 disables — whole sub-LOW tail is not_applicable)
@@ -2874,6 +2875,7 @@ func FromEnv() (Config, error) {
 	}
 	jiminyOutcomeClassifierEnabled := getBool("JIMINY_OUTCOME_CLASSIFIER_ENABLED", true)
 	jiminyOutcomeLLMEnabled := getBool("JIMINY_OUTCOME_LLM_ENABLED", true)
+	jiminyTier1BypassEnabled := getBool("JIMINY_TIER1_BYPASS_ENABLED", false)
 	jiminyOutcomeSimilarityHigh, err := atof("JIMINY_OUTCOME_SIMILARITY_HIGH", 0.55)
 	if err != nil {
 		return Config{}, err
@@ -5762,6 +5764,7 @@ func FromEnv() (Config, error) {
 		JiminyEvaluateLLMMaxTokens:      jiminyEvaluateLLMMaxTokens,
 		JiminyOutcomeClassifierEnabled:  jiminyOutcomeClassifierEnabled,
 		JiminyOutcomeLLMEnabled:         jiminyOutcomeLLMEnabled,
+		JiminyTier1BypassEnabled:        jiminyTier1BypassEnabled,
 		JiminyOutcomeSimilarityHigh:     jiminyOutcomeSimilarityHigh,
 		JiminyOutcomeSimilarityLow:      jiminyOutcomeSimilarityLow,
 		JiminyOutcomeNotApplicableSim:   jiminyOutcomeNotApplicableSim,
