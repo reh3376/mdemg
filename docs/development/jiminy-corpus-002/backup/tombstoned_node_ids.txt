@@ -1,0 +1,6 @@
+node_id, code, name
+"rn4q69xcuzpzep4vqtflamug", "auto-015a122bcbb8", "CRITICAL WORKFLOW VIOLATION (Phase 101): Declared implementation complete and presented a commit-ready summary WITHOUT r"
+"vs9gr0xowy54qjp42bn9ildt", "auto-9f5134a1a0c3", "TESTING BLIND SPOT: Automated tests (unit, integration, E2E) consistently pass while critical user-facing failures hide"
+"nt84k60g0z9u891hqio2ib3x", "auto-fcb814b48e33", "Session halt 2026-03-01"
+"j3w4gu5q2c6k9tsy0xecclza", "full-system-gap-analysis", "Phase 92: Full system gap analysis for deployable package"
+"zc4qd0l3ecdcvpkhxpmecsgu", "llm-multi-hop-synthesis", "COGNITIVE INTELLIGENCE GAP ANALYSIS — Foundation document for Phases 101-105"

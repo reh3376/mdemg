@@ -60,6 +60,14 @@ func TestConstraintPromotionGate_RejectsJunkClasses(t *testing.T) {
 		{"phase_status_nonadjacent_forensic", "learning", "Phase 14 Epic 0 forensic complete. Closed Phase 13 Epic 6 wiring gap (V0017 retrieval_audit writer was never instantiated)."},
 		{"pr_number_merged_phrase", "decision", "All green. PR #489 merged after the SHA re-pin."},
 		{"fully_implemented_phrase", "insight", "The eventgraph federation walk is now fully implemented and live."},
+		// JIMINY-CORPUS-002: narrative-shaped classes. Live-verified nodes on
+		// mdemg-dev (constraint_codes auto-fcb814b48e33, auto-015a122bcbb8,
+		// auto-9f5134a1a0c3, full-system-gap-analysis, llm-multi-hop-synthesis).
+		{"session_halt_narrative", "decision", "Session halt 2026-03-01. Commit 8683ac8: added agent resume context (HTML comments) to roadmap.md."},
+		{"workflow_violation_narrative", "decision", "CRITICAL WORKFLOW VIOLATION (Phase 101): Declared implementation complete WITHOUT running E2E tests or updating documentation."},
+		{"testing_blind_spot_narrative", "insight", "TESTING BLIND SPOT: Automated tests (unit, integration, E2E) consistently pass while critical user-facing failures hide."},
+		{"foundation_document_narrative", "decision", "COGNITIVE INTELLIGENCE GAP ANALYSIS — Foundation document for Phases 101-105. Five gaps identified against VISION.md cognitive goals."},
+		{"phase_gap_analysis_narrative", "decision", "Phase 92: Full system gap analysis for deployable package."},
 	}
 
 	for _, tc := range cases {
@@ -101,6 +109,14 @@ func TestConstraintPromotionGate_PassesGenuineConstraints(t *testing.T) {
 		{"live_rebase_after_admin_merge", "learning", "After merging a PR to main via --admin, if the dev branch has more work to push, rebase the dev branch onto main (git pull --rebase origin main) BEFORE pushing the next commit. This keeps the branch linear and avoids merge commits that force squash-merging. In PR #172, the GPG fix was admin-merged to main via PR #171, then the docs commit was pushed to reh3376_dev01 without rebasing — git created a merge commit, resulting in 4 commits (3 real + 1 merge) that required squash to keep history clean."},
 		{"live_12_section_format", "constraint", "All sprint development plans MUST follow the standardized 12-section format (v1.0). Required sections: Header & Metadata, Problem Statement, Scope & Constraints, Dependencies & Pre-Conditions, Implementation Plan (sequential epics with gates), Testing Plan (3 tiers: unit + integration + e2e — never cut)."},
 		{"live_never_alter_schema", "constraint", "CONSTRAINT: Never modify production database schemas without a migration file. Always use CREATE TABLE IF NOT EXISTS and index creation with IF NOT EXISTS guards. Direct ALTER TABLE on production is forbidden."},
+		// JIMINY-CORPUS-002 negative cases: real constraint text that MENTIONS
+		// junk-narrative keywords must still promote. The new patterns are
+		// anchored (`^Session\s+halt`, `^CRITICAL\s+WORKFLOW\s+VIOLATION`,
+		// `^TESTING\s+BLIND\s+SPOT`, `^Phase\s+\d+:...analysis`) so a rule that
+		// merely references these concepts inline doesn't trip them.
+		{"rule_mentions_workflow", "constraint", "You must always run golangci-lint before committing to catch a workflow violation early."},
+		{"rule_mentions_analysis", "constraint", "Every sprint plan must include a risk analysis section documenting failure modes."},
+		{"rule_mentions_session", "constraint", "Never allow a session to halt without a clean context snapshot to CMS."},
 	}
 
 	for _, tc := range cases {
