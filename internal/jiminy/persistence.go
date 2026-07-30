@@ -105,19 +105,19 @@ func (ps *PersistenceStore) PersistGuidanceOutcome(
 }
 
 // FindConstraintCodeForNode looks up the constraint_code property for a node by
-// its node_id. Returns empty string when the node doesn't exist, isn't role_type
-// = 'constraint', or has no code set. Defensive safety net for the empty-code
-// class in constraint_outcomes (JIMINY-CODE-BACKFILL-001): the Guide()-time
-// embedding-similarity match (JIMINY-OUTCOME-001) SHOULD populate item.
-// ConstraintCode for constraint-typed items, but this lookup covers the edge
-// case where a constraint-role source node reached the outcome writer without
-// its code populated (e.g. concurrent code assignment mid-request).
+// its node_id. Returns empty string when the node doesn't exist, isn't a
+// codifiable role type, or has no code set. Defensive safety net for the
+// empty-code class in constraint_outcomes (JIMINY-CODE-BACKFILL-001): the
+// Guide()-time embedding-similarity match (JIMINY-OUTCOME-001) SHOULD populate
+// item.ConstraintCode, but this lookup covers the edge case where a
+// codifiable source node reached the outcome writer without its code
+// populated (e.g. concurrent code assignment mid-request, embedder failure).
 //
-// Deliberately narrow: only role_type='constraint' nodes are targeted. Empty
-// codes on non-constraint types (pattern/concept/learning/decision) are
-// EXPECTED — those items don't map to a codified constraint. Correction
-// nodes are excluded because they don't carry codes today
-// (CORRECTION-CODE-GEN-001 follow-up).
+// Role filter: role_type IN ('constraint', 'correction'). Empty codes on
+// non-codifiable types (pattern/concept/learning/decision/preference/risk/
+// conflict) are EXPECTED — those items don't map to a codified rule. Correction
+// added to the role set by CORRECTION-CODE-GEN-001 (correction nodes now carry
+// codes via BootstrapCorrectionCodes).
 func (ps *PersistenceStore) FindConstraintCodeForNode(ctx context.Context, spaceID, nodeID string) string {
 	if ps == nil || ps.driver == nil || spaceID == "" || nodeID == "" {
 		return ""
@@ -127,8 +127,9 @@ func (ps *PersistenceStore) FindConstraintCodeForNode(ctx context.Context, space
 
 	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 		res, txErr := tx.Run(ctx, `
-			MATCH (c:MemoryNode {space_id: $spaceID, node_id: $nid, role_type: 'constraint'})
-			WHERE c.constraint_code IS NOT NULL AND c.constraint_code <> ''
+			MATCH (c:MemoryNode {space_id: $spaceID, node_id: $nid})
+			WHERE c.role_type IN ['constraint', 'correction']
+			  AND c.constraint_code IS NOT NULL AND c.constraint_code <> ''
 			RETURN c.constraint_code AS code
 			LIMIT 1`,
 			map[string]any{"spaceID": spaceID, "nid": nodeID})

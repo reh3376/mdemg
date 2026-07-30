@@ -17,29 +17,24 @@ import "testing"
 
 // guidanceTypesWithoutCodes enumerates GuidanceType values that legitimately
 // have empty constraint_code in constraint_outcomes. Codes only apply to
-// role_type='constraint' Neo4j nodes; guidance items whose source isn't a
-// constraint node have no code to carry.
-//
-// Correction is INCLUDED for now because role_type='correction' nodes don't
-// carry constraint_code today (CORRECTION-CODE-GEN-001 follow-up).
-// When corrections DO get codes, remove GuidanceCorrection from this list
-// and update the CLAUDE.md pin in the same PR.
+// codifiable-role Neo4j nodes; guidance items whose source is a
+// pattern/concept/learning/… node have no code to carry.
 var guidanceTypesWithoutCodes = map[GuidanceType]string{
-	GuidancePattern:    "concept-abstracted; no codified constraint",
-	GuidanceConcept:    "L2+ emergent-concept; no codified constraint",
-	GuidanceLearning:   "insight/context/technical_note obs_type; no codified constraint",
-	GuidanceDecision:   "decision/task obs_type; no codified constraint",
-	GuidanceCorrection: "correction nodes don't carry constraint_code today (CORRECTION-CODE-GEN-001 follow-up)",
-	GuidancePreference: "user preference obs; no codified constraint",
-	GuidanceRisk:       "error/blocker obs; no codified constraint",
-	GuidanceConflict:   "cross-source conflict summary; no codified constraint",
+	GuidancePattern:    "concept-abstracted; no codified rule",
+	GuidanceConcept:    "L2+ emergent-concept; no codified rule",
+	GuidanceLearning:   "insight/context/technical_note obs_type; no codified rule",
+	GuidanceDecision:   "decision/task obs_type; no codified rule",
+	GuidancePreference: "user preference obs; no codified rule",
+	GuidanceRisk:       "error/blocker obs; no codified rule",
+	GuidanceConflict:   "cross-source conflict summary; no codified rule",
 }
 
 // guidanceTypesWithCodes enumerates GuidanceType values that SHOULD carry a
-// non-empty constraint_code when the source is a real constraint node.
-// Currently just GuidanceConstraint.
+// non-empty constraint_code when the source is a codifiable-role node
+// (constraint or correction).
 var guidanceTypesWithCodes = map[GuidanceType]string{
 	GuidanceConstraint: "role_type='constraint' L1 nodes carry constraint_code",
+	GuidanceCorrection: "role_type='correction' L1 nodes carry constraint_code post CORRECTION-CODE-GEN-001 (BootstrapCorrectionCodes at startup + code-gen at promotion)",
 }
 
 func TestEmptyConstraintCodeTaxonomy_Disjoint(t *testing.T) {
