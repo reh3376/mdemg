@@ -1786,8 +1786,22 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 			if len(item.SourceNodes) > 0 {
 				constraintID = item.SourceNodes[0]
 			}
+			// JIMINY-CODE-BACKFILL-001: defensive constraint_code lookup for
+			// the rare case where a constraint-role source node reached the
+			// outcome writer without ConstraintCode populated (Guide()-time
+			// embedding-sim match may have missed for legitimate reasons —
+			// concurrent code assignment, embedder failure, etc.). Narrow-scope
+			// safety net: only queries when guidance_type=constraint AND
+			// ConstraintCode is empty AND we have a source node_id. Empty
+			// constraint_code for non-constraint types (pattern/concept/
+			// learning/decision) is EXPECTED — those items don't map to a
+			// codified constraint (see docs pin).
+			constraintCode := item.ConstraintCode
+			if constraintCode == "" && item.Type == GuidanceConstraint && constraintID != "" && s.persistence != nil {
+				constraintCode = s.persistence.FindConstraintCodeForNode(ctx, req.SpaceID, constraintID)
+			}
 			s.outcomeWriter.RecordOutcome(
-				req.SpaceID, constraintID, item.ConstraintCode,
+				req.SpaceID, constraintID, constraintCode,
 				req.GuidanceID, feedbackSessionID,
 				string(outcome), string(item.Type), s.cfg.InstanceID,
 				cr.Source, cr.Confidence,
