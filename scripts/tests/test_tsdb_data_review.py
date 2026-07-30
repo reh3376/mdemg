@@ -274,7 +274,7 @@ def test_format_text_basic():
     """format_text produces non-empty output without errors."""
     sections = [
         tdr.SectionResult(name="schema_health", data={"schema_version": 8, "tables_present": 8, "tables_expected": 8, "index_count": 14, "continuous_aggregates": ["metrics_hourly", "metrics_daily"]}),
-        tdr.SectionResult(name="ft_tables", data={"table_counts": {"ft_benchmarks": 0}, "all_empty": True}),
+        tdr.SectionResult(name="ft_tables", data={"table_counts": {"ft_training_cycles": 0}, "all_empty": True}),
     ]
     findings = [tdr.Finding("info", "ft_tables", "All empty")]
     text = tdr.format_text(sections, findings, "2026-04-01T00:00:00Z", 24.5)

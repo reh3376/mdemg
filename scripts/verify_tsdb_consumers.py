@@ -11,7 +11,7 @@ file must have an adjudicated entry in docs/api/tsdb_consumer_inventory.json:
       "<table_name>": {
         "writers": ["<code-path descriptor>", ...],
         "readers": ["<code-path descriptor>", ...],
-        "disposition": "IN_USE" | "DORMANT_INTENTIONAL" | "DORMANT_TO_REMOVE",
+        "disposition": "IN_USE" | "DORMANT_INTENTIONAL" | "DORMANT_TO_REMOVE" | "REMOVED",
         "notes": "..."
       }
     }
@@ -86,7 +86,7 @@ def check() -> int:
         print(f"FAIL: {len(unreviewed)} inventory entry/entries with disposition=UNREVIEWED:")
         for n in sorted(unreviewed):
             print(f"  ? {n}")
-        print("  -> adjudicate: IN_USE / DORMANT_INTENTIONAL / DORMANT_TO_REMOVE")
+        print("  -> adjudicate: IN_USE / DORMANT_INTENTIONAL / DORMANT_TO_REMOVE / REMOVED")
 
     if added or removed or unreviewed:
         print(f"\ntables: {len(live)} declared, {len(inv_names)} inventoried; DRIFT")
