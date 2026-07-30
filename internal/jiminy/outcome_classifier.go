@@ -160,6 +160,7 @@ type OutcomeClassifier struct {
 	naThreshold        float64 // JIMINY-CORPUS-001 Epic 4 relevance gate: below this = not_applicable; [this, low) = ignored. ≤0 disables (whole sub-LOW tail is not_applicable)
 	nonViolationCredit bool    // JIMINY-ACTIONABILITY-COMPLIANCE-CREDIT-001: when true, LLM classifier prompt gets an extended clause telling the LLM to classify must_not-type constraints as not_applicable (not ignored) when the action didn't touch the constraint's mechanism. Routes ~50% of current unrelated-context ignored verdicts to not_applicable, which the shipped writer gate (service.go:1730,1762) filters from constraint_outcomes. Predicted to lift constraint follow rate 10%→~20%. Default false; operator runs 3-day A/B before flipping.
 	contextMismatchCredit bool // JIMINY-CLASSIFIER-CONTEXT-001: generalizes non-violation credit to ANY constraint type where the rule is durable but doesn't govern the action's context (git rule + file-write action, code rule + read-only-query action, workflow-step rule + different-step action, language-specific rule + different-language action, or the "rule" is a session log / phase description not a real rule). Predicted to lift 11% → 35-50%; JIMINY-CEILING-INVESTIGATION-001 evidence base (8/16 samples were context mismatch, 7/16 surface mismatch, 0/16 genuine ignore). Default false; operator flips after live smoke.
+	tier1BypassEnabled bool    // JIMINY-TIER1-BYPASS-001: when true, tier1 (embedding-similarity) is bypassed for the follow/ignore decision. Only the sub-naThreshold → NotApplicable pre-gate stays tier1. All other cases route to LLM tier2. Addresses JIMINY-CEILING-INVESTIGATION-001 defect B: embedding sim between rule text + action text is functionally blind to follows (1% follow rate on 102 real-durable-rule tier1 events). Default false; operator flips after live smoke.
 	maxTokens          int     // J14: max tokens for LLM classification
 
 	// G8: circuit breaker for LLM calls
@@ -187,6 +188,7 @@ type OutcomeClassifierConfig struct {
 	CompressPrompts        bool    // J17-PC: compress classification prompts to reduce tokens
 	NonViolationCredit     bool    // JIMINY-ACTIONABILITY-COMPLIANCE-CREDIT-001: extend classifier prompt with must_not non-violation credit clause. Default false.
 	ContextMismatchCredit  bool    // JIMINY-CLASSIFIER-CONTEXT-001: extend classifier prompt with generalized context-mismatch credit clause. Default false.
+	Tier1BypassEnabled     bool    // JIMINY-TIER1-BYPASS-001: bypass tier1 for follow/ignore decisions; keep tier1 only as the sub-naThreshold pre-gate for not_applicable. Default false.
 }
 
 // classifyCacheEntry holds a cached classification result.
@@ -206,6 +208,7 @@ func NewOutcomeClassifier(embedder embeddings.Embedder, cfg OutcomeClassifierCon
 		maxTokens:          cfg.MaxTokens,
 		nonViolationCredit:    cfg.NonViolationCredit,
 		contextMismatchCredit: cfg.ContextMismatchCredit,
+		tier1BypassEnabled:    cfg.Tier1BypassEnabled,
 		cacheMap:           make(map[string]*list.Element),
 		cacheList:          list.New(),
 	}
@@ -309,15 +312,31 @@ func (oc *OutcomeClassifier) Classify(ctx context.Context, item GuidanceItem, ac
 	// (Source "llm", which may themselves say ignored/not_applicable) are
 	// always returned as-is further down.
 	if similarity < oc.lowThreshold {
+		// JIMINY-TIER1-BYPASS-001: keep the < naThreshold → NotApplicable
+		// pre-gate always (it's a real optimization — most surface volume
+		// is genuinely irrelevant). But bypass the [naThreshold, lowThreshold)
+		// → Ignored tier1 verdict when the flag is on — that band is where
+		// mislabeled follows live (JIMINY-CEILING-INVESTIGATION-001 defect
+		// B: 1% follow rate on 102 tier1 events on real durable rules).
+		// Route to LLM tier2 for the follow/ignore/not_applicable decision.
 		if oc.naThreshold > 0 && similarity >= oc.naThreshold {
-			return ClassificationResult{Outcome: OutcomeIgnored, Confidence: similarity, Source: "tier1"}
+			if !oc.tier1BypassEnabled {
+				return ClassificationResult{Outcome: OutcomeIgnored, Confidence: similarity, Source: "tier1"}
+			}
+			// fall through to LLM tier2 (skip the followed short-circuit
+			// below — that's for HIGH sim, not this sub-LOW band)
+		} else {
+			return ClassificationResult{Outcome: OutcomeNotApplicable, Confidence: similarity, Source: "tier1"}
 		}
-		return ClassificationResult{Outcome: OutcomeNotApplicable, Confidence: similarity, Source: "tier1"}
-	}
-
-	// High similarity + no negation = followed
-	if similarity >= oc.highThreshold && !hasNegation {
-		return ClassificationResult{Outcome: OutcomeFollowed, Confidence: similarity, Source: "tier1"}
+	} else if similarity >= oc.highThreshold && !hasNegation {
+		// High similarity + no negation = followed.
+		// JIMINY-TIER1-BYPASS-001: bypass this verdict too when the flag is
+		// on. Embedding-sim can produce false positives here (e.g., action
+		// text quotes the constraint text but doesn't actually follow it).
+		if !oc.tier1BypassEnabled {
+			return ClassificationResult{Outcome: OutcomeFollowed, Confidence: similarity, Source: "tier1"}
+		}
+		// fall through to LLM tier2
 	}
 
 	// Uncertain range OR high-similarity-with-negation: try LLM Tier 2 if available.

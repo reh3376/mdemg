@@ -138,13 +138,15 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext, consultant Co
 			CompressPrompts:        cfg.JiminyClassifyCompress,
 			NonViolationCredit:     cfg.JiminyNonViolationCreditEnabled,
 			ContextMismatchCredit:  cfg.JiminyContextMismatchCreditEnabled,
+			Tier1BypassEnabled:     cfg.JiminyTier1BypassEnabled,
 		})
 		slog.Info("jiminy: semantic outcome classifier enabled",
 			"high_threshold", cfg.JiminyOutcomeSimilarityHigh, "low_threshold", cfg.JiminyOutcomeSimilarityLow,
 			"not_applicable_threshold", cfg.JiminyOutcomeNotApplicableSim,
 			"llm_enabled", cfg.JiminyOutcomeLLMEnabled, "cache_size", cfg.JiminyOutcomeCacheSize,
 			"nonviolation_credit", cfg.JiminyNonViolationCreditEnabled,
-			"context_mismatch_credit", cfg.JiminyContextMismatchCreditEnabled)
+			"context_mismatch_credit", cfg.JiminyContextMismatchCreditEnabled,
+			"tier1_bypass", cfg.JiminyTier1BypassEnabled)
 	}
 
 	// J12: Initialize escalation tracker if enabled
