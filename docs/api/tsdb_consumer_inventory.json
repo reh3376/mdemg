@@ -38,15 +38,15 @@
     },
     "ft_benchmarks": {
       "writers": [],
-      "readers": ["internal/cli/tsdb.go:252 (informational listing only)"],
-      "disposition": "DORMANT_TO_REMOVE",
-      "notes": "SUPERSEDED by benchmark_runs + benchmark_results. Defined in early FT schema (002_ft_schema.sql) as a per-benchmark-run table but never wired to a writer. Removal follow-up: DORMANT-CENSUS-002 disclosed; needs a migration to DROP."
+      "readers": [],
+      "disposition": "REMOVED",
+      "notes": "DROPPED in V0032 (FT-DORMANT-CLEANUP-001, 2026-07-30). Superseded by benchmark_runs + benchmark_results. 0 rows at drop time."
     },
     "ft_hitl_decisions": {
       "writers": [],
-      "readers": ["internal/cli/tsdb.go:253 (informational listing only)", "internal/cli/tsdb.go:275 (space-scoped teardown)"],
-      "disposition": "DORMANT_TO_REMOVE",
-      "notes": "SUPERSEDED by HITL-REVIEW-001's review_grades. Defined in early FT schema (002_ft_schema.sql) but never wired. Removal follow-up: DORMANT-CENSUS-002 disclosed."
+      "readers": [],
+      "disposition": "REMOVED",
+      "notes": "DROPPED in V0032 (FT-DORMANT-CLEANUP-001, 2026-07-30). Superseded by review_grades (V0028). 0 rows at drop time."
     },
     "ft_model_versions": {
       "writers": ["internal/tsdb/ft_model_versions_writer.go (FT-RECURSIVE-003 E2)"],

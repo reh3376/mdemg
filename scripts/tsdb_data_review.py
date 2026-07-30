@@ -44,7 +44,9 @@ PRIVACY_PATTERNS = {
 EXPECTED_SCHEMA_VERSION = 7
 EXPECTED_TABLES = [
     "metric_samples", "llm_interactions", "embedding_events", "retrieval_events",
-    "ft_benchmarks", "ft_training_cycles", "ft_model_versions", "ft_hitl_decisions",
+    "ft_training_cycles", "ft_model_versions",
+    # ft_benchmarks + ft_hitl_decisions DROPPED in V0032 (FT-DORMANT-CLEANUP-001)
+    # — superseded by benchmark_runs (V0012) + review_grades (V0028).
 ]
 EXPECTED_TASK_NAMES = [
     "ape.reflect", "consulting.classify", "consulting.synthesis",
@@ -654,11 +656,11 @@ def section_f_ft_tables(cur: Any, verbose: bool) -> SectionResult:
     result = SectionResult(name="ft_tables")
     findings = result.findings
 
+    # ft_benchmarks + ft_hitl_decisions DROPPED in V0032 (FT-DORMANT-CLEANUP-001)
+    # — superseded by benchmark_runs (V0012) + review_grades (V0028).
     cur.execute("""
-        SELECT 'ft_benchmarks' as tbl, count(*) FROM ft_benchmarks
-        UNION ALL SELECT 'ft_training_cycles', count(*) FROM ft_training_cycles
+        SELECT 'ft_training_cycles' as tbl, count(*) FROM ft_training_cycles
         UNION ALL SELECT 'ft_model_versions', count(*) FROM ft_model_versions
-        UNION ALL SELECT 'ft_hitl_decisions', count(*) FROM ft_hitl_decisions
     """)
     counts = {r[0]: r[1] for r in cur.fetchall()}
     result.data["table_counts"] = counts

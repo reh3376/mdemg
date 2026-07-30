@@ -249,8 +249,8 @@ func newTSDBStatsCmd() *cobra.Command {
 		Long: `Query row counts for all metric tables and show compression settings.
 
 Tables queried:
-  metric_samples, llm_interactions, ft_benchmarks,
-  ft_training_cycles, ft_model_versions, ft_hitl_decisions
+  metric_samples, llm_interactions, benchmark_runs,
+  ft_training_cycles, ft_model_versions
 
 Examples:
   mdemg tsdb stats`,
@@ -269,10 +269,10 @@ Examples:
 			tables := []string{
 				"metric_samples",
 				"llm_interactions",
-				"ft_benchmarks",
+				"benchmark_runs", // V0012 replaced the V0002 ft_benchmarks
 				"ft_training_cycles",
 				"ft_model_versions",
-				"ft_hitl_decisions",
+				// ft_hitl_decisions dropped in V0032 (superseded by review_grades V0028)
 			}
 
 			fmt.Println("Row counts:")

@@ -15,9 +15,11 @@ echo ""; echo "── 2. Row Counts ──"
 for t in metric_samples llm_interactions embedding_events retrieval_events; do
   c=$(Q "SELECT count(*) FROM $t;"); [ "$c" -gt 0 ] 2>/dev/null && PASS "$t: $c rows" || FAIL "$t: 0 rows"
 done
-for t in ft_benchmarks ft_training_cycles ft_model_versions ft_hitl_decisions; do
+for t in ft_training_cycles ft_model_versions; do
   c=$(Q "SELECT count(*) FROM $t;"); [ "$c" = "0" ] && PASS "$t: empty (expected)" || WARN "$t: $c rows"
 done
+# ft_benchmarks + ft_hitl_decisions dropped in V0032 (FT-DORMANT-CLEANUP-001)
+# — superseded by benchmark_runs (V0012) + review_grades (V0028).
 echo ""; echo "── 3. metric_samples ──"
 MS=$(Q "SELECT count(*) FROM metric_samples;")
 if [ "$MS" -gt 0 ] 2>/dev/null; then
