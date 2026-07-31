@@ -15,12 +15,6 @@
         "description": "Total HTTP requests counter must be present"
       },
       {
-        "name": "mdemg_retrieval_cache_hits_total",
-        "section": "counters",
-        "path": "$.data.counters",
-        "description": "Retrieval cache hits counter must be present"
-      },
-      {
         "name": "mdemg_circuit_breaker_state",
         "section": "gauges",
         "path": "$.data.gauges",

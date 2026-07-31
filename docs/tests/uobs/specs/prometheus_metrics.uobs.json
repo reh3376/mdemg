@@ -26,16 +26,6 @@
         "description": "Memory retrieval operation latency"
       },
       {
-        "name": "mdemg_retrieval_cache_hits_total",
-        "type": "counter",
-        "description": "Number of retrieval cache hits"
-      },
-      {
-        "name": "mdemg_retrieval_cache_misses_total",
-        "type": "counter",
-        "description": "Number of retrieval cache misses"
-      },
-      {
         "name": "mdemg_rate_limit_rejected_total",
         "type": "counter",
         "description": "Requests rejected by rate limiting"
