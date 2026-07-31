@@ -100,6 +100,20 @@ Last updated: 2026-07-21 (DOC-CURRENCY-002 — §2/§3/§5 refreshed to on-disk 
 
 ---
 
+## 5a) Companion Adjudication Registries (build-time drift checks)
+
+Not UxTS specs; sibling forcing functions in the DORMANT-CENSUS family. Each is a JSON audit registry + a `scripts/verify_*.py` grep-based verifier + a merge-blocking CI step in `ci.yml`. Complement — they don't overlap with — UOBS (runtime metric-presence contracts) and UOTS (artifact-level observability).
+
+| Registry | Scope | Verifier | Inventory | CI |
+| -------- | ----- | -------- | --------- | -- |
+| DORMANT-CENSUS-001 | HTTP routes | `scripts/verify_route_consumers.py` | `docs/api/routes_consumer_inventory.json` | merge-blocking in `ci.yml` |
+| DORMANT-CENSUS-002 | TSDB tables | `scripts/verify_tsdb_consumers.py` | `docs/api/tsdb_consumer_inventory.json` | merge-blocking in `ci.yml` |
+| DORMANT-CENSUS-003 | Metrics-registry counters/gauges/histograms | `scripts/verify_metrics_consumers.py` | `docs/api/metrics_consumer_inventory.json` | merge-blocking in `ci.yml` |
+
+Contract for all three: every declaration in the source tree MUST have an adjudicated entry (writers + readers + disposition + notes). Adding a new declaration without adjudication FAILS CI. Same shape as DOC-CURRENCY-002 (env vars) + CACHE-KEY-002 (RetrieveRequest fields) — established pattern for "silent-drift kills observability" classes.
+
+---
+
 ## 6) Reference Documents
 
 - `docs/specs/FRAMEWORK_GOVERNANCE.md`

@@ -438,6 +438,18 @@ jobs:
         # forcing-function pattern from routes to TSDB tables.
         run: python3 scripts/verify_tsdb_consumers.py
 
+      - name: Metrics consumer guard (merge-blocking)
+        # DORMANT-CENSUS-003: every declared metric (via `r.NewCounter/
+        # NewGauge/NewHistogram` in internal/**/*.go) must have an
+        # adjudicated entry in docs/api/metrics_consumer_inventory.json.
+        # Same fail-on-drift + UNREVIEWED contract as the TSDB check.
+        # Histogram base ↔ percentile derivative naming (`_p95`, `_p99`,
+        # `_bucket`, `_sum`, `_count`) is expanded automatically at
+        # consumer-walk time — grep on the base name alone is not enough
+        # (was the false-positive class that deferred this from
+        # DORMANT-CENSUS-002 to its own sprint).
+        run: python3 scripts/verify_metrics_consumers.py
+
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
