@@ -232,9 +232,9 @@ func TestStandardMetrics(t *testing.T) {
 		t.Errorf("histogram count = %d, want 1", count)
 	}
 
-	// Test fixed metrics
+	// Test fixed metrics (DORMANT-METRICS-CLEANUP-001: RetrievalCacheHits removed
+	// from StandardMetrics — never written outside this test, zero samples/7d).
 	m.RetrievalLatency.Observe(0.05)
-	m.RetrievalCacheHits.Inc()
 	m.RateLimitRejected.Inc()
 
 	// Test gauge factory

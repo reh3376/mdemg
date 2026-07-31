@@ -31,9 +31,11 @@ type StandardMetrics struct {
 	HTTPRequestDuration func(method, path string) *Histogram
 
 	// Retrieval metrics
-	RetrievalLatency   *Histogram
-	RetrievalCacheHits *Counter
-	RetrievalCacheMiss *Counter
+	RetrievalLatency *Histogram
+	// DORMANT-METRICS-CLEANUP-001: retrieval_cache_hits_total and
+	// retrieval_cache_misses_total had zero writer sites + zero samples/7d.
+	// Retrieval cache accounting is done via a separate path
+	// (retrieval column cache in service.go); these fields were dead.
 
 	// Rate limiting metrics
 	RateLimitRejected *Counter
@@ -101,16 +103,14 @@ type StandardMetrics struct {
 	// CMS observation lifecycle metrics (CMS Hardening)
 	CMSObserveTotal      func(outcome string) *Counter // "success", "degraded", "deduplicated"
 	CMSEmbeddingFailures *Counter
-	CMSDedupSkips        *Counter
 	CMSDedupMergeFails   *Counter
-
-	// CMS retrieval metrics
-	CMSRecallTotal *Counter
-	CMSResumeTotal *Counter
+	// DORMANT-METRICS-CLEANUP-001: CMSDedupSkips, CMSRecallTotal, CMSResumeTotal,
+	// CMSLearningEdgeFails removed — zero writer sites + zero samples/7d.
+	// CMS observability is currently covered by hook-observation flow (which
+	// writes directly to Neo4j observations), not through these counters.
 
 	// CMS error metrics
 	CMSWriteJSONFails       *Counter
-	CMSLearningEdgeFails    *Counter
 	CMSStabilityUpdateFails *Counter
 
 	// Neo4j graph per-space metrics (Grafana Neo4j Dashboard)
@@ -265,9 +265,11 @@ type StandardMetrics struct {
 	CompactEventTimestamp             func(spaceID string) *Gauge
 
 	// Jiminy Guide + Warm metrics (event-driven pre-computation)
+	// DORMANT-METRICS-CLEANUP-001: JiminyGuideTimeout removed — zero writer
+	// sites + zero samples/7d. Timeouts on Guide() are covered by the
+	// jiminy_warm_errors_total path (which IS wired).
 	JiminyGuideCalls    func(spaceID string) *Counter
 	JiminyGuideEmpty    func(spaceID string) *Counter
-	JiminyGuideTimeout  func(spaceID string) *Counter
 	JiminyWarmCompleted func(spaceID string) *Counter
 	JiminyWarmErrors    func(spaceID string) *Counter
 	JiminyWarmDebounced func(spaceID string) *Counter
@@ -349,8 +351,6 @@ func NewStandardMetrics(r *Registry) *StandardMetrics {
 
 	// Retrieval metrics
 	m.RetrievalLatency = r.NewHistogram("retrieval_latency_seconds", "Retrieval operation latency", nil)
-	m.RetrievalCacheHits = r.NewCounter("retrieval_cache_hits_total", "Retrieval cache hits", nil)
-	m.RetrievalCacheMiss = r.NewCounter("retrieval_cache_misses_total", "Retrieval cache misses", nil)
 
 	// Rate limiting
 	m.RateLimitRejected = r.NewCounter("rate_limit_rejected_total", "Requests rejected by rate limiting", nil)
@@ -417,16 +417,10 @@ func NewStandardMetrics(r *Registry) *StandardMetrics {
 		return r.NewCounter("cms_observe_total", "Total CMS observe operations", labels)
 	}
 	m.CMSEmbeddingFailures = r.NewCounter("cms_embedding_failures_total", "CMS observations created with failed embeddings", nil)
-	m.CMSDedupSkips = r.NewCounter("cms_dedup_skips_total", "CMS dedup checks skipped (no embedding)", nil)
 	m.CMSDedupMergeFails = r.NewCounter("cms_dedup_merge_failures_total", "CMS dedup merge operation failures", nil)
-
-	// CMS retrieval metrics
-	m.CMSRecallTotal = r.NewCounter("cms_recall_total", "Total CMS recall operations", nil)
-	m.CMSResumeTotal = r.NewCounter("cms_resume_total", "Total CMS resume operations", nil)
 
 	// CMS error metrics
 	m.CMSWriteJSONFails = r.NewCounter("cms_writejson_failures_total", "JSON encoding failures in writeJSON", nil)
-	m.CMSLearningEdgeFails = r.NewCounter("cms_learning_edge_failures_total", "Learning edge creation failures", nil)
 	m.CMSStabilityUpdateFails = r.NewCounter("cms_stability_update_failures_total", "Stability reinforcement update failures", nil)
 
 	// Neo4j graph per-space metrics (Grafana Neo4j Dashboard)
@@ -812,10 +806,7 @@ func NewStandardMetrics(r *Registry) *StandardMetrics {
 		return r.NewCounter("jiminy_guide_empty_total", "Guide() calls returning zero items",
 			map[string]string{"space_id": spaceID})
 	}
-	m.JiminyGuideTimeout = func(spaceID string) *Counter {
-		return r.NewCounter("jiminy_guide_timeout_total", "Guide() calls that timed out",
-			map[string]string{"space_id": spaceID})
-	}
+	// DORMANT-METRICS-CLEANUP-001: JiminyGuideTimeout factory removed.
 	m.JiminyWarmCompleted = func(spaceID string) *Counter {
 		return r.NewCounter("jiminy_warm_completed_total", "Warm pre-computations completed",
 			map[string]string{"space_id": spaceID})
