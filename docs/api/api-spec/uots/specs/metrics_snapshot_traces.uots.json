@@ -19,13 +19,6 @@
         "value_range": { "min": 0 }
       },
       {
-        "name": "mdemg_retrieval_cache_hits_total",
-        "type": "counter",
-        "section": "counters",
-        "help_contains": "cache",
-        "value_range": { "min": 0 }
-      },
-      {
         "name": "mdemg_circuit_breaker_state",
         "type": "gauge",
         "section": "gauges",
