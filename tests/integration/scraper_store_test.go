@@ -456,12 +456,24 @@ func TestStore_CreateIngestedAsRelationship(t *testing.T) {
 		t.Fatalf("SaveScrapedContent failed: %v", err)
 	}
 
-	// Create a MemoryNode directly via Cypher
+	// Create a MemoryNode directly via Cypher. ExecuteWrite commits the
+	// transaction synchronously before returning — critical for
+	// cross-session read-your-writes. sess.Run inside a deferred-close
+	// session commits only when the outer function returns (which is AFTER
+	// CreateIngestedAsRelationship runs), so the MATCH in that call could
+	// silently return zero rows and the SET clauses would never fire.
+	// Fix: SCRAPER-TEST-TX-VISIBILITY-001.
 	sess := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer sess.Close(ctx)
-	_, err := sess.Run(ctx,
-		`CREATE (n:MemoryNode {node_id: $nodeID, space_id: $spaceID, content: "test"}) RETURN n`,
-		map[string]any{"nodeID": nodeID, "spaceID": spaceID})
+	_, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, runErr := tx.Run(ctx,
+			`CREATE (n:MemoryNode {node_id: $nodeID, space_id: $spaceID, content: "test"}) RETURN n`,
+			map[string]any{"nodeID": nodeID, "spaceID": spaceID})
+		if runErr != nil {
+			return nil, runErr
+		}
+		return res.Consume(ctx)
+	})
 	if err != nil {
 		t.Fatalf("failed to create MemoryNode: %v", err)
 	}
