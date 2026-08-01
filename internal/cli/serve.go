@@ -542,6 +542,12 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 				// excludes correctly-ignored advisory). Floor=0 disables.
 				rules = append(rules, alert.GuidanceShouldFollowRules(
 					cfg.GuidanceShouldFollowRateFloor, cfg.GuidanceShouldFollowLookbackHours)...)
+				// FOLLOW-RATE-CALIBRATE-001 (2026-08-01): raw follow-rate alert
+				// extracted from DefaultRules with a config-driven floor. Default
+				// 0.15 sits below the post-JIMINY-CORPUS-001 raw steady state ~0.30
+				// (was hardcoded 0.30 which flapped chronically on healthy substrate).
+				rules = append(rules, alert.JiminyFollowRateRules(
+					cfg.JiminyFollowRateAlertFloor)...)
 			// TSDB-CONSUME-001: buffered-writer flush failures (a wedged
 			// writer used to drop rows in silence).
 			rules = append(rules, alert.TSDBWriterRules(

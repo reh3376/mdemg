@@ -1237,6 +1237,7 @@ type Config struct {
 	// "Follow rate on guidance that SHOULD have been followed" (actionable
 	// constraint/correction types) — excludes correctly-ignored advisory items.
 	GuidanceShouldFollowRateFloor     float64 // GUIDANCE_SHOULD_FOLLOW_RATE_FLOOR — alert when actionable-compliance rate drops below this (default: 0.05 — must sit BELOW the ~0.10-0.14 by-design steady state so only genuine collapse fires; was 0.5 pre-JIMINY-ACTIONABILITY-INVERSION-001 verdict; 0 disables the rule)
+	JiminyFollowRateAlertFloor        float64 // JIMINY_FOLLOW_RATE_ALERT_FLOOR — alert when the raw `mdemg_jiminy_follow_rate` gauge drops below this (default: 0.15 — post-JIMINY-CORPUS-001 raw steady state ~0.30; 0.15 sits below so only genuine collapse fires; was hardcoded 0.30 which flapped on healthy substrate — HEBB-ETA-001 live-caught. 0 disables the rule)
 	GuidanceShouldFollowLookbackHours int     // GUIDANCE_SHOULD_FOLLOW_LOOKBACK_HOURS — window for the should-follow rate (default: 168 = 7d, floor: 1)
 
 	// HITL-REVIEW-001 — general-purpose human-in-the-loop review + live-reinforcement platform.
@@ -3745,6 +3746,10 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	jiminyFollowRateAlertFloor, err := atof("JIMINY_FOLLOW_RATE_ALERT_FLOOR", 0.15)
+	if err != nil {
+		return Config{}, err
+	}
 	if guidanceShouldFollowRateFloor < 0 || guidanceShouldFollowRateFloor > 1 {
 		guidanceShouldFollowRateFloor = 0.05 // out-of-range → default
 	}
@@ -6089,6 +6094,7 @@ func FromEnv() (Config, error) {
 		GuidanceAuditSampleSize:                        guidanceAuditSampleSize,
 		GuidanceAuditInitialDelaySec:                   guidanceAuditInitialDelaySec,
 		GuidanceShouldFollowRateFloor:                  guidanceShouldFollowRateFloor,
+		JiminyFollowRateAlertFloor:                     jiminyFollowRateAlertFloor,
 		GuidanceShouldFollowLookbackHours:              guidanceShouldFollowLookbackHours,
 		ReviewEnabled:                                  reviewEnabled,
 		ReviewWriterFlushIntervalSec:                   reviewWriterFlushIntervalSec,

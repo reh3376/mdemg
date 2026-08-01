@@ -38,6 +38,36 @@ type AlertRule struct {
 //     which was a perpetual zero (the neo4j driver has no pool-stats API;
 //     the "pool" gauges were a VerifyConnectivity probe in disguise). The
 //     rule could never fire. Neo4j liveness is the health prober's job.
+// JiminyFollowRateRules returns the raw follow-rate alert (moved out of DefaultRules by
+// FOLLOW-RATE-CALIBRATE-001 to accept a config-driven floor). The default 0.30 was hardcoded
+// from before JIMINY-CORPUS-001 established the honest ~0.30 steady state, causing the rule
+// to flap chronically. Extract to config lets operators set a floor BELOW the steady state
+// so only genuine collapse fires. Floor ≤ 0 → rule disabled entirely.
+func JiminyFollowRateRules(floor float64) []AlertRule {
+	if floor <= 0 {
+		return nil
+	}
+	return []AlertRule{
+		{
+			ID:          "jiminy_follow_rate_drop",
+			Title:       "Jiminy Follow Rate Drop",
+			Service:     "jiminy",
+			Severity:    SeverityMedium,
+			Interval:    60 * time.Second,
+			ForDuration: 30 * time.Minute,
+			// ALERT-TRUTH-001: LIMIT 1 → windowed AVG; COALESCE to 1.0 (healthy)
+			// on an idle window so absence never fires this "lt" rule.
+			QuerySQL: `SELECT COALESCE(AVG(value), 1.0) AS follow_rate FROM metric_samples
+					WHERE metric_name = 'mdemg_jiminy_follow_rate'
+					  AND metric_type = 'gauge'
+					  AND time > now() - interval '30 minutes'`,
+			Threshold: floor,
+			Operator:  "lt",
+			Enabled:   true,
+		},
+	}
+}
+
 func DefaultRules() []AlertRule {
 	return []AlertRule{
 		{
@@ -136,23 +166,9 @@ func DefaultRules() []AlertRule {
 			Operator:  "lt",
 			Enabled:   true,
 		},
-		{
-			ID:          "jiminy_follow_rate_drop",
-			Title:       "Jiminy Follow Rate Drop",
-			Service:     "jiminy",
-			Severity:    SeverityMedium,
-			Interval:    60 * time.Second,
-			ForDuration: 30 * time.Minute,
-			// ALERT-TRUTH-001: LIMIT 1 → windowed AVG; COALESCE to 1.0 (healthy)
-			// on an idle window so absence never fires this "lt" rule.
-			QuerySQL: `SELECT COALESCE(AVG(value), 1.0) AS follow_rate FROM metric_samples
-				WHERE metric_name = 'mdemg_jiminy_follow_rate'
-				  AND metric_type = 'gauge'
-				  AND time > now() - interval '30 minutes'`,
-			Threshold: 0.3,
-			Operator:  "lt",
-			Enabled:   true,
-		},
+		// jiminy_follow_rate_drop extracted to JiminyFollowRateRules() by
+		// FOLLOW-RATE-CALIBRATE-001 (2026-08-01) — needed a config-driven floor
+		// below the honest post-JIMINY-CORPUS-001 ~0.30 steady state.
 	}
 }
 
