@@ -6,6 +6,9 @@
       "consumers": [
         "deploy/docker/grafana/dashboards/mdemg-overview.json",
         "deploy/docker/grafana/provisioning/alerting/alerts.yml",
+        "docs/api/api-spec/uots/specs/metrics_snapshot_traces.uots.json",
+        "docs/tests/uobs/specs/metrics_snapshot_observability.uobs.json",
+        "docs/tests/uobs/specs/prometheus_metrics.uobs.json",
         "internal/alert/rules.go",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-overview.json",
         "internal/cli/grafana_templates/staged/provisioning/alerting/alerts.yml"
@@ -21,6 +24,10 @@
         "deploy/docker/grafana/dashboards/mdemg-neo4j.json",
         "deploy/docker/grafana/dashboards/mdemg-overview.json",
         "deploy/docker/grafana/provisioning/alerting/alerts.yml",
+        "docs/api/api-spec/uots/specs/grafana_neo4j_dashboard.uots.json",
+        "docs/api/api-spec/uots/specs/metrics_snapshot_traces.uots.json",
+        "docs/tests/uobs/specs/metrics_snapshot_observability.uobs.json",
+        "docs/tests/uobs/specs/prometheus_metrics.uobs.json",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-llm-routing.json",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-neo4j.json",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-overview.json",
@@ -95,6 +102,7 @@
       "declaration": "internal/metrics/collectors.go:371",
       "consumers": [
         "deploy/docker/grafana/dashboards/mdemg-overview.json",
+        "docs/tests/uobs/specs/prometheus_metrics.uobs.json",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-overview.json"
       ],
       "disposition": "IN_USE",
@@ -188,6 +196,9 @@
       "declaration": "internal/metrics/collectors.go:348",
       "consumers": [
         "deploy/docker/grafana/dashboards/mdemg-overview.json",
+        "docs/api/api-spec/uots/specs/metrics_snapshot_traces.uots.json",
+        "docs/tests/uobs/specs/metrics_snapshot_observability.uobs.json",
+        "docs/tests/uobs/specs/prometheus_metrics.uobs.json",
         "internal/alert/rules.go",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-overview.json"
       ],
@@ -200,6 +211,9 @@
       "consumers": [
         "deploy/docker/grafana/dashboards/mdemg-overview.json",
         "deploy/docker/grafana/provisioning/alerting/alerts.yml",
+        "docs/api/api-spec/uots/specs/metrics_snapshot_traces.uots.json",
+        "docs/tests/uobs/specs/metrics_snapshot_observability.uobs.json",
+        "docs/tests/uobs/specs/prometheus_metrics.uobs.json",
         "internal/alert/rules.go",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-overview.json",
         "internal/cli/grafana_templates/staged/provisioning/alerting/alerts.yml"
@@ -212,6 +226,7 @@
       "declaration": "internal/metrics/collectors.go:634",
       "consumers": [
         "deploy/docker/grafana/dashboards/mdemg-j17.json",
+        "docs/tests/uobs/specs/jiminy_protocol_metrics.uobs.json",
         "internal/ape/live_collectors.go",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-j17.json"
       ],
@@ -258,6 +273,7 @@
       "declaration": "internal/metrics/collectors.go:630",
       "consumers": [
         "deploy/docker/grafana/dashboards/mdemg-j17.json",
+        "docs/tests/uobs/specs/jiminy_protocol_metrics.uobs.json",
         "internal/ape/live_collectors.go",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-j17.json"
       ],
@@ -269,6 +285,7 @@
       "declaration": "internal/metrics/collectors.go:654",
       "consumers": [
         "deploy/docker/grafana/dashboards/mdemg-j17.json",
+        "docs/tests/uobs/specs/jiminy_protocol_metrics.uobs.json",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-j17.json"
       ],
       "disposition": "IN_USE",
@@ -710,6 +727,9 @@
       "consumers": [
         "deploy/docker/grafana/dashboards/mdemg-neo4j.json",
         "deploy/docker/grafana/provisioning/alerting/alerts.yml",
+        "docs/api/api-spec/uots/specs/alert_rules_neo4j.uots.json",
+        "docs/api/api-spec/uots/specs/grafana_neo4j_dashboard.uots.json",
+        "docs/api/api-spec/uots/specs/prometheus_neo4j_container.uots.json",
         "internal/alert/rules.go",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-neo4j.json",
         "internal/cli/grafana_templates/staged/provisioning/alerting/alerts.yml"
@@ -722,6 +742,7 @@
       "declaration": "internal/metrics/collectors.go:460",
       "consumers": [
         "deploy/docker/grafana/dashboards/mdemg-neo4j.json",
+        "docs/api/api-spec/uots/specs/prometheus_neo4j_container.uots.json",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-neo4j.json"
       ],
       "disposition": "IN_USE",
@@ -732,6 +753,7 @@
       "declaration": "internal/metrics/collectors.go:461",
       "consumers": [
         "deploy/docker/grafana/provisioning/alerting/alerts.yml",
+        "docs/api/api-spec/uots/specs/prometheus_neo4j_container.uots.json",
         "internal/alert/rules.go",
         "internal/cli/grafana_templates/staged/provisioning/alerting/alerts.yml"
       ],
@@ -743,6 +765,8 @@
       "declaration": "internal/metrics/collectors.go:459",
       "consumers": [
         "deploy/docker/grafana/dashboards/mdemg-neo4j.json",
+        "docs/api/api-spec/uots/specs/grafana_neo4j_dashboard.uots.json",
+        "docs/api/api-spec/uots/specs/prometheus_neo4j_container.uots.json",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-neo4j.json"
       ],
       "disposition": "IN_USE",
@@ -771,6 +795,7 @@
       "declaration": "internal/metrics/collectors.go:446",
       "consumers": [
         "deploy/docker/grafana/provisioning/alerting/alerts.yml",
+        "docs/api/api-spec/uots/specs/alert_rules_neo4j.uots.json",
         "internal/alert/rules.go",
         "internal/cli/grafana_templates/staged/provisioning/alerting/alerts.yml"
       ],
@@ -789,6 +814,7 @@
       "declaration": "internal/metrics/collectors.go:428",
       "consumers": [
         "deploy/docker/grafana/provisioning/alerting/alerts.yml",
+        "docs/api/api-spec/uots/specs/alert_rules_neo4j.uots.json",
         "internal/alert/rules.go",
         "internal/cli/grafana_templates/staged/provisioning/alerting/alerts.yml"
       ],
@@ -818,6 +844,7 @@
       "declaration": "internal/metrics/collectors.go:437",
       "consumers": [
         "deploy/docker/grafana/provisioning/alerting/alerts.yml",
+        "docs/api/api-spec/uots/specs/alert_rules_neo4j.uots.json",
         "internal/alert/rules.go",
         "internal/ape/self_assess.go",
         "internal/cli/grafana_templates/staged/provisioning/alerting/alerts.yml"
@@ -830,6 +857,8 @@
       "declaration": "internal/metrics/collectors.go:454",
       "consumers": [
         "deploy/docker/grafana/dashboards/mdemg-neo4j.json",
+        "docs/api/api-spec/uots/specs/grafana_neo4j_dashboard.uots.json",
+        "docs/api/api-spec/uots/specs/prometheus_neo4j_graph.uots.json",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-neo4j.json"
       ],
       "disposition": "IN_USE",
@@ -840,6 +869,8 @@
       "declaration": "internal/metrics/collectors.go:453",
       "consumers": [
         "deploy/docker/grafana/dashboards/mdemg-neo4j.json",
+        "docs/api/api-spec/uots/specs/grafana_neo4j_dashboard.uots.json",
+        "docs/api/api-spec/uots/specs/prometheus_neo4j_graph.uots.json",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-neo4j.json"
       ],
       "disposition": "IN_USE",
@@ -848,22 +879,27 @@
     "neo4j_graph_total_spaces": {
       "type": "gauge",
       "declaration": "internal/metrics/collectors.go:455",
-      "consumers": [],
-      "disposition": "IN_USE_TSDB_ONLY",
-      "notes": "Auto-generate: no direct dashboard/alert/reader hit; flushed to TSDB metric_samples by internal/metrics/recorder.go. Operator: re-adjudicate to DORMANT_TO_REMOVE if a downstream review confirms no consumer value."
+      "consumers": [
+        "docs/api/api-spec/uots/specs/prometheus_neo4j_graph.uots.json"
+      ],
+      "disposition": "IN_USE",
+      "notes": "METRICS-VERIFIER-UOBS-UOTS-001: promoted from IN_USE_TSDB_ONLY \u2014 the verifier's UOBS/UOTS spec-root pass found a runtime observability contract that asserts this metric MUST be present. Removing this declaration would break the spec's runner assertion."
     },
     "probe_latency_ms": {
       "type": "gauge",
       "declaration": "internal/healthprobe/prober.go:270",
-      "consumers": [],
-      "disposition": "IN_USE_TSDB_ONLY",
-      "notes": "Auto-generate: no direct dashboard/alert/reader hit; flushed to TSDB metric_samples by internal/metrics/recorder.go. Operator: re-adjudicate to DORMANT_TO_REMOVE if a downstream review confirms no consumer value."
+      "consumers": [
+        "docs/tests/uobs/specs/health_probes.uobs.json"
+      ],
+      "disposition": "IN_USE",
+      "notes": "METRICS-VERIFIER-UOBS-UOTS-001: promoted from IN_USE_TSDB_ONLY \u2014 the verifier's UOBS/UOTS spec-root pass found a runtime observability contract that asserts this metric MUST be present. Removing this declaration would break the spec's runner assertion."
     },
     "probe_up": {
       "type": "gauge",
       "declaration": "internal/healthprobe/prober.go:269",
       "consumers": [
         "deploy/docker/grafana/provisioning/alerting/alerts.yml",
+        "docs/tests/uobs/specs/health_probes.uobs.json",
         "internal/cli/grafana_templates/staged/provisioning/alerting/alerts.yml"
       ],
       "disposition": "IN_USE",
@@ -875,6 +911,7 @@
       "consumers": [
         "deploy/docker/grafana/dashboards/mdemg-overview.json",
         "deploy/docker/grafana/provisioning/alerting/alerts.yml",
+        "docs/tests/uobs/specs/prometheus_metrics.uobs.json",
         "internal/alert/rules.go",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-overview.json",
         "internal/cli/grafana_templates/staged/provisioning/alerting/alerts.yml"
@@ -908,6 +945,9 @@
       "declaration": "internal/metrics/collectors.go:353",
       "consumers": [
         "deploy/docker/grafana/dashboards/mdemg-overview.json",
+        "docs/api/api-spec/uots/specs/metrics_snapshot_traces.uots.json",
+        "docs/tests/uobs/specs/metrics_snapshot_observability.uobs.json",
+        "docs/tests/uobs/specs/prometheus_metrics.uobs.json",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-overview.json"
       ],
       "disposition": "IN_USE",
@@ -965,6 +1005,7 @@
       "consumers": [
         "deploy/docker/grafana/dashboards/mdemg-rsic.json",
         "deploy/docker/grafana/provisioning/alerting/alerts.yml",
+        "docs/tests/uobs/specs/rsic_task_cleanup.uobs.json",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-rsic.json",
         "internal/cli/grafana_templates/staged/provisioning/alerting/alerts.yml"
       ],
@@ -976,6 +1017,7 @@
       "declaration": "internal/metrics/collectors.go:564",
       "consumers": [
         "deploy/docker/grafana/dashboards/mdemg-rsic.json",
+        "docs/tests/uobs/specs/rsic_task_cleanup.uobs.json",
         "internal/ape/live_collectors.go",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-rsic.json"
       ],
@@ -1057,6 +1099,7 @@
         "deploy/docker/grafana/dashboards/mdemg-neo4j.json",
         "deploy/docker/grafana/dashboards/mdemg-overview.json",
         "deploy/docker/grafana/dashboards/mdemg-rsic.json",
+        "docs/api/api-spec/uots/specs/grafana_neo4j_dashboard.uots.json",
         "internal/ape/live_collectors.go",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-neo4j.json",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-overview.json",
@@ -1305,6 +1348,8 @@
       "declaration": "internal/metrics/collectors.go:377",
       "consumers": [
         "deploy/docker/grafana/dashboards/mdemg-neo4j.json",
+        "docs/api/api-spec/uots/specs/grafana_neo4j_dashboard.uots.json",
+        "docs/api/api-spec/uots/specs/prometheus_neo4j_pool.uots.json",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-neo4j.json"
       ],
       "disposition": "IN_USE",
@@ -1313,15 +1358,19 @@
     "tsdb_pool_empty_acquire_total": {
       "type": "gauge",
       "declaration": "internal/metrics/collectors.go:379",
-      "consumers": [],
-      "disposition": "IN_USE_TSDB_ONLY",
-      "notes": "Auto-generate: no direct dashboard/alert/reader hit; flushed to TSDB metric_samples by internal/metrics/recorder.go. Operator: re-adjudicate to DORMANT_TO_REMOVE if a downstream review confirms no consumer value."
+      "consumers": [
+        "docs/api/api-spec/uots/specs/prometheus_neo4j_pool.uots.json"
+      ],
+      "disposition": "IN_USE",
+      "notes": "METRICS-VERIFIER-UOBS-UOTS-001: promoted from IN_USE_TSDB_ONLY \u2014 the verifier's UOBS/UOTS spec-root pass found a runtime observability contract that asserts this metric MUST be present. Removing this declaration would break the spec's runner assertion."
     },
     "tsdb_pool_idle_conns": {
       "type": "gauge",
       "declaration": "internal/metrics/collectors.go:376",
       "consumers": [
         "deploy/docker/grafana/dashboards/mdemg-neo4j.json",
+        "docs/api/api-spec/uots/specs/grafana_neo4j_dashboard.uots.json",
+        "docs/api/api-spec/uots/specs/prometheus_neo4j_pool.uots.json",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-neo4j.json"
       ],
       "disposition": "IN_USE",
@@ -1330,15 +1379,19 @@
     "tsdb_pool_max_conns": {
       "type": "gauge",
       "declaration": "internal/metrics/collectors.go:378",
-      "consumers": [],
-      "disposition": "IN_USE_TSDB_ONLY",
-      "notes": "Auto-generate: no direct dashboard/alert/reader hit; flushed to TSDB metric_samples by internal/metrics/recorder.go. Operator: re-adjudicate to DORMANT_TO_REMOVE if a downstream review confirms no consumer value."
+      "consumers": [
+        "docs/api/api-spec/uots/specs/prometheus_neo4j_pool.uots.json"
+      ],
+      "disposition": "IN_USE",
+      "notes": "METRICS-VERIFIER-UOBS-UOTS-001: promoted from IN_USE_TSDB_ONLY \u2014 the verifier's UOBS/UOTS spec-root pass found a runtime observability contract that asserts this metric MUST be present. Removing this declaration would break the spec's runner assertion."
     },
     "tsdb_pool_total_conns": {
       "type": "gauge",
       "declaration": "internal/metrics/collectors.go:375",
       "consumers": [
         "deploy/docker/grafana/dashboards/mdemg-neo4j.json",
+        "docs/api/api-spec/uots/specs/grafana_neo4j_dashboard.uots.json",
+        "docs/api/api-spec/uots/specs/prometheus_neo4j_pool.uots.json",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-neo4j.json"
       ],
       "disposition": "IN_USE",
