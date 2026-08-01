@@ -1,12 +1,16 @@
 package api
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 
+	"mdemg/internal/alert"
 	"mdemg/internal/config"
+	"mdemg/internal/jiminy"
 )
 
 // TestJiminyHealthz_MethodNotAllowed verifies POST returns 405.
@@ -254,5 +258,90 @@ func TestJiminyWarm_NilService(t *testing.T) {
 	}
 	if !contains(w.Body.String(), `"error":"jiminy guidance is not enabled`) {
 		t.Errorf("unexpected body: %s", w.Body.String())
+	}
+}
+
+// JIMINY-ENFORCE-001: mockAlertSender captures Send() calls for verifying the
+// deny→alert wiring without a full alert.Dispatcher.
+type mockAlertSender struct {
+	calls atomic.Int32
+	last  alert.Alert
+}
+
+func (m *mockAlertSender) Send(_ context.Context, a alert.Alert) {
+	m.calls.Add(1)
+	m.last = a
+}
+
+// TestEmitJiminyBlockAlert_DenyFiresHighAlert pins JIMINY-ENFORCE-001's core
+// enforcement contract: every deny verdict emits a HIGH-severity alert to the
+// user via the alert dispatcher.
+func TestEmitJiminyBlockAlert_DenyFiresHighAlert(t *testing.T) {
+	m := &mockAlertSender{}
+	req := jiminy.ClassifyRequest{
+		SpaceID:     "mdemg-dev",
+		SessionID:   "claude-core",
+		AgentOutput: "uuid.New()",
+		ToolName:    "Write",
+		FilePath:    "/tmp/foo.go",
+	}
+	resp := jiminy.ClassifyResponse{
+		Verdict:      "deny",
+		DenialReason: "always-use-cuidv2",
+	}
+	emitJiminyBlockAlert(context.Background(), m, req, resp)
+	if m.calls.Load() != 1 {
+		t.Fatalf("expected 1 Send() call, got %d", m.calls.Load())
+	}
+	if m.last.Service != "jiminy-block" {
+		t.Errorf("service=%q, want jiminy-block", m.last.Service)
+	}
+	if m.last.Severity != alert.SeverityHigh {
+		t.Errorf("severity=%q, want high", m.last.Severity)
+	}
+	if !strings.Contains(m.last.Message, "always-use-cuidv2") {
+		t.Errorf("message should include reason: %q", m.last.Message)
+	}
+	if !strings.Contains(m.last.Message, "/tmp/foo.go") {
+		t.Errorf("message should include file_path: %q", m.last.Message)
+	}
+}
+
+// TestEmitJiminyBlockAlert_PassIsNoOp — an allowed action must never emit an alert.
+func TestEmitJiminyBlockAlert_PassIsNoOp(t *testing.T) {
+	m := &mockAlertSender{}
+	emitJiminyBlockAlert(context.Background(), m,
+		jiminy.ClassifyRequest{SpaceID: "s"},
+		jiminy.ClassifyResponse{Verdict: "pass"})
+	if m.calls.Load() != 0 {
+		t.Errorf("pass verdict must not emit alert, got %d calls", m.calls.Load())
+	}
+}
+
+// TestEmitJiminyBlockAlert_NilDispatcherIsSafe — server without dispatcher initialised
+// must not panic.
+func TestEmitJiminyBlockAlert_NilDispatcherIsSafe(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("nil dispatcher must not panic: %v", r)
+		}
+	}()
+	emitJiminyBlockAlert(context.Background(), nil,
+		jiminy.ClassifyRequest{SpaceID: "s"},
+		jiminy.ClassifyResponse{Verdict: "deny", DenialReason: "x"})
+}
+
+// TestEmitJiminyBlockAlert_EmptyReasonUsesFallback — an unusual case: verdict is deny
+// but the classifier returned no reason. Message must still be meaningful.
+func TestEmitJiminyBlockAlert_EmptyReasonUsesFallback(t *testing.T) {
+	m := &mockAlertSender{}
+	emitJiminyBlockAlert(context.Background(), m,
+		jiminy.ClassifyRequest{SpaceID: "s"},
+		jiminy.ClassifyResponse{Verdict: "deny"})
+	if m.calls.Load() != 1 {
+		t.Fatalf("expected 1 call, got %d", m.calls.Load())
+	}
+	if m.last.Message == "" {
+		t.Error("message must not be empty even with no denial reason")
 	}
 }

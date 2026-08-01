@@ -71,6 +71,35 @@ func TestMaintenanceLivenessRules(t *testing.T) {
 	}
 }
 
+func TestJiminyFollowRateRules(t *testing.T) {
+	// Default floor produces one rule.
+	rs := JiminyFollowRateRules(0.15)
+	if len(rs) != 1 {
+		t.Fatalf("expected 1 rule, got %d", len(rs))
+	}
+	r := rs[0]
+	if r.ID != "jiminy_follow_rate_drop" || r.Service != "jiminy" || r.Threshold != 0.15 || r.Operator != "lt" {
+		t.Errorf("unexpected rule shape: id=%q svc=%q thr=%v op=%q", r.ID, r.Service, r.Threshold, r.Operator)
+	}
+	// Idle-safe: COALESCE + AVG (ALERT-TRUTH-001 contract; NOT ORDER BY … LIMIT 1)
+	for _, want := range []string{"COALESCE", "AVG", "mdemg_jiminy_follow_rate"} {
+		if !strings.Contains(r.QuerySQL, want) {
+			t.Errorf("QuerySQL missing %q", want)
+		}
+	}
+	if strings.Contains(r.QuerySQL, "LIMIT 1") {
+		t.Errorf("rule uses forbidden LIMIT 1 anti-pattern")
+	}
+
+	// Floor=0 → rule disabled (opt-out contract).
+	if got := JiminyFollowRateRules(0); got != nil {
+		t.Errorf("floor=0 must disable the rule, got %d rules", len(got))
+	}
+	if got := JiminyFollowRateRules(-1); got != nil {
+		t.Errorf("floor<0 must disable the rule, got %d rules", len(got))
+	}
+}
+
 func TestCoverageRules(t *testing.T) {
 	r := CoverageRules(0)[0]
 	if r.ID != "low_conversation_coverage" || r.Service != "conversation-coverage" {

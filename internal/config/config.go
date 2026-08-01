@@ -428,6 +428,13 @@ type Config struct {
 	JiminyEscalationDecayMinutes   int    // JIMINY_ESCALATION_DECAY_MINUTES — reset after inactivity (default: 60)
 	JiminyEscalationPersistEnabled bool   // JIMINY_ESCALATION_PERSIST_ENABLED — persist escalation to Neo4j (default: true)
 	JiminyStrictStatePath          string // JIMINY_STRICT_STATE_PATH — path to strict-mode state file (default: ~/.mdemg/.jiminy-strict-mode)
+	// JIMINY-ENFORCE-001: default-on strict mode. When true and the state file is absent at boot,
+	// StrictModeManager auto-enables for JiminyStrictDefaultSessionID. The operator directive
+	// 2026-08-01 formalized Jiminy as an ENFORCER of hard constraints, not merely advisory.
+	// Ships default false in code (behavior-changing flag pattern per HEBB-ETA-001 rule) and
+	// default true in .env for the mdemg-dev deployment.
+	JiminyStrictDefaultEnabled   bool   // JIMINY_STRICT_DEFAULT_ENABLED (default: false)
+	JiminyStrictDefaultSessionID string // JIMINY_STRICT_DEFAULT_SESSION_ID — session key auto-enabled at boot (default: "claude-core")
 
 	// Jiminy Code Comprehension Feedback Loop
 	JiminyCodeRegenEnabled    bool    // JIMINY_CODE_REGEN_ENABLED — enable code comprehension feedback loop (default: false)
@@ -1237,6 +1244,7 @@ type Config struct {
 	// "Follow rate on guidance that SHOULD have been followed" (actionable
 	// constraint/correction types) — excludes correctly-ignored advisory items.
 	GuidanceShouldFollowRateFloor     float64 // GUIDANCE_SHOULD_FOLLOW_RATE_FLOOR — alert when actionable-compliance rate drops below this (default: 0.05 — must sit BELOW the ~0.10-0.14 by-design steady state so only genuine collapse fires; was 0.5 pre-JIMINY-ACTIONABILITY-INVERSION-001 verdict; 0 disables the rule)
+	JiminyFollowRateAlertFloor        float64 // JIMINY_FOLLOW_RATE_ALERT_FLOOR — alert when the raw `mdemg_jiminy_follow_rate` gauge drops below this (default: 0.15 — post-JIMINY-CORPUS-001 raw steady state ~0.30; 0.15 sits below so only genuine collapse fires; was hardcoded 0.30 which flapped on healthy substrate — HEBB-ETA-001 live-caught. 0 disables the rule)
 	GuidanceShouldFollowLookbackHours int     // GUIDANCE_SHOULD_FOLLOW_LOOKBACK_HOURS — window for the should-follow rate (default: 168 = 7d, floor: 1)
 
 	// HITL-REVIEW-001 — general-purpose human-in-the-loop review + live-reinforcement platform.
@@ -2997,6 +3005,8 @@ func FromEnv() (Config, error) {
 	}
 	jiminyEscalationPersistEnabled := getBool("JIMINY_ESCALATION_PERSIST_ENABLED", true)
 	jiminyStrictStatePath := get("JIMINY_STRICT_STATE_PATH", "")
+	jiminyStrictDefaultEnabled := getBool("JIMINY_STRICT_DEFAULT_ENABLED", false)
+	jiminyStrictDefaultSessionID := get("JIMINY_STRICT_DEFAULT_SESSION_ID", "claude-core")
 	if jiminyStrictStatePath == "" {
 		home, _ := os.UserHomeDir()
 		if home != "" {
@@ -3742,6 +3752,10 @@ func FromEnv() (Config, error) {
 	// JIMINY-ACTIONABILITY-COMPLIANCE-CREDIT-001 E6 with inverted reasoning
 	// and would have kept the alert chronically firing; corrected same-day.)
 	guidanceShouldFollowRateFloor, err := atof("GUIDANCE_SHOULD_FOLLOW_RATE_FLOOR", 0.05)
+	if err != nil {
+		return Config{}, err
+	}
+	jiminyFollowRateAlertFloor, err := atof("JIMINY_FOLLOW_RATE_ALERT_FLOOR", 0.15)
 	if err != nil {
 		return Config{}, err
 	}
@@ -5844,6 +5858,8 @@ func FromEnv() (Config, error) {
 		JiminyEscalationDecayMinutes:    jiminyEscalationDecayMinutes,
 		JiminyEscalationPersistEnabled:  jiminyEscalationPersistEnabled,
 		JiminyStrictStatePath:           jiminyStrictStatePath,
+		JiminyStrictDefaultEnabled:      jiminyStrictDefaultEnabled,
+		JiminyStrictDefaultSessionID:    jiminyStrictDefaultSessionID,
 		JiminyCodeRegenEnabled:          jiminyCodeRegenEnabled,
 		JiminyCodeRegenThreshold:        jiminyCodeRegenThreshold,
 		JiminyCodeRegenMinSamples:       jiminyCodeRegenMinSamples,
@@ -6089,6 +6105,7 @@ func FromEnv() (Config, error) {
 		GuidanceAuditSampleSize:                        guidanceAuditSampleSize,
 		GuidanceAuditInitialDelaySec:                   guidanceAuditInitialDelaySec,
 		GuidanceShouldFollowRateFloor:                  guidanceShouldFollowRateFloor,
+		JiminyFollowRateAlertFloor:                     jiminyFollowRateAlertFloor,
 		GuidanceShouldFollowLookbackHours:              guidanceShouldFollowLookbackHours,
 		ReviewEnabled:                                  reviewEnabled,
 		ReviewWriterFlushIntervalSec:                   reviewWriterFlushIntervalSec,

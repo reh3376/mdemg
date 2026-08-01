@@ -4,16 +4,52 @@
 Hook: PreToolUse (Write/Edit) — block file modifications when /strict mode is active
 and escalated constraints are violated.
 
-Fail-open design: if the MDEMG server is unreachable or returns an error,
-the action is ALLOWED. This ensures hooks never block normal workflow when
-MDEMG is down.
+JIMINY-ENFORCE-001 (2026-08-01): Jiminy is an ENFORCER of hard constraints,
+not merely advisory. The operator directive requires user notification on
+every enforcement decision — blocks emit a HIGH-severity server-side alert
+(see handleJiminyClassify in internal/api/handlers_jiminy.go).
+
+Fail-open policy (operator-confirmed 2026-08-01): if the MDEMG server is
+unreachable or errors, the action is ALLOWED but a WARNING is written to
+stderr on EVERY fail-open (no silent second violations) AND a marker file
+is written to ~/.mdemg/.jiminy-server-unreachable so subsequent hook fires
+know the enforcement guarantee is temporarily off. The marker + warning
+clear on the next successful classify call.
 """
 
 import json
 import os
 import sys
+import time
 import urllib.request
 import urllib.error
+
+
+JIMINY_UNREACHABLE_MARKER = os.path.expanduser("~/.mdemg/.jiminy-server-unreachable")
+
+
+def _emit_fail_open_warning(reason: str, url: str):
+    """JIMINY-ENFORCE-001 fail-open policy: stderr WARN on every fail-open + persistent marker."""
+    msg = (
+        f"⚠️  JIMINY ENFORCEMENT SUSPENDED (MDEMG server unreachable at {url}): "
+        f"{reason}. Action allowed; strict-mode guarantee is temporarily OFF."
+    )
+    print(msg, file=sys.stderr)
+    try:
+        os.makedirs(os.path.dirname(JIMINY_UNREACHABLE_MARKER), exist_ok=True)
+        with open(JIMINY_UNREACHABLE_MARKER, "w") as f:
+            json.dump({"reason": reason, "url": url, "ts": int(time.time())}, f)
+    except OSError:
+        pass  # marker best-effort
+
+
+def _clear_fail_open_marker():
+    """Called on any successful classify call — the outage window is over."""
+    try:
+        if os.path.exists(JIMINY_UNREACHABLE_MARKER):
+            os.remove(JIMINY_UNREACHABLE_MARKER)
+    except OSError:
+        pass
 
 
 def _deny(reason: str):
@@ -129,8 +165,18 @@ def main():
     try:
         with urllib.request.urlopen(req, timeout=5) as resp:
             result = json.loads(resp.read())
-    except (urllib.error.URLError, OSError, json.JSONDecodeError, TimeoutError):
-        sys.exit(0)  # Fail open — server unreachable
+    except urllib.error.URLError as e:
+        _emit_fail_open_warning(f"URLError: {e}", classify_url)
+        sys.exit(0)
+    except TimeoutError:
+        _emit_fail_open_warning("timeout after 5s", classify_url)
+        sys.exit(0)
+    except (OSError, json.JSONDecodeError) as e:
+        _emit_fail_open_warning(f"{type(e).__name__}: {e}", classify_url)
+        sys.exit(0)
+
+    # Successful classify → clear any prior fail-open marker.
+    _clear_fail_open_marker()
 
     data = result.get("data", {})
     verdict = data.get("verdict", "pass")

@@ -104,8 +104,11 @@ func TestDefaultRules_Count(t *testing.T) {
 	// host-relative Neo4jCPURule().
 	// 6 → 5 in NODE-DROP-CALIBRATION-001: graph_node_drop extracted to the
 	// config-driven, min-node-floored, severity-downgraded GraphNodeDropRule().
-	if len(rules) != 5 {
-		t.Errorf("expected 5 default rules, got %d", len(rules))
+	// 5 → 4 in FOLLOW-RATE-CALIBRATE-001: jiminy_follow_rate_drop extracted to
+	// the config-driven JiminyFollowRateRules() (was hardcoded 0.30, chronically
+	// flapping on post-JIMINY-CORPUS-001 ~0.30 honest steady state).
+	if len(rules) != 4 {
+		t.Errorf("expected 4 default rules, got %d", len(rules))
 	}
 
 	// Verify all rules are enabled

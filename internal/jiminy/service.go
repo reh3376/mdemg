@@ -256,6 +256,21 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext, consultant Co
 		if err := strictMode.LoadFromFile(); err != nil {
 			slog.Warn("jiminy: strict mode file load failed", "error", err)
 		}
+		// JIMINY-ENFORCE-001: default-on strict mode. When the flag is true and no
+		// session is already active (state file absent or held a different session),
+		// auto-enable for the configured default session. Idempotent — Enable() writes
+		// the state file. The operator directive 2026-08-01 formalized Jiminy as an
+		// ENFORCER; this flip aligns the shipped default with that intent.
+		if cfg.JiminyStrictDefaultEnabled && cfg.JiminyStrictDefaultSessionID != "" {
+			if !strictMode.IsStrict(cfg.JiminyStrictDefaultSessionID) {
+				if err := strictMode.Enable(cfg.JiminyStrictDefaultSessionID); err != nil {
+					slog.Warn("jiminy: default strict mode enable failed", "error", err)
+				} else {
+					slog.Info("jiminy: strict mode auto-enabled (JIMINY_STRICT_DEFAULT_ENABLED)",
+						"session_id", cfg.JiminyStrictDefaultSessionID)
+				}
+			}
+		}
 	}
 
 	// /strict: Reformulator for imperative directive generation
