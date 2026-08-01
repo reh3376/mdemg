@@ -47,6 +47,15 @@ sprint):
     a metric may be consumed through it without a direct grep-hit on the name.
     The walker records this as a soft-signal for operator adjudication.
 
+  - UOBS + UOTS specs assert metrics MUST-be-present at runtime
+    (``docs/tests/uobs/specs/**``, ``docs/api/api-spec/uots/specs/**``).
+    METRICS-VERIFIER-UOBS-UOTS-001 added these as consumer roots: a metric
+    referenced by a spec is a real coupling that surfaces at test time,
+    and removing that metric without also updating the spec FAILS the
+    runner (live-caught during DORMANT-METRICS-CLEANUP-001 CI cycle —
+    ``retrieval_cache_hits_total`` was removed while three specs still
+    asserted its presence).
+
 The script fails on:
   - metrics declared in Go but absent from the inventory (added tables)
   - inventory entries for metrics no longer in Go (removed)
@@ -66,6 +75,12 @@ INVENTORY_PATH = REPO / "docs" / "api" / "metrics_consumer_inventory.json"
 
 # Consumer roots to scan. Ordered by expected hit density (dashboards first
 # so their hits appear at the top of the "consumers" list for readability).
+#
+# METRICS-VERIFIER-UOBS-UOTS-001: UOBS + UOTS spec paths added as consumer
+# roots after DORMANT-METRICS-CLEANUP-001 CI-caught the class where a removed
+# metric was still asserted MUST-be-present at runtime by a UOBS or UOTS spec,
+# causing the observability runner to FAIL post-removal. Treating those spec
+# assertions as real consumers surfaces the coupling BEFORE removal.
 CONSUMER_ROOTS = [
     REPO / "deploy" / "docker" / "grafana",
     REPO / "internal" / "cli" / "grafana_templates" / "staged",
@@ -74,6 +89,8 @@ CONSUMER_ROOTS = [
     REPO / "internal" / "api",         # snapshot endpoint + admin endpoints
     REPO / "internal" / "tsdb",        # dataset builder reads metric_samples
     REPO / "internal" / "consulting",  # consulting reads some cache stats
+    REPO / "docs" / "tests" / "uobs" / "specs",       # UOBS runtime-metric-presence contracts
+    REPO / "docs" / "api" / "api-spec" / "uots" / "specs",  # UOTS artifact-observability contracts
 ]
 
 # Filesystem extensions to search inside consumer roots.
@@ -241,6 +258,23 @@ def generate() -> int:
                 entry["declaration"] = info["declaration"]
                 entry["consumers"] = consumers
                 updated += 1
+            # METRICS-VERIFIER-UOBS-UOTS-001 auto-promotion: an entry that was
+            # previously IN_USE_TSDB_ONLY becomes IN_USE the moment a UOBS or
+            # UOTS spec references it (those are real runtime coupling — the
+            # spec's runner will FAIL if the metric goes missing). Do NOT
+            # auto-demote in the other direction: an operator marking DORMANT_*
+            # explicitly wins over a passive spec-reference sweep.
+            if entry.get("disposition") == "IN_USE_TSDB_ONLY":
+                spec_hits = [c for c in consumers
+                             if "uobs/specs" in c or "uots/specs" in c]
+                if spec_hits:
+                    entry["disposition"] = "IN_USE"
+                    entry["notes"] = (
+                        "Auto-promoted by METRICS-VERIFIER-UOBS-UOTS-001: "
+                        "referenced by a UOBS or UOTS runtime observability "
+                        "contract that asserts this metric MUST be present. "
+                        "Removing the declaration would break the spec runner."
+                    )
         else:
             # Auto-disposition:
             #   direct consumer hit  → IN_USE
