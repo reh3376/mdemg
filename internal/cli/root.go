@@ -167,6 +167,11 @@ Use "mdemg <command> --help" for more information about a command.`,
 	symbolsCmd.GroupID = "memory"
 	rootCmd.AddCommand(symbolsCmd)
 
+	// HEBB-ETA-001: `mdemg confidence backfill`
+	confidenceCmd := newConfidenceCmd()
+	confidenceCmd.GroupID = "memory"
+	rootCmd.AddCommand(confidenceCmd)
+
 	// Configuration
 	configCmd := newConfigCmd()
 	configCmd.GroupID = "config"
