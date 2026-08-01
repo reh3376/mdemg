@@ -337,8 +337,8 @@ type Config struct {
 	JiminySurfaceEffectivenessPriorMinSamples int     // JIMINY_SURFACE_EFFECTIVENESS_PRIOR_MIN_SAMPLES — minimum surfaced outcomes before the prior applies to a node; below it the node is neutral, not penalised (default: 5)
 	// JIMINY-ACTIONABILITY-001 Lever C (Epic 5): guarantee actionable candidates enter the guidance pool.
 	JiminyGuidanceConstraintBiasEnabled bool    // JIMINY_GUIDANCE_CONSTRAINT_BIAS_ENABLED — Lever C: fetch top-K constraint/correction nodes by embedding similarity and merge into the guidance pool (default: false). Addresses the Epic-4 finding that retrieval surfaces no actionable candidates for most contexts.
-	JiminyGuidanceConstraintIncludeTopK int     // JIMINY_GUIDANCE_CONSTRAINT_INCLUDE_TOPK — how many actionable nodes to merge (default: 5)
-	JiminyGuidanceConstraintSimFloor    float64 // JIMINY_GUIDANCE_CONSTRAINT_SIM_FLOOR — cosine (vector-index) similarity floor for a merged actionable node — STABLE [0,1] scale, NOT the RRF score (RRF-SCALE-001-safe). 0 disables the floor. (default: 0.30)
+	JiminyGuidanceConstraintIncludeTopK int     // JIMINY_GUIDANCE_CONSTRAINT_INCLUDE_TOPK — how many actionable nodes to merge (default: 4 — LEVER-C-TIGHTEN-001 tightened 5→4; TSDB 7d actionable fraction 0.342 vs 0.30 quota → 5 over-supplied slightly; 4 gives ~2.7 survivors after 32% attrition, quota-safe via cooldown fallback)
+	JiminyGuidanceConstraintSimFloor    float64 // JIMINY_GUIDANCE_CONSTRAINT_SIM_FLOOR — cosine (vector-index) similarity floor for a merged actionable node — STABLE [0,1] scale, NOT the RRF score (RRF-SCALE-001-safe). 0 disables the floor. (default: 0.45 — LEVER-C-TIGHTEN-001 tightened 0.30→0.45; TSDB 7d: 0/257 followed below downstream-sim 0.40, all 78 followed events ≥0.50 (77 ≥0.60); 0.45 conservative "kill the tail, keep the head" cutoff)
 	// JIMINY-OUTCOME-001 — minimum vector-index cosine similarity for an embedding-based
 	// constraint-code match. Concept-abstracted guidance rarely shares 3+ literal words
 	// with raw constraint text, so keyword matching missed everything and the Neo4j
@@ -2790,14 +2790,14 @@ func FromEnv() (Config, error) {
 	if jiminyDirectiveSynthesisMaxPromptTokens < 1000 {
 		jiminyDirectiveSynthesisMaxPromptTokens = 1000 // floor
 	}
-	jiminyGuidanceConstraintIncludeTopK, err := atoi("JIMINY_GUIDANCE_CONSTRAINT_INCLUDE_TOPK", 5)
+	jiminyGuidanceConstraintIncludeTopK, err := atoi("JIMINY_GUIDANCE_CONSTRAINT_INCLUDE_TOPK", 4)
 	if err != nil {
 		return Config{}, err
 	}
 	if jiminyGuidanceConstraintIncludeTopK < 0 {
 		jiminyGuidanceConstraintIncludeTopK = 0
 	}
-	jiminyGuidanceConstraintSimFloor, err := atof("JIMINY_GUIDANCE_CONSTRAINT_SIM_FLOOR", 0.30)
+	jiminyGuidanceConstraintSimFloor, err := atof("JIMINY_GUIDANCE_CONSTRAINT_SIM_FLOOR", 0.45)
 	if err != nil {
 		return Config{}, err
 	}

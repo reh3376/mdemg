@@ -166,3 +166,25 @@ func TestFetchActionableCandidates_Guards(t *testing.T) {
 		t.Errorf("empty embedding must return nil")
 	}
 }
+
+// LEVER-C-TIGHTEN-001: pin the shipped defaults so future config bumps are
+// explicit — the values are data-decided against 7d TSDB analysis of
+// mdemg-dev's constraint_outcomes distribution (0/257 followed below sim 0.40).
+// If defaults change, update the sprint post + revert-tripwire calculation.
+func TestLeverC_ShippedDefaults(t *testing.T) {
+	t.Setenv("NEO4J_URI", "bolt://localhost:7687")
+	t.Setenv("NEO4J_USER", "neo4j")
+	t.Setenv("NEO4J_PASS", "x")
+	t.Setenv("JIMINY_GUIDANCE_CONSTRAINT_INCLUDE_TOPK", "")
+	t.Setenv("JIMINY_GUIDANCE_CONSTRAINT_SIM_FLOOR", "")
+	cfg, err := config.FromEnv()
+	if err != nil {
+		t.Fatalf("FromEnv failed: %v", err)
+	}
+	if cfg.JiminyGuidanceConstraintIncludeTopK != 4 {
+		t.Errorf("LEVER-C-TIGHTEN-001: TOPK default must be 4, got %d", cfg.JiminyGuidanceConstraintIncludeTopK)
+	}
+	if cfg.JiminyGuidanceConstraintSimFloor != 0.45 {
+		t.Errorf("LEVER-C-TIGHTEN-001: SIM_FLOOR default must be 0.45, got %f", cfg.JiminyGuidanceConstraintSimFloor)
+	}
+}
