@@ -85,3 +85,31 @@ The `Incorrect`/`Correct`/`Context` triple that `POST /v1/conversation/correct` 
 **Retired dead code:** the `metadata_*` param flatten in `createObservationNode` was never referenced by the CREATE cypher — no `metadata_incorrect` / `metadata_correct` property has ever landed on any MemoryNode (verified live). Removed with a comment explaining prior intent; if a future feature needs graph-persisted Metadata it must add BOTH the flatten AND matching cypher SET clauses.
 
 See `docs/development/jiminy-structured-correction-001/`.
+
+## Follow-up — Lever C tightening (LEVER-C-TIGHTEN-001, 2026-08-01)
+
+The operator flagged J17 avg trust at 25.4% + Jiminy actionable-compliance at ~14% as SUBSTRATE-QUALITY problems, not calibration artifacts (correction: `[correction]` 2026-08-01). Trust is the receiver-side view of guidance quality; a compliance rate of ~14% means most surfaced actionable guidance is not worth acting on. A 7-agent read-only deep-dive workflow (`wf_e576f7f8-625`) investigated Lever C's role in denominator inflation.
+
+**Data-decided values** (from 7d TSDB analysis on mdemg-dev):
+- **`JIMINY_GUIDANCE_CONSTRAINT_INCLUDE_TOPK`**: code default **5 → 4** (`.env` **5 → 4**). Live actionable-fraction gauge mean is 0.342 (vs 0.30 quota) — TOPK=5 was over-supplying with headroom; TOPK=4 gives ~2.7 survivors after 32% cooldown/prior attrition, still quota-safe via the shipped cooldown-fallback path.
+- **`JIMINY_GUIDANCE_CONSTRAINT_SIM_FLOOR`**: code default **0.30 → 0.45** (`.env` **0.70 → 0.55**). `constraint_outcomes` distribution over 7d: 257 rows below downstream-sim 0.40, 0 followed (37% pure denominator noise). All 78 followed events sit at sim ≥ 0.50 (77 ≥ 0.60). Surface-time sim runs systematically lower than downstream sim → 0.45 code default kills the noise tail with margin; `.env` relaxes 0.70 → 0.55 to restore Lever C supply headroom (0.70 was starving the quota, forcing over-reliance on cooldown-fallback which re-surfaces recently-ignored items).
+
+**Startup log**: `slog.Info("jiminy: lever c actionable bias", "enabled", "topk", "sim_floor")` emitted at boot when Lever C is enabled — grepable, no hidden state.
+
+**A/B measurement** — passive over 7d:
+- Expect: actionable-compliance rate **~14% → ~17-19%** (denominator-shrink mechanism, same shape as JIMINY-ACTIONABILITY-COMPLIANCE-CREDIT-001).
+- Expect: J17 avg trust EMA positive 7d slope (steady state fixed point: 14% follow → 0.312; 30% follow → 0.44).
+- Actionable volume/day: expect **~101 → ~75-80**, ~20-25% cut.
+
+**Revert tripwires** (if any tripped, revert single commit):
+- Actionable-compliance rate **falls** below 0.10
+- `mdemg_jiminy_surfaced_actionable_fraction` **falls below 0.20** for 6h continuously (quota starving)
+- Surface-cooldown fallback rate > 30% of surfaces (TOPK too tight)
+
+**Load-bearing downstream — watch-item**: `GetConstraintEffectiveness` (RSIC per-constraint prune signal, `ape/task_dispatch.go:736,764`) accumulates ~20% slower per constraint (from ~100 GUIDANCE_OUTCOME edges/day/space). Not blocking — the signal isn't lost, just slower. If RSIC prune velocity measurably degrades over 30d, follow-up sprint bumps `RSIC_GUIDANCE_MIN_SURFACES` or similar.
+
+⚠️ **Architectural rule pinned**: when a config knob has a "shrink the denominator" shape (Lever C top-K + sim floor), the load-bearing downstream isn't the surface volume itself but the signal-per-time density feeding secondary consumers. Enumerate consumers of `constraint_outcomes` / `GUIDANCE_OUTCOME` edges BEFORE tightening; disclose slower-accumulation risk even when it's not blocking.
+
+⚠️ **Also pinned**: trust score is a receiver-side quality signal, NOT an observability-only gauge. Even when `J17_TIER_GATE_MODE=comprehension` (J17-TIER-GATE-001) bypasses trust for tier selection, a low trust EMA still means the substrate is producing untrustworthy guidance. Don't frame low trust as "harmless-by-design." The operator directive from 2026-08-01 stands: raise the trust signal, don't calibrate away the alarming number.
+
+See `docs/development/lever-c-tighten-001/`.

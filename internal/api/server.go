@@ -1173,6 +1173,15 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		jiminySvc.SetWarmStore(s.warmStore)
 	}
 
+	// LEVER-C-TIGHTEN-001: record live Lever C tuning at boot for operator visibility.
+	if jiminySvc != nil && cfg.JiminyGuidanceConstraintBiasEnabled {
+		slog.Info("jiminy: lever c actionable bias",
+			"enabled", cfg.JiminyGuidanceConstraintBiasEnabled,
+			"topk", cfg.JiminyGuidanceConstraintIncludeTopK,
+			"sim_floor", cfg.JiminyGuidanceConstraintSimFloor,
+		)
+	}
+
 	// J17: Hydrate trust scores from Neo4j and start persistence flush loop
 	if jiminySvc != nil {
 		if err := jiminySvc.HydrateTrust(context.Background()); err != nil {
