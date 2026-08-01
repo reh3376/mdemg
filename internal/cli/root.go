@@ -162,6 +162,11 @@ Use "mdemg <command> --help" for more information about a command.`,
 	extractSymbolsCmd.GroupID = "memory"
 	rootCmd.AddCommand(extractSymbolsCmd)
 
+	// GO-IMPLEMENTS-001: `mdemg symbols analyze-go-implements`
+	symbolsCmd := newSymbolsCmd()
+	symbolsCmd.GroupID = "memory"
+	rootCmd.AddCommand(symbolsCmd)
+
 	// Configuration
 	configCmd := newConfigCmd()
 	configCmd.GroupID = "config"
