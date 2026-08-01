@@ -596,6 +596,12 @@ type Config struct {
 	RSICGuidanceDecayThreshold     float64 // RSIC_GUIDANCE_DECAY_THRESHOLD — effectiveness rate below which confidence is decayed (default: 0.1)
 	RSICGuidanceDecayMinSurfaces   int     // RSIC_GUIDANCE_DECAY_MIN_SURFACES — min surfaces before decay applies (default: 5)
 
+	// DASHBOARD-TRUTH-003: reflector floors extracted from hardcoded 0.5/0.7 (self_reflect.go patterns 9+15).
+	// Recalibrated to the honest steady-state guidance-health band (JIMINY-CORPUS-001 + JIMINY-ACTIONABILITY-COMPLIANCE-CREDIT-001):
+	// the shipped follow-rate steady state is ~0.14; a legacy 0.5 floor fired ~always on healthy state.
+	RSICGuidanceHealthFollowFloor float64 // RSIC_GUIDANCE_HEALTH_FOLLOW_FLOOR — GuidanceHealth below this fires pattern 9 "low_guidance_follow_rate" (default: 0.20)
+	RSICGuidanceHealthDriftFloor  float64 // RSIC_GUIDANCE_HEALTH_DRIFT_FLOOR — GuidanceHealth below this fires pattern 15 "guidance_confidence_drift" (default: 0.25)
+
 	SpacePruneIntervalHours    int  // SPACE_PRUNE_INTERVAL_HOURS — auto-prune interval in hours (default: 24, 0=disabled)
 	ContextCoolerEnabled       bool // CONTEXT_COOLER_ENABLED — enable background context cooler processing (default: false)
 	WeeklyGapInterviewsEnabled bool // WEEKLY_GAP_INTERVIEWS_ENABLED — enable background weekly gap interviews (default: false)
@@ -3393,6 +3399,14 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	rsicGuidanceHealthFollowFloor, err := atof("RSIC_GUIDANCE_HEALTH_FOLLOW_FLOOR", 0.20)
+	if err != nil {
+		return Config{}, err
+	}
+	rsicGuidanceHealthDriftFloor, err := atof("RSIC_GUIDANCE_HEALTH_DRIFT_FLOOR", 0.25)
+	if err != nil {
+		return Config{}, err
+	}
 
 	spacePruneIntervalHours, err := atoi("SPACE_PRUNE_INTERVAL_HOURS", 24)
 	if err != nil {
@@ -5967,6 +5981,8 @@ func FromEnv() (Config, error) {
 		RSICGuidanceBoostThreshold:           rsicGuidanceBoostThreshold,
 		RSICGuidanceDecayThreshold:           rsicGuidanceDecayThreshold,
 		RSICGuidanceDecayMinSurfaces:         rsicGuidanceDecayMinSurfaces,
+		RSICGuidanceHealthFollowFloor:        rsicGuidanceHealthFollowFloor,
+		RSICGuidanceHealthDriftFloor:         rsicGuidanceHealthDriftFloor,
 		SpacePruneIntervalHours:              spacePruneIntervalHours,
 		ContextCoolerEnabled:                 contextCoolerEnabled,
 		WeeklyGapInterviewsEnabled:           weeklyGapInterviewsEnabled,

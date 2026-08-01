@@ -160,29 +160,32 @@ func (r *Reflector) Reflect(ctx context.Context, report *SelfAssessmentReport) (
 		})
 	}
 
-	// 9. J10: Low guidance follow rate
-	if report.GuidanceHealth > 0 && report.GuidanceHealth < 0.5 {
+	// 9. J10: Low guidance follow rate.
+	// DASHBOARD-TRUTH-003: floor extracted to RSIC_GUIDANCE_HEALTH_FOLLOW_FLOOR (default 0.20).
+	// The legacy 0.5 fired on the honest steady-state band (~0.14 post JIMINY-CORPUS-001).
+	if floor := r.cfg.RSICGuidanceHealthFollowFloor; floor > 0 && report.GuidanceHealth > 0 && report.GuidanceHealth < floor {
 		insights = append(insights, ReflectionInsight{
 			PatternID:         "low_guidance_follow_rate",
 			Severity:          SeverityMedium,
-			Description:       "Less than 50% of high-priority guidance is being followed — agent may be ignoring constraints",
+			Description:       fmt.Sprintf("Guidance health %.0f%% below floor %.0f%% — agent may be ignoring constraints", report.GuidanceHealth*100, floor*100),
 			RecommendedAction: "review_guidance_effectiveness",
 			Metric:            "guidance_health",
 			Value:             report.GuidanceHealth,
-			Threshold:         0.5,
+			Threshold:         floor,
 		})
 	}
 
-	// 15. RSIC-SK1: Per-constraint confidence calibration
-	if report.GuidanceHealth > 0 && report.GuidanceHealth < 0.7 {
+	// 15. RSIC-SK1: Per-constraint confidence calibration.
+	// DASHBOARD-TRUTH-003: floor extracted to RSIC_GUIDANCE_HEALTH_DRIFT_FLOOR (default 0.25).
+	if floor := r.cfg.RSICGuidanceHealthDriftFloor; floor > 0 && report.GuidanceHealth > 0 && report.GuidanceHealth < floor {
 		insights = append(insights, ReflectionInsight{
 			PatternID:         "guidance_confidence_drift",
 			Severity:          SeverityMedium,
-			Description:       "Guidance health below 70% — per-constraint confidence may need calibration",
+			Description:       fmt.Sprintf("Guidance health %.0f%% below drift floor %.0f%% — per-constraint confidence may need calibration", report.GuidanceHealth*100, floor*100),
 			RecommendedAction: "adjust_guidance_confidence",
 			Metric:            "guidance_health",
 			Value:             report.GuidanceHealth,
-			Threshold:         0.7,
+			Threshold:         floor,
 		})
 	}
 

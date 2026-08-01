@@ -32,6 +32,7 @@
     },
     {
       "title": "Guidance Health",
+      "description": "Composite: 0.5*follow_rate + 0.3*constraint_eff + 0.2*source_diversity (self_assess.go:504-516). DASHBOARD-TRUTH-003 (2026-08-01) recalibrated bands: pre-fix thresholds red<0.4 / green>=0.7 were calibrated for the legacy 'follow rate >= 90%' world, structurally unreachable under the honest post-JIMINY-ACTIONABILITY-COMPLIANCE-CREDIT-001 steady state (ceiling ~= 0.5*0.15 + 0.3*0.22 + 0.2*0.76 = 0.29). New bands: red<0.20 = collapse; yellow>=0.20 = pre-flip steady state; green>=0.28 = post-corpus-lift target zone (matches the honest ceiling +/- the diversity variance).",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -74,11 +75,11 @@
               },
               {
                 "color": "yellow",
-                "value": 0.4
+                "value": 0.20
               },
               {
                 "color": "green",
-                "value": 0.7
+                "value": 0.28
               }
             ]
           }
@@ -87,6 +88,7 @@
     },
     {
       "title": "Follow Rate",
+      "description": "Raw jiminy follow rate over ALL guidance types (constraint/correction/pattern/concept/learning/decision). JIMINY-CEILING-INVESTIGATION-001 (2026-07-29) established that the raw rate's honest ceiling is 15-25% under proper measurement, NOT >90% (the corpus is ~50% correctly-ignored advisory abstractions by design). DASHBOARD-TRUTH-003 (2026-08-01) recalibrated: pre-fix thresholds red<0.4 / green>=0.7 flagged a healthy substrate as critical every render. New bands: red null (any value shown is not-collapse); yellow>=0.05 = collapse floor matches the guidance_should_follow_rate_low alert; green>=0.15 = the honest steady-state pinned in CLAUDE.md. See Actionable Compliance Rate panel for the constraint/correction-only slice (the metric that actually maps to actionable-guidance follow-rate).",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -129,11 +131,11 @@
               },
               {
                 "color": "yellow",
-                "value": 0.4
+                "value": 0.05
               },
               {
                 "color": "green",
-                "value": 0.7
+                "value": 0.15
               }
             ]
           }
@@ -253,8 +255,8 @@
       }
     },
     {
-      "title": "Actionable Compliance Rate",
-      "description": "Compliance rate on ACTIONABLE guidance types (constraint/correction), excluding correctly-ignored advisory abstractions (pattern/learning/concept). JIMINY-ACTIONABILITY-INVERSION-001 discovered this rate reads LOWER than raw follow rate (10% vs 15%) under current architecture \u2014 an emergent effect of (constraint semantics \u00d7 Lever C over-surfacing \u00d7 correct must/should classifier calibration), NOT a defect. The >90% goal ISN'T the right frame \u2014 real actionable rate under Lever C's aggressive constraint-partition biasing has an expected floor around 10-25% (higher once JIMINY-ACTIONABILITY-COMPLIANCE-CREDIT-001's non-violation-credit prompt is enabled \u2014 routes unrelated-context ignored verdicts to not_applicable, predicted lift ~+10pp). WATCH THE TREND OVER 14-DAY WINDOWS, not the absolute value. DASHBOARD-TRUTH-001: not_applicable / blank / unknown excluded from BOTH numerator and denominator. Matches the guidance_should_follow_rate_low alert. Computed from guidance_training_rows in the dashboard time range (followed=1.0, partial_compliance=0.5). Bands: red <0.05 = genuine collapse (matches the alert floor GUIDANCE_SHOULD_FOLLOW_RATE_FLOOR); yellow 0.05-0.18 = pre-flip by-design steady state (~0.10-0.14 live); green \u22650.18 = the non-violation-credit post-flip target zone.",
+      "title": "Actionable Compliance Rate (expected 10-13% by design)",
+      "description": "Compliance rate on ACTIONABLE guidance types (constraint/correction), excluding correctly-ignored advisory abstractions (pattern/learning/concept). JIMINY-ACTIONABILITY-INVERSION-001 discovered this rate reads LOWER than raw follow rate (10% vs 15%) under current architecture \u2014 an emergent effect of (constraint semantics \u00d7 Lever C over-surfacing \u00d7 correct must/should classifier calibration), NOT a defect. The >90% goal ISN'T the right frame \u2014 real actionable rate under Lever C's aggressive constraint-partition biasing has an expected floor around 10-25%. WATCH THE TREND OVER 14-DAY WINDOWS, not the absolute value. See ab_verdict.md at docs/development/jiminy-actionability-compliance-credit-001/ab_verdict.md for the reference measurement (12.97% burst-adjusted steady state, KEEP-ON verdict). DASHBOARD-TRUTH-001: not_applicable / blank / unknown excluded from BOTH numerator and denominator. Matches the guidance_should_follow_rate_low alert. Computed from guidance_training_rows in the dashboard time range (followed=1.0, partial_compliance=0.5). DASHBOARD-TRUTH-003 (2026-08-01) recalibrated bands per the JIMINY-ACTIONABILITY-INVERSION observation: red<0.05 = alert floor (guidance_should_follow_rate_low); yellow 0.05-0.10 = below-expected; green-neutral 0.10-0.25 = the expected by-design steady-state band (this is where healthy substrate lives, NOT green); green\u22650.25 = above the honest ceiling (corpus-quality lift is working).",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -300,8 +302,12 @@
                 "value": 0.05
               },
               {
+                "color": "light-green",
+                "value": 0.10
+              },
+              {
                 "color": "green",
-                "value": 0.18
+                "value": 0.25
               }
             ]
           }
@@ -365,6 +371,7 @@
     },
     {
       "title": "Auto-compact AVG",
+      "description": "Average interval between Claude auto-compact events (pre-compact hook → compact_event_ts). Computed over DISTINCT event timestamps of the LAST 10 events regardless of dashboard window — compactions are rare (days apart), so a windowed query read 'no value' on any range narrower than ~2 events, and the gauge's repeated flush rows previously inflated COUNT(*) (interval understated). LONGER is BETTER: frequent compaction means context pressure. DASHBOARD-TRUTH-003 (2026-08-01): copy-fix from the j17 twin panel that DASHBOARD-TRUTH-002 already fixed 2026-07-21.",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -379,7 +386,7 @@
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT NOW() AS time, CASE WHEN count(*) > 1 THEN EXTRACT(EPOCH FROM (max(time) - min(time))) / (count(*) - 1) / 60.0 ELSE 0 END AS value FROM metric_samples WHERE metric_name = 'mdemg_compact_event_ts' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time)",
+          "rawSql": "-- distinct compact events, last 10 lifetime (rare-event stream; no window filter)\nWITH ev AS (\n  SELECT DISTINCT value FROM metric_samples\n  WHERE metric_name = 'mdemg_compact_event_ts' AND metric_type = 'gauge'\n    AND space_id = '$space_id' AND value > 0\n  ORDER BY value DESC LIMIT 10\n)\nSELECT (MAX(value) - MIN(value)) / NULLIF(COUNT(*) - 1, 0) / 60.0 AS value FROM ev",
           "format": "time_series"
         }
       ],
@@ -388,7 +395,7 @@
         "graphMode": "area",
         "reduceOptions": {
           "calcs": [
-            "mean"
+            "lastNotNull"
           ]
         }
       },
@@ -632,11 +639,6 @@
         {
           "refId": "A",
           "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_jiminy_follow_rate' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
-          "format": "time_series"
-        },
-        {
-          "refId": "B",
-          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_jiminy_constraint_effectiveness' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
           "format": "time_series"
         },
         {

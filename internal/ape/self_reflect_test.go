@@ -8,10 +8,11 @@ import (
 )
 
 func TestReflect_GuidanceConfidenceDrift(t *testing.T) {
-	cfg := config.Config{}
+	// DASHBOARD-TRUTH-003: floor now config-driven via RSIC_GUIDANCE_HEALTH_DRIFT_FLOOR.
+	cfg := config.Config{RSICGuidanceHealthDriftFloor: 0.7}
 	r := NewReflector(cfg, nil)
 
-	// Pattern 15 should trigger when GuidanceHealth is between 0 and 0.7
+	// Pattern 15 should trigger when GuidanceHealth is between 0 and floor (0.7).
 	report := &SelfAssessmentReport{
 		SpaceID:        "test",
 		GuidanceHealth: 0.55,
@@ -40,7 +41,7 @@ func TestReflect_GuidanceConfidenceDrift(t *testing.T) {
 		t.Error("guidance_confidence_drift pattern not triggered with GuidanceHealth=0.55")
 	}
 
-	// Should NOT trigger when GuidanceHealth >= 0.7
+	// Should NOT trigger when GuidanceHealth >= floor
 	report.GuidanceHealth = 0.75
 	insights, _ = r.Reflect(context.Background(), report)
 	for _, insight := range insights {
@@ -56,6 +57,66 @@ func TestReflect_GuidanceConfidenceDrift(t *testing.T) {
 		if insight.PatternID == "guidance_confidence_drift" {
 			t.Error("guidance_confidence_drift should not trigger with GuidanceHealth=0")
 		}
+	}
+
+	// DASHBOARD-TRUTH-003: floor=0 disables the pattern entirely (opt-out).
+	r2 := NewReflector(config.Config{RSICGuidanceHealthDriftFloor: 0}, nil)
+	report.GuidanceHealth = 0.10
+	insights, _ = r2.Reflect(context.Background(), report)
+	for _, insight := range insights {
+		if insight.PatternID == "guidance_confidence_drift" {
+			t.Error("floor=0 must disable guidance_confidence_drift")
+		}
+	}
+}
+
+func TestReflect_LowGuidanceFollowRate_FloorConfigurable(t *testing.T) {
+	// DASHBOARD-TRUTH-003: floor now config-driven via RSIC_GUIDANCE_HEALTH_FOLLOW_FLOOR.
+	// Default is 0.20 (recalibrated from hardcoded 0.5 that fired chronically on the honest ~0.14 steady state).
+	r := NewReflector(config.Config{RSICGuidanceHealthFollowFloor: 0.20}, nil)
+
+	// Fires below floor.
+	report := &SelfAssessmentReport{SpaceID: "test", GuidanceHealth: 0.10}
+	insights, err := r.Reflect(context.Background(), report)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	found := false
+	for _, insight := range insights {
+		if insight.PatternID == "low_guidance_follow_rate" {
+			found = true
+			if insight.Threshold != 0.20 {
+				t.Errorf("expected threshold 0.20, got %f", insight.Threshold)
+			}
+		}
+	}
+	if !found {
+		t.Error("low_guidance_follow_rate must fire with GuidanceHealth=0.10 < floor=0.20")
+	}
+
+	// Does NOT fire at or above floor — the honest steady-state ~0.14 stays quiet under default 0.20.
+	// Note: at ~0.14 the pattern would fire at floor=0.20, which is the intended catch band.
+	// This case tests the boundary at floor + noise margin.
+	report.GuidanceHealth = 0.25
+	insights, _ = r.Reflect(context.Background(), report)
+	for _, insight := range insights {
+		if insight.PatternID == "low_guidance_follow_rate" {
+			t.Error("low_guidance_follow_rate must not fire at GuidanceHealth=0.25 > floor=0.20")
+		}
+	}
+
+	// Legacy behavior recovery: set floor=0.5, verify the old semantics still work when operators want them.
+	rLegacy := NewReflector(config.Config{RSICGuidanceHealthFollowFloor: 0.5}, nil)
+	report.GuidanceHealth = 0.30
+	insights, _ = rLegacy.Reflect(context.Background(), report)
+	found = false
+	for _, insight := range insights {
+		if insight.PatternID == "low_guidance_follow_rate" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("floor=0.5 must fire at GuidanceHealth=0.30 (legacy semantics)")
 	}
 }
 
@@ -137,7 +198,8 @@ func TestReflect_RecoveryBufferEmpty_NoInsight(t *testing.T) {
 }
 
 func TestReflect_LowGuidanceFollowRate(t *testing.T) {
-	cfg := config.Config{}
+	// DASHBOARD-TRUTH-003: both floors now config-driven. Legacy 0.5/0.7 used explicitly here.
+	cfg := config.Config{RSICGuidanceHealthFollowFloor: 0.5, RSICGuidanceHealthDriftFloor: 0.7}
 	r := NewReflector(cfg, nil)
 
 	// Pattern 9 triggers at < 0.5
