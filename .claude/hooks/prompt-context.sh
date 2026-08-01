@@ -62,6 +62,17 @@ if ! curl -sf "${MDEMG_URL}/healthz" -o /dev/null --connect-timeout 1; then
   exit 0
 fi
 
+# JIMINY-ENFORCE-001: surface the persistent fail-open marker if the
+# pre-write-check hook fell open on an unreachable server since the last
+# prompt. The marker is cleared by the next successful classify call — so
+# if it's present here, enforcement is still degraded.
+_JIMINY_UNREACHABLE_MARKER="${HOME}/.mdemg/.jiminy-server-unreachable"
+if [ -f "$_JIMINY_UNREACHABLE_MARKER" ]; then
+  _MARKER_REASON=$(jq -r '.reason // "unknown"' "$_JIMINY_UNREACHABLE_MARKER" 2>/dev/null || echo "unknown")
+  _MARKER_TS=$(jq -r '.ts // 0' "$_JIMINY_UNREACHABLE_MARKER" 2>/dev/null || echo 0)
+  echo "⚠️  JIMINY ENFORCEMENT DEGRADED — server was unreachable at $(date -r "$_MARKER_TS" 2>/dev/null || echo "unknown time"): ${_MARKER_REASON}. Marker clears on next successful pre-write-check."
+fi
+
 # --- Alert delivery: show pending MDEMG service alerts ---
 _ALERT_FILE="${ALERT_FILE_PATH:-${HOME}/.mdemg/alerts/current.json}"
 if [ -f "$_ALERT_FILE" ]; then

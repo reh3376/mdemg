@@ -3,10 +3,12 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
 
+	"mdemg/internal/alert"
 	"mdemg/internal/jiminy"
 	"mdemg/internal/llmclient"
 	"mdemg/internal/metrics"
@@ -540,8 +542,44 @@ func (s *Server) handleJiminyClassify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// JIMINY-ENFORCE-001: emit HIGH-severity alert on every block so the user is
+	// visibly notified via ~/.mdemg/alerts/current.json (surfaced by session-start
+	// + prompt-context hooks). Auto-clears on next hook fire per the shipped
+	// cleared-flag flow. Distinct Service per NOSILENT-001 cooldown-key contract.
+	emitJiminyBlockAlert(r.Context(), s.alertDispatcher, req, resp)
+
 	writeJSON(w, http.StatusOK, map[string]any{
 		"data": resp,
+	})
+}
+
+// alertSender is the minimum surface handlers_jiminy needs from an alert
+// dispatcher. Kept private + narrow so the handler can be exercised in tests
+// without a full alert.Dispatcher.
+type alertSender interface {
+	Send(ctx context.Context, a alert.Alert)
+}
+
+// emitJiminyBlockAlert dispatches the HIGH-severity user notification on a
+// classify deny. No-op on pass, nil dispatcher, or missing verdict.
+// JIMINY-ENFORCE-001.
+func emitJiminyBlockAlert(ctx context.Context, dispatcher alertSender, req jiminy.ClassifyRequest, resp jiminy.ClassifyResponse) {
+	if resp.Verdict != "deny" || dispatcher == nil {
+		return
+	}
+	reason := resp.DenialReason
+	if reason == "" {
+		reason = "constraint violation"
+	}
+	msg := reason
+	if req.FilePath != "" {
+		msg = fmt.Sprintf("%s (file: %s, tool: %s)", reason, req.FilePath, req.ToolName)
+	}
+	dispatcher.Send(ctx, alert.Alert{
+		Service:  "jiminy-block",
+		Severity: alert.SeverityHigh,
+		Title:    "Jiminy blocked action",
+		Message:  msg,
 	})
 }
 

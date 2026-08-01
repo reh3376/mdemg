@@ -428,6 +428,13 @@ type Config struct {
 	JiminyEscalationDecayMinutes   int    // JIMINY_ESCALATION_DECAY_MINUTES — reset after inactivity (default: 60)
 	JiminyEscalationPersistEnabled bool   // JIMINY_ESCALATION_PERSIST_ENABLED — persist escalation to Neo4j (default: true)
 	JiminyStrictStatePath          string // JIMINY_STRICT_STATE_PATH — path to strict-mode state file (default: ~/.mdemg/.jiminy-strict-mode)
+	// JIMINY-ENFORCE-001: default-on strict mode. When true and the state file is absent at boot,
+	// StrictModeManager auto-enables for JiminyStrictDefaultSessionID. The operator directive
+	// 2026-08-01 formalized Jiminy as an ENFORCER of hard constraints, not merely advisory.
+	// Ships default false in code (behavior-changing flag pattern per HEBB-ETA-001 rule) and
+	// default true in .env for the mdemg-dev deployment.
+	JiminyStrictDefaultEnabled   bool   // JIMINY_STRICT_DEFAULT_ENABLED (default: false)
+	JiminyStrictDefaultSessionID string // JIMINY_STRICT_DEFAULT_SESSION_ID — session key auto-enabled at boot (default: "claude-core")
 
 	// Jiminy Code Comprehension Feedback Loop
 	JiminyCodeRegenEnabled    bool    // JIMINY_CODE_REGEN_ENABLED — enable code comprehension feedback loop (default: false)
@@ -2998,6 +3005,8 @@ func FromEnv() (Config, error) {
 	}
 	jiminyEscalationPersistEnabled := getBool("JIMINY_ESCALATION_PERSIST_ENABLED", true)
 	jiminyStrictStatePath := get("JIMINY_STRICT_STATE_PATH", "")
+	jiminyStrictDefaultEnabled := getBool("JIMINY_STRICT_DEFAULT_ENABLED", false)
+	jiminyStrictDefaultSessionID := get("JIMINY_STRICT_DEFAULT_SESSION_ID", "claude-core")
 	if jiminyStrictStatePath == "" {
 		home, _ := os.UserHomeDir()
 		if home != "" {
@@ -5849,6 +5858,8 @@ func FromEnv() (Config, error) {
 		JiminyEscalationDecayMinutes:    jiminyEscalationDecayMinutes,
 		JiminyEscalationPersistEnabled:  jiminyEscalationPersistEnabled,
 		JiminyStrictStatePath:           jiminyStrictStatePath,
+		JiminyStrictDefaultEnabled:      jiminyStrictDefaultEnabled,
+		JiminyStrictDefaultSessionID:    jiminyStrictDefaultSessionID,
 		JiminyCodeRegenEnabled:          jiminyCodeRegenEnabled,
 		JiminyCodeRegenThreshold:        jiminyCodeRegenThreshold,
 		JiminyCodeRegenMinSamples:       jiminyCodeRegenMinSamples,
