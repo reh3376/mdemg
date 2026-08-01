@@ -1182,6 +1182,15 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		)
 	}
 
+	// HEBB-ETA-001: record precision-weighted η state at boot.
+	slog.Info("hebb: precision-weighted eta",
+		"enabled", cfg.PrecisionWeightedEtaEnabled,
+		"confidence_alpha", cfg.ConfidenceAlpha,
+		"confidence_beta", cfg.ConfidenceBeta,
+		"confidence_gamma", cfg.ConfidenceGamma,
+		"half_life_sec", cfg.ConfidenceHalfLifeSec,
+	)
+
 	// J17: Hydrate trust scores from Neo4j and start persistence flush loop
 	if jiminySvc != nil {
 		if err := jiminySvc.HydrateTrust(context.Background()); err != nil {

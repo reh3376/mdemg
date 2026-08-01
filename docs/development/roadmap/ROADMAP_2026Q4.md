@@ -58,7 +58,7 @@ CODE-GEN-001) closing the last "0/N of a role type is codified" gap.
   first-party plugins in image + forward env, OR document native-only
   + `/v1/scraper` actionable error). No code work possible without
   the decision.
-- **CONTEXT-LIVE-001** / **HEBB-ETA-001** — stretch-tier research
+- **CONTEXT-LIVE-001** — SHIPPED Q3 (PR #456); **HEBB-ETA-001** — stretch-tier research
   work carried over from Q3; each blocked on a valid prerequisite
   (score-scale contract stability / SURPRISE-TOPK + CoactivateSession
   semantics).
@@ -373,7 +373,7 @@ follow-ups.
 | # | Sprint | Effort | Impact class | One-line justification |
 |---|---|---|---|---|
 | 1 | **PLUGIN-HYGIENE decision** | 1-2d after decision | operational (production-deployability) | Named Q3 deferral, still open — the compose template forwards zero PLUGINS_/SCRAPER_ env vars and Dockerfile.prod ships no plugins dir; plugins + scraper are undeployable in the documented-primary Docker deployment. Needs operator disposition call BEFORE code work (ship first-party plugins in image + forward env, OR document native-only + return actionable `/v1/scraper` error). |
-| 2 | **CONTEXT-LIVE-001** | 5d | stretch (benchmark-parity) | Q3 stretch tier; still valid. Phase-B fingerprint refresh (`RefineWithCoactivations` zero callers; 76,906 nodes on v1 vs v3 queries); version-guard ContextColumn; default server-side fingerprint derivation; QueryClassifier→category dispatch; fix consensus denominator; 120q UVTS A/B gate. |
+| ~~2~~ | ~~**CONTEXT-LIVE-001**~~ | ~~5d~~ | ~~stretch (benchmark-parity)~~ | **SHIPPED Q3 (2026-06-13, PR #456)** — not deferred. Roadmap-doc drift caught by LEVER-C-TIGHTEN-001's "verify pins against live state" rule. Post: `docs/development/context-live-001/post.md`; recorded follow-ups (symbol bits in catalogs, service_relationships classifier vocab, lnl-demo-whk catalog) are design deviations in other scopes, not gaps. |
 | 3 | **FT-RECURSIVE-004 → FT-RECURSIVE-005** integration expansion | ~4d | direct (feed the recursive-retrain loop) | The FT-RECURSIVE-004 base already ships; the natural next step is broadening the drift-triggered retrain to more benchmark task groups + surface a promotion dashboard tile. Concrete follow-up from DRIFT-TRIGGER-001's disclosed sprint list. |
 | 4 | **HITL-CURATION-003** — extension paths | ~2-3d | direct (corpus quality lever) | HITL-CURATION-002 shipped the auto-grading substrate; capacity for next-step curation datasets (guardrail rows already gold-labeled 59+, correction bridge drafts, contradicted-drafts) is now the operator's most-effective corpus quality lever. |
 | 5 | **HEBB-ETA-001** (idea 02) | 5d | research (PC-ladder gateway) | Q3 stretch; sequencing behind SURPRISE-TOPK-001 + CoactivateSession semantics fix (both shipped Q3). Precision-weighted Hebbian η behind a flag; unlocks unreachable CONTRASTS_WITH/COMPOSES_WITH. |
@@ -402,7 +402,7 @@ some and left others deferred with unchanged rationale.
 
 **Still explicitly deferred with unchanged rationale**:
 - **PLUGIN-HYGIENE** — waiting on operator disposition
-- **CONTEXT-LIVE-001**, **HEBB-ETA-001** — stretch tier; prerequisites
+- **CONTEXT-LIVE-001** — SHIPPED Q3 (PR #456; roadmap-doc drift closed 2026-08-01); **HEBB-ETA-001** — stretch tier; prerequisites
   now met (score-scale stable; SURPRISE-TOPK + CoactivateSession
   shipped), so both are genuinely next-quarter-shippable
 - **STRICT-SCOPE** — trigger not yet fired

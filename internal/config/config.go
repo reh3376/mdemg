@@ -1027,6 +1027,19 @@ type Config struct {
 	LearningScheduleWarmMult         float64 // LEARNING_SCHEDULE_WARM_MULT — eta multiplier for warm spaces (10k-50k edges) (default: 0.5)
 	LearningScheduleSatMult          float64 // LEARNING_SCHEDULE_SAT_MULT — eta multiplier for saturated spaces (50k+ edges) (default: 0.25)
 
+	// HEBB-ETA-001 — precision-weighted Hebbian η (predictive-coding B1). Behavior-changing.
+	// When enabled, per-node ActivationConfidence [0.05, 1.0] modulates the learning rate:
+	//   eta_effective = eta * confidence_a * confidence_b (multiplied AFTER existing etaMult)
+	// Ships DEFAULT-OFF for a safe substrate change; flag-flip requires an A/B verdict.
+	// Backfill nodes with `mdemg confidence backfill --space-id` BEFORE enabling — nodes
+	// without a stored confidence read 0.5 via COALESCE, which would 4x-shrink η for
+	// every un-backfilled node pair.
+	PrecisionWeightedEtaEnabled bool    // PRECISION_WEIGHTED_ETA_ENABLED — flag the new update rule (default: false)
+	ConfidenceAlpha             float64 // CONFIDENCE_ALPHA — reinforcement-count weight in confidence sigmoid (default: 1.0)
+	ConfidenceBeta              float64 // CONFIDENCE_BETA — recency weight (default: 0.5)
+	ConfidenceGamma             float64 // CONFIDENCE_GAMMA — surprise-variance penalty (default: 0.3)
+	ConfidenceHalfLifeSec       float64 // CONFIDENCE_HALF_LIFE_SEC — recency decay half-life in seconds (default: 604800 = 1 week)
+
 	// ===== ANN Optimization: Retrieval Subsystem =====
 	ScoringActivationFloor   float64 // SCORING_ACTIVATION_FLOOR — floor for squared activation (default: 0.05)
 	ScoringActivationSquared bool    // SCORING_ACTIVATION_SQUARED — enable squared activation for sparser signals (default: true)
@@ -4398,6 +4411,25 @@ func FromEnv() (Config, error) {
 		return Config{}, err
 	}
 
+	// HEBB-ETA-001 — precision-weighted η
+	precisionWeightedEtaEnabled := getBool("PRECISION_WEIGHTED_ETA_ENABLED", false)
+	confidenceAlpha, err := atof("CONFIDENCE_ALPHA", 1.0)
+	if err != nil {
+		return Config{}, err
+	}
+	confidenceBeta, err := atof("CONFIDENCE_BETA", 0.5)
+	if err != nil {
+		return Config{}, err
+	}
+	confidenceGamma, err := atof("CONFIDENCE_GAMMA", 0.3)
+	if err != nil {
+		return Config{}, err
+	}
+	confidenceHalfLifeSec, err := atof("CONFIDENCE_HALF_LIFE_SEC", 604800)
+	if err != nil {
+		return Config{}, err
+	}
+
 	// ===== ANN Optimization: Retrieval Subsystem =====
 	scoringActivationFloor, err := atof("SCORING_ACTIVATION_FLOOR", 0.05)
 	if err != nil {
@@ -6227,6 +6259,13 @@ func FromEnv() (Config, error) {
 		LearningScheduleLearningMult:     learningScheduleLearningMult,
 		LearningScheduleWarmMult:         learningScheduleWarmMult,
 		LearningScheduleSatMult:          learningScheduleSatMult,
+
+		// HEBB-ETA-001
+		PrecisionWeightedEtaEnabled: precisionWeightedEtaEnabled,
+		ConfidenceAlpha:             confidenceAlpha,
+		ConfidenceBeta:              confidenceBeta,
+		ConfidenceGamma:             confidenceGamma,
+		ConfidenceHalfLifeSec:       confidenceHalfLifeSec,
 
 		// ANN Optimization: Retrieval
 		ScoringActivationFloor:   scoringActivationFloor,

@@ -409,6 +409,9 @@ func (s *Service) ApplyCoactivation(ctx context.Context, spaceID string, resp mo
 		"etaSameDirMult": s.cfg.LearningEtaSameDirMult,
 		"fwdDir":         fwdDir,
 		"revDir":         revDir,
+		// HEBB-ETA-001: flag-guarded precision-weighted η. When false, precisionMult
+		// resolves to 1.0 in Cypher (byte-identical behavior to pre-sprint update).
+		"precisionEta": s.cfg.PrecisionWeightedEtaEnabled,
 	}
 
 	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
@@ -473,14 +476,23 @@ ON MATCH SET r.updated_at=datetime(), r.last_activated_at=datetime(),
              r.direction=CASE WHEN r.direction IS NULL THEN $fwdDir ELSE r.direction END
 WITH a,b,prod,pathSim,initialWeight,surpriseFactor,sessionA,sessionB,obsTypeA,obsTypeB,r,etaMult
 WITH a,b,prod,pathSim,initialWeight,surpriseFactor,sessionA,sessionB,obsTypeA,obsTypeB,r,etaMult,
-     coalesce(r.weight,initialWeight) AS w
+     coalesce(r.weight,initialWeight) AS w,
+     // HEBB-ETA-001: precision-weighted multiplier — 1.0 when flag off, else c_a*c_b clamped to [0.05,1.0]
+     // Un-backfilled nodes default confidence 0.5 via coalesce — an ADDITIVE-safe fallback.
+     CASE WHEN $precisionEta
+          THEN coalesce(a.activation_confidence, 0.5) * coalesce(b.activation_confidence, 0.5)
+          ELSE 1.0
+     END AS precisionMult
 // Apply Hebbian weight update with tanh soft-cap and multi-rate eta
-WITH a,b,prod,pathSim,initialWeight,surpriseFactor,sessionA,sessionB,obsTypeA,obsTypeB,r,etaMult,w,
-     ((1-$mu)*w + $eta*etaMult*prod) AS rawW
+WITH a,b,prod,pathSim,initialWeight,surpriseFactor,sessionA,sessionB,obsTypeA,obsTypeB,r,etaMult,w,precisionMult,
+     ($eta*etaMult*precisionMult) AS etaEff,
+     ((1-$mu)*w + $eta*etaMult*precisionMult*prod) AS rawW
 SET r.weight = CASE
   WHEN rawW < $wmin THEN $wmin
   ELSE $wmax * ((exp(2.0 * rawW / $wmax) - 1.0) / (exp(2.0 * rawW / $wmax) + 1.0))
-END
+END,
+r.eta_effective_pc = CASE WHEN $precisionEta THEN etaEff ELSE null END,
+r.precision_mult = CASE WHEN $precisionEta THEN precisionMult ELSE null END
 // reverse edge (symmetry): mirrors forward edge weight
 MERGE (b)-[rr:CO_ACTIVATED_WITH {space_id:$spaceId}]->(a)
 ON CREATE SET rr.edge_id=randomUUID(), rr.created_at=datetime(), rr.updated_at=datetime(),
@@ -500,7 +512,7 @@ RETURN
   r.weight AS new_weight,
   (r.weight - w) AS delta_weight,
   r.evidence_count AS evidence_count_after,
-  ($eta * etaMult) AS eta_effective,
+  etaEff AS eta_effective,
   surpriseFactor AS surprise_factor,
   prod AS activation_product,
   pathSim AS path_sim,
@@ -790,6 +802,8 @@ func (s *Service) CoactivateSession(ctx context.Context, spaceID, sessionID, new
 		"mu":        mu,
 		"wmin":      wmin,
 		"wmax":      wmax,
+		// HEBB-ETA-001
+		"precisionEta": s.cfg.PrecisionWeightedEtaEnabled,
 	}
 
 	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
@@ -857,14 +871,24 @@ ON MATCH SET r.updated_at=datetime(), r.last_activated_at=datetime(),
 // Calculate new weight with temporal proximity factor
 WITH a, b, r, activation, temporalProximity, surpriseFactor, initialWeight,
      coalesce(r.weight, initialWeight) AS w,
-     activation * activation AS prod
+     activation * activation AS prod,
+     // HEBB-ETA-001: precision-weighted multiplier — 1.0 when flag off (byte-identical),
+     // else c_a*c_b (missing confidences fall back to 0.5 via coalesce).
+     CASE WHEN $precisionEta
+          THEN coalesce(a.activation_confidence, 0.5) * coalesce(b.activation_confidence, 0.5)
+          ELSE 1.0
+     END AS precisionMult
 
 // Apply Hebbian update with temporal weighting
+WITH a, b, r, activation, temporalProximity, surpriseFactor, initialWeight, w, prod, precisionMult,
+     ($eta*precisionMult) AS etaEff
 SET r.weight = CASE
-  WHEN ((1-$mu)*w + $eta*prod) < $wmin THEN $wmin
-  WHEN ((1-$mu)*w + $eta*prod) > $wmax THEN $wmax
-  ELSE ((1-$mu)*w + $eta*prod)
-END
+  WHEN ((1-$mu)*w + etaEff*prod) < $wmin THEN $wmin
+  WHEN ((1-$mu)*w + etaEff*prod) > $wmax THEN $wmax
+  ELSE ((1-$mu)*w + etaEff*prod)
+END,
+r.eta_effective_pc = CASE WHEN $precisionEta THEN etaEff ELSE null END,
+r.precision_mult = CASE WHEN $precisionEta THEN precisionMult ELSE null END
 
 // Create reverse edge (symmetry)
 MERGE (b)-[rr:CO_ACTIVATED_WITH {space_id: $spaceId}]->(a)
@@ -886,7 +910,7 @@ RETURN
   r.weight AS new_weight,
   (r.weight - w) AS delta_weight,
   r.evidence_count AS evidence_count_after,
-  $eta AS eta_effective,
+  etaEff AS eta_effective,
   surpriseFactor AS surprise_factor,
   prod AS activation_product,
   null AS path_sim,
