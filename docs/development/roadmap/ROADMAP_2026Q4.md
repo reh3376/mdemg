@@ -433,6 +433,22 @@ some and left others deferred with unchanged rationale.
 New sprints surfaced by Q4 execution itself; will be recategorized
 in the Q5/2026 roadmap. All small (≤2d).
 
+- **DASHBOARD-METRICS-DEEP-DIVE-001** (operator-flagged 2026-08-01,
+  multi-agent investigation) — two operator-observed metric problems:
+  (1) `mdemg-j17` Protocol panels **Min Trust score + Max Trust
+  score both showing "N/A"**; (2) `mdemg-jiminy` panels **Guidance
+  Health, Follow Rate, Constraint Eff., Actionable Constraints,
+  Auto-Compact Avg all reading much lower than effective**. Both
+  clusters need class-by-class disposition: MEASUREMENT ARTIFACT
+  (dashboard bug / stale calculation / sample-floor issue —
+  DASHBOARD-TRUTH-001/002-shape) vs REAL LOW (genuine substrate
+  quality issue — JIMINY-CORPUS/ACTIONABILITY-shape). Multi-agent
+  deep dive → per-metric classification → sprint plan.
+  **Recall the pattern**: DASHBOARD-TRUTH-001 shipped 2026-07-03
+  found 6/8 alarming metrics were artifacts; DASHBOARD-TRUTH-002
+  shipped 2026-07-20 found 9/14 were artifacts. Same triage
+  discipline here. Sprint dir (post-investigation): TBD.
+
 - **GO-IMPLEMENTS-002** — audit the 267→188 emitted-vs-landed gap
   (79 pairs' symbols aren't in the SymbolNode graph); disposition:
   document + accept, or widen ingest
