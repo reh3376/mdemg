@@ -1063,7 +1063,7 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		guardrailValidator:      guardrailVal,
 		guardrailProducerSem:    make(chan struct{}, max(1, cfg.GuardrailProducerMaxConcurrent)),
 		jiminySvc:               jiminySvc,
-		warmStore:               jiminy.NewWarmStore(),
+		warmStore:               jiminy.NewWarmStoreWithPersistence(cfg.JiminyWarmPersistDir),
 		metaLearnSvc:            metaLearnSvc,
 		signalLearner:           signalLearner,
 		untsRegistry:            untsReg,

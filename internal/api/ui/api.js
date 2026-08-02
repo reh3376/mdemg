@@ -142,3 +142,7 @@ export const adminInstances = () => fetch('/v1/admin/instances').then(r => {
     if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
     return r.json();
 });
+
+// JIMINY-MODE-001 — read/write Jiminy enforcement mode
+export const jiminyStrictGet = (sessionID) => get(`/v1/jiminy/strict?session_id=${encodeURIComponent(sessionID)}`);
+export const jiminyStrictSet = (sessionID, enabled) => post('/v1/jiminy/strict', { session_id: sessionID, enabled });

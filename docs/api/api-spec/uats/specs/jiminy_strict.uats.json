@@ -14,7 +14,7 @@
   "metadata": {
     "author": "reh3376",
     "created": "2026-06-11",
-    "description": "Validates POST /v1/jiminy/strict (deterministic governance toggle, /strict mode). Uses a dedicated session_id so the contract test never flips strict mode for real agent sessions; the base case enables and the restore_disabled variant turns it back off, leaving no state behind. Disabled-path contract (503 {error: 'jiminy guidance is not enabled'} when JIMINY_ENABLED=false) is documented as a skip variant \u2014 the live stack runs with Jiminy enabled.",
+    "description": "Validates POST /v1/jiminy/strict (deterministic governance toggle, /strict mode) and GET /v1/jiminy/strict (mode-read endpoint added by JIMINY-MODE-001, 2026-08-02). Uses a dedicated session_id so the contract test never flips strict mode for real agent sessions; the base case enables and the restore_disabled variant turns it back off, leaving no state behind. Disabled-path contract (503 {error: 'jiminy guidance is not enabled'} when JIMINY_ENABLED=false) is documented as a skip variant \u2014 the live stack runs with Jiminy enabled.",
     "test_type": "contract",
     "priority": "high"
   },
@@ -23,7 +23,7 @@
     "tags": [
       "jiminy"
     ],
-    "sha256": "fd2f9922a33f00c955cf2b85ec16eba103714331563b7108c35c9c8261817b1b"
+    "sha256": "dc4fab267f938eb91bde4b81d35b04bc3f5fe546f99d633d0cf3584fce3ccdfe"
   },
   "request": {
     "method": "POST",
@@ -107,10 +107,38 @@
       }
     },
     {
-      "name": "method_guard_get",
-      "description": "GET is rejected with 405.",
+      "name": "get_read_mode",
+      "description": "GET /v1/jiminy/strict (JIMINY-MODE-001, 2026-08-02) \u2014 reads current mode for a session. Was 405 pre-JIMINY-MODE-001; now returns 200 with {mode, strict, session_id, boot_default, default_session}.",
       "request": {
         "method": "GET",
+        "path": "/v1/jiminy/strict?session_id=uats-contract-strict"
+      },
+      "expected": {
+        "status": 200,
+        "body_assertions": [
+          {
+            "path": "$.data.session_id",
+            "op": "equals",
+            "expected": "uats-contract-strict"
+          },
+          {
+            "path": "$.data.mode",
+            "op": "type_is",
+            "expected": "string"
+          },
+          {
+            "path": "$.data.strict",
+            "op": "type_is",
+            "expected": "boolean"
+          }
+        ]
+      }
+    },
+    {
+      "name": "method_guard_put",
+      "description": "PUT (and DELETE/PATCH) remain rejected with 405 \u2014 only GET + POST are contracted.",
+      "request": {
+        "method": "PUT",
         "path": "/v1/jiminy/strict"
       },
       "expected": {

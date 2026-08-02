@@ -548,6 +548,13 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 				// (was hardcoded 0.30 which flapped chronically on healthy substrate).
 				rules = append(rules, alert.JiminyFollowRateRules(
 					cfg.JiminyFollowRateAlertFloor)...)
+				// JIMINY-TRACKER-TTL-001 (2026-08-02): symptom-monitor for the
+				// dropped-feedback class (guidance_id expired from in-memory
+				// tracker before feedback POST arrived). Post-fix (disk-persist
+				// warm store) drops should ~0; a non-zero rate is a real
+				// regression signal for the arc.
+				rules = append(rules, alert.JiminyFeedbackDropRules(
+					cfg.JiminyFeedbackDropThreshold, cfg.JiminyFeedbackDropLookbackMin)...)
 			// TSDB-CONSUME-001: buffered-writer flush failures (a wedged
 			// writer used to drop rows in silence).
 			rules = append(rules, alert.TSDBWriterRules(

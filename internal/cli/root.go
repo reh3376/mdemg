@@ -172,6 +172,11 @@ Use "mdemg <command> --help" for more information about a command.`,
 	confidenceCmd.GroupID = "memory"
 	rootCmd.AddCommand(confidenceCmd)
 
+	// JIMINY-MODE-001: `mdemg jiminy mode <strict|suggest>`
+	jiminyCmd := newJiminyCmd()
+	jiminyCmd.GroupID = "memory"
+	rootCmd.AddCommand(jiminyCmd)
+
 	// Configuration
 	configCmd := newConfigCmd()
 	configCmd.GroupID = "config"
