@@ -354,8 +354,9 @@ type Config struct {
 	JiminySignalStrengthWeight float64 // JIMINY_SIGNAL_STRENGTH_WEIGHT (default: 0.2; 0 = off)
 
 	// Jiminy Warm Store (event-driven pre-computation)
-	JiminyWarmEnabled     bool // JIMINY_WARM_ENABLED — enable warm store for pre-computed guidance (default: true)
-	JiminyWarmDebounceSec int  // JIMINY_WARM_DEBOUNCE_SEC — min seconds between warm computations (default: 10)
+	JiminyWarmEnabled     bool   // JIMINY_WARM_ENABLED — enable warm store for pre-computed guidance (default: true)
+	JiminyWarmDebounceSec int    // JIMINY_WARM_DEBOUNCE_SEC — min seconds between warm computations (default: 10)
+	JiminyWarmPersistDir  string // JIMINY_WARM_PERSIST_DIR — disk directory for warm-store persistence (JIMINY-TRACKER-TTL-001; default: ~/.mdemg/warm-store; empty disables persistence)
 	// GUIDANCE-SYNTH-001 — timeout for the Guide() compute on the warm path AND
 	// the synchronous /v1/jiminy/guide handler. Was a hardcoded 30s (in both
 	// handlers) that starved synthesis (per-node classifier ~15s + synthesis
@@ -1245,6 +1246,8 @@ type Config struct {
 	// constraint/correction types) — excludes correctly-ignored advisory items.
 	GuidanceShouldFollowRateFloor     float64 // GUIDANCE_SHOULD_FOLLOW_RATE_FLOOR — alert when actionable-compliance rate drops below this (default: 0.05 — must sit BELOW the ~0.10-0.14 by-design steady state so only genuine collapse fires; was 0.5 pre-JIMINY-ACTIONABILITY-INVERSION-001 verdict; 0 disables the rule)
 	JiminyFollowRateAlertFloor        float64 // JIMINY_FOLLOW_RATE_ALERT_FLOOR — alert when the raw `mdemg_jiminy_follow_rate` gauge drops below this (default: 0.15 — post-JIMINY-CORPUS-001 raw steady state ~0.30; 0.15 sits below so only genuine collapse fires; was hardcoded 0.30 which flapped on healthy substrate — HEBB-ETA-001 live-caught. 0 disables the rule)
+	JiminyFeedbackDropThreshold       int     // JIMINY_FEEDBACK_DROP_THRESHOLD — alert when dropped feedbacks over the lookback exceed this (default: 20 — post-JIMINY-TRACKER-TTL-001 fix drops should be ~0; a non-zero drop rate is a real regression signal). 0 disables.
+	JiminyFeedbackDropLookbackMin     int     // JIMINY_FEEDBACK_DROP_LOOKBACK_MIN — window for the drop counter (default: 60 min)
 	GuidanceShouldFollowLookbackHours int     // GUIDANCE_SHOULD_FOLLOW_LOOKBACK_HOURS — window for the should-follow rate (default: 168 = 7d, floor: 1)
 
 	// HITL-REVIEW-001 — general-purpose human-in-the-loop review + live-reinforcement platform.
@@ -2846,6 +2849,12 @@ func FromEnv() (Config, error) {
 
 	// Jiminy Warm Store (event-driven pre-computation)
 	jiminyWarmEnabled := getBool("JIMINY_WARM_ENABLED", true)
+	jiminyWarmPersistDir := get("JIMINY_WARM_PERSIST_DIR", "")
+	if jiminyWarmPersistDir == "" {
+		if home, hErr := os.UserHomeDir(); hErr == nil && home != "" {
+			jiminyWarmPersistDir = home + "/.mdemg/warm-store"
+		}
+	}
 	jiminyWarmComputeTimeoutMs, err := atoi("JIMINY_WARM_COMPUTE_TIMEOUT_MS", DefaultJiminyWarmComputeTimeoutMs)
 	if err != nil {
 		return Config{}, err
@@ -3756,6 +3765,14 @@ func FromEnv() (Config, error) {
 		return Config{}, err
 	}
 	jiminyFollowRateAlertFloor, err := atof("JIMINY_FOLLOW_RATE_ALERT_FLOOR", 0.15)
+	if err != nil {
+		return Config{}, err
+	}
+	jiminyFeedbackDropThreshold, err := atoi("JIMINY_FEEDBACK_DROP_THRESHOLD", 20)
+	if err != nil {
+		return Config{}, err
+	}
+	jiminyFeedbackDropLookbackMin, err := atoi("JIMINY_FEEDBACK_DROP_LOOKBACK_MIN", 60)
 	if err != nil {
 		return Config{}, err
 	}
@@ -5808,6 +5825,7 @@ func FromEnv() (Config, error) {
 		JiminyFrontierMinSim:                      jiminyFrontierMinSim,
 		JiminyEffectivenessTTLSec:                 jiminyEffectivenessTTLSec,
 		JiminyWarmEnabled:                         jiminyWarmEnabled,
+		JiminyWarmPersistDir:                      jiminyWarmPersistDir,
 		JiminyWarmDebounceSec:                     jiminyWarmDebounceSec,
 		JiminyWarmComputeTimeoutMs:                jiminyWarmComputeTimeoutMs,
 		JiminyReformulateTimeoutMs:                jiminyReformulateTimeoutMs,
@@ -6106,6 +6124,8 @@ func FromEnv() (Config, error) {
 		GuidanceAuditInitialDelaySec:                   guidanceAuditInitialDelaySec,
 		GuidanceShouldFollowRateFloor:                  guidanceShouldFollowRateFloor,
 		JiminyFollowRateAlertFloor:                     jiminyFollowRateAlertFloor,
+		JiminyFeedbackDropThreshold:                    jiminyFeedbackDropThreshold,
+		JiminyFeedbackDropLookbackMin:                  jiminyFeedbackDropLookbackMin,
 		GuidanceShouldFollowLookbackHours:              guidanceShouldFollowLookbackHours,
 		ReviewEnabled:                                  reviewEnabled,
 		ReviewWriterFlushIntervalSec:                   reviewWriterFlushIntervalSec,

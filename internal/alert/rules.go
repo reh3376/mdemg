@@ -38,6 +38,41 @@ type AlertRule struct {
 //     which was a perpetual zero (the neo4j driver has no pool-stats API;
 //     the "pool" gauges were a VerifyConnectivity probe in disguise). The
 //     rule could never fire. Neo4j liveness is the health prober's job.
+// JiminyFeedbackDropRules alerts when the rate of dropped feedbacks (guidance_id
+// expired from the in-memory tracker before the feedback POST arrived) exceeds
+// the threshold over the lookback window. Ships as a symptom-monitor for the
+// JIMINY-TRACKER-TTL-001 fix — post-fix (disk-persist warm store hydrated on
+// boot) drops should approach 0. Sustained non-zero drops indicate either:
+// (a) warm store persistence isn't being written (hydrate WARN in boot log),
+// (b) hook-side .jiminy-guidance-state is pointing at guidance beyond both
+//     the tracker TTL and warm store persistence window, or
+// (c) restart storm exceeds the warmStore's per-space hydrate coverage.
+//
+// The RSIC ape.reflect + operator alerts stream would otherwise silently
+// bleed outcome signal indefinitely.
+func JiminyFeedbackDropRules(threshold int, lookbackMin int) []AlertRule {
+	if threshold <= 0 || lookbackMin <= 0 {
+		return nil
+	}
+	return []AlertRule{
+		{
+			ID:          "jiminy_feedback_dropped",
+			Title:       "Jiminy Feedback Dropped — guidance_id expired from tracker",
+			Service:     "jiminy-feedback-drop",
+			Severity:    SeverityMedium,
+			Interval:    5 * time.Minute,
+			ForDuration: 15 * time.Minute,
+			QuerySQL: fmt.Sprintf(`SELECT COALESCE(SUM(value), 0) AS drops FROM metric_samples
+				WHERE metric_name = 'mdemg_jiminy_feedback_dropped_total'
+				  AND metric_type = 'counter'
+				  AND time > now() - interval '%d minutes'`, lookbackMin),
+			Threshold: float64(threshold),
+			Operator:  "gt",
+			Enabled:   true,
+		},
+	}
+}
+
 // JiminyFollowRateRules returns the raw follow-rate alert (moved out of DefaultRules by
 // FOLLOW-RATE-CALIBRATE-001 to accept a config-driven floor). The default 0.30 was hardcoded
 // from before JIMINY-CORPUS-001 established the honest ~0.30 steady state, causing the rule
