@@ -14,6 +14,24 @@ import (
 	"mdemg/internal/metrics"
 )
 
+// resolveJiminySessionID normalises the (session_id, space_id) → effective
+// session_id resolution across Jiminy paths (ESCALATION-ACCUMULATE-001 Defect 2
+// mitigation). Both /v1/jiminy/warm and /v1/jiminy/feedback MUST use this so
+// the escalation tracker's escalationKey{SessionID, NodeID} composite key
+// matches between surface-time and outcome-time. Previously the two handlers
+// had asymmetric fallbacks (warm kept empty; feedback fell back to space_id),
+// so an empty session_id from one hook + non-empty from the other could
+// silently produce a key mismatch — surface state under "" and outcome fired
+// against space_id, or vice versa. Now: explicit session_id wins; else fall
+// back to space_id (same rule for both paths); empty result is impossible if
+// space_id is validated at the edge (which every handler does).
+func resolveJiminySessionID(sessionID, spaceID string) string {
+	if sessionID != "" {
+		return sessionID
+	}
+	return spaceID
+}
+
 // handleJiminyHealthz handles GET /v1/jiminy/healthz
 // Lightweight liveness check for the Jiminy guidance subsystem.
 func (s *Server) handleJiminyHealthz(w http.ResponseWriter, r *http.Request) {
@@ -316,6 +334,11 @@ func (s *Server) handleJiminyWarm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// ESCALATION-ACCUMULATE-001 Defect 2 mitigation: normalise session_id via the
+	// shared helper so warm + feedback resolve identically and the escalation
+	// tracker's composite key matches across surface-time and outcome-time.
+	effectiveSessionID := resolveJiminySessionID(req.SessionID, req.SpaceID)
+
 	// Fire-and-forget: run Guide() in background goroutine.
 	// GUIDANCE-SYNTH-001: timeout is config-driven (was a hardcoded 30s that
 	// starved synthesis — per-node classifier + synthesis exceeded 30s).
@@ -323,13 +346,13 @@ func (s *Server) handleJiminyWarm(w http.ResponseWriter, r *http.Request) {
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), warmComputeTimeout)
 		defer cancel()
-		ctx = llmclient.WithSessionID(ctx, req.SessionID)
+		ctx = llmclient.WithSessionID(ctx, effectiveSessionID)
 
 		start := time.Now()
 		resp, err := s.jiminySvc.Guide(ctx, jiminy.GuidanceRequest{
 			SpaceID:   req.SpaceID,
 			Context:   req.ContextHint,
-			SessionID: req.SessionID,
+			SessionID: effectiveSessionID,
 		})
 		computeMs := time.Since(start).Milliseconds()
 

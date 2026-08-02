@@ -357,6 +357,96 @@ func TestEscalationTracker_DecayReset(t *testing.T) {
 	}
 }
 
+// ESCALATION-ACCUMULATE-001 Defect 3 fix: decay resets LEVEL only, preserves IgnoreCount.
+// Regression pin — pre-fix, the decay branch also wiped IgnoreCount to 0, making WARNED
+// unreachable in low-cadence sessions (100% of J12EscalationState rows sat at 0 on
+// mdemg-dev). New behavior: IgnoreCount survives; after a re-surface + one more ignore,
+// the counter continues past the pre-decay value.
+func TestEscalationTracker_DecayPreservesIgnoreCount(t *testing.T) {
+	cfg := config.Config{
+		JiminyEscalationEnabled:       true,
+		JiminyEscalationWarnAfter:     2,
+		JiminyEscalationEscalateAfter: 4,
+		JiminyEscalationBlockAfter:    6,
+		JiminyEscalationDecayMinutes:  60,
+	}
+	et := NewEscalationTracker(cfg)
+	et.decayDuration = 1 * time.Millisecond
+
+	et.RecordSurface("s1", "c1")
+	et.RecordOutcome("s1", "c1", OutcomeIgnored) // count=1
+	time.Sleep(5 * time.Millisecond)              // trigger decay on next surface
+
+	level := et.RecordSurface("s1", "c1")
+	if level != EscalationSurfaced {
+		t.Fatalf("post-decay surface must reset LEVEL to Surfaced, got %s", level)
+	}
+
+	// The load-bearing assertion: IgnoreCount survived the decay.
+	// One more ignore should land at count=2 → WARNED (warnAfter=2), not count=1.
+	level = et.RecordOutcome("s1", "c1", OutcomeIgnored)
+	if level != EscalationWarned {
+		t.Errorf("IgnoreCount must survive decay: expected WARNED after decay+resurface+ignore (count 1→2), got %s (pre-fix would return SURFACED because count reset to 0→1)", level)
+	}
+}
+
+// ESCALATION-ACCUMULATE-001 Defect 1 fix: RecordOutcome on missing key CREATES state
+// instead of silent-drop. The outcome is authoritative evidence the constraint was
+// live for the classifier. Pre-fix: 100% of outcomes on server-restart-lost keys
+// silently dropped, producing 0 WARNED escalations from 2,177 outcomes/7d on mdemg-dev.
+func TestEscalationTracker_RecordOutcomeCreatesMissingKey(t *testing.T) {
+	cfg := config.Config{
+		JiminyEscalationEnabled:       true,
+		JiminyEscalationWarnAfter:     2,
+		JiminyEscalationEscalateAfter: 4,
+		JiminyEscalationBlockAfter:    6,
+	}
+	et := NewEscalationTracker(cfg)
+
+	// No prior RecordSurface — the (session, node) key does not exist.
+	level := et.RecordOutcome("s1", "c-never-surfaced", OutcomeIgnored)
+	// Pre-fix would return EscalationInactive; post-fix state is created + incremented.
+	if level != EscalationSurfaced {
+		t.Errorf("first outcome on missing key must create state at count=1 (level=Surfaced), got %s", level)
+	}
+
+	// Second outcome on same key crosses warnAfter=2 → WARNED.
+	level = et.RecordOutcome("s1", "c-never-surfaced", OutcomeIgnored)
+	if level != EscalationWarned {
+		t.Errorf("second outcome on the same (session, node) must reach WARNED, got %s", level)
+	}
+
+	// A followed outcome after WARNED resolves the constraint.
+	level = et.RecordOutcome("s1", "c-never-surfaced", OutcomeFollowed)
+	if level != EscalationResolved {
+		t.Errorf("followed outcome must resolve, got %s", level)
+	}
+}
+
+// ESCALATION-ACCUMULATE-001 Defect 4 fix: onDirty fires on EVERY surface, not just
+// new-key/decay-reset. Regression pin — pre-fix, repeat surfaces of the same node
+// didn't mark the session dirty, leaving persisted state hours stale.
+func TestEscalationTracker_RepeatSurfaceMarksDirty(t *testing.T) {
+	cfg := config.Config{JiminyEscalationEnabled: true, JiminyEscalationDecayMinutes: 60}
+	et := NewEscalationTracker(cfg)
+
+	dirtyCount := 0
+	et.SetOnDirty(func(sessionID string) { dirtyCount++ })
+
+	et.RecordSurface("s1", "c1") // new key
+	if dirtyCount != 1 {
+		t.Fatalf("new key must fire onDirty once, got %d", dirtyCount)
+	}
+	et.RecordSurface("s1", "c1") // repeat — must ALSO fire dirty (defect 4 fix)
+	if dirtyCount != 2 {
+		t.Errorf("repeat surface must also fire onDirty (defect 4 fix); count %d", dirtyCount)
+	}
+	et.RecordSurface("s1", "c1") // third
+	if dirtyCount != 3 {
+		t.Errorf("every surface fires dirty; got %d", dirtyCount)
+	}
+}
+
 func TestApplyEscalation_Warned(t *testing.T) {
 	item := GuidanceItem{
 		Type:     GuidanceConstraint,
