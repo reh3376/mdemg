@@ -1671,7 +1671,13 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 		}, nil
 	}
 
-	// J17: Resolve session ID for trust scoring — prefer explicit SessionID, fall back to SpaceID
+	// J17 + ESCALATION-ACCUMULATE-001 Defect 2: same fallback shape as
+	// resolveJiminySessionID() in internal/api/handlers_jiminy.go — both paths
+	// MUST resolve identically or the escalation tracker's escalationKey{S,N}
+	// composite key silently mismatches between surface-time (warm) and
+	// outcome-time (feedback) → RecordOutcome operates on keys that were never
+	// RecordSurface'd. The Defect 1 fix (RecordOutcome creates state on-demand)
+	// covers restart-lost keys; this Defect 2 fix covers session_id drift.
 	feedbackSessionID := req.SessionID
 	if feedbackSessionID == "" {
 		feedbackSessionID = req.SpaceID

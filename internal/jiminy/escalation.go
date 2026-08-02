@@ -90,23 +90,37 @@ func (et *EscalationTracker) RecordSurface(sessionID, nodeID string) EscalationL
 		return EscalationSurfaced
 	}
 
-	// Check decay
+	// ESCALATION-ACCUMULATE-001 Defect 3 fix: decay resets LEVEL to Surfaced but
+	// PRESERVES IgnoreCount. Accumulation across normal activity gaps is the whole
+	// point of the counter; wiping it on decay made WARNED unreachable in low-
+	// cadence sessions (100% of J12EscalationState rows sat at ignore_count=0
+	// pre-fix). Operator can still see the "constraint went quiet" signal via the
+	// level demoting; the accumulator survives.
 	if time.Since(state.LastSurfaced) > et.decayDuration {
-		// Reset �� constraint hasn't been relevant for a while
 		state.Level = EscalationSurfaced
-		state.IgnoreCount = 0
-		state.LastSurfaced = time.Now()
-		if et.onDirty != nil {
-			et.onDirty(sessionID)
-		}
-		return EscalationSurfaced
 	}
 
 	state.LastSurfaced = time.Now()
+	// ESCALATION-ACCUMULATE-001 Defect 4 fix: mark dirty on EVERY surface (not
+	// just new-key or decay-reset). Persistence liveness matters more than the
+	// tiny per-surface cost — pre-fix the persisted state lagged in-memory by
+	// hours whenever the same nodes kept re-surfacing.
+	if et.onDirty != nil {
+		et.onDirty(sessionID)
+	}
 	return state.Level
 }
 
 // RecordOutcome advances the escalation state machine based on guidance outcome.
+//
+// ESCALATION-ACCUMULATE-001 (Defect 1 fix): if the (session, node) key has no
+// prior state, CREATE one on-demand instead of returning EscalationInactive.
+// The outcome is authoritative evidence that the constraint was live for the
+// classifier — requiring a preceding RecordSurface introduces a temporal-order
+// fragility (surface-before-outcome, no restart between) that the shipped
+// architecture can't honor. Pre-fix behavior silently dropped every outcome
+// on a not-in-map key, causing 100% of J12EscalationState rows on mdemg-dev
+// to sit at level=surfaced ignore_count=0 despite 2,177 outcomes/7d.
 func (et *EscalationTracker) RecordOutcome(sessionID, nodeID string, outcome GuidanceOutcome) EscalationLevel {
 	et.mu.Lock()
 	defer et.mu.Unlock()
@@ -114,7 +128,14 @@ func (et *EscalationTracker) RecordOutcome(sessionID, nodeID string, outcome Gui
 	key := escalationKey{SessionID: sessionID, NodeID: nodeID}
 	state, ok := et.states[key]
 	if !ok {
-		return EscalationInactive
+		state = &escalationState{
+			Level:        EscalationSurfaced,
+			LastSurfaced: time.Now(),
+		}
+		et.states[key] = state
+		if et.onDirty != nil {
+			et.onDirty(sessionID)
+		}
 	}
 
 	prevLevel := state.Level
