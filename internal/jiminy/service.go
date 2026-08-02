@@ -256,20 +256,41 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext, consultant Co
 		if err := strictMode.LoadFromFile(); err != nil {
 			slog.Warn("jiminy: strict mode file load failed", "error", err)
 		}
-		// JIMINY-ENFORCE-001: default-on strict mode. When the flag is true and no
-		// session is already active (state file absent or held a different session),
-		// auto-enable for the configured default session. Idempotent — Enable() writes
-		// the state file. The operator directive 2026-08-01 formalized Jiminy as an
-		// ENFORCER; this flip aligns the shipped default with that intent.
-		if cfg.JiminyStrictDefaultEnabled && cfg.JiminyStrictDefaultSessionID != "" {
-			if !strictMode.IsStrict(cfg.JiminyStrictDefaultSessionID) {
-				if err := strictMode.Enable(cfg.JiminyStrictDefaultSessionID); err != nil {
-					slog.Warn("jiminy: default strict mode enable failed", "error", err)
+		// JIMINY-ENFORCE-001 + JIMINY-MODE-001: mode-driven boot behavior.
+		//   mode=strict  → auto-enable enforcement (blocking + alerting on WARNED+)
+		//   mode=suggest → auto-DISABLE enforcement (advisory-only)
+		// Idempotent — Enable/Disable are safe to call at every boot. Operator
+		// overrides via UI (Jiminy tab), CLI (mdemg jiminy mode), or POST
+		// /v1/jiminy/strict persist across restarts via the state file, and
+		// are re-asserted here only when they diverge from the configured mode.
+		effectiveMode := cfg.JiminyMode
+		if effectiveMode != "strict" && effectiveMode != "suggest" {
+			// Backward-compat: JIMINY_MODE unset or invalid → derive from flag.
+			if cfg.JiminyStrictDefaultEnabled {
+				effectiveMode = "strict"
+			} else {
+				effectiveMode = "suggest"
+			}
+		}
+		if cfg.JiminyStrictDefaultSessionID != "" {
+			desired := effectiveMode == "strict"
+			current := strictMode.IsStrict(cfg.JiminyStrictDefaultSessionID)
+			if desired != current {
+				var err error
+				if desired {
+					err = strictMode.Enable(cfg.JiminyStrictDefaultSessionID)
 				} else {
-					slog.Info("jiminy: strict mode auto-enabled (JIMINY_STRICT_DEFAULT_ENABLED)",
-						"session_id", cfg.JiminyStrictDefaultSessionID)
+					err = strictMode.Disable(cfg.JiminyStrictDefaultSessionID)
+				}
+				if err != nil {
+					slog.Warn("jiminy: mode application failed",
+						"mode", effectiveMode, "session_id", cfg.JiminyStrictDefaultSessionID, "error", err)
 				}
 			}
+			slog.Info("jiminy: mode",
+				"mode", effectiveMode,
+				"session_id", cfg.JiminyStrictDefaultSessionID,
+				"strict_enabled", strictMode.IsStrict(cfg.JiminyStrictDefaultSessionID))
 		}
 	}
 

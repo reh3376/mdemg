@@ -434,8 +434,14 @@ type Config struct {
 	// 2026-08-01 formalized Jiminy as an ENFORCER of hard constraints, not merely advisory.
 	// Ships default false in code (behavior-changing flag pattern per HEBB-ETA-001 rule) and
 	// default true in .env for the mdemg-dev deployment.
-	JiminyStrictDefaultEnabled   bool   // JIMINY_STRICT_DEFAULT_ENABLED (default: false)
+	JiminyStrictDefaultEnabled   bool   // JIMINY_STRICT_DEFAULT_ENABLED (default: false; JIMINY_MODE overrides when set)
 	JiminyStrictDefaultSessionID string // JIMINY_STRICT_DEFAULT_SESSION_ID — session key auto-enabled at boot (default: "claude-core")
+	// JIMINY_MODE — first-class operator-facing mode selector (JIMINY-MODE-001, 2026-08-02).
+	// "strict"  → auto-enable enforcement at boot for JiminyStrictDefaultSessionID (blocks + alerts on WARNED+ violations)
+	// "suggest" → advisory only (guidance surfaces via warm/latest, no blocking, no alerts on classify)
+	// Empty/other → falls back to JiminyStrictDefaultEnabled for backward-compat with pre-MODE-001 installs.
+	// Operator can override the boot default via UI (Jiminy tab), CLI (mdemg jiminy mode), or POST /v1/jiminy/strict.
+	JiminyMode string // JIMINY_MODE — "strict" | "suggest" (default: "strict")
 
 	// Jiminy Code Comprehension Feedback Loop
 	JiminyCodeRegenEnabled    bool    // JIMINY_CODE_REGEN_ENABLED — enable code comprehension feedback loop (default: false)
@@ -3016,6 +3022,16 @@ func FromEnv() (Config, error) {
 	jiminyStrictStatePath := get("JIMINY_STRICT_STATE_PATH", "")
 	jiminyStrictDefaultEnabled := getBool("JIMINY_STRICT_DEFAULT_ENABLED", false)
 	jiminyStrictDefaultSessionID := get("JIMINY_STRICT_DEFAULT_SESSION_ID", "claude-core")
+	jiminyMode := get("JIMINY_MODE", "strict")
+	// JIMINY-MODE-001: mode is the operator-facing enum; JiminyStrictDefaultEnabled
+	// is the derived lower-level flag. Mode overrides the flag when set to a known
+	// value. Invalid modes fall back to the flag with a WARN at boot (elsewhere).
+	switch jiminyMode {
+	case "strict":
+		jiminyStrictDefaultEnabled = true
+	case "suggest":
+		jiminyStrictDefaultEnabled = false
+	}
 	if jiminyStrictStatePath == "" {
 		home, _ := os.UserHomeDir()
 		if home != "" {
@@ -5878,6 +5894,7 @@ func FromEnv() (Config, error) {
 		JiminyStrictStatePath:           jiminyStrictStatePath,
 		JiminyStrictDefaultEnabled:      jiminyStrictDefaultEnabled,
 		JiminyStrictDefaultSessionID:    jiminyStrictDefaultSessionID,
+		JiminyMode:                      jiminyMode,
 		JiminyCodeRegenEnabled:          jiminyCodeRegenEnabled,
 		JiminyCodeRegenThreshold:        jiminyCodeRegenThreshold,
 		JiminyCodeRegenMinSamples:       jiminyCodeRegenMinSamples,

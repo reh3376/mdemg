@@ -654,8 +654,15 @@ func (s *Server) handleJiminyReformulate(w http.ResponseWriter, r *http.Request)
 	})
 }
 
-// handleJiminyStrict handles POST /v1/jiminy/strict — toggle strict mode.
+// handleJiminyStrict handles GET/POST /v1/jiminy/strict — read or toggle strict mode.
+// JIMINY-MODE-001: GET added so UI + CLI can read current state before flipping.
+// GET  /v1/jiminy/strict?session_id=X → {"enabled": bool, "mode": "strict"|"suggest", "session_id": X}
+// POST /v1/jiminy/strict {"session_id":"X","enabled":true|false} → toggle
 func (s *Server) handleJiminyStrict(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet {
+		s.handleJiminyStrictGet(w, r)
+		return
+	}
 	if r.Method != http.MethodPost {
 		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
 		return
@@ -709,7 +716,48 @@ func (s *Server) handleJiminyStrict(w http.ResponseWriter, r *http.Request) {
 		"data": map[string]any{
 			"session_id": req.SessionID,
 			"strict":     req.Enabled,
+			"mode":       jiminyModeFromEnabled(req.Enabled),
 			"message":    msg,
 		},
 	})
+}
+
+// handleJiminyStrictGet reads current strict-mode state for a session.
+// JIMINY-MODE-001: UI + CLI need to know current state before flipping so the
+// operator doesn't overwrite a session-specific override.
+func (s *Server) handleJiminyStrictGet(w http.ResponseWriter, r *http.Request) {
+	if s.jiminySvc == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "jiminy guidance is not enabled"})
+		return
+	}
+	mgr := s.jiminySvc.GetStrictMode()
+	if mgr == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "strict mode manager not initialized"})
+		return
+	}
+	sessionID := r.URL.Query().Get("session_id")
+	if sessionID == "" {
+		sessionID = s.cfg.JiminyStrictDefaultSessionID
+		if sessionID == "" {
+			sessionID = "claude-core"
+		}
+	}
+	enabled := mgr.IsStrict(sessionID)
+	writeJSON(w, http.StatusOK, map[string]any{
+		"data": map[string]any{
+			"session_id":      sessionID,
+			"strict":          enabled,
+			"mode":            jiminyModeFromEnabled(enabled),
+			"boot_default":    s.cfg.JiminyMode,
+			"default_session": s.cfg.JiminyStrictDefaultSessionID,
+		},
+	})
+}
+
+// jiminyModeFromEnabled — string label for the strict flag.
+func jiminyModeFromEnabled(enabled bool) string {
+	if enabled {
+		return "strict"
+	}
+	return "suggest"
 }
