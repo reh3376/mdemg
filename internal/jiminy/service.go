@@ -808,7 +808,85 @@ func (s *Service) Classify(ctx context.Context, req ClassifyRequest) (ClassifyRe
 	if s.strictClassifier == nil {
 		return ClassifyResponse{Verdict: "pass"}, nil
 	}
-	return s.strictClassifier.Classify(ctx, req)
+	resp, err := s.strictClassifier.Classify(ctx, req)
+	if err != nil {
+		return resp, err
+	}
+	// JIMINY-ENFORCE-004: write enforcement outcomes to constraint_outcomes so
+	// the shipped RSIC reader consumes them alongside followed/ignored. Verdict
+	// deny with unoverridden codes → OutcomeBlockedTruePositive (enforcement
+	// worked). Full-override suppression (verdict=pass with override annotation)
+	// → OutcomeBlockedFalsePositive on each overridden code (operator judged
+	// the classifier wrong; RSIC pattern consumes these to recommend
+	// deprecate/reword). Partial overrides ALSO get per-code writes for the
+	// overridden subset. Fire-and-forget; hot path unaffected.
+	s.writeEnforcementOutcomes(req, resp)
+	return resp, nil
+}
+
+// writeEnforcementOutcomes emits per-constraint enforcement rows into the
+// outcome sink. Silent no-op when outcomeWriter is nil (tests) or when the
+// verdict + suppression state produces no enforcement decisions to record.
+func (s *Service) writeEnforcementOutcomes(req ClassifyRequest, resp ClassifyResponse) {
+	if s.outcomeWriter == nil {
+		return
+	}
+	// True-positive blocks: deny survived after any override subtraction.
+	if resp.Verdict == "deny" {
+		for _, code := range resp.ViolatedCodes {
+			if code == "" {
+				continue
+			}
+			s.outcomeWriter.RecordOutcome(
+				req.SpaceID, "" /* constraint_id — unknown at classify time */, code,
+				"" /* guidance_id — classify is a standalone decision */, req.SessionID,
+				string(OutcomeBlockedTruePositive), string(GuidanceConstraint),
+				s.cfg.InstanceID, "strict_classifier", resp.Confidence,
+			)
+		}
+	}
+	// False-positive suppressions: encoded in DenialReason as "[override:CODE …]".
+	// Parse them out (single source of truth is the annotation the classifier
+	// emitted). Written for both pass-with-override and partial-deny paths.
+	if resp.DenialReason != "" {
+		for _, code := range extractOverriddenCodes(resp.DenialReason) {
+			s.outcomeWriter.RecordOutcome(
+				req.SpaceID, "", code,
+				"", req.SessionID,
+				string(OutcomeBlockedFalsePositive), string(GuidanceConstraint),
+				s.cfg.InstanceID, "operator_override", 1.0,
+			)
+		}
+	}
+}
+
+// extractOverriddenCodes finds every code inside "[override:CODE reason=…]"
+// annotations in a classifier reason string. The annotations are the
+// single source of truth for which codes were suppressed on a call.
+func extractOverriddenCodes(reason string) []string {
+	const marker = "[override:"
+	var out []string
+	rest := reason
+	for {
+		i := strings.Index(rest, marker)
+		if i < 0 {
+			return out
+		}
+		codeStart := i + len(marker)
+		space := strings.IndexByte(rest[codeStart:], ' ')
+		end := strings.IndexByte(rest[codeStart:], ']')
+		var codeEnd int
+		switch {
+		case space >= 0 && (end < 0 || space < end):
+			codeEnd = codeStart + space
+		case end >= 0:
+			codeEnd = codeStart + end
+		default:
+			return out
+		}
+		out = append(out, rest[codeStart:codeEnd])
+		rest = rest[codeEnd:]
+	}
 }
 
 // GetGuidanceStats returns aggregated guidance stats for RSIC integration (J10).

@@ -622,6 +622,14 @@ type Config struct {
 	// the shipped follow-rate steady state is ~0.14; a legacy 0.5 floor fired ~always on healthy state.
 	RSICGuidanceHealthFollowFloor float64 // RSIC_GUIDANCE_HEALTH_FOLLOW_FLOOR — GuidanceHealth below this fires pattern 9 "low_guidance_follow_rate" (default: 0.20)
 	RSICGuidanceHealthDriftFloor  float64 // RSIC_GUIDANCE_HEALTH_DRIFT_FLOOR — GuidanceHealth below this fires pattern 15 "guidance_confidence_drift" (default: 0.25)
+	// JIMINY-ENFORCE-004 (2026-08-03): alert threshold for the enforcement-
+	// learning loop. When a constraint accumulates ≥N blocked_false_positive
+	// outcomes in the lookback window, a MEDIUM alert fires so the operator
+	// sees "constraint X keeps being overridden — consider deprecate/reword."
+	// RSIC self_reflect pattern hookup is a disclosed follow-up sprint
+	// (JIMINY-ENFORCE-004-FOLLOWUP). Threshold ≤0 disables the alert.
+	BlockedFalsePositiveAlertThreshold   int // BLOCKED_FALSE_POSITIVE_ALERT_THRESHOLD (default: 3)
+	BlockedFalsePositiveAlertWindowHours int // BLOCKED_FALSE_POSITIVE_ALERT_WINDOW_HOURS (default: 168 = 7d)
 
 	SpacePruneIntervalHours    int  // SPACE_PRUNE_INTERVAL_HOURS — auto-prune interval in hours (default: 24, 0=disabled)
 	ContextCoolerEnabled       bool // CONTEXT_COOLER_ENABLED — enable background context cooler processing (default: false)
@@ -3468,6 +3476,14 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	blockedFalsePositiveAlertThreshold, err := atoi("BLOCKED_FALSE_POSITIVE_ALERT_THRESHOLD", 3)
+	if err != nil {
+		return Config{}, err
+	}
+	blockedFalsePositiveAlertWindowHours, err := atoi("BLOCKED_FALSE_POSITIVE_ALERT_WINDOW_HOURS", 168)
+	if err != nil {
+		return Config{}, err
+	}
 
 	spacePruneIntervalHours, err := atoi("SPACE_PRUNE_INTERVAL_HOURS", 24)
 	if err != nil {
@@ -6080,6 +6096,8 @@ func FromEnv() (Config, error) {
 		RSICGuidanceDecayMinSurfaces:         rsicGuidanceDecayMinSurfaces,
 		RSICGuidanceHealthFollowFloor:        rsicGuidanceHealthFollowFloor,
 		RSICGuidanceHealthDriftFloor:         rsicGuidanceHealthDriftFloor,
+		BlockedFalsePositiveAlertThreshold:   blockedFalsePositiveAlertThreshold,
+		BlockedFalsePositiveAlertWindowHours: blockedFalsePositiveAlertWindowHours,
 		SpacePruneIntervalHours:              spacePruneIntervalHours,
 		ContextCoolerEnabled:                 contextCoolerEnabled,
 		WeeklyGapInterviewsEnabled:           weeklyGapInterviewsEnabled,

@@ -38,6 +38,45 @@ type AlertRule struct {
 //     which was a perpetual zero (the neo4j driver has no pool-stats API;
 //     the "pool" gauges were a VerifyConnectivity probe in disguise). The
 //     rule could never fire. Neo4j liveness is the health prober's job.
+// JiminyBlockedFalsePositiveRules alerts when a specific constraint accumulates
+// ≥threshold blocked_false_positive outcomes over the lookback window
+// (JIMINY-ENFORCE-004, 2026-08-03). Signal: the classifier keeps flagging
+// something the operator keeps overriding — the constraint is either wrong,
+// too broad, or context-inappropriate. Operator response: deprecate or
+// reword the constraint (or extend its context gate).
+//
+// One rule per constraint would blow past the alert budget; instead we run
+// ONE query that GROUP BY constraint_code and fires when any code crosses
+// threshold. The alert message names the offending code(s) so the operator
+// can act without a separate dashboard lookup. Threshold ≤0 disables.
+func JiminyBlockedFalsePositiveRules(threshold, lookbackHours int) []AlertRule {
+	if threshold <= 0 || lookbackHours <= 0 {
+		return nil
+	}
+	return []AlertRule{
+		{
+			ID:          "jiminy_blocked_false_positive",
+			Title:       "Jiminy Constraint Repeatedly Overridden — consider deprecate/reword",
+			Service:     "jiminy-blocked-false-positive",
+			Severity:    SeverityMedium,
+			Interval:    10 * time.Minute,
+			ForDuration: 15 * time.Minute,
+			// Idle-safe: COALESCE + MAX over per-code aggregate → single row
+			// (TSDB-CONSUME-001 contract; no LIMIT 1 anti-pattern).
+			QuerySQL: fmt.Sprintf(`SELECT COALESCE(MAX(cnt), 0) AS worst_code_count FROM (
+				SELECT constraint_code, COUNT(*) AS cnt FROM constraint_outcomes
+				WHERE outcome_type = 'blocked_false_positive'
+				  AND constraint_code != ''
+				  AND time > now() - interval '%d hours'
+				GROUP BY constraint_code
+			) t`, lookbackHours),
+			Threshold: float64(threshold),
+			Operator:  "gte",
+			Enabled:   true,
+		},
+	}
+}
+
 // JiminyFeedbackDropRules alerts when the rate of dropped feedbacks (guidance_id
 // expired from the in-memory tracker before the feedback POST arrived) exceeds
 // the threshold over the lookback window. Ships as a symptom-monitor for the

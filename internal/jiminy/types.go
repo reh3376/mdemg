@@ -133,6 +133,16 @@ const (
 	OutcomeNotApplicable     GuidanceOutcome = "not_applicable" // guidance topic unrelated to the action taken
 	OutcomeContradicted      GuidanceOutcome = "contradicted"
 	OutcomeUnknown           GuidanceOutcome = "unknown"
+	// JIMINY-ENFORCE-004 (2026-08-03): enforcement-decision outcomes.
+	// These are written when /strict blocks (BlockedTruePositive) or when
+	// the operator overrides a would-be block (BlockedFalsePositive). They
+	// flow through the same outcomeWriter → constraint_outcomes → RSIC
+	// consumer path as the shipped outcomes, so no new schema is needed.
+	// Missed-violation outcome (OutcomeMissedViolation) will be written by
+	// JIMINY-ENFORCE-005's post-hoc detector.
+	OutcomeBlockedTruePositive  GuidanceOutcome = "blocked_true_positive"
+	OutcomeBlockedFalsePositive GuidanceOutcome = "blocked_false_positive"
+	OutcomeMissedViolation      GuidanceOutcome = "missed_violation"
 )
 
 // GuidanceFeedbackRequest is the input to the feedback endpoint.
