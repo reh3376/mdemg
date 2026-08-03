@@ -40,6 +40,25 @@ type DatasetProvider interface {
 	// FOLLOWUP's RSIC self_reflect patterns that recommend deprecate/reword
 	// (high false_positive) or strengthen (high missed_violation).
 	EnforcementOutcomes(ctx context.Context, spaceID string, window time.Duration) (map[string]EnforcementOutcomeCounts, error)
+	// OverrideHistory returns individual override events in the window
+	// (ENFORCE-OVERRIDES-TSDB, 2026-08-03) — one row per apply/revoke/expire
+	// op from the constraint_overrides hypertable. UI reads for the Jiminy
+	// tab timeline; RSIC reads to gate action-execution on "how many times
+	// has this constraint been overridden?" Empty slice + nil error signals
+	// no events in the window.
+	OverrideHistory(ctx context.Context, spaceID string, window time.Duration) ([]OverrideEvent, error)
+}
+
+// OverrideEvent is a single row from constraint_overrides — one operator
+// apply/revoke/expire op. ENFORCE-OVERRIDES-TSDB.
+type OverrideEvent struct {
+	Time            time.Time `json:"time"`             // op timestamp (audit key)
+	SessionID       string    `json:"session_id"`
+	ConstraintCode  string    `json:"constraint_code"`
+	Reason          string    `json:"reason"`
+	Op              string    `json:"op"`               // apply | revoke | expire
+	AppliedAt       time.Time `json:"applied_at"`
+	ExpiresAt       time.Time `json:"expires_at"`
 }
 
 // EnforcementOutcomeCounts holds the per-constraint counts of the three
@@ -311,6 +330,35 @@ func (b *DatasetBuilder) EnforcementOutcomes(ctx context.Context, spaceID string
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("dataset_builder: enforcement_outcomes rows: %w", err)
+	}
+	return out, nil
+}
+
+// OverrideHistory returns individual override events in the window
+// (ENFORCE-OVERRIDES-TSDB). Ordered by time DESC so the newest events come
+// first — UI timeline + RSIC action-execution both want that order.
+func (b *DatasetBuilder) OverrideHistory(ctx context.Context, spaceID string, window time.Duration) ([]OverrideEvent, error) {
+	cutoff := time.Now().Add(-window)
+	const query = `
+		SELECT time, session_id, constraint_code, reason, op, applied_at, expires_at
+		FROM constraint_overrides
+		WHERE space_id = $1 AND time >= $2
+		ORDER BY time DESC`
+	rows, err := b.pool.Query(ctx, query, spaceID, cutoff)
+	if err != nil {
+		return nil, fmt.Errorf("dataset_builder: override_history: %w", err)
+	}
+	defer rows.Close()
+	var out []OverrideEvent
+	for rows.Next() {
+		var e OverrideEvent
+		if err := rows.Scan(&e.Time, &e.SessionID, &e.ConstraintCode, &e.Reason, &e.Op, &e.AppliedAt, &e.ExpiresAt); err != nil {
+			return nil, fmt.Errorf("dataset_builder: override_history scan: %w", err)
+		}
+		out = append(out, e)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("dataset_builder: override_history rows: %w", err)
 	}
 	return out, nil
 }

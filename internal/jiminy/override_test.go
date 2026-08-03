@@ -158,6 +158,20 @@ func TestOverrideManager_AuditFailsOpen(t *testing.T) {
 	}
 }
 
+// ENFORCE-OVERRIDES-TSDB: SetTSDB with nil pool must be a no-op — the JSONL-
+// only fallback still works. Regression pin: the TSDB write path must never
+// attempt to dereference a nil pool.
+func TestOverrideManager_SetTSDBNilPoolIsSafe(t *testing.T) {
+	m := NewOverrideManager(t.TempDir() + "/audit.jsonl")
+	m.SetTSDB(nil, "any-space")
+	if _, err := m.Apply("s1", "c1", "reason", time.Minute); err != nil {
+		t.Errorf("apply must succeed with nil TSDB pool: %v", err)
+	}
+	if rev := m.Revoke("s1", "c1"); rev == nil {
+		t.Error("revoke must succeed with nil TSDB pool")
+	}
+}
+
 // JIMINY-ENFORCE-003 — StrictClassifier suppression pin.
 // Full-suppression path: verdict deny with all-violated codes overridden → pass.
 func TestStrictClassifier_OverrideSuppressesDeny(t *testing.T) {

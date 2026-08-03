@@ -1297,6 +1297,12 @@ func (s *Server) SetTSDBClient(client *tsdb.Client) {
 		conflictTracker := conversation.NewConflictTracker(client.Pool(), 0)
 		if s.jiminySvc != nil {
 			s.jiminySvc.SetConflictTracker(conflictTracker)
+			// ENFORCE-OVERRIDES-TSDB (2026-08-03): wire the override manager to
+			// the constraint_overrides hypertable so RSIC + UI can query history
+			// alongside outcomes. JSONL audit persists as forensic + portable.
+			if om := s.jiminySvc.GetOverrides(); om != nil {
+				om.SetTSDB(client.Pool(), s.cfg.RSICWatchdogSpaceID)
+			}
 		}
 		if s.consultant != nil {
 			s.consultant.SetConflictTracker(conflictTracker)
