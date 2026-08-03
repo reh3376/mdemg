@@ -331,6 +331,55 @@ func TestEmitJiminyBlockAlert_NilDispatcherIsSafe(t *testing.T) {
 		jiminy.ClassifyResponse{Verdict: "deny", DenialReason: "x"})
 }
 
+// JIMINY-ENFORCE-002: verify the Bash-specific message shape. Bash requests
+// carry empty file_path — the message must include tool: Bash + the truncated
+// command preview so operator can tell Write blocks from Bash blocks in the
+// alert stream.
+func TestEmitJiminyBlockAlert_BashIncludesCommandPreview(t *testing.T) {
+	m := &mockAlertSender{}
+	req := jiminy.ClassifyRequest{
+		SpaceID:     "mdemg-dev",
+		SessionID:   "claude-core",
+		AgentOutput: "git push --force origin main",
+		ToolName:    "Bash",
+		FilePath:    "", // Bash has no file_path
+	}
+	resp := jiminy.ClassifyResponse{
+		Verdict:      "deny",
+		DenialReason: "never-force-push-to-main",
+	}
+	emitJiminyBlockAlert(context.Background(), m, req, resp)
+	if m.calls.Load() != 1 {
+		t.Fatalf("expected 1 Send() call, got %d", m.calls.Load())
+	}
+	if !strings.Contains(m.last.Message, "tool: Bash") {
+		t.Errorf("bash message must include tool: Bash, got %q", m.last.Message)
+	}
+	if !strings.Contains(m.last.Message, "git push --force") {
+		t.Errorf("bash message must include command preview, got %q", m.last.Message)
+	}
+	if !strings.Contains(m.last.Message, "never-force-push-to-main") {
+		t.Errorf("bash message must include reason, got %q", m.last.Message)
+	}
+}
+
+// JIMINY-ENFORCE-002: long Bash commands must be truncated so a runaway
+// pipeline doesn't blow past the alert-message size budget.
+func TestEmitJiminyBlockAlert_BashTruncatesLongCommands(t *testing.T) {
+	m := &mockAlertSender{}
+	longCmd := strings.Repeat("cat /dev/urandom | tr -d 0 | head -c 100 && ", 20) // ~880 chars
+	emitJiminyBlockAlert(context.Background(), m,
+		jiminy.ClassifyRequest{SpaceID: "s", ToolName: "Bash", AgentOutput: longCmd},
+		jiminy.ClassifyResponse{Verdict: "deny", DenialReason: "test"})
+	if !strings.Contains(m.last.Message, "…") {
+		t.Errorf("long command must be truncated with … marker, got len=%d msg=%q", len(m.last.Message), m.last.Message)
+	}
+	// Message must be reasonably bounded — command preview capped at 200 chars.
+	if len(m.last.Message) > 400 {
+		t.Errorf("truncated message still too long: %d chars", len(m.last.Message))
+	}
+}
+
 // TestEmitJiminyBlockAlert_EmptyReasonUsesFallback — an unusual case: verdict is deny
 // but the classifier returned no reason. Message must still be meaningful.
 func TestEmitJiminyBlockAlert_EmptyReasonUsesFallback(t *testing.T) {
