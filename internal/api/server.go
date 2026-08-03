@@ -2827,6 +2827,10 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/jiminy/strict", s.handleJiminyStrict)
 	// JIMINY-ENFORCE-003: operator escape-hatch. GET list / POST apply / DELETE revoke.
 	mux.HandleFunc("/v1/jiminy/override", s.handleJiminyOverride)
+	// ENFORCE-UI-OVERRIDES (2026-08-03): TSDB-backed history for the UI timeline
+	// + future RSIC action-execution reads. Separate path so it doesn't collide
+	// with the active-list GET on /v1/jiminy/override.
+	mux.HandleFunc("/v1/jiminy/override/history", s.handleJiminyOverrideHistory)
 	mux.HandleFunc("/v1/jiminy/reformulate", s.handleJiminyReformulate)
 	mux.HandleFunc("/v1/jiminy/classify", s.handleJiminyClassify)
 	mux.HandleFunc("/v1/jiminy/extension", s.handleJ17Extension)

@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"time"
 
 	"mdemg/internal/alert"
 	"mdemg/internal/jiminy"
 	"mdemg/internal/llmclient"
 	"mdemg/internal/metrics"
+	"mdemg/internal/tsdb"
 )
 
 // resolveJiminySessionID normalises the (session_id, space_id) → effective
@@ -778,6 +780,54 @@ func jiminyModeFromEnabled(enabled bool) string {
 }
 
 // --- JIMINY-ENFORCE-003: operator override endpoints -------------------------
+
+// handleJiminyOverrideHistory reads the TSDB constraint_overrides hypertable
+// (ENFORCE-OVERRIDES-TSDB). Returns per-op events ORDERED BY time DESC for
+// the Jiminy UI timeline + RSIC action-execution consumption.
+//
+// GET /v1/jiminy/override/history?space_id=X&hours=168 → {events: [...], count: N}
+// hours defaults to 168 (7d). space_id defaults to RSICWatchdogSpaceID.
+func (s *Server) handleJiminyOverrideHistory(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
+		return
+	}
+	if s.tsdbClient == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "TSDB is not enabled"})
+		return
+	}
+	spaceID := r.URL.Query().Get("space_id")
+	if spaceID == "" {
+		spaceID = s.cfg.RSICWatchdogSpaceID
+		if spaceID == "" {
+			spaceID = "mdemg-dev"
+		}
+	}
+	hours := 168
+	if h := r.URL.Query().Get("hours"); h != "" {
+		if parsed, err := strconv.Atoi(h); err == nil && parsed > 0 {
+			hours = parsed
+		}
+	}
+	window := time.Duration(hours) * time.Hour
+	builder := tsdb.NewDatasetBuilder(s.tsdbClient.Pool())
+	events, err := builder.OverrideHistory(r.Context(), spaceID, window)
+	if err != nil {
+		writeInternalError(w, err, "override history")
+		return
+	}
+	if events == nil {
+		events = []tsdb.OverrideEvent{}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"data": map[string]any{
+			"events": events,
+			"count":  len(events),
+			"space_id": spaceID,
+			"hours":  hours,
+		},
+	})
+}
 
 // handleJiminyOverride multiplexes on method:
 //   POST   /v1/jiminy/override           → apply override
