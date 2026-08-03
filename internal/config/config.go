@@ -442,6 +442,13 @@ type Config struct {
 	// Empty/other → falls back to JiminyStrictDefaultEnabled for backward-compat with pre-MODE-001 installs.
 	// Operator can override the boot default via UI (Jiminy tab), CLI (mdemg jiminy mode), or POST /v1/jiminy/strict.
 	JiminyMode string // JIMINY_MODE — "strict" | "suggest" (default: "strict")
+	// JIMINY-ENFORCE-003 (2026-08-03): operator escape-hatch audit trail.
+	// Every override apply/revoke/expire writes one JSONL record to this file.
+	// Empty string disables audit (in-memory-only overrides — tests + spaces
+	// that can't allocate a home dir). Default: ~/.mdemg/jiminy-overrides.jsonl
+	// TSDB audit table for RSIC learning consumption is deferred to
+	// JIMINY-ENFORCE-004; until then, this JSONL is the durable forensic record.
+	JiminyOverrideAuditPath string // JIMINY_OVERRIDE_AUDIT_PATH — override audit JSONL path
 
 	// Jiminy Code Comprehension Feedback Loop
 	JiminyCodeRegenEnabled    bool    // JIMINY_CODE_REGEN_ENABLED — enable code comprehension feedback loop (default: false)
@@ -3023,6 +3030,12 @@ func FromEnv() (Config, error) {
 	jiminyStrictDefaultEnabled := getBool("JIMINY_STRICT_DEFAULT_ENABLED", false)
 	jiminyStrictDefaultSessionID := get("JIMINY_STRICT_DEFAULT_SESSION_ID", "claude-core")
 	jiminyMode := get("JIMINY_MODE", "strict")
+	jiminyOverrideAuditPath := get("JIMINY_OVERRIDE_AUDIT_PATH", "")
+	if jiminyOverrideAuditPath == "" {
+		if home, hErr := os.UserHomeDir(); hErr == nil && home != "" {
+			jiminyOverrideAuditPath = home + "/.mdemg/jiminy-overrides.jsonl"
+		}
+	}
 	// JIMINY-MODE-001: mode is the operator-facing enum; JiminyStrictDefaultEnabled
 	// is the derived lower-level flag. Mode overrides the flag when set to a known
 	// value. Invalid modes fall back to the flag with a WARN at boot (elsewhere).
@@ -5895,6 +5908,7 @@ func FromEnv() (Config, error) {
 		JiminyStrictDefaultEnabled:      jiminyStrictDefaultEnabled,
 		JiminyStrictDefaultSessionID:    jiminyStrictDefaultSessionID,
 		JiminyMode:                      jiminyMode,
+		JiminyOverrideAuditPath:         jiminyOverrideAuditPath,
 		JiminyCodeRegenEnabled:          jiminyCodeRegenEnabled,
 		JiminyCodeRegenThreshold:        jiminyCodeRegenThreshold,
 		JiminyCodeRegenMinSamples:       jiminyCodeRegenMinSamples,

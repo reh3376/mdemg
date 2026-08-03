@@ -776,3 +776,103 @@ func jiminyModeFromEnabled(enabled bool) string {
 	}
 	return "suggest"
 }
+
+// --- JIMINY-ENFORCE-003: operator override endpoints -------------------------
+
+// handleJiminyOverride multiplexes on method:
+//   POST   /v1/jiminy/override           → apply override
+//   GET    /v1/jiminy/override[?session_id=X] → list active overrides
+//   DELETE /v1/jiminy/override           → revoke (body: {session_id, constraint_code})
+func (s *Server) handleJiminyOverride(w http.ResponseWriter, r *http.Request) {
+	if s.jiminySvc == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "jiminy guidance is not enabled"})
+		return
+	}
+	mgr := s.jiminySvc.GetOverrides()
+	if mgr == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "override manager not initialized"})
+		return
+	}
+	switch r.Method {
+	case http.MethodGet:
+		s.handleJiminyOverrideList(w, r, mgr)
+	case http.MethodPost:
+		s.handleJiminyOverrideApply(w, r, mgr)
+	case http.MethodDelete:
+		s.handleJiminyOverrideRevoke(w, r, mgr)
+	default:
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
+	}
+}
+
+func (s *Server) handleJiminyOverrideApply(w http.ResponseWriter, r *http.Request, mgr *jiminy.OverrideManager) {
+	var req struct {
+		SessionID      string `json:"session_id"`
+		ConstraintCode string `json:"constraint_code"`
+		Reason         string `json:"reason"`
+		DurationSec    int    `json:"duration_sec"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid request body"})
+		return
+	}
+	if req.SessionID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "session_id is required"})
+		return
+	}
+	if req.ConstraintCode == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "constraint_code is required"})
+		return
+	}
+	if req.Reason == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "reason is required (audit trail depends on it)"})
+		return
+	}
+	if req.DurationSec <= 0 {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "duration_sec must be positive"})
+		return
+	}
+	entry, err := mgr.Apply(req.SessionID, req.ConstraintCode, req.Reason, time.Duration(req.DurationSec)*time.Second)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+		return
+	}
+	slog.Info("jiminy: override applied",
+		"session_id", entry.SessionID, "constraint_code", entry.ConstraintCode,
+		"reason", entry.Reason, "expires_at", entry.ExpiresAt.Format(time.RFC3339))
+	writeJSON(w, http.StatusOK, map[string]any{"data": entry})
+}
+
+func (s *Server) handleJiminyOverrideList(w http.ResponseWriter, r *http.Request, mgr *jiminy.OverrideManager) {
+	sessionID := r.URL.Query().Get("session_id")
+	entries := mgr.List(sessionID)
+	// Always emit an array, never null (client contract — mirrors event-graph pin).
+	if entries == nil {
+		entries = []*jiminy.OverrideEntry{}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"data": map[string]any{"overrides": entries, "count": len(entries)}})
+}
+
+func (s *Server) handleJiminyOverrideRevoke(w http.ResponseWriter, r *http.Request, mgr *jiminy.OverrideManager) {
+	var req struct {
+		SessionID      string `json:"session_id"`
+		ConstraintCode string `json:"constraint_code"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid request body"})
+		return
+	}
+	if req.SessionID == "" || req.ConstraintCode == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "session_id and constraint_code are required"})
+		return
+	}
+	entry := mgr.Revoke(req.SessionID, req.ConstraintCode)
+	if entry == nil {
+		writeJSON(w, http.StatusNotFound, map[string]any{"error": "no active override for the given (session_id, constraint_code)"})
+		return
+	}
+	slog.Info("jiminy: override revoked",
+		"session_id", entry.SessionID, "constraint_code", entry.ConstraintCode,
+		"reason", entry.Reason)
+	writeJSON(w, http.StatusOK, map[string]any{"data": map[string]any{"revoked": entry}})
+}

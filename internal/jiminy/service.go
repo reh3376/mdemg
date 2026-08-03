@@ -64,6 +64,7 @@ type Service struct {
 	strictMode               *StrictModeManager            // /strict: per-session strict mode toggle
 	reformulator             *StrictReformulator           // /strict: prompt reformulation
 	strictClassifier         *StrictClassifier             // /strict: response classification for PreToolUse
+	overrideMgr              *OverrideManager              // JIMINY-ENFORCE-003: operator escape-hatch
 	trustCancel              context.CancelFunc            // cancels trust persistence goroutine
 	conflictTracker          *conversation.ConflictTracker // Phase 12 Epic 6: optional divergence-recorder hook
 	codeComprehensionTracker *CodeComprehensionTracker     // P1-15: code comprehension feedback loop
@@ -306,6 +307,14 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext, consultant Co
 		strictClassifier = NewStrictClassifier(evaluator, escalation)
 	}
 
+	// JIMINY-ENFORCE-003: operator escape-hatch. OverrideManager is always
+	// created (nil-safe on strictClassifier without it); wired into the
+	// classifier for the suppression path.
+	overrideMgr := NewOverrideManager(cfg.JiminyOverrideAuditPath)
+	if strictClassifier != nil {
+		strictClassifier.SetOverrides(overrideMgr)
+	}
+
 	// NS-01: ML components with sidecar arbitration (shadow → causal promotion)
 	var tierPredictor *TierPredictor
 	var nliScorer *NLIComprehensionScorer
@@ -410,6 +419,7 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext, consultant Co
 		strictMode:         strictMode,
 		reformulator:       reformulator,
 		strictClassifier:   strictClassifier,
+		overrideMgr:        overrideMgr,
 		surfaceCooldown:    surfaceCooldown,
 		feedbackCounts:     make(map[string]*sessionFeedback),
 	}
@@ -752,6 +762,11 @@ func (s *Service) GetEvaluator() *Evaluator {
 // GetOutcomeClassifier returns the outcome classifier for CB wiring (G8).
 func (s *Service) GetOutcomeClassifier() *OutcomeClassifier {
 	return s.classifier
+}
+
+// GetOverrides returns the operator escape-hatch manager (JIMINY-ENFORCE-003).
+func (s *Service) GetOverrides() *OverrideManager {
+	return s.overrideMgr
 }
 
 // GetStrictMode returns the strict mode manager.

@@ -2819,6 +2819,8 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/jiminy/protocol/learn", s.handleJ17ProtocolLearn)
 	mux.HandleFunc("/v1/jiminy/protocol/status", s.handleJiminyProtocolStatus)
 	mux.HandleFunc("/v1/jiminy/strict", s.handleJiminyStrict)
+	// JIMINY-ENFORCE-003: operator escape-hatch. GET list / POST apply / DELETE revoke.
+	mux.HandleFunc("/v1/jiminy/override", s.handleJiminyOverride)
 	mux.HandleFunc("/v1/jiminy/reformulate", s.handleJiminyReformulate)
 	mux.HandleFunc("/v1/jiminy/classify", s.handleJiminyClassify)
 	mux.HandleFunc("/v1/jiminy/extension", s.handleJ17Extension)
