@@ -630,6 +630,12 @@ type Config struct {
 	// (JIMINY-ENFORCE-004-FOLLOWUP). Threshold ≤0 disables the alert.
 	BlockedFalsePositiveAlertThreshold   int // BLOCKED_FALSE_POSITIVE_ALERT_THRESHOLD (default: 3)
 	BlockedFalsePositiveAlertWindowHours int // BLOCKED_FALSE_POSITIVE_ALERT_WINDOW_HOURS (default: 168 = 7d)
+	// JIMINY-ENFORCE-005 (2026-08-03): alert threshold for the missed-
+	// violation class. When a constraint accumulates ≥N missed_violation
+	// outcomes in the window, MEDIUM alert fires — classifier keeps missing
+	// something operator keeps correcting → reword / lower escalation gate.
+	MissedViolationAlertThreshold   int // MISSED_VIOLATION_ALERT_THRESHOLD (default: 3)
+	MissedViolationAlertWindowHours int // MISSED_VIOLATION_ALERT_WINDOW_HOURS (default: 168 = 7d)
 
 	SpacePruneIntervalHours    int  // SPACE_PRUNE_INTERVAL_HOURS — auto-prune interval in hours (default: 24, 0=disabled)
 	ContextCoolerEnabled       bool // CONTEXT_COOLER_ENABLED — enable background context cooler processing (default: false)
@@ -3484,6 +3490,14 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	missedViolationAlertThreshold, err := atoi("MISSED_VIOLATION_ALERT_THRESHOLD", 3)
+	if err != nil {
+		return Config{}, err
+	}
+	missedViolationAlertWindowHours, err := atoi("MISSED_VIOLATION_ALERT_WINDOW_HOURS", 168)
+	if err != nil {
+		return Config{}, err
+	}
 
 	spacePruneIntervalHours, err := atoi("SPACE_PRUNE_INTERVAL_HOURS", 24)
 	if err != nil {
@@ -6098,6 +6112,8 @@ func FromEnv() (Config, error) {
 		RSICGuidanceHealthDriftFloor:         rsicGuidanceHealthDriftFloor,
 		BlockedFalsePositiveAlertThreshold:   blockedFalsePositiveAlertThreshold,
 		BlockedFalsePositiveAlertWindowHours: blockedFalsePositiveAlertWindowHours,
+		MissedViolationAlertThreshold:        missedViolationAlertThreshold,
+		MissedViolationAlertWindowHours:      missedViolationAlertWindowHours,
 		SpacePruneIntervalHours:              spacePruneIntervalHours,
 		ContextCoolerEnabled:                 contextCoolerEnabled,
 		WeeklyGapInterviewsEnabled:           weeklyGapInterviewsEnabled,
