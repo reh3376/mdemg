@@ -30,6 +30,24 @@ type DatasetProvider interface {
 	// so the gauge, the panels, and RSIC GuidanceHealth all agree. samples=0
 	// signals no data in the window (caller falls back).
 	GuidanceEffectiveness(ctx context.Context, spaceID string, window time.Duration) (rate float64, samples int, err error)
+	// EnforcementOutcomes returns per-constraint-code counts of the three
+	// enforcement-decision outcome types (JIMINY-ENFORCE-004/005):
+	//   blocked_true_positive   — classifier denied, deny survived override
+	//   blocked_false_positive  — would-be deny suppressed by operator override
+	//   missed_violation        — correction observed matched an existing
+	//                             constraint (classifier didn't catch it)
+	// Empty map + nil error signals no data in the window. Feeds ENFORCE-004-
+	// FOLLOWUP's RSIC self_reflect patterns that recommend deprecate/reword
+	// (high false_positive) or strengthen (high missed_violation).
+	EnforcementOutcomes(ctx context.Context, spaceID string, window time.Duration) (map[string]EnforcementOutcomeCounts, error)
+}
+
+// EnforcementOutcomeCounts holds the per-constraint counts of the three
+// enforcement-decision outcome types over the query window. ENFORCE-004-FOLLOWUP.
+type EnforcementOutcomeCounts struct {
+	BlockedTruePositive  int `json:"blocked_true_positive"`
+	BlockedFalsePositive int `json:"blocked_false_positive"`
+	MissedViolation      int `json:"missed_violation"`
 }
 
 // LLMPerformanceSummary holds per-task LLM performance metrics.
@@ -260,6 +278,41 @@ func (b *DatasetBuilder) GuidanceEffectiveness(ctx context.Context, spaceID stri
 		return 0, 0, fmt.Errorf("dataset_builder: guidance_effectiveness: %w", err)
 	}
 	return rate, n, nil
+}
+
+// EnforcementOutcomes returns per-constraint counts of enforcement-decision
+// outcome types (ENFORCE-004-FOLLOWUP). GROUP BY constraint_code so the caller
+// can decide which codes cross action thresholds.
+func (b *DatasetBuilder) EnforcementOutcomes(ctx context.Context, spaceID string, window time.Duration) (map[string]EnforcementOutcomeCounts, error) {
+	cutoff := time.Now().Add(-window)
+	const query = `
+		SELECT constraint_code,
+			COUNT(*) FILTER (WHERE outcome_type = 'blocked_true_positive')::int AS btp,
+			COUNT(*) FILTER (WHERE outcome_type = 'blocked_false_positive')::int AS bfp,
+			COUNT(*) FILTER (WHERE outcome_type = 'missed_violation')::int AS mv
+		FROM constraint_outcomes
+		WHERE space_id = $1 AND time >= $2
+		  AND outcome_type IN ('blocked_true_positive', 'blocked_false_positive', 'missed_violation')
+		  AND constraint_code != ''
+		GROUP BY constraint_code`
+	rows, err := b.pool.Query(ctx, query, spaceID, cutoff)
+	if err != nil {
+		return nil, fmt.Errorf("dataset_builder: enforcement_outcomes: %w", err)
+	}
+	defer rows.Close()
+	out := make(map[string]EnforcementOutcomeCounts)
+	for rows.Next() {
+		var code string
+		var counts EnforcementOutcomeCounts
+		if err := rows.Scan(&code, &counts.BlockedTruePositive, &counts.BlockedFalsePositive, &counts.MissedViolation); err != nil {
+			return nil, fmt.Errorf("dataset_builder: enforcement_outcomes scan: %w", err)
+		}
+		out[code] = counts
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("dataset_builder: enforcement_outcomes rows: %w", err)
+	}
+	return out, nil
 }
 
 // RetrievalQuality returns retrieval pipeline quality summary for the given window.

@@ -193,6 +193,14 @@ type SelfAssessmentReport struct {
 	// relative to the latest benchmark. Mirrors alert.FtProductionDriftRule
 	// math via the shared DatasetProvider.ProductionDrift path.
 	ProductionDrift   *tsdb.ProductionDriftSummary   `json:"production_drift,omitempty"`
+	// ENFORCE-004-FOLLOWUP (2026-08-03): per-constraint counts of the three
+	// enforcement-decision outcome types (blocked_true_positive, blocked_
+	// false_positive, missed_violation) over the assessor's window. Feeds
+	// two self_reflect patterns: enforcement_false_positive_high (recommend
+	// archive_ineffective_constraints when a code is chronically overridden)
+	// and enforcement_missed_violation_high (recommend adjust_guidance_
+	// confidence to widen a chronically-missed constraint's match surface).
+	EnforcementOutcomes map[string]tsdb.EnforcementOutcomeCounts `json:"enforcement_outcomes,omitempty"`
 }
 
 // ───────────── Reflection ─────────────

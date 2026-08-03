@@ -11,6 +11,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"mdemg/internal/ape"
 	"mdemg/internal/conversation"
+	"mdemg/internal/embeddings"
 	"mdemg/internal/llmclient"
 	"mdemg/internal/metrics"
 	"mdemg/internal/models"
@@ -71,6 +72,35 @@ func (s *Server) handleObserve(w http.ResponseWriter, r *http.Request) {
 	// Track observation in session tracker (Phase 3A)
 	if s.sessionTracker != nil && req.SessionID != "" {
 		s.sessionTracker.RecordObserve(req.SessionID)
+	}
+
+	// JIMINY-ENFORCE-005 (2026-08-03): post-hoc missed-violation detector.
+	// When a correction lands, check whether it matches an existing constraint
+	// node — if yes, emit OutcomeMissedViolation for RSIC to consume. The
+	// correction IS the operator's retrospective judgment that "the classifier
+	// should have blocked something and didn't." Fire-and-forget on a background
+	// goroutine so the hot path isn't delayed by the embed + Neo4j vector query.
+	if req.ObsType == "correction" && s.jiminySvc != nil && s.embedder != nil && req.Content != "" {
+		spaceID := req.SpaceID
+		sessionID := req.SessionID
+		content := req.Content
+		// Intentional detached goroutine: request ctx is cancelled when the HTTP
+		// response is written, but the missed-violation detector must survive to
+		// complete the embed + Neo4j vector query. GUARDRAIL-PRODUCER-001 uses
+		// the same pattern for its detached async producer.
+		go func() { //nolint:gosec // G118 detached-goroutine pattern (see comment above)
+			bgCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			bgCtx = embeddings.WithEmbeddingMeta(bgCtx, embeddings.EmbeddingMeta{
+				CallSite: "jiminy_missed_violation_detector",
+				SpaceID:  spaceID,
+			})
+			emb, embErr := s.embedder.Embed(bgCtx, content)
+			if embErr != nil || len(emb) == 0 {
+				return
+			}
+			s.jiminySvc.DetectMissedViolation(bgCtx, spaceID, sessionID, emb)
+		}()
 	}
 
 	// Record compact event timestamp for Auto-compact AVG dashboard metric

@@ -561,6 +561,12 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 				// something operator keeps overriding → deprecate/reword.
 				rules = append(rules, alert.JiminyBlockedFalsePositiveRules(
 					cfg.BlockedFalsePositiveAlertThreshold, cfg.BlockedFalsePositiveAlertWindowHours)...)
+				// JIMINY-ENFORCE-005 (2026-08-03): missed-violation signal —
+				// classifier isn't catching something operator keeps correcting.
+				// Reword the constraint (widen match), lower escalation gate, or
+				// add a sibling rule.
+				rules = append(rules, alert.JiminyMissedViolationRules(
+					cfg.MissedViolationAlertThreshold, cfg.MissedViolationAlertWindowHours)...)
 			// TSDB-CONSUME-001: buffered-writer flush failures (a wedged
 			// writer used to drop rows in silence).
 			rules = append(rules, alert.TSDBWriterRules(

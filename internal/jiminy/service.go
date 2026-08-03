@@ -769,6 +769,45 @@ func (s *Service) GetOverrides() *OverrideManager {
 	return s.overrideMgr
 }
 
+// DetectMissedViolation is called by the API layer after a successful
+// `correction`-type observation lands. If the correction's content matches
+// an existing constraint node (cosine sim >= threshold), it emits ONE
+// OutcomeMissedViolation row into constraint_outcomes for RSIC to consume.
+//
+// JIMINY-ENFORCE-005 (2026-08-03): closes the arc loop. The correction IS
+// the operator's retrospective judgment that "the classifier should have
+// blocked something and didn't." Fire-and-forget — hot path already
+// completed (the observation is committed); the missed-violation write
+// is best-effort. Returns the matched constraint code (or empty).
+//
+// Threshold defaults are aligned with JIMINY-OUTCOME-001's
+// JIMINY_CONSTRAINT_CODE_SIM_THRESHOLD (0.55) — the shipped pattern for
+// "does this content match this constraint" via cosine sim on the
+// role-filtered vector index.
+func (s *Service) DetectMissedViolation(ctx context.Context, spaceID, sessionID string, embedding []float32) string {
+	if s.outcomeWriter == nil || len(embedding) == 0 {
+		return ""
+	}
+	threshold := s.cfg.JiminyConstraintCodeSimThreshold
+	if threshold <= 0 {
+		threshold = 0.55
+	}
+	code := s.matchConstraintCodeByEmbedding(ctx, spaceID, embedding, threshold)
+	if code == "" {
+		return ""
+	}
+	s.outcomeWriter.RecordOutcome(
+		spaceID, "" /* constraint_id — not needed; RSIC keys on code */, code,
+		"" /* guidance_id — the correction IS the retrospective judgment */,
+		sessionID,
+		string(OutcomeMissedViolation), string(GuidanceConstraint),
+		s.cfg.InstanceID, "correction_observed", 1.0,
+	)
+	slog.Info("jiminy: missed_violation detected",
+		"space_id", spaceID, "session_id", sessionID, "constraint_code", code)
+	return code
+}
+
 // GetStrictMode returns the strict mode manager.
 func (s *Service) GetStrictMode() *StrictModeManager {
 	return s.strictMode

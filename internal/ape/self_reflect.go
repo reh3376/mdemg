@@ -535,6 +535,61 @@ func (r *Reflector) Reflect(ctx context.Context, report *SelfAssessmentReport) (
 		}
 	}
 
+	// ENFORCE-004-FOLLOWUP (2026-08-03): elevate the enforcement-arc alerts
+	// from operator-visible signal to RSIC-actionable insights.
+	//
+	// Pattern 32: enforcement_false_positive_high — constraint has ≥N
+	// blocked_false_positive outcomes in the window. Classifier keeps
+	// flagging something the operator keeps overriding → the constraint
+	// is wrong / too broad. Recommend archive_ineffective_constraints
+	// (the shipped LLM-allowed action closest to the semantic).
+	//
+	// Pattern 33: enforcement_missed_violation_high — constraint has ≥N
+	// missed_violation outcomes. Classifier isn't catching what the
+	// operator keeps correcting → widen match surface or lower
+	// escalation gate. Recommend adjust_guidance_confidence.
+	if len(report.EnforcementOutcomes) > 0 {
+		bfpFloor := r.cfg.BlockedFalsePositiveAlertThreshold
+		if bfpFloor <= 0 {
+			bfpFloor = 3
+		}
+		mvFloor := r.cfg.MissedViolationAlertThreshold
+		if mvFloor <= 0 {
+			mvFloor = 3
+		}
+		for code, counts := range report.EnforcementOutcomes {
+			if code == "" {
+				continue
+			}
+			if counts.BlockedFalsePositive >= bfpFloor {
+				insights = append(insights, ReflectionInsight{
+					PatternID: "enforcement_false_positive_high",
+					Severity:  SeverityMedium,
+					Description: fmt.Sprintf(
+						"Constraint %q accumulated %d blocked_false_positive outcomes (threshold %d) — operator keeps overriding; consider deprecate/reword.",
+						code, counts.BlockedFalsePositive, bfpFloor),
+					RecommendedAction: "archive_ineffective_constraints",
+					Metric:            "blocked_false_positive_count",
+					Value:             float64(counts.BlockedFalsePositive),
+					Threshold:         float64(bfpFloor),
+				})
+			}
+			if counts.MissedViolation >= mvFloor {
+				insights = append(insights, ReflectionInsight{
+					PatternID: "enforcement_missed_violation_high",
+					Severity:  SeverityMedium,
+					Description: fmt.Sprintf(
+						"Constraint %q was missed %d times (threshold %d) — classifier isn't catching what operator corrects; consider widening match or lowering escalation gate.",
+						code, counts.MissedViolation, mvFloor),
+					RecommendedAction: "adjust_guidance_confidence",
+					Metric:            "missed_violation_count",
+					Value:             float64(counts.MissedViolation),
+					Threshold:         float64(mvFloor),
+				})
+			}
+		}
+	}
+
 	// 28. Embedding pipeline regression: empty call_sites reappearing (Sprint 1 regression check)
 	if report.EmbeddingDataset != nil && report.EmbeddingDataset.EmptyCallSites > 0 {
 		insights = append(insights, ReflectionInsight{

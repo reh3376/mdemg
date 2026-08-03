@@ -38,6 +38,44 @@ type AlertRule struct {
 //     which was a perpetual zero (the neo4j driver has no pool-stats API;
 //     the "pool" gauges were a VerifyConnectivity probe in disguise). The
 //     rule could never fire. Neo4j liveness is the health prober's job.
+// JiminyMissedViolationRules alerts when a specific constraint accumulates
+// ≥threshold missed_violation outcomes over the lookback window
+// (JIMINY-ENFORCE-005, 2026-08-03). Signal: the classifier is NOT catching
+// something the operator keeps having to correct — constraint may be too
+// narrow (needs more embedding coverage), escalation may be gated too high
+// (never reaches WARNED so deny never fires), or a related constraint that
+// should exist doesn't. Operator response: reword the constraint to widen
+// its match surface, lower the escalation threshold, or add a sibling rule.
+//
+// Aggregate GROUP BY constraint_code with COALESCE(MAX(cnt),0) subquery —
+// idle-safe TSDB-CONSUME-001 contract; fires when the WORST code crosses
+// threshold. Threshold ≤0 disables.
+func JiminyMissedViolationRules(threshold, lookbackHours int) []AlertRule {
+	if threshold <= 0 || lookbackHours <= 0 {
+		return nil
+	}
+	return []AlertRule{
+		{
+			ID:          "jiminy_missed_violation",
+			Title:       "Jiminy Constraint Repeatedly Missed — consider rewording or lowering escalation gate",
+			Service:     "jiminy-missed-violation",
+			Severity:    SeverityMedium,
+			Interval:    10 * time.Minute,
+			ForDuration: 15 * time.Minute,
+			QuerySQL: fmt.Sprintf(`SELECT COALESCE(MAX(cnt), 0) AS worst_code_count FROM (
+				SELECT constraint_code, COUNT(*) AS cnt FROM constraint_outcomes
+				WHERE outcome_type = 'missed_violation'
+				  AND constraint_code != ''
+				  AND time > now() - interval '%d hours'
+				GROUP BY constraint_code
+			) t`, lookbackHours),
+			Threshold: float64(threshold),
+			Operator:  "gte",
+			Enabled:   true,
+		},
+	}
+}
+
 // JiminyBlockedFalsePositiveRules alerts when a specific constraint accumulates
 // ≥threshold blocked_false_positive outcomes over the lookback window
 // (JIMINY-ENFORCE-004, 2026-08-03). Signal: the classifier keeps flagging
