@@ -555,6 +555,12 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 				// regression signal for the arc.
 				rules = append(rules, alert.JiminyFeedbackDropRules(
 					cfg.JiminyFeedbackDropThreshold, cfg.JiminyFeedbackDropLookbackMin)...)
+				// JIMINY-ENFORCE-004 (2026-08-03): enforcement-learning signal.
+				// When a constraint accumulates ≥threshold blocked_false_positive
+				// outcomes in the window, alert: classifier keeps flagging
+				// something operator keeps overriding → deprecate/reword.
+				rules = append(rules, alert.JiminyBlockedFalsePositiveRules(
+					cfg.BlockedFalsePositiveAlertThreshold, cfg.BlockedFalsePositiveAlertWindowHours)...)
 			// TSDB-CONSUME-001: buffered-writer flush failures (a wedged
 			// writer used to drop rows in silence).
 			rules = append(rules, alert.TSDBWriterRules(

@@ -834,6 +834,14 @@
         "jiminy_latest.uats.json"
       ]
     },
+    "/v1/jiminy/override": {
+      "consumers": [
+        "internal/cli/jiminy.go (mdemg jiminy override apply|list|revoke)"
+      ],
+      "disposition": "IN_USE",
+      "notes": "JIMINY-ENFORCE-003 (2026-08-03): operator escape-hatch for the enforcement arc. POST=apply / GET=list / DELETE=revoke on the same path (method-multiplexed). Time-boxed constraint overrides suppress classifier deny verdicts on WARNED+ escalations that the operator judges as false positives. Every apply/revoke JSONL-audited at ~/.mdemg/jiminy-overrides.jsonl. UI display of active overrides deferred as a small follow-up. UATS spec deferred to JIMINY-ENFORCE-004 (which will formalize the outcome-writing contract) — the CLI live-verified all three methods end-to-end.",
+      "uats_specs": []
+    },
     "/v1/jiminy/protocol/feedback": {
       "consumers": [],
       "disposition": "INTERNAL",
