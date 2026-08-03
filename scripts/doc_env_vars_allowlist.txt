@@ -80,3 +80,6 @@ SIDECAR_HOST            # CLAUDE.md governance note: deliberate negative mention
 NEURAL_DEVICE           # real: pydantic env_prefix "NEURAL_" + field device (never appears literally)
 NEURAL_LOG_LEVEL        # real: pydantic env_prefix "NEURAL_" + field log_level (never appears literally)
 DEEP_DIVE_2026          # HITL-CURATION-002 pin cites the Q4 scoping doc DEEP_DIVE_2026-07-27.md; the regex over-matches its date-shaped prefix
+MEASUREMENT_ARTIFACT     # DASHBOARD-TRUTH sprint prose — a triage-classification label, not an env var
+REAL_LOW                 # DASHBOARD-TRUTH sprint prose — triage-classification label alongside MEASUREMENT_ARTIFACT
+REFERENCES_SYMBOL        # RQA-001 disclosed follow-up: hypothesized graph edge label, not shipped code
