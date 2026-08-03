@@ -284,8 +284,10 @@ func TestBuildUserPrompt_BackwardCompat(t *testing.T) {
 func TestLLMReflector_ValidActions_Has17Entries(t *testing.T) {
 	// RSIC-LLM-ALERT-GUARD-001: 20 → 17 after removing the 3 deterministic
 	// alert actions (alert_jiminy_critical/_memory_bloat/_synergy_overlap).
-	if len(validActions) != 17 {
-		t.Errorf("expected 17 valid actions, got %d", len(validActions))
+	// ENFORCE-AUTO-EXECUTE (2026-08-03): 17 → 18 after adding
+	// archive_constraint_by_code (targeted per-code archive with strict guards).
+	if len(validActions) != 18 {
+		t.Errorf("expected 18 valid actions, got %d", len(validActions))
 	}
 
 	expected := []string{
@@ -298,6 +300,8 @@ func TestLLMReflector_ValidActions_Has17Entries(t *testing.T) {
 		"review_nli_calibration",
 		// Diagnostic actions
 		"ingest_stale_spaces",
+		// ENFORCE-AUTO-EXECUTE: targeted per-code archive
+		"archive_constraint_by_code",
 		// RSIC-LLM-ALERT-GUARD-001: alert_jiminy_critical / alert_memory_bloat /
 		// alert_synergy_overlap were REMOVED from the LLM whitelist — the
 		// rule-based reflector owns those deterministic alerts; see

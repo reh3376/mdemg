@@ -637,6 +637,17 @@ type Config struct {
 	MissedViolationAlertThreshold   int // MISSED_VIOLATION_ALERT_THRESHOLD (default: 3)
 	MissedViolationAlertWindowHours int // MISSED_VIOLATION_ALERT_WINDOW_HOURS (default: 168 = 7d)
 
+	// ENFORCE-AUTO-EXECUTE (2026-08-03): RSIC auto-execution of
+	// enforcement_false_positive_high insights → archive the offending
+	// constraint via ArchiveConstraintByCode with provenance stamp.
+	// Shipped default-OFF + dry-run-default-TRUE for safety. Enable only
+	// after live-verify. adjust_guidance_confidence path deferred (mutation
+	// not cleanly reversible without HITL).
+	EnforcementAutoExecuteEnabled       bool // ENFORCEMENT_AUTO_EXECUTE_ENABLED (default: false)
+	EnforcementAutoExecuteDryRun        bool // ENFORCEMENT_AUTO_EXECUTE_DRY_RUN (default: true — logs what would be done without doing it)
+	EnforcementAutoExecuteMaxPerHour    int  // ENFORCEMENT_AUTO_EXECUTE_MAX_PER_HOUR — global rate limit across all codes (default: 3)
+	EnforcementAutoExecuteCooldownHours int  // ENFORCEMENT_AUTO_EXECUTE_COOLDOWN_HOURS — per-code cooldown after archive (default: 24)
+
 	SpacePruneIntervalHours    int  // SPACE_PRUNE_INTERVAL_HOURS — auto-prune interval in hours (default: 24, 0=disabled)
 	ContextCoolerEnabled       bool // CONTEXT_COOLER_ENABLED — enable background context cooler processing (default: false)
 	WeeklyGapInterviewsEnabled bool // WEEKLY_GAP_INTERVIEWS_ENABLED — enable background weekly gap interviews (default: false)
@@ -3498,6 +3509,17 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	// ENFORCE-AUTO-EXECUTE
+	enforcementAutoExecuteEnabled := getBool("ENFORCEMENT_AUTO_EXECUTE_ENABLED", false)
+	enforcementAutoExecuteDryRun := getBool("ENFORCEMENT_AUTO_EXECUTE_DRY_RUN", true)
+	enforcementAutoExecuteMaxPerHour, err := atoi("ENFORCEMENT_AUTO_EXECUTE_MAX_PER_HOUR", 3)
+	if err != nil {
+		return Config{}, err
+	}
+	enforcementAutoExecuteCooldownHours, err := atoi("ENFORCEMENT_AUTO_EXECUTE_COOLDOWN_HOURS", 24)
+	if err != nil {
+		return Config{}, err
+	}
 
 	spacePruneIntervalHours, err := atoi("SPACE_PRUNE_INTERVAL_HOURS", 24)
 	if err != nil {
@@ -6114,6 +6136,10 @@ func FromEnv() (Config, error) {
 		BlockedFalsePositiveAlertWindowHours: blockedFalsePositiveAlertWindowHours,
 		MissedViolationAlertThreshold:        missedViolationAlertThreshold,
 		MissedViolationAlertWindowHours:      missedViolationAlertWindowHours,
+		EnforcementAutoExecuteEnabled:        enforcementAutoExecuteEnabled,
+		EnforcementAutoExecuteDryRun:         enforcementAutoExecuteDryRun,
+		EnforcementAutoExecuteMaxPerHour:     enforcementAutoExecuteMaxPerHour,
+		EnforcementAutoExecuteCooldownHours:  enforcementAutoExecuteCooldownHours,
 		SpacePruneIntervalHours:              spacePruneIntervalHours,
 		ContextCoolerEnabled:                 contextCoolerEnabled,
 		WeeklyGapInterviewsEnabled:           weeklyGapInterviewsEnabled,

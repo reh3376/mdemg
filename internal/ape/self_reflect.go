@@ -568,7 +568,12 @@ func (r *Reflector) Reflect(ctx context.Context, report *SelfAssessmentReport) (
 					Description: fmt.Sprintf(
 						"Constraint %q accumulated %d blocked_false_positive outcomes (threshold %d) — operator keeps overriding; consider deprecate/reword.",
 						code, counts.BlockedFalsePositive, bfpFloor),
-					RecommendedAction: "archive_ineffective_constraints",
+					// ENFORCE-AUTO-EXECUTE (2026-08-03): route to the targeted
+					// archive_constraint_by_code executor via TargetCode so
+					// the strict-guard dispatcher can archive THIS code (not
+					// the bulk shipped archive_ineffective_constraints path).
+					RecommendedAction: "archive_constraint_by_code",
+					TargetCode:        code,
 					Metric:            "blocked_false_positive_count",
 					Value:             float64(counts.BlockedFalsePositive),
 					Threshold:         float64(bfpFloor),
@@ -581,7 +586,12 @@ func (r *Reflector) Reflect(ctx context.Context, report *SelfAssessmentReport) (
 					Description: fmt.Sprintf(
 						"Constraint %q was missed %d times (threshold %d) — classifier isn't catching what operator corrects; consider widening match or lowering escalation gate.",
 						code, counts.MissedViolation, mvFloor),
+					// ENFORCE-AUTO-EXECUTE: adjust_guidance_confidence auto-
+					// execution deferred (mutation not cleanly reversible
+					// without HITL). Insight still fires + surfaces via the
+					// existing shipped alert path.
 					RecommendedAction: "adjust_guidance_confidence",
+					TargetCode:        code,
 					Metric:            "missed_violation_count",
 					Value:             float64(counts.MissedViolation),
 					Threshold:         float64(mvFloor),

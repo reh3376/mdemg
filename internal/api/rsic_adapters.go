@@ -358,6 +358,11 @@ func (a *rsicGuidanceCalibrationAdapter) ArchiveStaleConstraints(ctx context.Con
 	return a.svc.ArchiveStaleConstraints(ctx, spaceID)
 }
 
+// ENFORCE-AUTO-EXECUTE (2026-08-03): targeted archive by constraint code.
+func (a *rsicGuidanceCalibrationAdapter) ArchiveConstraintByCode(ctx context.Context, spaceID, constraintCode, archiveReason string) (bool, bool, error) {
+	return a.svc.ArchiveConstraintByCode(ctx, spaceID, constraintCode, archiveReason)
+}
+
 // rsicTierEffectivenessAdapter adapts *jiminy.Service to ape.TierEffectivenessProvider.
 type rsicTierEffectivenessAdapter struct {
 	svc *jiminy.Service

@@ -819,6 +819,9 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 
 	rsicPlanner := ape.NewPlanner(cfg)
 	rsicDispatcher := ape.NewDispatcher(driver, learnerAdapter, convAdapter, hiddenAdapter)
+	// ENFORCE-AUTO-EXECUTE (2026-08-03): wire config so the enforcement
+	// auto-archive executor can consult its guard flags at dispatch time.
+	rsicDispatcher.SetConfig(cfg)
 	// J17: Wire protocol evolver to dispatcher
 	if jiminySvc != nil && cfg.J17MetricsEnabled {
 		evolver := jiminySvc.NewProtocolEvolver()

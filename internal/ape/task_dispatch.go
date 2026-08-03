@@ -9,6 +9,7 @@ import (
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 
+	"mdemg/internal/config"
 	"mdemg/internal/metrics"
 )
 
@@ -47,6 +48,15 @@ type Dispatcher struct {
 
 	// DD-P2-16: Goroutine semaphore to bound concurrent RSIC task execution
 	sem chan struct{}
+
+	// ENFORCE-AUTO-EXECUTE (2026-08-03): per-code cooldown + global rate limit
+	// for archive_constraint_by_code. Rejected requests are logged as
+	// suppressed (visible via metrics) but count as a "handled" action so
+	// RSIC doesn't retry-storm.
+	cfg                   config.Config
+	enforceMu             sync.Mutex
+	enforceRecentArchives []time.Time          // sliding window for global rate limit
+	enforceCodeCooldowns  map[string]time.Time // per-code (code → time after which allowed)
 
 	// SR-001: Alert delivery
 	alertDispatcher AlertDispatcher
@@ -124,6 +134,13 @@ func (d *Dispatcher) SetProtocolEvolver(pe ProtocolEvolverProvider) {
 // SetGuidanceCalibrator attaches an RSIC-SK1 guidance calibration provider.
 func (d *Dispatcher) SetGuidanceCalibrator(gc GuidanceCalibrationProvider) {
 	d.guidanceCalibrator = gc
+}
+
+// SetConfig attaches the runtime config so executors can consult flags
+// (e.g. ENFORCEMENT_AUTO_EXECUTE_* for the auto-archive guards).
+// ENFORCE-AUTO-EXECUTE (2026-08-03).
+func (d *Dispatcher) SetConfig(cfg config.Config) {
+	d.cfg = cfg
 }
 
 // SetGuidanceCalibrationThresholds wires the RSIC_GUIDANCE_* config values
@@ -372,6 +389,13 @@ func (d *Dispatcher) executeTask(ctx context.Context, at *activeTask) {
 		deliverables, execErr = d.executeAdjustGuidanceConfidence(ctx, at.Spec.TargetSpace)
 	case "archive_ineffective_constraints":
 		deliverables, execErr = d.executeArchiveIneffectiveConstraints(ctx, at.Spec.TargetSpace)
+	case "archive_constraint_by_code":
+		// ENFORCE-AUTO-EXECUTE (2026-08-03): targeted per-code archive with
+		// strict guards (enabled flag, dry-run, rate limit, per-code cooldown,
+		// protected-space allowlist). TargetCode is required; without it the
+		// executor returns a no-op deliverable so the shipped bulk path stays
+		// the fallback for insights that couldn't extract a code.
+		deliverables, execErr = d.executeArchiveConstraintByCode(ctx, at.Spec.TargetSpace, at.Spec.TargetCode)
 	case "ingest_stale_spaces":
 		deliverables, execErr = d.executeIngestStaleSpaces(ctx, at.Spec.TargetSpace)
 	case "alert_jiminy_critical":
@@ -811,6 +835,122 @@ func (d *Dispatcher) executeArchiveIneffectiveConstraints(ctx context.Context, s
 		return nil, err
 	}
 	return map[string]any{"archived": archived}, nil
+}
+
+// executeArchiveConstraintByCode is the ENFORCE-AUTO-EXECUTE (2026-08-03)
+// targeted archive path. Applies strict guards BEFORE mutating:
+//   - enabled flag (ENFORCEMENT_AUTO_EXECUTE_ENABLED, default false)
+//   - dry-run (ENFORCEMENT_AUTO_EXECUTE_DRY_RUN, default true → log-only)
+//   - global rate limit (ENFORCEMENT_AUTO_EXECUTE_MAX_PER_HOUR, default 3)
+//   - per-code cooldown (ENFORCEMENT_AUTO_EXECUTE_COOLDOWN_HOURS, default 24)
+//   - protected-space allowlist (RSICProtectedSpaces — never mutate a
+//     protected space unless the operator explicitly removes it from the list)
+//   - empty TargetCode → no-op deliverable (dispatcher's shipped bulk-archive
+//     path handles code-less insights)
+// Provenance: on real archive, stamps archive_reason = "rsic_enforcement_
+// false_positive_high" so operators can trace back from the archived node
+// to the RSIC decision. Reversible via
+// MATCH (n {constraint_code: X}) SET n.is_archived = false REMOVE n.archive_reason.
+func (d *Dispatcher) executeArchiveConstraintByCode(ctx context.Context, spaceID, constraintCode string) (map[string]any, error) {
+	deliverables := map[string]any{"target_space": spaceID, "target_code": constraintCode}
+	if constraintCode == "" {
+		deliverables["result"] = "skipped_no_code"
+		return deliverables, nil
+	}
+	if !d.cfg.EnforcementAutoExecuteEnabled {
+		deliverables["result"] = "skipped_disabled"
+		return deliverables, nil
+	}
+	// Protected-space guard (never mutate a listed space)
+	for _, ps := range d.cfg.RSICProtectedSpaces {
+		if ps == spaceID {
+			slog.Warn("enforce-auto-execute: skipping protected space",
+				"space_id", spaceID, "constraint_code", constraintCode)
+			deliverables["result"] = "skipped_protected_space"
+			return deliverables, nil
+		}
+	}
+	// Rate limit + cooldown check
+	if !d.enforceReserveSlot(constraintCode) {
+		deliverables["result"] = "skipped_rate_limited"
+		return deliverables, nil
+	}
+	// Dry-run: log what WOULD happen without mutating
+	if d.cfg.EnforcementAutoExecuteDryRun {
+		slog.Info("enforce-auto-execute: DRY RUN would archive",
+			"space_id", spaceID, "constraint_code", constraintCode,
+			"archive_reason", "rsic_enforcement_false_positive_high")
+		deliverables["result"] = "dry_run_would_archive"
+		return deliverables, nil
+	}
+	// Real archive
+	if d.guidanceCalibrator == nil {
+		return nil, fmt.Errorf("guidance calibrator not available")
+	}
+	found, archived, err := d.guidanceCalibrator.ArchiveConstraintByCode(
+		ctx, spaceID, constraintCode, "rsic_enforcement_false_positive_high")
+	if err != nil {
+		return nil, err
+	}
+	slog.Info("enforce-auto-execute: archived constraint",
+		"space_id", spaceID, "constraint_code", constraintCode,
+		"found", found, "archived", archived,
+		"archive_reason", "rsic_enforcement_false_positive_high")
+	if d.alertDispatcher != nil && archived {
+		d.alertDispatcher.SendAlert(ctx, "rsic-auto-archive",
+			"RSIC auto-archived a constraint (enforcement_false_positive_high)",
+			fmt.Sprintf("Space %q code %q archived after repeated blocked_false_positive outcomes. Reversible via `MATCH (n {constraint_code: %q}) SET n.is_archived = false REMOVE n.archive_reason`.",
+				spaceID, constraintCode, constraintCode),
+			SeverityMedium)
+	}
+	deliverables["result"] = "archived"
+	deliverables["found"] = found
+	deliverables["archived"] = archived
+	return deliverables, nil
+}
+
+// enforceReserveSlot checks + reserves a global rate slot AND records the
+// per-code cooldown. Returns false when either guard denies (caller emits
+// "skipped_rate_limited" deliverable). Sliding window over the past hour.
+func (d *Dispatcher) enforceReserveSlot(constraintCode string) bool {
+	maxPerHour := d.cfg.EnforcementAutoExecuteMaxPerHour
+	if maxPerHour <= 0 {
+		maxPerHour = 3
+	}
+	cooldown := time.Duration(d.cfg.EnforcementAutoExecuteCooldownHours) * time.Hour
+	if cooldown <= 0 {
+		cooldown = 24 * time.Hour
+	}
+	now := time.Now()
+	d.enforceMu.Lock()
+	defer d.enforceMu.Unlock()
+	if d.enforceCodeCooldowns == nil {
+		d.enforceCodeCooldowns = make(map[string]time.Time)
+	}
+	// Per-code cooldown check
+	if until, ok := d.enforceCodeCooldowns[constraintCode]; ok && now.Before(until) {
+		slog.Warn("enforce-auto-execute: per-code cooldown active",
+			"constraint_code", constraintCode, "cooldown_until", until.Format(time.RFC3339))
+		return false
+	}
+	// Sliding-window global limit — trim old + count
+	cutoff := now.Add(-1 * time.Hour)
+	kept := d.enforceRecentArchives[:0]
+	for _, t := range d.enforceRecentArchives {
+		if t.After(cutoff) {
+			kept = append(kept, t)
+		}
+	}
+	d.enforceRecentArchives = kept
+	if len(d.enforceRecentArchives) >= maxPerHour {
+		slog.Warn("enforce-auto-execute: global rate limit reached",
+			"max_per_hour", maxPerHour, "current", len(d.enforceRecentArchives))
+		return false
+	}
+	// Reserve the slot + record cooldown
+	d.enforceRecentArchives = append(d.enforceRecentArchives, now)
+	d.enforceCodeCooldowns[constraintCode] = now.Add(cooldown)
+	return true
 }
 
 // executeIngestStaleSpaces triggers re-ingestion for spaces past the staleness threshold (Phase 47.2).
