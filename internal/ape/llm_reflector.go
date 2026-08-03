@@ -390,6 +390,10 @@ var AllowedLLMActions = []string{
 	"review_guidance_effectiveness",
 	"adjust_guidance_confidence",
 	"archive_ineffective_constraints",
+	// ENFORCE-AUTO-EXECUTE (2026-08-03): targeted per-code archive with
+	// provenance stamp; dispatcher applies strict guards (rate limit,
+	// per-code cooldown, protected-space allowlist, dry-run mode).
+	"archive_constraint_by_code",
 	// Recovery/review
 	"flush_recovery_buffer",
 	"review_nli_calibration",

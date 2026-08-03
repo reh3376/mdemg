@@ -14,6 +14,7 @@ import (
 type mockDatasetProvider struct {
 	metricTrends        map[string]*tsdb.MetricTrend
 	enforcementOutcomes map[string]tsdb.EnforcementOutcomeCounts // ENFORCE-004-FOLLOWUP
+	overrideHistory     []tsdb.OverrideEvent                     // ENFORCE-OVERRIDES-TSDB
 }
 
 func (m *mockDatasetProvider) LLMPerformance(_ context.Context, _ string, _ time.Duration) ([]tsdb.LLMPerformanceSummary, error) {
@@ -51,6 +52,11 @@ func (m *mockDatasetProvider) GuidanceEffectiveness(_ context.Context, _ string,
 // override lives in the test that consumes the reflect pattern.
 func (m *mockDatasetProvider) EnforcementOutcomes(_ context.Context, _ string, _ time.Duration) (map[string]tsdb.EnforcementOutcomeCounts, error) {
 	return m.enforcementOutcomes, nil
+}
+
+// ENFORCE-OVERRIDES-TSDB: mock returns nil slice by default.
+func (m *mockDatasetProvider) OverrideHistory(_ context.Context, _ string, _ time.Duration) ([]tsdb.OverrideEvent, error) {
+	return m.overrideHistory, nil
 }
 
 // ─── Pattern 25: LLM Latency Regression ───
@@ -638,8 +644,8 @@ func TestReflect_EnforcementFalsePositiveHigh_Fires(t *testing.T) {
 	if got == nil {
 		t.Fatal("enforcement_false_positive_high did not fire for 5 blocked_false_positive")
 	}
-	if got.RecommendedAction != "archive_ineffective_constraints" {
-		t.Errorf("action = %q, want archive_ineffective_constraints", got.RecommendedAction)
+	if got.RecommendedAction != "archive_constraint_by_code" {
+		t.Errorf("action = %q, want archive_constraint_by_code (ENFORCE-AUTO-EXECUTE)", got.RecommendedAction)
 	}
 	if got.Value != 5 {
 		t.Errorf("value = %v, want 5", got.Value)

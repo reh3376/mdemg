@@ -735,6 +735,16 @@ func (s *Service) ArchiveStaleConstraints(ctx context.Context, spaceID string) (
 	return s.confidenceUpdater.ArchiveStaleConstraints(ctx, spaceID)
 }
 
+// ArchiveConstraintByCode delegates to the confidence updater to archive a
+// SPECIFIC constraint by its constraint_code, stamping the archive_reason
+// for forensics. Returns (found, archived, error). ENFORCE-AUTO-EXECUTE.
+func (s *Service) ArchiveConstraintByCode(ctx context.Context, spaceID, constraintCode, archiveReason string) (bool, bool, error) {
+	if s.confidenceUpdater == nil {
+		return false, false, fmt.Errorf("confidence updater not available")
+	}
+	return s.confidenceUpdater.ArchiveConstraintByCode(ctx, spaceID, constraintCode, archiveReason)
+}
+
 // SetRetriever sets the retrieval provider for full-spectrum knowledge access (J7).
 func (s *Service) SetRetriever(r RetrievalProvider) {
 	s.retriever = r

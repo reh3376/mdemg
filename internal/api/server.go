@@ -819,6 +819,9 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 
 	rsicPlanner := ape.NewPlanner(cfg)
 	rsicDispatcher := ape.NewDispatcher(driver, learnerAdapter, convAdapter, hiddenAdapter)
+	// ENFORCE-AUTO-EXECUTE (2026-08-03): wire config so the enforcement
+	// auto-archive executor can consult its guard flags at dispatch time.
+	rsicDispatcher.SetConfig(cfg)
 	// J17: Wire protocol evolver to dispatcher
 	if jiminySvc != nil && cfg.J17MetricsEnabled {
 		evolver := jiminySvc.NewProtocolEvolver()
@@ -1297,6 +1300,12 @@ func (s *Server) SetTSDBClient(client *tsdb.Client) {
 		conflictTracker := conversation.NewConflictTracker(client.Pool(), 0)
 		if s.jiminySvc != nil {
 			s.jiminySvc.SetConflictTracker(conflictTracker)
+			// ENFORCE-OVERRIDES-TSDB (2026-08-03): wire the override manager to
+			// the constraint_overrides hypertable so RSIC + UI can query history
+			// alongside outcomes. JSONL audit persists as forensic + portable.
+			if om := s.jiminySvc.GetOverrides(); om != nil {
+				om.SetTSDB(client.Pool(), s.cfg.RSICWatchdogSpaceID)
+			}
 		}
 		if s.consultant != nil {
 			s.consultant.SetConflictTracker(conflictTracker)
@@ -2821,6 +2830,10 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/jiminy/strict", s.handleJiminyStrict)
 	// JIMINY-ENFORCE-003: operator escape-hatch. GET list / POST apply / DELETE revoke.
 	mux.HandleFunc("/v1/jiminy/override", s.handleJiminyOverride)
+	// ENFORCE-UI-OVERRIDES (2026-08-03): TSDB-backed history for the UI timeline
+	// + future RSIC action-execution reads. Separate path so it doesn't collide
+	// with the active-list GET on /v1/jiminy/override.
+	mux.HandleFunc("/v1/jiminy/override/history", s.handleJiminyOverrideHistory)
 	mux.HandleFunc("/v1/jiminy/reformulate", s.handleJiminyReformulate)
 	mux.HandleFunc("/v1/jiminy/classify", s.handleJiminyClassify)
 	mux.HandleFunc("/v1/jiminy/extension", s.handleJ17Extension)

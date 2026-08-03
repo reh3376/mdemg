@@ -18,6 +18,12 @@
       "disposition": "IN_USE",
       "notes": "Guidance outcome telemetry — TELEMETRY-ONLY table (retrain consumes guidance_training_rows). See CLASSIFIER-CONSISTENCY-001."
     },
+    "constraint_overrides": {
+      "writers": ["internal/jiminy/override.go::auditTSDB (V0033, sync INSERT per op)"],
+      "readers": ["internal/tsdb/dataset_builder.go::OverrideHistory (RSIC + UI reader)", "internal/api/server.go::handleJiminyOverrideHistory (GET /v1/jiminy/override/history)"],
+      "disposition": "IN_USE",
+      "notes": "ENFORCE-OVERRIDES-TSDB (2026-08-03). Operator override apply/revoke/expire events; feeds Jiminy tab UI + RSIC enforcement_false_positive_high pattern."
+    },
     "context_catalog_versions": {
       "writers": ["internal/hidden/context_catalog_builder.go (V0020)"],
       "readers": ["internal/retrieval/column_context.go (query-time catalog lookup)"],

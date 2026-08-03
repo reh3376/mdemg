@@ -839,7 +839,15 @@
         "internal/cli/jiminy.go (mdemg jiminy override apply|list|revoke)"
       ],
       "disposition": "IN_USE",
-      "notes": "JIMINY-ENFORCE-003 (2026-08-03): operator escape-hatch for the enforcement arc. POST=apply / GET=list / DELETE=revoke on the same path (method-multiplexed). Time-boxed constraint overrides suppress classifier deny verdicts on WARNED+ escalations that the operator judges as false positives. Every apply/revoke JSONL-audited at ~/.mdemg/jiminy-overrides.jsonl. UI display of active overrides deferred as a small follow-up. UATS spec deferred to JIMINY-ENFORCE-004 (which will formalize the outcome-writing contract) — the CLI live-verified all three methods end-to-end.",
+      "notes": "JIMINY-ENFORCE-003 (2026-08-03): operator escape-hatch for the enforcement arc. POST=apply / GET=list / DELETE=revoke on the same path (method-multiplexed). Time-boxed constraint overrides suppress classifier deny verdicts on WARNED+ escalations that the operator judges as false positives. Every apply/revoke JSONL-audited at ~/.mdemg/jiminy-overrides.jsonl. UI display of active overrides deferred as a small follow-up. UATS spec deferred to JIMINY-ENFORCE-004 (which will formalize the outcome-writing contract) \u2014 the CLI live-verified all three methods end-to-end.",
+      "uats_specs": []
+    },
+    "/v1/jiminy/override/history": {
+      "consumers": [
+        "internal/api/ui/tabs/jiminy.js (Recent Override Timeline section)"
+      ],
+      "disposition": "IN_USE",
+      "notes": "ENFORCE-UI-OVERRIDES (2026-08-03): reads the constraint_overrides hypertable (V0033, ENFORCE-OVERRIDES-TSDB) and returns per-op events ORDER BY time DESC for the Jiminy UI timeline. Also intended as a read path for the future RSIC action-execution layer (auto-archive constraints with sustained blocked_false_positive volume). space_id defaults to RSICWatchdogSpaceID; hours defaults to 168 (7d). GET-only.",
       "uats_specs": []
     },
     "/v1/jiminy/protocol/feedback": {

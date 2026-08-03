@@ -15,6 +15,11 @@ type mockGuidanceCalibrator struct {
 	archiveErr     error
 	updateCalls    []string // node IDs updated
 	updateOutcomes []string // outcomes applied
+
+	// ENFORCE-AUTO-EXECUTE
+	archiveByCodeFound    bool
+	archiveByCodeArchived bool
+	archiveByCodeErr      error
 }
 
 func (m *mockGuidanceCalibrator) GetConstraintEffectiveness(_ context.Context, _ string) ([]GuidanceEffectivenessItem, error) {
@@ -48,6 +53,12 @@ func (m *mockGuidanceCalibrator) UpdateNodeConfidence(_ context.Context, nodeID 
 
 func (m *mockGuidanceCalibrator) ArchiveStaleConstraints(_ context.Context, _ string) (int, error) {
 	return m.archiveCount, m.archiveErr
+}
+
+// ENFORCE-AUTO-EXECUTE: mock returns (found, archived, err) — tests override
+// via the corresponding mock fields.
+func (m *mockGuidanceCalibrator) ArchiveConstraintByCode(_ context.Context, _, _, _ string) (bool, bool, error) {
+	return m.archiveByCodeFound, m.archiveByCodeArchived, m.archiveByCodeErr
 }
 
 func TestExecuteReviewGuidanceEffectiveness(t *testing.T) {

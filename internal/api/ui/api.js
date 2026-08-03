@@ -146,3 +146,26 @@ export const adminInstances = () => fetch('/v1/admin/instances').then(r => {
 // JIMINY-MODE-001 — read/write Jiminy enforcement mode
 export const jiminyStrictGet = (sessionID) => get(`/v1/jiminy/strict?session_id=${encodeURIComponent(sessionID)}`);
 export const jiminyStrictSet = (sessionID, enabled) => post('/v1/jiminy/strict', { session_id: sessionID, enabled });
+
+// JIMINY-ENFORCE-003 / ENFORCE-UI-OVERRIDES (2026-08-03) — override endpoints
+export const jiminyOverrideList = (sessionID) => {
+    const q = sessionID ? `?session_id=${encodeURIComponent(sessionID)}` : '';
+    return get(`/v1/jiminy/override${q}`);
+};
+export const jiminyOverrideApply = (sessionID, constraintCode, reason, durationSec) =>
+    post('/v1/jiminy/override', { session_id: sessionID, constraint_code: constraintCode, reason, duration_sec: durationSec });
+export const jiminyOverrideRevoke = async (sessionID, constraintCode) => {
+    const res = await fetch(_baseURL + '/v1/jiminy/override', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: sessionID, constraint_code: constraintCode }),
+    });
+    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+    return res.json();
+};
+export const jiminyOverrideHistory = (spaceID, hours) => {
+    const q = new URLSearchParams();
+    if (spaceID) q.set('space_id', spaceID);
+    if (hours) q.set('hours', String(hours));
+    return get('/v1/jiminy/override/history' + (q.toString() ? '?' + q.toString() : ''));
+};

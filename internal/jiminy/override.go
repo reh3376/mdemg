@@ -1,6 +1,7 @@
 package jiminy
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -8,6 +9,8 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // JIMINY-ENFORCE-003 (2026-08-03): operator escape-hatch for the enforcement arc.
@@ -57,22 +60,36 @@ type overrideKey struct {
 }
 
 // OverrideManager holds per-session per-constraint overrides. Safe for
-// concurrent use. Optional JSONL audit path — empty disables audit.
+// concurrent use. Two independent audit sinks:
+//   - JSONL file (auditPath) — forensic + portable (works without TSDB)
+//   - TSDB constraint_overrides table (tsdbPool) — queryable by RSIC + UI
+// Both are best-effort; write failures WARN-log and the override itself
+// still succeeds.
 type OverrideManager struct {
 	mu        sync.RWMutex
 	entries   map[overrideKey]*OverrideEntry
 	auditPath string
+	tsdbPool  *pgxpool.Pool // ENFORCE-OVERRIDES-TSDB (nil-safe when TSDB disabled)
+	spaceID   string        // default space stamped on TSDB rows when caller doesn't override
 }
 
-// NewOverrideManager constructs a manager. auditPath="" disables audit
-// (tests + memory-only fallback). Non-empty path — the enclosing directory
-// is MkdirAll'd; any write failure is WARN-logged and the operation still
-// succeeds (audit is best-effort, not load-bearing for the override itself).
+// NewOverrideManager constructs a memory + JSONL-only manager.
+// auditPath="" disables JSONL audit (tests + memory-only fallback).
 func NewOverrideManager(auditPath string) *OverrideManager {
 	return &OverrideManager{
 		entries:   make(map[overrideKey]*OverrideEntry),
 		auditPath: auditPath,
 	}
+}
+
+// SetTSDB wires the pgxpool + default space for the constraint_overrides
+// hypertable audit (ENFORCE-OVERRIDES-TSDB). Called from the server init
+// after the pool is up. Nil pool is a no-op (JSONL-only fallback).
+func (m *OverrideManager) SetTSDB(pool *pgxpool.Pool, defaultSpaceID string) {
+	m.mu.Lock()
+	m.tsdbPool = pool
+	m.spaceID = defaultSpaceID
+	m.mu.Unlock()
 }
 
 // Apply installs an override. Returns the resulting entry (with applied_at
@@ -165,11 +182,15 @@ func (m *OverrideManager) Revoke(sessionID, constraintCode string) *OverrideEntr
 	return entry
 }
 
-// audit writes a single JSONL line to the audit file. Best-effort; a write
-// failure is WARN-logged but does not fail the caller (audit is durable
-// forensic record, not load-bearing for the override itself).
+// audit writes to both sinks (JSONL + TSDB constraint_overrides). Both are
+// best-effort — write failures WARN-log but do not fail the caller (audit
+// is durable forensic record, not load-bearing for the override itself).
 func (m *OverrideManager) audit(op string, entry *OverrideEntry) {
-	if m.auditPath == "" || entry == nil {
+	if entry == nil {
+		return
+	}
+	m.auditTSDB(op, entry)
+	if m.auditPath == "" {
 		return
 	}
 	if err := os.MkdirAll(filepath.Dir(m.auditPath), 0o755); err != nil {
@@ -198,5 +219,39 @@ func (m *OverrideManager) audit(op string, entry *OverrideEntry) {
 	defer f.Close()
 	if _, err := f.Write(append(line, '\n')); err != nil {
 		slog.Warn("override audit: write failed", "path", m.auditPath, "error", err)
+	}
+}
+
+// auditTSDB inserts one row into constraint_overrides. Silent no-op when
+// tsdbPool is nil (test / JSONL-only fallback). Uses a short timeout so the
+// hot Apply/Revoke path isn't blocked by a slow database. Best-effort —
+// failures WARN-log but caller succeeds.
+//
+// NO MUTEX: audit() is called from BOTH lock-held paths (Get's lazy purge
+// under mu.Lock) and lock-released paths (Apply after mu.Unlock). Taking the
+// mutex here would deadlock the lock-held caller. Instead we accept an
+// unsynchronised read of tsdbPool + spaceID — SetTSDB is called once at
+// startup before any Apply/Get/Revoke, so a data race here is impossible
+// in the shipped call order. (If SetTSDB grows a runtime-toggle use case,
+// switch to atomic.Value.)
+func (m *OverrideManager) auditTSDB(op string, entry *OverrideEntry) {
+	pool := m.tsdbPool
+	spaceID := m.spaceID
+	if pool == nil || entry == nil {
+		return
+	}
+	if spaceID == "" {
+		spaceID = "mdemg-dev"
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	_, err := pool.Exec(ctx, `
+		INSERT INTO constraint_overrides
+		    (time, space_id, session_id, constraint_code, reason, op, applied_at, expires_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+		time.Now(), spaceID, entry.SessionID, entry.ConstraintCode,
+		entry.Reason, op, entry.AppliedAt, entry.ExpiresAt)
+	if err != nil {
+		slog.Warn("override audit: TSDB insert failed", "op", op, "code", entry.ConstraintCode, "error", err)
 	}
 }

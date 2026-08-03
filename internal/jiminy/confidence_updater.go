@@ -155,6 +155,79 @@ RETURN count(n) AS archived_count`
 	return count, nil
 }
 
+// ArchiveConstraintByCode archives a specific role_type='constraint' node
+// by its constraint_code, stamping the archive_reason for forensics. Uses
+// the `is_archived` boolean + archive_reason property (parity with the
+// shipped tombstone pattern in JIMINY-CORPUS-001 / JIMINY-CORPUS-002).
+// Returns (found, archived, error):
+//   found=false                   → no matching non-archived node exists (idempotent no-op)
+//   found=true, archived=false    → node existed but SET didn't mutate (already archived)
+//   found=true, archived=true     → node was archived by this call
+//
+// Reversible via `MATCH (n {constraint_code: X}) SET n.is_archived = false
+// REMOVE n.archive_reason`. ENFORCE-AUTO-EXECUTE (2026-08-03).
+func (u *ConfidenceUpdater) ArchiveConstraintByCode(ctx context.Context, spaceID, constraintCode, archiveReason string) (bool, bool, error) {
+	if constraintCode == "" {
+		return false, false, fmt.Errorf("archive constraint by code: empty constraint_code")
+	}
+	if archiveReason == "" {
+		archiveReason = "rsic_auto_archive"
+	}
+	cypher := `
+MATCH (n:MemoryNode {space_id: $spaceId, constraint_code: $code})
+WHERE n.role_type = 'constraint'
+  AND NOT coalesce(n.is_archived, false)
+SET n.is_archived = true,
+    n.archived_at = datetime(),
+    n.archive_reason = $reason
+RETURN count(n) AS archived_count, n.node_id AS node_id`
+
+	sess := u.driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: "neo4j"})
+	defer sess.Close(ctx)
+
+	// First check: does a matching non-archived node exist? (drives found=false)
+	checkCypher := `
+MATCH (n:MemoryNode {space_id: $spaceId, constraint_code: $code})
+WHERE n.role_type = 'constraint' AND NOT coalesce(n.is_archived, false)
+RETURN count(n) > 0 AS exists`
+	found, err := neo4j.ExecuteRead(ctx, sess, func(tx neo4j.ManagedTransaction) (bool, error) {
+		res, err := tx.Run(ctx, checkCypher, map[string]any{"spaceId": spaceID, "code": constraintCode})
+		if err != nil {
+			return false, err
+		}
+		if res.Next(ctx) {
+			raw, _ := res.Record().Get("exists")
+			b, _ := raw.(bool)
+			return b, res.Err()
+		}
+		return false, res.Err()
+	})
+	if err != nil {
+		return false, false, fmt.Errorf("archive constraint by code: check (space=%s code=%s): %w", spaceID, constraintCode, err)
+	}
+	if !found {
+		return false, false, nil
+	}
+
+	count, err := neo4j.ExecuteWrite(ctx, sess, func(tx neo4j.ManagedTransaction) (int, error) {
+		res, err := tx.Run(ctx, cypher, map[string]any{
+			"spaceId": spaceID, "code": constraintCode, "reason": archiveReason,
+		})
+		if err != nil {
+			return 0, err
+		}
+		if res.Next(ctx) {
+			raw, _ := res.Record().Get("archived_count")
+			return int(asFloat64(raw)), res.Err()
+		}
+		return 0, res.Err()
+	})
+	if err != nil {
+		return true, false, fmt.Errorf("archive constraint by code: write (space=%s code=%s): %w", spaceID, constraintCode, err)
+	}
+	return true, count > 0, nil
+}
+
 // AdjustConfidenceDirect applies a confidence delta WITHOUT touching the
 // outcome counters (RSIC-VALIDATE-001). RSIC's self-calibration previously
 // injected synthetic "followed"/"ignored" outcomes through UpdateConfidence,

@@ -540,6 +540,12 @@ type GuidanceCalibrationProvider interface {
 	// ConfidenceCalibrationDeltas exposes the configured boost/decay magnitudes.
 	ConfidenceCalibrationDeltas() (boost, decay float64)
 	ArchiveStaleConstraints(ctx context.Context, spaceID string) (int, error)
+	// ArchiveConstraintByCode archives a specific constraint by its constraint_code
+	// with a provenance stamp (archive_reason). Reversible via
+	// is_archived=false. Returns (found, archived, error) where found=false
+	// signals no matching non-archived node exists (idempotent no-op).
+	// ENFORCE-AUTO-EXECUTE (2026-08-03).
+	ArchiveConstraintByCode(ctx context.Context, spaceID, constraintCode, archiveReason string) (found, archived bool, err error)
 }
 
 // GuidanceEffectivenessItem carries per-constraint effectiveness metrics for RSIC calibration.
