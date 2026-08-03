@@ -51,3 +51,9 @@ CREATE INDEX IF NOT EXISTS idx_constraint_overrides_session
 -- and useful for retrospective analysis of enforcement calibration).
 SELECT add_retention_policy('constraint_overrides', interval '180 days',
     if_not_exists => TRUE);
+
+-- Bump schema version marker so RSIC's schema_drift_detected pattern stays
+-- silent (see internal/ape/self_reflect.go — tsdbVer < TSDBRequiredSchemaVersion
+-- fires alert_schema_drift). Every migration bumps by 1; TSDB_REQUIRED_SCHEMA_
+-- VERSION default in internal/config/config.go must land at the same value.
+UPDATE tsdb_schema_meta SET value = '33' WHERE key = 'schema_version';
