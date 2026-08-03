@@ -12,7 +12,8 @@ import (
 
 // mockDatasetProvider implements tsdb.DatasetProvider for tests.
 type mockDatasetProvider struct {
-	metricTrends map[string]*tsdb.MetricTrend
+	metricTrends        map[string]*tsdb.MetricTrend
+	enforcementOutcomes map[string]tsdb.EnforcementOutcomeCounts // ENFORCE-004-FOLLOWUP
 }
 
 func (m *mockDatasetProvider) LLMPerformance(_ context.Context, _ string, _ time.Duration) ([]tsdb.LLMPerformanceSummary, error) {
@@ -44,6 +45,12 @@ func (m *mockDatasetProvider) ProductionDrift(_ context.Context) (*tsdb.Producti
 
 func (m *mockDatasetProvider) GuidanceEffectiveness(_ context.Context, _ string, _ time.Duration) (float64, int, error) {
 	return 0, 0, nil // JIMINY-SIGNAL-001: mock returns no data → caller uses Neo4j fallback
+}
+
+// ENFORCE-004-FOLLOWUP: mock returns empty map by default; per-test EnforcementOutcomes
+// override lives in the test that consumes the reflect pattern.
+func (m *mockDatasetProvider) EnforcementOutcomes(_ context.Context, _ string, _ time.Duration) (map[string]tsdb.EnforcementOutcomeCounts, error) {
+	return m.enforcementOutcomes, nil
 }
 
 // ─── Pattern 25: LLM Latency Regression ───
@@ -600,5 +607,121 @@ func TestReflect_ProductionDriftDetected_UsesConfigMargin(t *testing.T) {
 		if got != tc.wantFire {
 			t.Errorf("margin=%v delta=%v: got fire=%v want %v", tc.margin, tc.delta, got, tc.wantFire)
 		}
+	}
+}
+
+// ─── ENFORCE-004-FOLLOWUP: enforcement outcome patterns ───
+
+func TestReflect_EnforcementFalsePositiveHigh_Fires(t *testing.T) {
+	// Fires when a constraint has ≥ threshold blocked_false_positive outcomes.
+	cfg := config.Config{BlockedFalsePositiveAlertThreshold: 3}
+	r := NewReflector(cfg, nil)
+
+	report := &SelfAssessmentReport{
+		SpaceID: "test",
+		EnforcementOutcomes: map[string]tsdb.EnforcementOutcomeCounts{
+			"OVERRIDDEN-RULE": {BlockedFalsePositive: 5},
+			"OK-RULE":         {BlockedFalsePositive: 2}, // below threshold
+		},
+	}
+	insights, err := r.Reflect(context.Background(), report)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got *ReflectionInsight
+	for i := range insights {
+		if insights[i].PatternID == "enforcement_false_positive_high" {
+			got = &insights[i]
+			break
+		}
+	}
+	if got == nil {
+		t.Fatal("enforcement_false_positive_high did not fire for 5 blocked_false_positive")
+	}
+	if got.RecommendedAction != "archive_ineffective_constraints" {
+		t.Errorf("action = %q, want archive_ineffective_constraints", got.RecommendedAction)
+	}
+	if got.Value != 5 {
+		t.Errorf("value = %v, want 5", got.Value)
+	}
+	// The OK-RULE (count 2) must not fire.
+	for _, i := range insights {
+		if i.PatternID == "enforcement_false_positive_high" && i.Value < 3 {
+			t.Errorf("below-threshold fire on count %v", i.Value)
+		}
+	}
+}
+
+func TestReflect_EnforcementMissedViolationHigh_Fires(t *testing.T) {
+	cfg := config.Config{MissedViolationAlertThreshold: 3}
+	r := NewReflector(cfg, nil)
+
+	report := &SelfAssessmentReport{
+		SpaceID: "test",
+		EnforcementOutcomes: map[string]tsdb.EnforcementOutcomeCounts{
+			"MISSED-RULE": {MissedViolation: 4},
+		},
+	}
+	insights, err := r.Reflect(context.Background(), report)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got *ReflectionInsight
+	for i := range insights {
+		if insights[i].PatternID == "enforcement_missed_violation_high" {
+			got = &insights[i]
+			break
+		}
+	}
+	if got == nil {
+		t.Fatal("enforcement_missed_violation_high did not fire for 4 missed_violation")
+	}
+	if got.RecommendedAction != "adjust_guidance_confidence" {
+		t.Errorf("action = %q, want adjust_guidance_confidence", got.RecommendedAction)
+	}
+}
+
+func TestReflect_EnforcementOutcomes_NoDataNoFire(t *testing.T) {
+	cfg := config.Config{BlockedFalsePositiveAlertThreshold: 3, MissedViolationAlertThreshold: 3}
+	r := NewReflector(cfg, nil)
+	report := &SelfAssessmentReport{SpaceID: "test"} // EnforcementOutcomes nil
+	insights, err := r.Reflect(context.Background(), report)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, i := range insights {
+		if i.PatternID == "enforcement_false_positive_high" || i.PatternID == "enforcement_missed_violation_high" {
+			t.Errorf("enforcement pattern fired with no data: %+v", i)
+		}
+	}
+}
+
+func TestReflect_EnforcementOutcomes_ZeroThresholdDisables(t *testing.T) {
+	// Config threshold ≤0 → pattern uses safe default 3, not disabled.
+	// (Alert rule respects ≤0 = disabled; reflector uses defaults for its
+	// per-cycle guard so an unconfigured operator still gets the signal.)
+	cfg := config.Config{BlockedFalsePositiveAlertThreshold: 0}
+	r := NewReflector(cfg, nil)
+	report := &SelfAssessmentReport{
+		SpaceID: "test",
+		EnforcementOutcomes: map[string]tsdb.EnforcementOutcomeCounts{
+			"HOT": {BlockedFalsePositive: 5},
+		},
+	}
+	insights, err := r.Reflect(context.Background(), report)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, i := range insights {
+		if i.PatternID == "enforcement_false_positive_high" {
+			found = true
+			if i.Threshold != 3 {
+				t.Errorf("default threshold should be 3, got %v", i.Threshold)
+			}
+		}
+	}
+	if !found {
+		t.Error("threshold=0 should fall back to safe default 3, not disable the pattern")
 	}
 }

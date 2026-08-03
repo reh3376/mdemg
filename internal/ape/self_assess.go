@@ -238,6 +238,14 @@ func (a *Assessor) Assess(ctx context.Context, spaceID string, tier CycleTier) (
 		} else {
 			slog.Warn("RSIC assess: embedding coverage query failed", "error", dErr)
 		}
+		// ENFORCE-004-FOLLOWUP: per-constraint enforcement outcome counts.
+		// Silent skip on error — the enforcement patterns simply won't fire
+		// this cycle; alerts already cover the operator-visible layer.
+		if enf, dErr := a.datasetProvider.EnforcementOutcomes(ctx, spaceID, window); dErr == nil {
+			report.EnforcementOutcomes = enf
+		} else {
+			slog.Warn("RSIC assess: enforcement outcomes query failed", "error", dErr)
+		}
 		if readiness, dErr := a.datasetProvider.TrainingDataReadiness(ctx); dErr == nil {
 			report.TrainingReadiness = readiness
 			// SF-1 heartbeat: only on SUCCESS. A silent query failure stops
