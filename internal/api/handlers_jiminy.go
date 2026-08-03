@@ -594,9 +594,24 @@ func emitJiminyBlockAlert(ctx context.Context, dispatcher alertSender, req jimin
 	if reason == "" {
 		reason = "constraint violation"
 	}
+	// JIMINY-ENFORCE-001 + JIMINY-ENFORCE-002: message shape includes tool_name
+	// so operator can tell Write/Edit blocks (with file_path) from Bash blocks
+	// (with truncated command preview). Bash requests carry empty file_path;
+	// the classify request's AgentOutput IS the command.
 	msg := reason
-	if req.FilePath != "" {
+	switch {
+	case req.FilePath != "":
 		msg = fmt.Sprintf("%s (file: %s, tool: %s)", reason, req.FilePath, req.ToolName)
+	case req.ToolName == "Bash" && req.AgentOutput != "":
+		// Truncate the command preview so a runaway pipeline doesn't blow
+		// past the alert-message size budget.
+		cmd := req.AgentOutput
+		if len(cmd) > 200 {
+			cmd = cmd[:200] + "…"
+		}
+		msg = fmt.Sprintf("%s (tool: Bash, command: %s)", reason, cmd)
+	case req.ToolName != "":
+		msg = fmt.Sprintf("%s (tool: %s)", reason, req.ToolName)
 	}
 	dispatcher.Send(ctx, alert.Alert{
 		Service:  "jiminy-block",
