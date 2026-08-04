@@ -72,6 +72,7 @@ type Service struct {
 	guidanceTrainingWriter   GuidanceTrainingWriter        // JIMINY-RELEVANCE-001: TSDB writer for the guidance training-evidence corpus
 	contradictedDraftWriter  ContradictedDraftWriter       // JIMINY-CONTRADICTED-BRIDGE-001: TSDB writer for contradicted-outcome correction drafts
 	contradictedDraftCache   *contradictedBridgeCache      // JIMINY-CONTRADICTED-BRIDGE-001: dedup LRU
+	contradictedDraftGate    *ContradictedBridgeGate       // JIMINY-CONTRADICTED-BRIDGE-QUALITY-001: content-quality gate
 	surfaceCooldown          *SurfaceCooldownTracker       // JIMINY-CORPUS-001 Lever A: per-session surfacing cooldown
 
 	// JIMINY-CORPUS-001 Lever B: per-space effectiveness-prior cache (TTL-bounded;
@@ -2000,20 +2001,32 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 		// so a repeat-violation burst doesn't spawn duplicates.
 		if outcome == OutcomeContradicted && s.contradictedDraftWriter != nil &&
 			s.cfg.JiminyContradictedBridgeEnabled {
-			actionHash := hashAction(req.GuidanceID, req.ActionSummary)
-			if s.contradictedDraftCache == nil || !s.contradictedDraftCache.TrySeen(req.GuidanceID, actionHash) {
-				srcID := ""
-				if len(item.SourceNodes) > 0 {
-					srcID = item.SourceNodes[0]
+			// JIMINY-CONTRADICTED-BRIDGE-QUALITY-001: content-quality gate —
+			// reject transient / non-actionable guidance BEFORE writing a HITL
+			// draft. Same regex list as ConstraintPromotionGate; type filter
+			// defaults to actionable-only (constraint, correction).
+			if reason, rejected := s.contradictedDraftGate.Reject(item.Type, item.Content); rejected {
+				slog.Info("jiminy: contradicted draft suppressed by quality gate",
+					"guidance_id", req.GuidanceID,
+					"guidance_type", string(item.Type),
+					"reason", reason,
+					"space_id", req.SpaceID)
+			} else {
+				actionHash := hashAction(req.GuidanceID, req.ActionSummary)
+				if s.contradictedDraftCache == nil || !s.contradictedDraftCache.TrySeen(req.GuidanceID, actionHash) {
+					srcID := ""
+					if len(item.SourceNodes) > 0 {
+						srcID = item.SourceNodes[0]
+					}
+					maxLen := s.cfg.JiminyContradictedBridgeMaxContentLen
+					incorrect, correct := buildContradictedDraft(req.ActionSummary, item.Content, maxLen)
+					s.contradictedDraftWriter.RecordDraft(
+						newDraftID(), req.SpaceID, req.GuidanceID, string(item.Type), srcID,
+						clipContent(item.Content, maxLen), clipContent(req.ActionSummary, maxLen),
+						actionHash, incorrect, correct, feedbackSessionID,
+						cr.Confidence,
+					)
 				}
-				maxLen := s.cfg.JiminyContradictedBridgeMaxContentLen
-				incorrect, correct := buildContradictedDraft(req.ActionSummary, item.Content, maxLen)
-				s.contradictedDraftWriter.RecordDraft(
-					newDraftID(), req.SpaceID, req.GuidanceID, string(item.Type), srcID,
-					clipContent(item.Content, maxLen), clipContent(req.ActionSummary, maxLen),
-					actionHash, incorrect, correct, feedbackSessionID,
-					cr.Confidence,
-				)
 			}
 		}
 
@@ -2544,6 +2557,16 @@ func (s *Service) SetContradictedDraftWriter(w ContradictedDraftWriter) {
 		cacheMax = 1024
 	}
 	s.contradictedDraftCache = newContradictedBridgeCache(cacheMax)
+	// JIMINY-CONTRADICTED-BRIDGE-QUALITY-001: content-quality gate.
+	allowed := make([]GuidanceType, 0, len(s.cfg.JiminyContradictedBridgeAllowedTypes))
+	for _, t := range s.cfg.JiminyContradictedBridgeAllowedTypes {
+		allowed = append(allowed, GuidanceType(t))
+	}
+	s.contradictedDraftGate = NewContradictedBridgeGate(
+		s.cfg.JiminyContradictedBridgeGateEnabled,
+		allowed,
+		s.cfg.JiminyContradictedBridgeRejectPatterns,
+	)
 }
 
 // resolveSourceMeta does a bounded, best-effort Neo4j lookup of a source node's
