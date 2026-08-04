@@ -258,6 +258,38 @@ func (s contradictedDraftsSink) Apply(ctx context.Context, g review.Grade) (revi
 	}
 }
 
+// ApplyNonReinforcing implements review.NonReinforcingApplier: lets the
+// auto-grader drain draft-dismiss verdicts (status-only, no substrate mutation)
+// when reinforce=false. Approve verdicts are refused here (return ok=false)
+// because they mint an L0 obs = substrate mutation; those still require an
+// operator grade to fire Apply.
+//
+// The dismissal flip touches ONLY the draft's own row in the
+// contradicted_correction_drafts hypertable — no Neo4j nodes, no trust scores,
+// no embeddings. That's the invariant boundary that makes this safe under
+// reinforce=false.
+//
+// HITL-AUTO-DISMISS-001 (2026-08-04).
+func (s contradictedDraftsSink) ApplyNonReinforcing(ctx context.Context, g review.Grade) (review.ReinforcementDetail, bool, error) {
+	d := review.ReinforcementDetail{
+		SinkID: "contradicted_drafts", GradeID: g.GradeID,
+		PriorState: map[string]any{"draft_id": g.ItemID, "prior_status": g.Item.Meta["status"]},
+		Applied:    map[string]any{},
+	}
+	if s.writer == nil {
+		return d, false, fmt.Errorf("contradicted_drafts sink: writer not wired")
+	}
+	if draftVerdict(g) != "dismiss" {
+		// approve/defer/unclear all require operator reinforcement.
+		return d, false, nil
+	}
+	if err := s.writer.MarkDismissed(ctx, g.ItemID); err != nil {
+		return d, false, fmt.Errorf("contradicted_drafts sink: MarkDismissed: %w", err)
+	}
+	d.Verb = "correction_draft:dismiss:auto"
+	return d, true, nil
+}
+
 func (s contradictedDraftsSink) Reverse(ctx context.Context, detail review.ReinforcementDetail) error {
 	if s.writer == nil {
 		return fmt.Errorf("contradicted_drafts sink: writer not wired")
