@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -3122,20 +3123,56 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	}
 }
 
+// httpStatusClientClosedRequest — nginx-style "Client Closed Request" for a
+// request that failed because the CALLER cancelled its context, not because
+// the server errored. Not in net/http's constants (nginx-specific), but widely
+// recognised and outside the ^5 alert regex.
+// RETRIEVE-CALLER-CANCEL-001 (2026-08-04).
+const httpStatusClientClosedRequest = 499
+
+// isCallerCancelled distinguishes "the caller walked away" from "the server
+// hit its own deadline or errored." Only returns true when the ROOT CAUSE is
+// context.Canceled (the request context was cancelled by the client) and NOT
+// context.DeadlineExceeded (the server's own timeout). Same principle as the
+// llmclient `caller_canceled:` recorder tag (LLM-HEALTH-INVESTIGATION-001) —
+// applied at the HTTP handler layer so caller cancellations no longer show up
+// as 5xx in mdemg_http_requests_total and no longer trip high_error_rate.
+func isCallerCancelled(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return false
+	}
+	return errors.Is(err, context.Canceled)
+}
+
 // sanitizeError logs the detailed error for debugging but returns a generic
 // message suitable for client responses. This prevents internal details
 // (stack traces, file paths, database errors) from leaking to clients.
+//
+// Caller-cancellations log at INFO (not ERROR) — the SERVER did its job right
+// up to the point the client walked away; an ERROR line for every impatient
+// curl is noise, not signal.
 func sanitizeError(err error, operation string) string {
-	// Log the full error for debugging
+	if isCallerCancelled(err) {
+		slog.Info("operation cancelled by caller", "operation", operation, "error", err)
+		return "request cancelled during " + operation
+	}
 	slog.Error("operation failed", "operation", operation, "error", err)
-	// Return generic message to client
 	return "internal error during " + operation
 }
 
-// writeInternalError writes a sanitized internal server error response.
-// The detailed error is logged but not exposed to the client.
+// writeInternalError writes a sanitized error response. Caller-cancellations
+// return HTTP 499 (nginx "Client Closed Request"); real server errors return
+// HTTP 500. The 499 status is outside the ^5 regex used by high_error_rate,
+// so caller-cancels no longer trip the SLO alert.
 func writeInternalError(w http.ResponseWriter, err error, operation string) {
-	writeJSON(w, http.StatusInternalServerError, map[string]any{
+	status := http.StatusInternalServerError
+	if isCallerCancelled(err) {
+		status = httpStatusClientClosedRequest
+	}
+	writeJSON(w, status, map[string]any{
 		"error": sanitizeError(err, operation),
 	})
 }
