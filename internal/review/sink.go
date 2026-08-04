@@ -54,6 +54,27 @@ type ReinforcementDetail struct {
 	Applied    map[string]any `json:"applied"`
 }
 
+// NonReinforcingApplier is an optional sink capability for datasets whose
+// verdicts split into "reinforcing" (mutates the substrate — Apply) and
+// "non-reinforcing" (status-only cleanup that touches ONLY the dataset's own
+// row, not the substrate — e.g. marking a draft dismissed). Sinks that
+// implement this let the auto-grader drain their non-mutating verdicts even
+// when reinforce=false; the substrate-mutation invariant is preserved because
+// the caller only invokes ApplyNonReinforcing when reinforce=false, and this
+// method is contractually restricted to operations that do NOT mutate the
+// cognitive substrate (Neo4j nodes, trust scores, edges, embeddings).
+//
+// Return ok=true if the verdict was HANDLED (status updated, cleanup done);
+// ok=false means the verdict requires reinforcement and the caller should skip
+// (no auto-effect for that verdict). Sinks whose ALL verdicts are reinforcing
+// (or whose ALL verdicts are non-reinforcing) do NOT need this — Apply handles
+// them directly under reinforce=true.
+//
+// HITL-AUTO-DISMISS-001 (2026-08-04).
+type NonReinforcingApplier interface {
+	ApplyNonReinforcing(ctx context.Context, g Grade) (detail ReinforcementDetail, ok bool, err error)
+}
+
 // NoopSink makes a dataset gold-only (grades persist but never touch the live
 // system).
 type NoopSink struct{}

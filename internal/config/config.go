@@ -1267,6 +1267,9 @@ type Config struct {
 	JiminyContradictedBridgeWriterFlushIntervalSec int  // JIMINY_CONTRADICTED_BRIDGE_WRITER_FLUSH_INTERVAL_SEC — buffered writer flush cadence (default: 30, floor: 5)
 	JiminyContradictedBridgeWriterBufferSize       int  // JIMINY_CONTRADICTED_BRIDGE_WRITER_BUFFER_SIZE — max rows held before FIFO eviction (default: 1000, 0 = unlimited)
 	JiminyContradictedBridgeMaxContentLen          int  // JIMINY_CONTRADICTED_BRIDGE_MAX_CONTENT_LEN — cap draft_incorrect/draft_correct at this many chars (default: 400)
+	JiminyContradictedBridgeGateEnabled            bool     // JIMINY_CONTRADICTED_BRIDGE_GATE_ENABLED — content-quality gate for draft emission (default: true)
+	JiminyContradictedBridgeAllowedTypes           []string // JIMINY_CONTRADICTED_BRIDGE_ALLOWED_TYPES — comma-separated guidance types eligible for draft emission (default: "constraint,correction")
+	JiminyContradictedBridgeRejectPatterns         []string // JIMINY_CONTRADICTED_BRIDGE_REJECT_PATTERNS — JSON array of Go regexes; guidance content matching ANY blocks draft emission (default: reuses ConstraintPromotionRejectPatterns junk-class list)
 	GuidanceCorpusMaxContentBytes                  int  // GUIDANCE_CORPUS_MAX_CONTENT_BYTES — truncate guidance/action snapshots to this many bytes (default: 8192, floor: 256)
 	GuidanceCorpusSourceLookupTimeoutMs            int  // GUIDANCE_CORPUS_SOURCE_LOOKUP_TIMEOUT_MS — bounded best-effort Neo4j lookup of source-node role_type/layer at emit (default: 300, 0 = disable; never blocks the hot path beyond this)
 
@@ -3797,6 +3800,30 @@ func FromEnv() (Config, error) {
 	if jiminyContradictedBridgeMaxContentLen < 50 {
 		jiminyContradictedBridgeMaxContentLen = 50
 	}
+	// JIMINY-CONTRADICTED-BRIDGE-QUALITY-001 (2026-08-04): content-quality
+	// gate for draft emission. Default on with the same regex list the
+	// constraint-promotion gate uses; type filter defaults to actionable-only
+	// (constraint, correction).
+	jiminyContradictedBridgeGateEnabled := getBool("JIMINY_CONTRADICTED_BRIDGE_GATE_ENABLED", true)
+	var jiminyContradictedBridgeAllowedTypes []string
+	for _, t := range strings.Split(get("JIMINY_CONTRADICTED_BRIDGE_ALLOWED_TYPES", "constraint,correction"), ",") {
+		if t = strings.ToLower(strings.TrimSpace(t)); t != "" {
+			jiminyContradictedBridgeAllowedTypes = append(jiminyContradictedBridgeAllowedTypes, t)
+		}
+	}
+	jiminyContradictedBridgeRejectPatterns := DefaultConstraintPromotionRejectPatterns()
+	if raw := strings.TrimSpace(os.Getenv("JIMINY_CONTRADICTED_BRIDGE_REJECT_PATTERNS")); raw != "" {
+		var parsed []string
+		if err := json.Unmarshal([]byte(raw), &parsed); err != nil {
+			return Config{}, fmt.Errorf("JIMINY_CONTRADICTED_BRIDGE_REJECT_PATTERNS must be a valid JSON string array: %w", err)
+		}
+		jiminyContradictedBridgeRejectPatterns = parsed
+	}
+	for _, p := range jiminyContradictedBridgeRejectPatterns {
+		if _, err := regexp.Compile(p); err != nil {
+			return Config{}, fmt.Errorf("JIMINY_CONTRADICTED_BRIDGE_REJECT_PATTERNS: invalid regex %q: %w", p, err)
+		}
+	}
 	guidanceCorpusMaxContentBytes, err := atoi("GUIDANCE_CORPUS_MAX_CONTENT_BYTES", 8192)
 	if err != nil {
 		return Config{}, err
@@ -6205,6 +6232,9 @@ func FromEnv() (Config, error) {
 		JiminyContradictedBridgeWriterFlushIntervalSec: jiminyContradictedBridgeWriterFlushIntervalSec,
 		JiminyContradictedBridgeWriterBufferSize:       jiminyContradictedBridgeWriterBufferSize,
 		JiminyContradictedBridgeMaxContentLen:          jiminyContradictedBridgeMaxContentLen,
+		JiminyContradictedBridgeGateEnabled:            jiminyContradictedBridgeGateEnabled,
+		JiminyContradictedBridgeAllowedTypes:           jiminyContradictedBridgeAllowedTypes,
+		JiminyContradictedBridgeRejectPatterns:         jiminyContradictedBridgeRejectPatterns,
 		GuidanceCorpusWriterFlushIntervalSec:           guidanceCorpusWriterFlushIntervalSec,
 		GuidanceCorpusWriterBufferSize:                 guidanceCorpusWriterBufferSize,
 		GuidanceCorpusMaxContentBytes:                  guidanceCorpusMaxContentBytes,

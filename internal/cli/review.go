@@ -172,6 +172,7 @@ func newReviewAutogradeCmd() *cobra.Command {
 	var minConfidence float64
 	var limit int
 	var dryRun bool
+	var force bool
 	var endpoint string
 	cmd := &cobra.Command{
 		Use:   "autograde",
@@ -208,6 +209,7 @@ substrate. Only operator-confirmed grades do that.
 				minConfidence: minConfidence,
 				limit:         limit,
 				dryRun:        dryRun,
+				force:         force,
 			})
 		},
 	}
@@ -216,6 +218,7 @@ substrate. Only operator-confirmed grades do that.
 	cmd.Flags().Float64Var(&minConfidence, "min-confidence", 0.80, "Auto-grade only when the model's confidence is >= this (0-1)")
 	cmd.Flags().IntVar(&limit, "limit", 50, "Max pending items to fetch (1-500)")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Preview mode — grade + display but don't POST")
+	cmd.Flags().BoolVar(&force, "force", false, "Re-grade items that already have a grade at the current rubric_version (needed to backfill after sink logic changes, e.g. HITL-AUTO-DISMISS-001)")
 	cmd.Flags().StringVar(&endpoint, "endpoint", "", "mdemg server (default: from LISTEN_ADDR in .env)")
 	return cmd
 }
@@ -227,6 +230,7 @@ type autogradeOpts struct {
 	minConfidence float64
 	limit         int
 	dryRun        bool
+	force         bool
 }
 
 func runReviewAutograde(ctx context.Context, opt autogradeOpts) error {
@@ -288,7 +292,7 @@ func runReviewAutograde(ctx context.Context, opt autogradeOpts) error {
 		if opt.dryRun {
 			continue
 		}
-		if err := postAutoGrade(ctx, opt.endpoint, ag.GraderID(), opt.spaceID, res); err != nil {
+		if err := postAutoGrade(ctx, opt.endpoint, ag.GraderID(), opt.spaceID, res, opt.force); err != nil {
 			failed++
 			fmt.Printf("        POST-ERR  %v\n", err)
 			continue
@@ -403,7 +407,7 @@ func fetchCandidates(ctx context.Context, endpoint, datasetID, spaceID string, l
 
 // postAutoGrade POSTs the auto-grade to /v1/review/grade. The invariant:
 // reinforce is ALWAYS false — never mutate the substrate from an auto-grade.
-func postAutoGrade(ctx context.Context, endpoint, graderID, spaceID string, res review.GradeResult) error {
+func postAutoGrade(ctx context.Context, endpoint, graderID, spaceID string, res review.GradeResult, force bool) error {
 	reinforceFalse := false
 	body := map[string]any{
 		"dataset_id": res.Submission.DatasetID,
@@ -412,6 +416,13 @@ func postAutoGrade(ctx context.Context, endpoint, graderID, spaceID string, res 
 		"grader_id":  graderID,
 		"dimensions": res.Submission.Dimensions,
 		"reinforce":  &reinforceFalse,
+	}
+	// HITL-AUTO-DISMISS-001: --force lets the autograder RE-issue a grade at the
+	// current rubric_version, needed to backfill after sink-logic changes so a
+	// previously-graded item can drive the newly-non-reinforcing sink path.
+	// Idempotency guard on the server side stays intact for operator grades.
+	if force {
+		body["force"] = true
 	}
 	b, err := json.Marshal(body)
 	if err != nil {

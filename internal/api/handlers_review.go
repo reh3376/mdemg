@@ -311,6 +311,24 @@ func (s *Server) handleReviewGrade(w http.ResponseWriter, r *http.Request) {
 		if b, mErr := json.Marshal(detail); mErr == nil {
 			detailJSON = string(b)
 		}
+	} else if nra, ok := d.Sink().(review.NonReinforcingApplier); ok {
+		// HITL-AUTO-DISMISS-001: sinks can opt-in to draining non-substrate-
+		// mutating verdicts (e.g. draft dismissal) when reinforce=false. This
+		// lets the autograder clear noise from the HITL queue without violating
+		// the "auto-grade never mutates the substrate" invariant. `applied`
+		// stays false — the caller can distinguish substrate reinforcement
+		// (applied=true) from non-reinforcing status cleanup by the sink's
+		// detail.Verb suffix (e.g. ":auto").
+		detail, handled, aerr := nra.ApplyNonReinforcing(r.Context(), grade)
+		if aerr != nil {
+			writeInternalError(w, aerr, "review non-reinforcing apply")
+			return
+		}
+		if handled {
+			if b, mErr := json.Marshal(detail); mErr == nil {
+				detailJSON = string(b)
+			}
+		}
 	}
 
 	dimsJSON, _ := json.Marshal(dims)
