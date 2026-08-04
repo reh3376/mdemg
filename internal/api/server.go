@@ -2350,6 +2350,40 @@ func (s *Server) StartSupervisedBackground() {
 			})
 			s.goSupervised("ft-loop-tripwire", tw.Run)
 		}
+
+		// AUTOGRADE-SCHEDULE-001 (2026-08-04): scheduled autograde loop —
+		// closes the HITL-AUTO-DISMISS-001 + JIMINY-CONTRADICTED-BRIDGE-
+		// QUALITY-001 arc so the queue self-drains without operator ceremony.
+		// Default OFF; opt-in via REVIEW_AUTOGRADE_SCHEDULE_ENABLED.
+		if s.cfg.ReviewAutogradeScheduleEnabled {
+			endpoint := "http://127.0.0.1" + s.cfg.ListenAddr
+			// ListenAddr may be ":9999" or "127.0.0.1:9999" — normalize to a
+			// dial-able form for the loopback CLI POST.
+			if !strings.Contains(s.cfg.ListenAddr, ":") {
+				endpoint = fmt.Sprintf("http://127.0.0.1:%s", s.cfg.ListenAddr)
+			} else if s.cfg.ListenAddr[0] != ':' {
+				endpoint = "http://" + s.cfg.ListenAddr
+			}
+			spaceID := s.cfg.RSICWatchdogSpaceID
+			asch := review.NewAutogradeScheduler(review.AutogradeScheduleConfig{
+				Enabled:         true,
+				IntervalHours:   s.cfg.ReviewAutogradeScheduleIntervalHours,
+				InitialDelayMin: s.cfg.ReviewAutogradeScheduleInitialDelayMin,
+				Datasets:        s.cfg.ReviewAutogradeScheduleDatasets,
+				SpaceID:         spaceID,
+				MinConfidence:   s.cfg.ReviewAutogradeScheduleMinConfidence,
+				Limit:           s.cfg.ReviewAutogradeScheduleLimit,
+				MdemgBin:        resolveMdemgBin(),
+				Endpoint:        endpoint,
+			}, func(ctx context.Context, jobName string, success bool, latencyMs int64, errMsg string) {
+				ev := tsdb.JobEventRow{JobName: jobName, SpaceID: spaceID,
+					InstanceID: s.cfg.InstanceID, Success: success, LatencyMS: latencyMs, ErrorMessage: errMsg}
+				// Distinct service label per NOSILENT-001 cooldown-key contract
+				// so autograde failures don't share cooldown with unrelated jobs.
+				jobhealth.ReportWithService(ctx, s.tsdbClient.Pool(), s.alertDispatcher, ev, "scheduled-autograde")
+			})
+			s.goSupervised("scheduled-autograde", asch.Run)
+		}
 	}
 }
 

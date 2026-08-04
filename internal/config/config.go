@@ -1305,6 +1305,14 @@ type Config struct {
 	ReviewLLMDatasetsEnabled         bool    // REVIEW_LLM_DATASETS_ENABLED — register the 16 MDEMG LLM call sites as reviewable datasets (gold-only review of llm_interactions) (default: true)
 	ReviewContradictedDatasetEnabled bool    // REVIEW_CONTRADICTED_DATASET_ENABLED — register the JIMINY-CONTRADICTED-BRIDGE-001 correction-drafts dataset (default: true)
 
+	// AUTOGRADE-SCHEDULE-001 (2026-08-04): scheduled autograde loop.
+	ReviewAutogradeScheduleEnabled         bool     // REVIEW_AUTOGRADE_SCHEDULE_ENABLED — run the autograder on a schedule (default: false; opt-in)
+	ReviewAutogradeScheduleIntervalHours   int      // REVIEW_AUTOGRADE_SCHEDULE_INTERVAL_HOURS — cadence between runs (default: 6)
+	ReviewAutogradeScheduleInitialDelayMin int      // REVIEW_AUTOGRADE_SCHEDULE_INITIAL_DELAY_MIN — startup delay before first run (default: 15)
+	ReviewAutogradeScheduleDatasets        []string // REVIEW_AUTOGRADE_SCHEDULE_DATASETS — comma-separated dataset ids (default: "contradicted_drafts")
+	ReviewAutogradeScheduleMinConfidence   float64  // REVIEW_AUTOGRADE_SCHEDULE_MIN_CONFIDENCE — confidence floor for auto-grades (default: 0.80, matches CLI default)
+	ReviewAutogradeScheduleLimit           int      // REVIEW_AUTOGRADE_SCHEDULE_LIMIT — max items per dataset per run (default: 50)
+
 	// EVENTGRAPH-001 — TSDB reinforcement_events + federation API (Pattern Y1)
 	EventGraphEnabled                        bool // EVENTGRAPH_ENABLED — record per-pair Hebbian telemetry into reinforcement_events + expose federation API (default: true)
 	EventGraphWriterFlushIntervalSec         int  // EVENTGRAPH_WRITER_FLUSH_INTERVAL_SEC — buffered writer flush cadence in seconds (default: 30, floor: 5)
@@ -3940,6 +3948,43 @@ func FromEnv() (Config, error) {
 		return Config{}, err
 	}
 
+	// AUTOGRADE-SCHEDULE-001 (2026-08-04): scheduled autograde loop.
+	reviewAutogradeScheduleEnabled := getBool("REVIEW_AUTOGRADE_SCHEDULE_ENABLED", false)
+	reviewAutogradeScheduleIntervalHours, err := atoi("REVIEW_AUTOGRADE_SCHEDULE_INTERVAL_HOURS", 6)
+	if err != nil {
+		return Config{}, err
+	}
+	if reviewAutogradeScheduleIntervalHours < 1 {
+		reviewAutogradeScheduleIntervalHours = 1
+	}
+	reviewAutogradeScheduleInitialDelayMin, err := atoi("REVIEW_AUTOGRADE_SCHEDULE_INITIAL_DELAY_MIN", 15)
+	if err != nil {
+		return Config{}, err
+	}
+	if reviewAutogradeScheduleInitialDelayMin < 1 {
+		reviewAutogradeScheduleInitialDelayMin = 1
+	}
+	var reviewAutogradeScheduleDatasets []string
+	for _, d := range strings.Split(get("REVIEW_AUTOGRADE_SCHEDULE_DATASETS", "contradicted_drafts"), ",") {
+		if d = strings.TrimSpace(d); d != "" {
+			reviewAutogradeScheduleDatasets = append(reviewAutogradeScheduleDatasets, d)
+		}
+	}
+	reviewAutogradeScheduleMinConfidence, err := atof("REVIEW_AUTOGRADE_SCHEDULE_MIN_CONFIDENCE", 0.80)
+	if err != nil {
+		return Config{}, err
+	}
+	if reviewAutogradeScheduleMinConfidence <= 0 || reviewAutogradeScheduleMinConfidence > 1 {
+		reviewAutogradeScheduleMinConfidence = 0.80
+	}
+	reviewAutogradeScheduleLimit, err := atoi("REVIEW_AUTOGRADE_SCHEDULE_LIMIT", 50)
+	if err != nil {
+		return Config{}, err
+	}
+	if reviewAutogradeScheduleLimit < 1 {
+		reviewAutogradeScheduleLimit = 1
+	}
+
 	// EVENTGRAPH-001 — TSDB reinforcement_events + federation API (Pattern Y1).
 	eventGraphEnabled := getBool("EVENTGRAPH_ENABLED", true)
 	eventGraphWriterFlushIntervalSec, err := atoi("EVENTGRAPH_WRITER_FLUSH_INTERVAL_SEC", 30)
@@ -6260,6 +6305,12 @@ func FromEnv() (Config, error) {
 		ReviewLLMDatasetsEnabled:                       reviewLLMDatasetsEnabled,
 		ReviewContradictedDatasetEnabled:               reviewContradictedDatasetEnabled,
 		ReviewGuidanceConfidenceNudge:                  reviewGuidanceConfidenceNudge,
+		ReviewAutogradeScheduleEnabled:                 reviewAutogradeScheduleEnabled,
+		ReviewAutogradeScheduleIntervalHours:           reviewAutogradeScheduleIntervalHours,
+		ReviewAutogradeScheduleInitialDelayMin:         reviewAutogradeScheduleInitialDelayMin,
+		ReviewAutogradeScheduleDatasets:                reviewAutogradeScheduleDatasets,
+		ReviewAutogradeScheduleMinConfidence:           reviewAutogradeScheduleMinConfidence,
+		ReviewAutogradeScheduleLimit:                   reviewAutogradeScheduleLimit,
 
 		EventGraphEnabled:                        eventGraphEnabled,
 		EventGraphWriterFlushIntervalSec:         eventGraphWriterFlushIntervalSec,
