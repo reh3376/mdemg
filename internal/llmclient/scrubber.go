@@ -34,7 +34,7 @@ type patternEntry struct {
 var patterns = []patternEntry{
 	{"api_key", apiKeyPattern, func(s string) string { return apiKeyPattern.ReplaceAllString(s, "[REDACTED_KEY]") }},
 	{"abs_path", absPathPattern, func(s string) string { return absPathPattern.ReplaceAllStringFunc(s, scrubAbsPath) }},
-	{"env_secret", envSecretPattern, func(s string) string { return envSecretPattern.ReplaceAllString(s, "${1}=[REDACTED]") }},
+	{"env_secret", envSecretPattern, scrubEnvSecret},
 	{"email", emailPattern, func(s string) string { return emailPattern.ReplaceAllString(s, "[EMAIL]") }},
 	{"neo4j_cred", neo4jCredPattern, func(s string) string { return neo4jCredPattern.ReplaceAllString(s, "neo4j://[REDACTED]@") }},
 }
@@ -69,6 +69,65 @@ func Scrub(rec *InteractionRecord) {
 	rec.UserPrompt = ScrubStringExcluding(rec.UserPrompt, nil)
 	rec.Response = ScrubStringExcluding(rec.Response, nil)
 	rec.ThinkContent = ScrubStringExcluding(rec.ThinkContent, nil)
+}
+
+// scrubEnvSecret redacts env-secret matches, but PRESERVES matches whose
+// value is a shell env-var REFERENCE (e.g. `$FOO`, `${FOO}`, `${FOO:-x}`,
+// Windows `%FOO%`) rather than a literal secret. The reference doesn't
+// carry the secret — it's a POINTER the shell will expand at runtime.
+// Redacting these was the SCRUB-ENV-REF-001 false-positive class (2026-08-04):
+// captured `bash error:` telemetry containing `PGPASSWORD=$TSDB_PASSWORD`
+// blocked export-auto with a spurious "PII detected" halt.
+//
+// Kept as a top-level function (not a closure) so tests can call it directly.
+func scrubEnvSecret(s string) string {
+	return envSecretPattern.ReplaceAllStringFunc(s, func(match string) string {
+		sub := envSecretPattern.FindStringSubmatch(match)
+		if len(sub) < 3 {
+			return match
+		}
+		name, value := sub[1], sub[2]
+		if isShellEnvVarRef(value) {
+			return match // preserve — the value is a reference, not a secret
+		}
+		return name + "=[REDACTED]"
+	})
+}
+
+// isShellEnvVarRef reports whether a captured "value" is a shell env-var
+// reference rather than a literal secret. The check is intentionally
+// conservative: it recognises only well-formed references so a real secret
+// that happens to start with `$` is still redacted (nothing legitimate
+// starts with a bare `$` followed by non-identifier characters).
+func isShellEnvVarRef(v string) bool {
+	if len(v) < 2 {
+		return false
+	}
+	// Windows %FOO% — begins AND ends with %.
+	if v[0] == '%' && v[len(v)-1] == '%' && len(v) >= 3 {
+		return true
+	}
+	// Bash ${FOO}, ${FOO:-default}, ${FOO:?err} — anything inside braces
+	// that starts with an identifier char.
+	if strings.HasPrefix(v, "${") && strings.HasSuffix(v, "}") && len(v) >= 4 {
+		inner := v[2 : len(v)-1]
+		return len(inner) > 0 && isIdentifierChar(inner[0])
+	}
+	// Bash $FOO — dollar followed by identifier chars until end (or a shell
+	// separator, but the outer regex value-class already stops at spaces /
+	// quotes / commas / semicolons, so we just need to verify the leading
+	// chars form an identifier).
+	if v[0] == '$' && isIdentifierChar(v[1]) {
+		return true
+	}
+	return false
+}
+
+// isIdentifierChar matches [A-Za-z_] (identifier-lead) or a digit (allowed
+// in identifier tails). Kept simple — the outer regex already bounds the
+// value's overall shape.
+func isIdentifierChar(b byte) bool {
+	return (b >= 'A' && b <= 'Z') || (b >= 'a' && b <= 'z') || b == '_' || (b >= '0' && b <= '9')
 }
 
 // scrubAbsPath replaces /Users/username/path with /[PATH]/last/two/components
