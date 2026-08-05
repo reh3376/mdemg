@@ -20,8 +20,9 @@ func TestManifest_ExpectedFileCount(t *testing.T) {
 	if err != nil {
 		t.Fatalf("manifest: %v", err)
 	}
-	// 8 dashboards + 3 datasources + 1 alerting + 1 dashboards.yml + 2 notifiers = 15
-	const want = 15
+	// 9 dashboards + 3 datasources + 1 alerting + 1 dashboards.yml + 2 notifiers = 16
+	// HITL-ANALYTICS-TILE-001 (2026-08-04) added mdemg-hitl.json → 9 dashboards.
+	const want = 16
 	if len(files) != want {
 		t.Fatalf("manifest file count = %d, want %d (a dashboard was removed or added without updating this pin)", len(files), want)
 	}
@@ -51,8 +52,8 @@ func TestMaterialize_WritesToExpectedTree(t *testing.T) {
 	if err != nil {
 		t.Fatalf("materialize: %v", err)
 	}
-	if written != 15 {
-		t.Errorf("first-run written = %d, want 15", written)
+	if written != 16 {
+		t.Errorf("first-run written = %d, want 16", written)
 	}
 	if preserved != 0 {
 		t.Errorf("first-run preserved = %d, want 0 (nothing existed)", preserved)
@@ -80,8 +81,8 @@ func TestMaterialize_Idempotent_SameContent(t *testing.T) {
 	if written != 0 {
 		t.Errorf("re-run written = %d, want 0 (all files identical)", written)
 	}
-	if preserved != 15 {
-		t.Errorf("re-run preserved = %d, want 15", preserved)
+	if preserved != 16 {
+		t.Errorf("re-run preserved = %d, want 16", preserved)
 	}
 }
 
@@ -104,8 +105,8 @@ func TestMaterialize_PreservesOperatorEdits(t *testing.T) {
 	if written != 0 {
 		t.Errorf("re-run must not overwrite anything; wrote %d", written)
 	}
-	if preserved != 15 {
-		t.Errorf("preserved = %d, want 15", preserved)
+	if preserved != 16 {
+		t.Errorf("preserved = %d, want 16", preserved)
 	}
 	// Confirm the operator-edited file was NOT overwritten.
 	got, _ := os.ReadFile(dashPath)

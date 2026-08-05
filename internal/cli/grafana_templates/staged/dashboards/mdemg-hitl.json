@@ -1,0 +1,142 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [
+    {
+      "title": "Dashboards",
+      "type": "dashboards",
+      "tags": ["mdemg"],
+      "icon": "external link",
+      "asDropdown": true
+    }
+  ],
+  "panels": [
+    {
+      "title": "HITL Curation Activity",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "panels": []
+    },
+    {
+      "title": "Grade Cadence — Operator vs Auto (per day)",
+      "description": "HITL-REVIEW-001 grade throughput split by grader class. auto:* = autograder (invariant: never mutates substrate). operator = human grade (drives real reinforcement / draft approval / dismissal). Whitespace between operator bars = the queue is stalling. Steady auto:* volume without operator volume = HITL-AUTO-DISMISS-001 draining noise but genuine rules pending. Steady operator volume = curation loop healthy.",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
+      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT time_bucket('1 day', time) AS time,\n  CASE WHEN grader_id LIKE 'auto:%' THEN 'auto' ELSE 'operator' END AS metric,\n  count(*) AS value\nFROM review_grades\nWHERE $__timeFilter(time)\nGROUP BY 1, 2\nORDER BY 1",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "custom": { "drawStyle": "bars", "lineWidth": 1, "fillOpacity": 60, "stacking": { "mode": "normal" } } }
+      }
+    },
+    {
+      "title": "Auto vs Operator Share (7d)",
+      "description": "Share of grades authored by autograder vs operator over the last 7d. HITL-CURATION-002 shipped auto-grading; HITL-AUTO-DISMISS-001 (2026-08-04) enabled auto-drain of dim=0 dismissals; AUTOGRADE-SCHEDULE-001 (2026-08-04) added scheduled runs. Expected steady state: majority auto (dismissals + advisory approvals) with a minority operator (substrate-mutating approvals of durable rules).",
+      "type": "piechart",
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 1 },
+      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT CASE WHEN grader_id LIKE 'auto:%' THEN 'auto' ELSE 'operator' END AS metric,\n  count(*) AS value\nFROM review_grades\nWHERE time > now() - interval '7 days'\nGROUP BY 1"
+        }
+      ],
+      "options": { "reduceOptions": { "values": true, "calcs": [] }, "pieType": "donut", "legend": { "displayMode": "table", "placement": "right", "values": ["value", "percent"] } }
+    },
+    {
+      "title": "Pending Drafts Queue",
+      "description": "contradicted_correction_drafts.status = 'pending' count. Rises when the contradicted-bridge emits drafts; falls when operator grades (approve → status='approved' with L0 obs mint) or autograder dismisses via HITL-AUTO-DISMISS-001 (dim=0 → status='dismissed', no substrate mutation). Elevated + rising = curation stall (`hitl-curation` alert threshold: > 5 with 0 operator grades in 7d). AUTOGRADE-SCHEDULE-001 default-off; enable via REVIEW_AUTOGRADE_SCHEDULE_ENABLED=true for auto-drain.",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 1 },
+      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT COALESCE(count(*), 0) AS pending\nFROM contradicted_correction_drafts\nWHERE status = 'pending'"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 5 },
+              { "color": "red", "value": 20 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Draft Status Split (all-time)",
+      "description": "contradicted_correction_drafts by lifecycle status. approved = L0 obs minted (feeds L1 correction on next consolidation via JIMINY-CORRECTION-PRODUCER-001). dismissed = operator or auto rejected (JIMINY-CONTRADICTED-BRIDGE-QUALITY-001 upstream filter reduces future noise). pending = awaiting decision.",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 5 },
+      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT status, count(*) AS value\nFROM contradicted_correction_drafts\nGROUP BY status\nORDER BY value DESC"
+        }
+      ],
+      "options": { "reduceOptions": { "values": true, "calcs": [] }, "textMode": "value_and_name" }
+    },
+    {
+      "title": "Scheduled Autograde — Run History",
+      "description": "AUTOGRADE-SCHEDULE-001 (2026-08-04) supervised loop runs. success=true rows = auto-drain cycle completed. Failures alert via jobhealth (distinct service label `scheduled-autograde:<dataset>` per NOSILENT-001 cooldown contract). Empty when scheduler is disabled (default: REVIEW_AUTOGRADE_SCHEDULE_ENABLED=false).",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 9 },
+      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT recorded_at AS time,\n  job_name,\n  success,\n  latency_ms,\n  COALESCE(error_message, '') AS error\nFROM scheduled_job_events\nWHERE job_name LIKE 'scheduled-autograde%'\n  AND $__timeFilter(recorded_at)\nORDER BY recorded_at DESC\nLIMIT 30"
+        }
+      ]
+    },
+    {
+      "title": "Reinforcement Applied (7d) — Substrate Mutations",
+      "description": "review_grades.reinforcement_applied=true count over last 7d. This is the ONLY grade class that mutates the cognitive substrate (guidance sink: trust EMA + node confidence; contradicted_drafts sink: L0 correction obs mint via conversation.Correct). auto:* grades ALWAYS have reinforcement_applied=false (HITL-CURATION-002 invariant + HITL-AUTO-DISMISS-001 status-only NonReinforcingApplier). This chart is the honest count of operator-driven substrate change.",
+      "type": "stat",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 9 },
+      "datasource": { "type": "postgres", "uid": "timescaledb" },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT COALESCE(count(*), 0) AS mutations_7d\nFROM review_grades\nWHERE reinforcement_applied = true\n  AND time > now() - interval '7 days'"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "green", "value": 5 }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["mdemg", "hitl"],
+  "refresh": "30s",
+  "templating": { "list": [] },
+  "time": { "from": "now-30d", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "MDEMG HITL Curation",
+  "uid": "mdemg-hitl",
+  "version": 1
+}
