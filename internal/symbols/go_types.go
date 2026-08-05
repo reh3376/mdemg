@@ -132,6 +132,16 @@ func (a *GoTypesAnalyzer) AnalyzeImplements(ctx context.Context, spaceID, projec
 			if isVendored(filePath) {
 				continue
 			}
+			// GO-IMPLEMENTS-002 (2026-08-05): skip generated protobuf code.
+			// The .pb.go / _grpc.pb.go files carry gRPC-wire interfaces
+			// (*Server, Unsafe*Server) that describe RPC transport, not
+			// domain semantics. Tree-sitter ingest already excludes them
+			// from SymbolNode; the analyzer emitting IMPLEMENTS pairs whose
+			// targets don't exist in the graph was the dominant 79-pair
+			// class in the GO-IMPLEMENTS-002 gap audit.
+			if isGeneratedProtobuf(filePath) {
+				continue
+			}
 			info := namedInfo{named: named, pkg: p, filePath: filePath, name: name}
 			if _, isIface := named.Underlying().(*types.Interface); isIface {
 				interfaces = append(interfaces, info)
@@ -174,6 +184,11 @@ func (a *GoTypesAnalyzer) AnalyzeImplements(ctx context.Context, spaceID, projec
 			Tier:             2,
 			Confidence:       1.0,
 			ResolutionMethod: "go_types",
+			// GO-IMPLEMENTS-002 diagnostic breadcrumbs (not persisted).
+			SourceName: src.name,
+			SourcePath: relativizePath(src.filePath, projectRoot),
+			TargetName: dst.name,
+			TargetPath: relativizePath(dst.filePath, projectRoot),
 		})
 	}
 
@@ -237,6 +252,17 @@ func isVendored(filePath string) bool {
 	return strings.Contains(filePath, "/vendor/") ||
 		strings.Contains(filePath, "/pkg/mod/") ||
 		strings.Contains(filePath, "/go/pkg/mod/")
+}
+
+// isGeneratedProtobuf returns true for protobuf-generated Go files
+// (`*.pb.go`, `*_grpc.pb.go`). Those files carry wire-format interfaces
+// (like `*Server` / `Unsafe*Server`) that describe RPC transport, not
+// domain semantics — the tree-sitter symbol ingest already excludes them
+// from SymbolNode, so emitting IMPLEMENTS pairs against them would
+// silently drop at SaveRelationships' MATCH. GO-IMPLEMENTS-002 (2026-08-05).
+func isGeneratedProtobuf(filePath string) bool {
+	return strings.HasSuffix(filePath, ".pb.go") ||
+		strings.HasSuffix(filePath, "_grpc.pb.go")
 }
 
 // relativizePath returns filePath relative to projectRoot when possible; the

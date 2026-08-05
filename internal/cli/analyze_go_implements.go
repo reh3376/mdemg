@@ -31,6 +31,7 @@ func newAnalyzeGoImplementsCmd() *cobra.Command {
 		neo4jUser string
 		neo4jPass string
 		dryRun    bool
+		dumpPairs string
 	)
 
 	cmd := &cobra.Command{
@@ -80,6 +81,33 @@ Examples:
 				return nil
 			}
 
+			// GO-IMPLEMENTS-002: --dump-pairs writes all pairs to a file for
+			// gap-audit + regression comparison. Format is one pair per line,
+			// tab-separated: source_id | src_name | src_path | target_id |
+			// dst_name | dst_path. SaveRelationships silently drops pairs whose
+			// source or target SymbolNode isn't in the graph — the audit path
+			// is to dump-pairs + Cypher-diff for the missing IDs (see
+			// docs/development/go-implements-002/gap_audit.md for the recipe).
+			if dumpPairs != "" {
+				f, err := os.Create(dumpPairs)
+				if err != nil {
+					return fmt.Errorf("open dump-pairs: %w", err)
+				}
+				defer func() { _ = f.Close() }()
+				// Header — makes the file self-describing for humans + scripts.
+				if _, err := fmt.Fprintln(f, "source_id\tsource_name\tsource_path\ttarget_id\ttarget_name\ttarget_path"); err != nil {
+					return fmt.Errorf("write dump-pairs header: %w", err)
+				}
+				for _, r := range rels {
+					if _, err := fmt.Fprintf(f, "%s\t%s\t%s\t%s\t%s\t%s\n",
+						r.SourceSymbolID, r.SourceName, r.SourcePath,
+						r.TargetSymbolID, r.TargetName, r.TargetPath); err != nil {
+						return fmt.Errorf("write dump-pairs: %w", err)
+					}
+				}
+				fmt.Fprintf(os.Stdout, "Dumped %d pair(s) to %s\n", len(rels), dumpPairs)
+			}
+
 			// Show a sample (first 10) for operator sanity.
 			max := 10
 			if len(rels) < max {
@@ -124,6 +152,7 @@ Examples:
 	cmd.Flags().StringVar(&neo4jUser, "neo4j-user", "neo4j", "Neo4j username")
 	cmd.Flags().StringVar(&neo4jPass, "neo4j-pass", "testpassword", "Neo4j password")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Compute + print the pairs without writing")
+	cmd.Flags().StringVar(&dumpPairs, "dump-pairs", "", "Optional file to dump ALL discovered pairs as 'source_id|target_id' lines (GO-IMPLEMENTS-002 gap-audit)")
 
 	return cmd
 }
