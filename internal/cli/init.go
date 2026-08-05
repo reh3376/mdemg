@@ -285,7 +285,15 @@ func runInit(flags initFlags) error {
 		fmt.Println()
 	}
 
-	// Embedding provider
+	// Embedding provider.
+	// INIT-DEFAULTS-LOCAL-FIRST-001 (2026-08-05): when `--defaults` is used
+	// with NO OPENAI_API_KEY in the environment, pick `disabled` instead of
+	// `openai` — the pre-sprint openai default silently produced a config
+	// that fresh users could not use out of the box (config validate FAILED
+	// with "OPENAI_API_KEY not set"). Disabled = mdemg works for ingest,
+	// retrieval-by-BM25, dashboard; LLM synthesis + Jiminy + embeddings
+	// require an operator opt-in step. The follow-on `.env`/config summary
+	// prints how to enable each.
 	hasOpenAIKey := os.Getenv("OPENAI_API_KEY") != ""
 	if flags.embeddingProvider != "" {
 		opts.EmbeddingProvider = flags.embeddingProvider
@@ -293,7 +301,7 @@ func runInit(flags initFlags) error {
 		if hasOpenAIKey {
 			opts.EmbeddingProvider = "openai"
 		} else {
-			opts.EmbeddingProvider = "openai" // OpenAI is the default; user will be prompted for key
+			opts.EmbeddingProvider = "disabled" // no key → don't lock the user out
 		}
 	} else {
 		defaultProvider := "openai"
@@ -363,17 +371,34 @@ func runInit(flags initFlags) error {
 				openAIKey = key
 			}
 		}
+	case "disabled":
+		// INIT-DEFAULTS-LOCAL-FIRST-001: no-provider install. Ingest, BM25
+		// retrieval, dashboard all work; embedding-dependent retrieval columns
+		// (vector, RRF-embedding, context-fingerprint), LLM synthesis, and
+		// Jiminy guidance need an operator opt-in. The follow-up "next steps"
+		// summary prints how to enable each. Do NOT populate LLMProvider —
+		// callers should treat empty as disabled.
+		opts.EmbeddingModel = ""
+		opts.LLMModel = ""
+		opts.LLMProvider = "disabled"
 	}
 
 	// Jiminy inner-voice guidance
 	if flags.defaults {
-		opts.JiminyEnabled = true
-		opts.JiminyProvider = opts.LLMProvider
-		switch opts.LLMProvider {
-		case "ollama":
-			opts.JiminyModel = "qwen3:8b"
-		default:
-			opts.JiminyModel = "gpt-4.1"
+		if opts.LLMProvider == "disabled" {
+			// INIT-DEFAULTS-LOCAL-FIRST-001: with no LLM provider, Jiminy has
+			// nothing to synthesize against. Default OFF — operator enables
+			// after configuring an LLM.
+			opts.JiminyEnabled = false
+		} else {
+			opts.JiminyEnabled = true
+			opts.JiminyProvider = opts.LLMProvider
+			switch opts.LLMProvider {
+			case "ollama":
+				opts.JiminyModel = "qwen3:8b"
+			default:
+				opts.JiminyModel = "gpt-4.1"
+			}
 		}
 	} else {
 		fmt.Println()
@@ -601,6 +626,16 @@ func runInit(flags initFlags) error {
 		envLines = append(envLines, fmt.Sprintf("MDEMG_INSTANCE_ID=%s", iid))
 	}
 
+	// INIT-DEFAULTS-LOCAL-FIRST-001 (2026-08-05): seed
+	// RSIC_PROTECTED_SPACES with the freshly-init'd space so destructive
+	// RSIC actions (pattern 31 archive, cooler tombstoning) cannot touch
+	// this operator's substrate without an explicit config change. Config
+	// validate warns loudly when this is empty; seeding it here removes
+	// the scary warning on a fresh install.
+	if !envContains(envLines, "RSIC_PROTECTED_SPACES") {
+		envLines = append(envLines, fmt.Sprintf("RSIC_PROTECTED_SPACES=%s", opts.SpaceID))
+	}
+
 	if err := os.WriteFile(envPath, []byte(strings.Join(envLines, "\n")+"\n"), 0600); err != nil {
 		fmt.Printf("  Warning: could not write .env: %v\n", err)
 	} else {
@@ -616,6 +651,27 @@ func runInit(flags initFlags) error {
 	fmt.Println("Secrets file:  .env (gitignored)")
 	fmt.Printf("Space ID:      %s\n", opts.SpaceID)
 	fmt.Println()
+
+	// INIT-DEFAULTS-LOCAL-FIRST-001: print explicit next-steps when the user
+	// landed on the no-provider default (--defaults without an OPENAI_API_KEY).
+	// Without this, the operator would run `mdemg config validate` and see
+	// FAILED without knowing what to do about it.
+	if opts.LLMProvider == "disabled" {
+		fmt.Println("⚠  LLM & Jiminy DISABLED because no OPENAI_API_KEY was detected.")
+		fmt.Println("   MDEMG will still run: ingest, BM25 retrieval, dashboard, metrics.")
+		fmt.Println("   To enable the full feature set, pick ONE of:")
+		fmt.Println()
+		fmt.Println("   (A) OpenAI (simplest — 1 key):")
+		fmt.Println("       export OPENAI_API_KEY=sk-...  # then re-run: mdemg init --defaults")
+		fmt.Println()
+		fmt.Println("   (B) Ollama (local, free — ~5GB model download):")
+		fmt.Println("       brew install ollama && ollama serve &")
+		fmt.Println("       ollama pull qwen3-embedding:8b && ollama pull qwen3:8b")
+		fmt.Println("       mdemg init --embedding-provider ollama --defaults")
+		fmt.Println()
+		fmt.Println("   Re-run `mdemg config validate` after either change.")
+		fmt.Println()
+	}
 
 	// Load .env into current process so spawned daemon inherits secrets
 	// Use Overload (not Load) to ensure values are set even if env vars exist as empty
