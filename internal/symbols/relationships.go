@@ -34,6 +34,15 @@ type RelationshipRecord struct {
 	ImportPath       string  `json:"import_path,omitempty"`  // IMPORTS only
 	CallCount        int     `json:"call_count,omitempty"`   // CALLS only
 	ResolutionMethod string  `json:"resolution_method"`      // "ast", "tree_sitter_query", "go_types"
+
+	// GO-IMPLEMENTS-002 (2026-08-05): optional diagnostic fields the analyzer
+	// populates for gap-audit visibility. NEVER persisted to Neo4j (the writer
+	// only reads the two symbol_ids); carried in-memory so the CLI can name
+	// the source/target when they fail to MATCH.
+	SourceName     string `json:"source_name,omitempty"`
+	SourcePath     string `json:"source_path,omitempty"`
+	TargetName     string `json:"target_name,omitempty"`
+	TargetPath     string `json:"target_path,omitempty"`
 }
 
 // SaveRelationships persists relationship edges in Neo4j.
