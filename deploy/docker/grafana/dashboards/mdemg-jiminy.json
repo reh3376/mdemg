@@ -31,7 +31,7 @@
       "panels": []
     },
     {
-      "title": "Guidance Health",
+      "title": "Guidance Health (green ≥0.28 target)",
       "description": "Composite: 0.5*follow_rate + 0.3*constraint_eff + 0.2*source_diversity (self_assess.go:504-516). DASHBOARD-TRUTH-003 (2026-08-01) recalibrated bands: pre-fix thresholds red<0.4 / green>=0.7 were calibrated for the legacy 'follow rate >= 90%' world, structurally unreachable under the honest post-JIMINY-ACTIONABILITY-COMPLIANCE-CREDIT-001 steady state (ceiling ~= 0.5*0.15 + 0.3*0.22 + 0.2*0.76 = 0.29). New bands: red<0.20 = collapse; yellow>=0.20 = pre-flip steady state; green>=0.28 = post-corpus-lift target zone (matches the honest ceiling +/- the diversity variance).",
       "type": "stat",
       "gridPos": {
@@ -87,7 +87,7 @@
       }
     },
     {
-      "title": "Follow Rate",
+      "title": "Follow Rate (honest 15-25% by design)",
       "description": "Raw jiminy follow rate over ALL guidance types (constraint/correction/pattern/concept/learning/decision). JIMINY-CEILING-INVESTIGATION-001 (2026-07-29) established that the raw rate's honest ceiling is 15-25% under proper measurement, NOT >90% (the corpus is ~50% correctly-ignored advisory abstractions by design). DASHBOARD-TRUTH-003 (2026-08-01) recalibrated: pre-fix thresholds red<0.4 / green>=0.7 flagged a healthy substrate as critical every render. New bands: red null (any value shown is not-collapse); yellow>=0.05 = collapse floor matches the guidance_should_follow_rate_low alert; green>=0.15 = the honest steady-state pinned in CLAUDE.md. See Actionable Compliance Rate panel for the constraint/correction-only slice (the metric that actually maps to actionable-guidance follow-rate).",
       "type": "stat",
       "gridPos": {
@@ -143,7 +143,7 @@
       }
     },
     {
-      "title": "Constraint Eff. (All-Time)",
+      "title": "Constraint Eff. All-Time (honest ~15% by design)",
       "description": "Volume-weighted effectiveness across constraints with 5+ outcomes (all time). DASHBOARD-TRUTH-002 E7 (2026-07-20): reads TSDB constraint_outcomes directly (was reading Neo4j gauge which cumulated pre-2026-06-11 heuristic half-credit inflation \u2192 All-Time and Selected Range diverged by up to 0.10 for the same underlying data). Now both panels share source-of-truth AND filter classifier_source IN ('llm','tier1','explicit') to exclude the ~50%25 heuristic-labeled rows. HAVING >= 5 preserves the historical All-Time threshold; Selected Range uses HAVING >= 2 for smaller windows.",
       "type": "stat",
       "gridPos": {
@@ -199,7 +199,7 @@
       }
     },
     {
-      "title": "Constraint Eff. (Selected Range)",
+      "title": "Constraint Eff. Selected Range (honest ~15% by design)",
       "description": "Dynamically computed from constraint_outcomes within the dashboard time range. Volume-weighted across constraints with 5+ outcomes in the selected interval. RE-BASELINE (JIMINY-OUTCOME-002): history before 2026-06-11T19:00Z is heuristic-dominated \u2014 94.9% of Tier-2 classifier calls were context-cancelled and fell back to half-credit partial_compliance verdicts (fixed by SUPERVISOR-002). Not comparable to post-fix LLM-classified data. Rows now carry classifier_source (tier1|llm|heuristic|explicit) to filter the artifact class.",
       "type": "stat",
       "gridPos": {
@@ -370,7 +370,7 @@
       }
     },
     {
-      "title": "Auto-compact AVG",
+      "title": "Auto-compact AVG interval (LONGER=BETTER)",
       "description": "Average interval between Claude auto-compact events (pre-compact hook → compact_event_ts). Computed over DISTINCT event timestamps of the LAST 10 events regardless of dashboard window — compactions are rare (days apart), so a windowed query read 'no value' on any range narrower than ~2 events, and the gauge's repeated flush rows previously inflated COUNT(*) (interval understated). LONGER is BETTER: frequent compaction means context pressure. DASHBOARD-TRUTH-003 (2026-08-01): copy-fix from the j17 twin panel that DASHBOARD-TRUTH-002 already fixed 2026-07-21.",
       "type": "stat",
       "gridPos": {
