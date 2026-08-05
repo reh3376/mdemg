@@ -59,7 +59,7 @@
           "unit": "percentunit",
           "min": 0,
           "max": 1,
-          "noValue": "N/A",
+          "noValue": "N/A (n<2)",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -107,7 +107,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "none",
-          "noValue": "N/A",
+          "noValue": "N/A (n<2)",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -157,7 +157,7 @@
           "unit": "percentunit",
           "min": 0,
           "max": 1,
-          "noValue": "N/A",
+          "noValue": "N/A (n<2)",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -212,7 +212,7 @@
           "unit": "percentunit",
           "min": 0,
           "max": 1,
-          "noValue": "N/A",
+          "noValue": "N/A (n<2)",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -414,7 +414,7 @@
           "min": 0,
           "max": 1,
           "unit": "percentunit",
-          "noValue": "N/A",
+          "noValue": "N/A (n<2)",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -506,7 +506,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "percentunit",
-          "noValue": "N/A",
+          "noValue": "N/A (n<2)",
           "custom": {
             "stacking": {
               "mode": "normal"
@@ -589,7 +589,7 @@
       "fieldConfig": {
         "defaults": {
           "displayName": "Compression Ratio",
-          "noValue": "N/A",
+          "noValue": "N/A (n<2)",
           "custom": {
             "thresholdsStyle": {
               "mode": "line"
@@ -775,7 +775,7 @@
           "unit": "percentunit",
           "min": 0,
           "max": 1,
-          "noValue": "N/A",
+          "noValue": "N/A (n<2)",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -823,7 +823,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "none",
-          "noValue": "N/A",
+          "noValue": "N/A (n<2)",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -863,7 +863,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "none",
-          "noValue": "N/A",
+          "noValue": "N/A (n<2)",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -910,7 +910,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "noValue": "N/A",
+          "noValue": "N/A (n<2)",
           "mappings": [
             {
               "type": "value",
@@ -980,7 +980,7 @@
           "min": 0,
           "max": 1,
           "decimals": 2,
-          "noValue": "N/A",
+          "noValue": "N/A (n<2)",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -1002,7 +1002,7 @@
       }
     },
     {
-      "title": "Min Trust Score",
+      "title": "Min Trust Score (needs ≥2 sessions)",
       "description": "Minimum trust across TTL-live sessions clearing J17_TRUST_MIN_FEEDBACK_COUNT. DASHBOARD-TRUTH-002 E6 (2026-07-20): SQL returns NULL (renders 'N/A') when trust_session_count < 2 — a distributional stat over a set of one is meaningless (min == max == avg by construction). See Active Trust Sessions panel for the current N.",
       "type": "stat",
       "gridPos": {
@@ -1032,7 +1032,7 @@
           "min": 0,
           "max": 1,
           "decimals": 2,
-          "noValue": "N/A",
+          "noValue": "N/A (n<2)",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -1054,7 +1054,7 @@
       }
     },
     {
-      "title": "Max Trust Score",
+      "title": "Max Trust Score (needs ≥2 sessions)",
       "description": "Maximum trust across TTL-live sessions clearing J17_TRUST_MIN_FEEDBACK_COUNT. DASHBOARD-TRUTH-002 E6 (2026-07-20): SQL returns NULL (renders 'N/A') when trust_session_count < 2 — a distributional stat over a set of one is meaningless (min == max == avg by construction). See Active Trust Sessions panel for the current N.",
       "type": "stat",
       "gridPos": {
@@ -1084,7 +1084,7 @@
           "min": 0,
           "max": 1,
           "decimals": 2,
-          "noValue": "N/A",
+          "noValue": "N/A (n<2)",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -1337,7 +1337,7 @@
           },
           "fieldConfig": {
             "defaults": {
-              "noValue": "N/A",
+              "noValue": "N/A (n<2)",
               "thresholds": {
                 "mode": "absolute",
                 "steps": [
