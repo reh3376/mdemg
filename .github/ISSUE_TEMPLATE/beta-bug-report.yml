@@ -100,9 +100,7 @@ body:
     id: diagnostics
     attributes:
       label: Diagnostic bundle
-      description: |
-        Run `mdemg diagnostics collect` — it writes a scrubbed tar.gz to `~/.mdemg/diagnostics/mdemg-diag-<host>-<ts>.tar.gz`. Drag that file into this issue.
-        If the bundle fails, paste `docker compose ps`, tail of `~/.mdemg/logs/server.log`, and the failing HTTP response headers.
+      description: Run `mdemg diagnostics collect` (ships in Sprint A) and attach the zip. If unavailable, paste `docker compose ps`, tail of `~/.mdemg/logs/server.log`, and the failing HTTP response headers.
       render: shell
 
   - type: textarea
