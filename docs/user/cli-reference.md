@@ -23,6 +23,27 @@ These persistent flags are available on every command and subcommand.
 
 ---
 
+## Essential Commands (Beta Tester First Hour)
+
+If you're a fresh beta tester on `v0.11.0-beta.1`, these are the ~8 commands you need to know. Everything else in this reference is either a specialized workflow or an internal utility.
+
+| Command | Purpose | When you'll use it |
+|---|---|---|
+| `mdemg init --defaults` | Initialize a project — creates `.env` + `.mdemg/config.yaml`, starts Docker stack. Works with or without `OPENAI_API_KEY`. | Once, at the start |
+| `mdemg config validate` | 3-outcome sanity check: `PASSED` / `PASSED (services not started)` / `FAILED`. Exit 0 for both PASSED variants. | Anytime you're unsure the setup is healthy |
+| `mdemg status` | Show server + services + ports at a glance. | Anytime "is it up?" |
+| `docker compose up -d` | Start the 5-service stack. | After `mdemg init` if you didn't let it auto-start |
+| `mdemg ingest <path>` | Ingest a codebase directory into your default space. | First-hour bulk ingest of your project |
+| `mdemg space list` | Enumerate configured spaces with node/edge counts. | Verify ingest landed |
+| `mdemg jiminy mode` | Read or set enforcement mode (`strict` / `suggest`). | When Jiminy's advice starts blocking a write you want to keep |
+| `mdemg upgrade` | Pull the latest release + refresh Docker instances. | Weekly during beta |
+
+Advanced workflows (retraining, HITL review, symbol-graph maintenance, RSIC control) live in their own sections below. **You do NOT need any of them for the 62-test beta plan** — they're power-user surfaces.
+
+Report any issue you hit to https://github.com/reh3376/mdemg/issues/new/choose.
+
+---
+
 ## Installation
 
 ### macOS
@@ -4081,6 +4102,31 @@ mdemg
     ft-loop
       report-stage      Record a manual retrain stage to scheduled_job_events
       promote           Operator-confirm a promote_pending retrain cycle
+
+  HITL Review:
+    review
+      cadence           Weekly HITL cadence summary
+      autograde         LLM-grade pending items (with --force for backfill)
+
+  Symbol Graph Maintenance:
+    symbols
+      analyze-go-implements   Go IMPLEMENTS via go/types (with --dump-pairs)
+
+  Precision-Weighted Hebbian η:
+    confidence
+      backfill          Backfill MemoryNode.activation_confidence for a space
+
+  Jiminy Enforcement Controls:
+    jiminy
+      mode              Read/set enforcement mode (strict|suggest)
+      override
+        apply           Install a time-boxed constraint override
+        list            List currently-active overrides
+        revoke          Revoke an active override
+
+  Hook Channel Diagnostics:
+    hooks
+      doctor            Diagnose the Claude Code hook channel
 
   Neural Training (Python sidecar):
     mdemg-neural-train              Fine-tune cross-encoder re-ranker

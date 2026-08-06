@@ -49,13 +49,14 @@ The MDEMG HTTP API is identical on all platforms (macOS, Linux, Windows). Only t
 39. [Plugins & Modules](#plugins--modules)
 40. [System](#system)
 41. [Event Graph Federation](#event-graph-federation)
-41. [Training Data Export](#training-data-export)
-42. [Dashboard / Visualization (internal)](#dashboard--visualization-internal)
-43. [MCP Server Tools](#mcp-server-tools)
-44. [Common Status Codes](#common-status-codes)
-45. [Common Headers](#common-headers)
-46. [Protected Spaces](#protected-spaces)
-43. [Platform-Specific Notes](#platform-specific-notes)
+42. [Training Data Export](#training-data-export)
+43. [Dashboard / Visualization (internal)](#dashboard--visualization-internal)
+44. [MCP Server Tools](#mcp-server-tools)
+45. [Common Status Codes](#common-status-codes)
+46. [Common Headers](#common-headers)
+47. [Protected Spaces](#protected-spaces)
+48. [Platform-Specific Notes](#platform-specific-notes)
+49. [Endpoint Capability Matrix](#endpoint-capability-matrix)
 
 ---
 
@@ -4981,6 +4982,37 @@ Guidance outcomes (constraint effectiveness) in a constraint's graph neighborhoo
 ```
 
 All three array fields (`outcomes`, `neighbor_node_ids`, `neighbor_constraint_codes`) always serialize as `[]` (never `null`) when empty. Outcomes recorded without a `constraint_code` are not joinable and won't appear.
+
+---
+
+## Endpoint Capability Matrix
+
+Quick-reference for beta testers on which endpoints work in which mode. Especially useful for `EMBEDDING_PROVIDER=disabled` installs (the new `mdemg init --defaults` default when no `OPENAI_API_KEY` is set): the "Disabled-mode" column tells you which endpoints degrade gracefully vs which need an operator to configure a provider first.
+
+| Endpoint | Method | Requires embedder | Requires LLM | Auth scope | Disabled-mode behavior |
+|---|---|---|---|---|---|
+| `/healthz` | GET | — | — | open | ✅ works |
+| `/readyz` | GET | — | — | open | ✅ works |
+| `/v1/conversation/observe` | POST | no | no | write | ✅ works — `surprise_score=0`, empty `surprise_factors`, no embedding stored |
+| `/v1/conversation/correct` | POST | no | no | write | ✅ works — same disabled-mode caveats as observe |
+| `/v1/memory/retrieve` | POST | no | no | read | ⚠️ BM25-only — `vector_sim=0`, `activation` may be omitted |
+| `/v1/memory/reflect` | POST | yes | yes | read | ❌ returns limited results (falls back to BM25 candidates) |
+| `/v1/memory/consult` | POST | yes | yes | read | ❌ needs both — degrades to error or empty synthesis |
+| `/v1/memory/ingest/batch` | POST | no | no | write | ✅ works — observations land without embeddings |
+| `/v1/jiminy/*` | * | yes (guide) | yes (synthesize) | read/write | ⚠️ classify/strict/mode surface works; guidance synthesis needs LLM |
+| `/v1/review/*` | * | no | no (autograder-side only) | admin | ✅ platform surface works; the autograder CLI still needs an LLM |
+| `/v1/embedding/health` | GET | — | — | read | reports `provider: disabled` |
+| `/v1/metrics/*` | GET | — | — | read (some admin) | ✅ works |
+| `/v1/prometheus` | GET | — | — | open | ✅ works |
+| `/v1/admin/*` | * | — | — | admin | ✅ works |
+| `/v1/backup/*` | * | — | — | admin | ✅ works |
+
+**Legend**:
+- ✅ = full behavior (or graceful degrade that beta testers can use meaningfully)
+- ⚠️ = works but reduced (documented degradation)
+- ❌ = returns error or empty — needs operator to enable an embedder or LLM
+
+For any endpoint marked ⚠️ or ❌, the fix is `export OPENAI_API_KEY=sk-...` + restart, OR install Ollama + `mdemg init --embedding-provider ollama --defaults`. See the [`mdemg init` next-steps summary](../packaging/homebrew-mdemg/README.md) for both paths.
 
 ---
 
