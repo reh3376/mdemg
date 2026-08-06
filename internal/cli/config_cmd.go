@@ -1,11 +1,14 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -154,6 +157,17 @@ func runConfigValidate() error {
 	}
 	fmt.Println()
 
+	// CONFIG-VALIDATE-TRANSIENT-DISTINGUISH-001 (2026-08-05): distinguish
+	// "containers not started yet" (transient — next step is `docker compose
+	// up -d`, config is fine) from "container up but service broken" (real
+	// error). Pre-sprint, a fresh `mdemg init` immediately followed by
+	// `mdemg config validate` reported FAILED — beta-tester reads that as
+	// "MDEMG is broken" when the actual state is "user hasn't started the
+	// services yet." Now: NOT STARTED = PASSED with next-step hint; real
+	// UNREACHABLE = FAILED.
+	composeUp := composeStackRunning()
+	var hasTransient bool
+
 	// Test Neo4j connectivity
 	neo4jURI := os.Getenv("NEO4J_URI")
 	if neo4jURI == "" {
@@ -162,8 +176,11 @@ func runConfigValidate() error {
 		fmt.Printf("Neo4j:    %s ... ", neo4jURI)
 		if testNeo4jReachable(neo4jURI) {
 			fmt.Println("OK")
+		} else if !composeUp {
+			fmt.Println("NOT STARTED")
+			hasTransient = true
 		} else {
-			fmt.Println("UNREACHABLE")
+			fmt.Println("UNREACHABLE (containers up but Bolt port not responding)")
 			hasErrors = true
 		}
 	}
@@ -171,7 +188,7 @@ func runConfigValidate() error {
 	// Test embedding provider
 	provider := os.Getenv("EMBEDDING_PROVIDER")
 	switch provider {
-	case "":
+	case "", "disabled":
 		fmt.Println("Embedding: (disabled)")
 	case "ollama":
 		endpoint := os.Getenv("OLLAMA_ENDPOINT")
@@ -182,7 +199,13 @@ func runConfigValidate() error {
 		if testHTTPReachable(endpoint + "/api/tags") {
 			fmt.Println("OK")
 		} else {
-			fmt.Println("UNREACHABLE")
+			// Ollama runs OUTSIDE the mdemg docker stack (native install)
+			// so composeUp doesn't gate this transient state. Still, treat
+			// the "not running yet" case as transient rather than a config
+			// error: the operator's next step is `ollama serve &`, not "fix
+			// your config."
+			fmt.Println("NOT STARTED (run: ollama serve &)")
+			hasTransient = true
 		}
 	case "openai":
 		apiKey := os.Getenv("OPENAI_API_KEY")
@@ -190,6 +213,8 @@ func runConfigValidate() error {
 			fmt.Println("Embedding: openai (API key set)")
 		} else {
 			fmt.Println("Embedding: openai (WARNING: OPENAI_API_KEY not set)")
+			// Not an error (the config is valid; the operator just hasn't
+			// exported the key yet). Warning already surfaced above.
 		}
 	default:
 		fmt.Printf("Embedding: unknown provider %q\n", provider)
@@ -203,8 +228,34 @@ func runConfigValidate() error {
 		os.Exit(1)
 	}
 
+	if hasTransient {
+		fmt.Println("Validation: PASSED (services not started — run: docker compose up -d)")
+		return nil
+	}
+
 	fmt.Println("Validation: PASSED")
 	return nil
+}
+
+// composeStackRunning returns true when at least one Docker Compose service
+// under the current project has a running container. Used to distinguish
+// "containers not up yet" (transient — reachable=NO but ok) from "containers
+// up but service is broken" (real error). Never blocks: bounded 2-second
+// timeout, and any failure (docker not installed, permission denied, etc.)
+// returns false — which flips the caller into the "not started" branch, which
+// is the safe default when we can't tell.
+func composeStackRunning() bool {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	// `docker compose ps -q` returns container IDs (one per line) for every
+	// service in the current project that has a container. Empty output = no
+	// containers = stack not up.
+	cmd := exec.CommandContext(ctx, "docker", "compose", "ps", "-q")
+	out, err := cmd.Output()
+	if err != nil {
+		return false
+	}
+	return len(strings.TrimSpace(string(out))) > 0
 }
 
 // testNeo4jReachable tests TCP connectivity to the Neo4j bolt port.
