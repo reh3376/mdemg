@@ -152,5 +152,7 @@ body:
     id: diagnostics
     attributes:
       label: Attach a diagnostic bundle
-      description: If you hit any issue, run `mdemg diagnostics collect` (ships in Sprint A — coming soon) OR paste the last ~50 lines of `~/.mdemg/logs/server.log` here. This makes reproduction 10× faster.
+      description: |
+        If you hit any issue, run `mdemg diagnostics collect` — writes a scrubbed tar.gz to `~/.mdemg/diagnostics/mdemg-diag-<host>-<ts>.tar.gz`. Drag that file into this issue.
+        Alternatively, paste the last ~50 lines of `~/.mdemg/logs/server.log` here. This makes reproduction 10× faster.
       render: shell

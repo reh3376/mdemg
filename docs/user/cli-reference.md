@@ -2900,6 +2900,101 @@ mdemg hooks doctor --json | jq '.hooks[] | select(.status != "healthy")'
 
 ---
 
+## Beta Diagnostics
+
+### `mdemg diagnostics collect`
+
+**Synopsis:** `mdemg diagnostics collect [--out PATH] [--logs-tail N] [--no-docker] [--server-url URL]`
+
+Bundle scrubbed environment + log tails + system info into a single tar.gz for GitHub issue attachment. Every text field passes through `internal/llmclient/scrubber.go`'s `ScrubString` (api_key / abs_path / env_secret / email / neo4j_cred; shell env-var references like `$PGPASSWORD` preserved per SCRUB-ENV-REF-001).
+
+**Bundle contents:**
+
+| File | Description |
+|------|-------------|
+| `MANIFEST.json` | Schema version, produced-at, hostname, mdemg version, per-file description map |
+| `version.txt` | `mdemg version` + build commit + build date |
+| `env.scrubbed` | `.env` from cwd, PII-scrubbed |
+| `config-show.txt` | `mdemg config show` output (scrubbed) |
+| `config-validate.txt` | `mdemg config validate` output + exit code |
+| `system.txt` | sw_vers/uname, docker versions, RAM, disk free |
+| `docker-ps.txt` | `docker compose ps` from cwd (unless `--no-docker`) |
+| `docker-logs/<svc>.log` | Per-service `docker compose logs --tail N` (unless `--no-docker`) |
+| `server-log-tail.txt` | `~/.mdemg/logs/server.log` tail (scrubbed) |
+| `healthz.txt` | `GET /healthz` response (skipped if `--server-url` empty) |
+| `metrics-snapshot.txt` | `GET /v1/metrics/snapshot` response |
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--out` | string | `~/.mdemg/diagnostics/mdemg-diag-<host>-<ts>.tar.gz` | Bundle output path |
+| `--logs-tail` | int | `200` | Lines to include from each log tail |
+| `--no-docker` | bool | `false` | Skip `docker compose ps` + per-service logs (use when Docker isn't running) |
+| `--server-url` | string | `http://localhost:9999` | MDEMG server URL for `/healthz` + metrics probes (empty to skip) |
+
+**Example:**
+```bash
+mdemg diagnostics collect
+# → writes ~/.mdemg/diagnostics/mdemg-diag-<host>-<ts>.tar.gz
+# → attach that file to a GitHub issue (all secrets scrubbed)
+
+mdemg diagnostics collect --no-docker --out /tmp/mydiag.tar.gz
+```
+
+**When to use:** Filing a beta bug report, install failure, or any "it's broken on my machine" GitHub issue — attach the bundle so the maintainer can reproduce without back-and-forth.
+
+**See Also:** [`docs/beta/install-checklist.md`](../beta/install-checklist.md), `.github/ISSUE_TEMPLATE/beta-bug-report.yml`
+
+---
+
+### `mdemg beta-share`
+
+**Synopsis:** `mdemg beta-share [--since-days N] [--no-embedding] [--out PATH] [--yes] [--dry-run] [--space-id ID]`
+
+Opt-in: package recent LLM interaction + retrieval events into a tar.gz you can attach to a GitHub issue. Wraps the shipped TSDB `RunExport` (same privacy scrubber as `mdemg data export`) and adds a `submission_receipt.json` with a CUIDv2 `submission_id` + 30-day retention policy + deletion-request instructions.
+
+Runs an interactive opt-in prompt by default; `--yes` skips the prompt for scripts.
+
+**Bundle contents (outer tar.gz):**
+
+| File | Purpose |
+|------|---------|
+| `README-BETA.md` | Human-readable version: what's inside, privacy, retention, submission flow |
+| `submission_receipt.json` | Structured receipt: submission_id, produced_at, window, row counts, deletion contact |
+| `utds-export.tar.gz` | The UTDS-compliant export (nested; has its own `manifest.json` inside) |
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--space-id` | string | resolved via env | Space to export (required — global flag; or set `MDEMG_SPACE_ID`) |
+| `--since-days` | int | `30` | Include events from the last N days |
+| `--no-embedding` | bool | `true` | Exclude `embedding_events` (default true — much smaller bundle; `--no-embedding=false` includes them) |
+| `--out` | string | `~/.mdemg/beta-share/mdemg-beta-share-<ts>.tar.gz` | Bundle output path |
+| `--yes` | bool | `false` | Skip the interactive opt-in prompt |
+| `--dry-run` | bool | `false` | Show row counts without producing a bundle |
+
+**Privacy:** The underlying export routes every text field through the shipped privacy scrubber. If ANY PII survives the scan the export BLOCKS and no bundle is produced. Run with `--dry-run` first to see row counts before committing.
+
+**Retention:** Bundles received by the maintainer are kept for 30 days from receipt. To request earlier deletion, email `rogerhenley345@gmail.com` with the submission_id as the subject line (the command prints a copy-pasteable subject line on completion).
+
+**Example:**
+```bash
+# Preview only — see how many rows would be exported
+mdemg beta-share --space-id mdemg-dev --since-days 7 --dry-run
+
+# Real run — interactive opt-in prompt
+mdemg beta-share --space-id mdemg-dev --since-days 30
+# → prints Submission ID: <cuidv2>
+# → writes ~/.mdemg/beta-share/mdemg-beta-share-<ts>.tar.gz
+
+# Script-friendly (skip the prompt)
+mdemg beta-share --space-id mdemg-dev --yes --since-days 7
+```
+
+**When to use:** You're filing a bug report and want to include the actual events that produced the failure. You've opted in to contributing training data to the beta program. You want to hand the maintainer a reproducible slice of your recent activity.
+
+**See Also:** `mdemg data export` (raw wrapper without opt-in prompt or receipt), [`docs/beta/install-checklist.md`](../beta/install-checklist.md)
+
+---
+
 ## Guidance Corpus Curation
 
 ### `mdemg data curate-guidance`

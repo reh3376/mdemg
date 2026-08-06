@@ -1,0 +1,143 @@
+name: Beta Weekly Digest
+
+# Sprint Beta-Pipeline-D: Monday-morning digest of open beta issues so the
+# maintainer can scan a single tracker instead of paging through the whole
+# issues list. Updates a fixed "Beta Digest" tracker issue (label:
+# `beta-digest`) in place — one long-lived tracker per beta cycle, not a
+# fresh issue every week. If no tracker exists, creates one on first run.
+#
+# Cadence: Mondays 14:00 UTC (≈10am EDT / 9am CDT) — matches the "check my
+# inbox first" moment. Manual dispatch also available for on-demand.
+#
+# Idempotent: reads → aggregates → updates the tracker's body via
+# `gh issue edit --body-file`. No comments are posted (the body IS the
+# digest); the tracker's `updated_at` is the freshness signal.
+
+on:
+  schedule:
+    # Every Monday at 14:00 UTC
+    - cron: '0 14 * * 1'
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build + post digest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -e
+
+          # ---- Aggregate open beta issues ------------------------------
+          # Query once, pipe into per-facet counts. `gh issue list --json`
+          # returns paginated JSON up to --limit; 200 is safely above the
+          # expected beta-cycle backlog. If we ever exceed 200, the digest
+          # header will note total count from `gh issue list --search`.
+          gh issue list --repo "$REPO" \
+            --state open \
+            --label beta \
+            --limit 200 \
+            --json number,title,labels,createdAt,updatedAt,url \
+            > /tmp/beta_issues.json
+
+          COUNT_TOTAL=$(jq 'length' /tmp/beta_issues.json)
+
+          # Per-severity counts (from the auto-triage labels)
+          count_label() {
+            jq --arg lbl "$1" '[.[] | select(.labels[]?.name == $lbl)] | length' /tmp/beta_issues.json
+          }
+          COUNT_BLOCKER=$(count_label "severity:blocker")
+          COUNT_DEGRADED=$(count_label "severity:degraded")
+          COUNT_COSMETIC=$(count_label "severity:cosmetic")
+
+          # Per-template counts (from template frontmatter labels)
+          COUNT_INSTALL=$(count_label "install-report")
+          COUNT_BUG=$(count_label "bug-report")
+          COUNT_FRICTION=$(count_label "feature-friction")
+
+          # Per-OS counts
+          COUNT_MACOS=$(count_label "os:macos")
+          COUNT_LINUX=$(count_label "os:linux")
+          COUNT_WSL=$(count_label "os:wsl2")
+
+          # Top 10 oldest open blockers (highest triage priority)
+          TOP_BLOCKERS=$(jq -r '
+            [.[] | select(.labels[]?.name == "severity:blocker")]
+            | sort_by(.createdAt)
+            | .[0:10]
+            | map("- [#\(.number)](\(.url)) — \(.title) (opened \(.createdAt | .[0:10]))")
+            | join("\n")
+          ' /tmp/beta_issues.json)
+          if [ -z "$TOP_BLOCKERS" ]; then TOP_BLOCKERS="_(none — 🎉)_"; fi
+
+          # Recently updated (last 7 days), most-recent first
+          SEVEN_DAYS_AGO=$(date -u -d '7 days ago' +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -v-7d +%Y-%m-%dT%H:%M:%SZ)
+          RECENT_UPDATES=$(jq -r --arg cutoff "$SEVEN_DAYS_AGO" '
+            [.[] | select(.updatedAt > $cutoff)]
+            | sort_by(.updatedAt) | reverse
+            | .[0:15]
+            | map("- [#\(.number)](\(.url)) — \(.title) (updated \(.updatedAt | .[0:10]))")
+            | join("\n")
+          ' /tmp/beta_issues.json)
+          if [ -z "$RECENT_UPDATES" ]; then RECENT_UPDATES="_(no updates in the last 7 days)_"; fi
+
+          # ---- Render digest body --------------------------------------
+          RUN_DATE=$(date -u +%Y-%m-%d)
+          cat > /tmp/digest_body.md <<EOF
+          # Beta Digest — updated $RUN_DATE
+
+          Auto-generated Monday mornings by \`.github/workflows/beta-weekly-digest.yml\`. Reflects state at scan time.
+
+          ## Snapshot
+
+          | Metric | Count |
+          |---|---|
+          | **Open beta issues (total)** | **$COUNT_TOTAL** |
+          | 🔴 severity:blocker | $COUNT_BLOCKER |
+          | 🟡 severity:degraded | $COUNT_DEGRADED |
+          | 🟢 severity:cosmetic | $COUNT_COSMETIC |
+          | 📦 install-report | $COUNT_INSTALL |
+          | 🐛 bug-report | $COUNT_BUG |
+          | 💬 feature-friction | $COUNT_FRICTION |
+          | 🍎 os:macos | $COUNT_MACOS |
+          | 🐧 os:linux | $COUNT_LINUX |
+          | 🪟 os:wsl2 | $COUNT_WSL |
+
+          ## Top open blockers (oldest first)
+
+          $TOP_BLOCKERS
+
+          ## Recently updated (last 7 days)
+
+          $RECENT_UPDATES
+
+          ---
+
+          _This tracker is updated in place every Monday. To re-run on demand: Actions → Beta Weekly Digest → Run workflow. To see all open beta issues: [click here](../issues?q=is%3Aopen+is%3Aissue+label%3Abeta)._
+          EOF
+
+          # ---- Find or create the tracker issue ------------------------
+          # Look for an OPEN issue with label `beta-digest`. First result
+          # wins if multiple exist (shouldn't happen; if it does, the
+          # maintainer should close the extras).
+          TRACKER_NUM=$(gh issue list --repo "$REPO" --state open --label beta-digest --limit 1 --json number --jq '.[0].number // empty')
+
+          if [ -z "$TRACKER_NUM" ]; then
+            # Create the label first (idempotent) so the create-issue succeeds.
+            gh label create "beta-digest" --color "5319e7" --description "Pinned tracker: rolling weekly beta backlog snapshot" --force --repo "$REPO" || true
+            TRACKER_NUM=$(gh issue create --repo "$REPO" \
+              --title "🧪 Beta Digest — rolling weekly snapshot" \
+              --label "beta-digest" \
+              --body-file /tmp/digest_body.md \
+              | grep -oE '[0-9]+$')
+            echo "Created new digest tracker: #$TRACKER_NUM"
+          else
+            gh issue edit "$TRACKER_NUM" --repo "$REPO" --body-file /tmp/digest_body.md
+            echo "Updated digest tracker #$TRACKER_NUM"
+          fi
