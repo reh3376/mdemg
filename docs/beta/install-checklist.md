@@ -209,6 +209,17 @@ mdemg diagnostics collect
 # → attach that file to your GitHub issue (all secrets are scrubbed automatically)
 ```
 
+**If you're up for contributing training data** (fully opt-in, per-run) — after you've completed Tier 2 you can bundle your recent events for the maintainer:
+
+```bash
+mdemg beta-share --space-id beta-first --since-days 7 --dry-run   # preview only
+mdemg beta-share --space-id beta-first --since-days 7             # opt-in prompt, then bundle
+# → prints a Submission ID
+# → writes ~/.mdemg/beta-share/mdemg-beta-share-<ts>.tar.gz
+```
+
+Bundles are kept 30 days from receipt; deletion-by-email supported. Details print in the terminal and inside `README-BETA.md` in the bundle.
+
 **If something worked but felt harder than it should have** — file a **[Beta Feature Friction](https://github.com/reh3376/mdemg/issues/new?template=beta-feature-friction.yml)** report. Docs gaps, unclear error messages, ergonomic missteps are all valuable feedback.
 
 ---
