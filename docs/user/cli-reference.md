@@ -97,33 +97,40 @@ Space ID resolution follows its own chain:
 
 **Synopsis:** `mdemg init [flags]`
 
-Interactive project initialization wizard. Detects the local environment (Docker, Neo4j, Ollama, Git, IDE), generates `.mdemg/config.yaml` and `.mdemgignore`, optionally installs git hooks and IDE integration configs.
+Interactive project initialization wizard. Detects the local environment (Docker, Neo4j, Ollama, Git, IDE), generates `.mdemg/config.yaml` and `.mdemgignore`, seeds `.env` (including `RSIC_PROTECTED_SPACES=<space_id>` auto-seed as of v0.11.0-beta.1), and starts the Docker stack via `docker compose up -d`.
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `--defaults` | bool | `false` | Accept all defaults without prompting |
 | `--yes` | bool | `false` | Alias for `--defaults` |
-| `--quick` | bool | `false` | Full auto-setup -- config, Neo4j, server, migrations, ingest, and companion app |
+| `--quick` | bool | `false` | Alias for `--defaults` |
 | `--native` | bool | `false` | Legacy native (non-Docker) deployment (dev-only, not recommended) |
 | `--space-id` | string | `""` | Pre-set space ID |
 | `--neo4j-uri` | string | `""` | Pre-set Neo4j URI |
-| `--embedding-provider` | string | `""` | Pre-set embedding provider (openai/ollama) |
+| `--embedding-provider` | string | `""` | Pre-set embedding provider (`openai` / `ollama` / `disabled`). Empty = auto: openai if `OPENAI_API_KEY` set, else `disabled`. |
 | `--no-hooks` | bool | `false` | Skip git hook installation |
 | `--no-ide` | bool | `false` | Skip IDE config generation |
 | `--no-menubar` | bool | `false` | Skip menu bar app installation (macOS only) |
-| `--no-sidebar` | bool | `false` | Skip sidebar app installation (Linux only) |
 
 **Usage Examples:**
 ```bash
 mdemg init                              # Interactive wizard
-mdemg init --defaults                   # Accept all defaults
-mdemg init --quick --space-id myproject # Full auto-setup with custom space
-mdemg init --neo4j-uri bolt://localhost:7687 --embedding-provider ollama
+mdemg init --defaults                   # Non-interactive (recommended for first install)
+mdemg init --defaults --space-id myproject
+mdemg init --embedding-provider ollama --defaults
 ```
 
-The wizard also configures **Jiminy inner-voice guidance** (enabled by default). Users select a Jiminy-specific LLM model for guidance synthesis and constraint evaluation:
-- **OpenAI default:** `gpt-4.1-nano` (cheapest non-tool-use option for small JSON tasks)
+**Disabled mode (v0.11.0-beta.1)**: `mdemg init --defaults` **works without `OPENAI_API_KEY`** — falls back to `EMBEDDING_PROVIDER=disabled`, LLM/Jiminy disabled, and prints a 2-option next-steps summary (OpenAI or Ollama) to enable full features. Ingest, BM25 retrieval, dashboard, and `POST /v1/conversation/observe` all work in disabled mode.
+
+**Auto-seeded `.env` entries** (v0.11.0-beta.1):
+- `RSIC_PROTECTED_SPACES=<new_space_id>` — protects the fresh substrate from destructive RSIC actions.
+- `MDEMG_INSTANCE_ID=<hostname>-<space_id>` — telemetry attribution.
+- `MDEMG_PORT` + 5 other dynamic port assignments (Neo4j Bolt/HTTP, TSDB, neural-sidecar, Grafana).
+
+The wizard also configures **Jiminy inner-voice guidance** (enabled when an LLM provider is present). Users select a Jiminy-specific LLM model:
+- **OpenAI default:** `gpt-4.1`
 - **Ollama default:** `qwen3:8b` (best local model for structured output)
+- **Disabled mode:** Jiminy disabled; re-run init with a provider to enable.
 
 **See Also:** `mdemg config show`, `mdemg config validate`, `mdemg hooks install`
 
@@ -952,11 +959,22 @@ mdemg config show --json
 
 **Synopsis:** `mdemg config validate`
 
-Validate the configuration by checking YAML syntax, probing Neo4j connectivity, and testing embedding provider reachability. No flags.
+Validate the configuration: YAML syntax + Neo4j connectivity + embedding provider reachability. No flags.
+
+**v0.11.0-beta.1 3-outcome model** (CONFIG-VALIDATE-TRANSIENT-DISTINGUISH-001):
+
+| Outcome | Meaning | Exit code |
+|---|---|---|
+| `Validation: PASSED` | All services reachable, config valid | 0 |
+| `Validation: PASSED (services not started — run: docker compose up -d)` | Config valid; Docker stack not started yet (transient — run the suggested command) | 0 |
+| `Validation: FAILED (errors found)` | Real config problem (details above) | 1 |
+
+The 3rd outcome distinguishes "you haven't started your services yet" (fine — run `docker compose up -d`) from "your config is broken" (fix the config). Pre-sprint, both surfaced as `FAILED + exit 1`, which reads as "MDEMG is broken" to a fresh beta tester.
 
 **Usage Examples:**
 ```bash
 mdemg config validate
+echo "exit code: $?"    # 0 for either PASSED, 1 for FAILED
 ```
 
 **See Also:** `mdemg config show`, `mdemg embeddings check`
@@ -1475,51 +1493,6 @@ mdemg menubar status
 
 ---
 
-### `mdemg sidebar` (Linux)
-
-Parent command for managing the MDEMG Linux sidebar companion app. The sidebar app provides a system tray icon showing server health status and quick access to MDEMG features.
-
-Subcommands: `start`, `stop`, `restart`, `status`
-
-On `mdemg init`, the sidebar app is automatically downloaded from GitHub releases and installed to `/usr/local/bin/`. Use `--no-sidebar` to skip this.
-
-> **Platform note:** This command is Linux-only. On macOS, use `mdemg menubar` instead.
-
-### `mdemg sidebar start`
-
-**Synopsis:** `mdemg sidebar start`
-
-Launch the MDEMG sidebar app. Searches for `mdemg-sidebar` in `/usr/local/bin/`, `~/.local/bin/`, and on `$PATH`.
-
-### `mdemg sidebar stop`
-
-**Synopsis:** `mdemg sidebar stop`
-
-Stop the running sidebar app. Sends SIGTERM, polls for exit (up to 10s), then force kills if needed.
-
-### `mdemg sidebar restart`
-
-**Synopsis:** `mdemg sidebar restart`
-
-Stop and relaunch the sidebar app.
-
-### `mdemg sidebar status`
-
-**Synopsis:** `mdemg sidebar status`
-
-Show whether the sidebar app is running (with PID) and its install path.
-
-**Usage Examples:**
-```bash
-mdemg sidebar start
-mdemg sidebar stop
-mdemg sidebar restart
-mdemg sidebar status
-```
-
-**See Also:** `mdemg init --no-sidebar`
-
----
 
 ## Model Distribution
 
@@ -3611,7 +3584,7 @@ Every operator-visible value is dynamic. Defaults tuned to the v1 production rea
 
 **Config file locations:** Same as macOS (using `~` / `$HOME`).
 
-**Companion app:** The sidebar app (`mdemg-sidebar`) is managed via `mdemg sidebar`. Installed by default during `mdemg init`.
+**Companion app:** No sidebar companion is currently shipped for Linux. (Prior versions of this doc referenced an `mdemg sidebar` command; that command was never wired into the CLI and the section has been removed.)
 
 **Keychain:** Secrets are stored via Secret Service (GNOME Keyring / KDE Wallet) under the service name `mdemg`.
 

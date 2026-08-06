@@ -94,7 +94,7 @@ Liveness probe with lightweight subsystem checks. Returns immediately if server 
 ```json
 {
   "status": "ok",
-  "version": "0.6.0",
+  "version": "0.11.0-beta.1",
   "commit": "abc1234",
   "checks": {
     "neo4j": "ok",
@@ -109,7 +109,7 @@ Liveness probe with lightweight subsystem checks. Returns immediately if server 
 ```json
 {
   "status": "degraded",
-  "version": "0.6.0",
+  "version": "0.11.0-beta.1",
   "commit": "abc1234",
   "checks": {
     "neo4j": "no_driver",
@@ -378,6 +378,8 @@ curl -s -X POST http://localhost:9999/v1/memory/retrieve \
   -H "Content-Type: application/json" \
   -d '{"space_id":"demo","query_text":"How does authentication work?","top_k":5}'
 ```
+
+> **Disabled mode (v0.11.0-beta.1)**: works with `EMBEDDING_PROVIDER=disabled` — retrieval gracefully degrades to BM25 lexical scoring only. Response `vector_sim` will be 0 and `activation` may be omitted; other fields (`node_id`, `content`, `bm25_score`, `layer`) behave normally.
 
 ---
 
@@ -1399,7 +1401,9 @@ Capture a conversation observation with surprise detection.
 }
 ```
 
-**Status Codes:** `200 OK`, `400 Bad Request`, `503 Service Unavailable` (no embedder)
+**Status Codes:** `200 OK`, `400 Bad Request`, `499 Client Closed Request` (caller cancellation)
+
+> **Disabled mode (v0.11.0-beta.1)**: works with `EMBEDDING_PROVIDER=disabled` — observation lands (obs_id + node_id returned) but `surprise_score` is 0 and `surprise_factors` are empty (embedder-dependent surprise detection is skipped). No embedding stored on the node.
 
 ```bash
 curl -s -X POST http://localhost:9999/v1/conversation/observe \
@@ -4625,8 +4629,9 @@ The MDEMG MCP server provides 20 tools for IDE integration. Start with `mdemg mc
 | `404 Not Found` | Resource not found |
 | `405 Method Not Allowed` | Wrong HTTP method |
 | `409 Conflict` | Concurrent operation (RSIC policy rejection, backup protected) |
+| `499 Client Closed Request` | Caller cancelled the request (nginx-style; deliberately outside the `^5` regex so SLO alerts don't fire on impatient callers). RETRIEVE-CALLER-CANCEL-001. |
 | `500 Internal Server Error` | Server error (details logged, not exposed to client) |
-| `503 Service Unavailable` | Required service not initialized (embedder, scraper, etc.) |
+| `503 Service Unavailable` | Required service not initialized (scraper, LLM, etc.) — note: `/v1/conversation/observe` no longer returns 503 without an embedder as of v0.11.0-beta.1 (works in disabled mode). |
 
 ---
 
