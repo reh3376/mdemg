@@ -2532,6 +2532,99 @@ Classify a candidate agent output (proposed code or action) against current stri
 
 Fail-open: if the server is unreachable, the hook treats this as `pass`.
 
+### POST /v1/jiminy/override
+
+Install a **time-boxed** constraint override — operator escape-hatch for the Jiminy classifier when it produces a false positive on a WARNED+ escalated constraint (JIMINY-ENFORCE-003). Session-scoped (never global). Duration is REQUIRED (unbounded overrides are refused).
+
+**Request Body:**
+```json
+{
+  "session_id": "claude-core",
+  "constraint_code": "no-direct-main-commits",
+  "reason": "shipping v0.11.0-beta.1 tag from main",
+  "duration": "30m"
+}
+```
+
+**Response (201):**
+```json
+{ "ok": true, "expires_at": "2026-08-06T18:35:00Z" }
+```
+
+**Status Codes:** `201 Created`, `400 Bad Request` (missing required field / bad duration), `503 Service Unavailable` (Jiminy disabled)
+
+```bash
+curl -s -X POST $MDEMG_BASE_URL/v1/jiminy/override \
+  -H "Content-Type: application/json" \
+  -d '{"session_id":"claude-core","constraint_code":"no-direct-main-commits","reason":"shipping v0.11.0-beta.1","duration":"30m"}'
+```
+
+Every apply/revoke/expire writes to (a) the session-scoped in-memory map, (b) `~/.mdemg/jiminy-overrides.jsonl` audit trail (0600 perms), and (c) the `constraint_overrides` TSDB hypertable (queryable by RSIC + UI).
+
+### DELETE /v1/jiminy/override
+
+Revoke an active override before its scheduled expiry.
+
+**Request Body:**
+```json
+{ "session_id": "claude-core", "constraint_code": "no-direct-main-commits" }
+```
+
+**Response (200):** `{ "ok": true, "revoked": true }`
+
+**Status Codes:** `200 OK`, `404 Not Found` (no active override for that session+code)
+
+### GET /v1/jiminy/override
+
+List currently-active overrides. Optional `?session_id=X` filter; omitted = all sessions.
+
+**Response (200):**
+```json
+{
+  "overrides": [
+    {
+      "session_id": "claude-core",
+      "constraint_code": "no-direct-main-commits",
+      "reason": "shipping v0.11.0-beta.1",
+      "applied_at": "2026-08-06T18:05:00Z",
+      "expires_at": "2026-08-06T18:35:00Z"
+    }
+  ]
+}
+```
+
+Always emits `overrides: []` (never null) on empty.
+
+### GET /v1/jiminy/override/history
+
+Return apply/revoke/expire events over a window — feeds the Jiminy tab UI (ENFORCE-UI-OVERRIDES) + the RSIC `enforcement_false_positive_high` pattern. Reads the `constraint_overrides` TSDB hypertable.
+
+**Query params:**
+- `space_id` (default: `RSICWatchdogSpaceID` server config)
+- `hours` (default: `168` = 7 days)
+
+**Response (200):**
+```json
+{
+  "events": [
+    {
+      "time": "2026-08-06T18:05:00Z",
+      "op": "apply",
+      "session_id": "claude-core",
+      "constraint_code": "no-direct-main-commits",
+      "reason": "shipping v0.11.0-beta.1",
+      "expires_at": "2026-08-06T18:35:00Z"
+    }
+  ]
+}
+```
+
+Always emits `events: []` (never null) on empty.
+
+```bash
+curl -s "$MDEMG_BASE_URL/v1/jiminy/override/history?space_id=mdemg-dev&hours=168" | jq .
+```
+
 ### GET /v1/jiminy/latest
 
 Get the most recent guidance entry for a session (used by `prompt-context.sh` to render the current advisory in chat-prompt context). Gated on `JIMINY_ENABLED=true && JIMINY_WARM_ENABLED=true` (warm store is the data source).
@@ -2902,9 +2995,37 @@ Add a comment to an issue.
 Dataset-agnostic human-in-the-loop review surface (HITL-REVIEW-001). All four endpoints require an admin-scoped API key when `AUTH_API_KEYS` is set. See `docs/features/hitl-review.md`.
 
 - `GET /v1/review/datasets` — list registered reviewable datasets with candidate counts.
-- `POST /v1/review/next` — fetch the next ungraded item for a dataset.
+- `GET /v1/review/candidates` — **bulk-fetch** ungraded items for a dataset (used by `mdemg review autograde` CLI; see below).
+- `POST /v1/review/next` — fetch the **next** ungraded item for a dataset (single item; UI-oriented).
 - `POST /v1/review/grade` — submit a rubric grade (optionally reinforcing the live substrate).
 - `POST /v1/review/reverse` — reverse a prior grade's reinforcement.
+
+### GET /v1/review/candidates
+
+Bulk fetch pending review items for a dataset. Used by the autograder (`mdemg review autograde`) to grade a batch in one round-trip; also useful for building custom review UIs.
+
+**Query params:**
+- `dataset_id` (required) — e.g. `contradicted_drafts`, `llm:jiminy.synthesize`, `guidance_corpus`
+- `space_id` (required)
+- `limit` (default: `50`, max: `500`)
+- `exclude_graded` (default: `true`) — skip items with an existing grade at the current rubric_version
+
+**Response (200):**
+```json
+{
+  "data": {
+    "items": [ /* ReviewItem objects */ ],
+    "rubric": { "version": "gr-v1", "kind": "rated", "dimensions": [ ... ] },
+    "autograde_prompt_hint": "1387 chars of dataset-specific classification hints"
+  }
+}
+```
+
+The `autograde_prompt_hint` is per-dataset text spliced into the autograder's LLM system prompt (only present when the dataset implements `AutogradePromptHinter`).
+
+```bash
+curl -s "$MDEMG_BASE_URL/v1/review/candidates?dataset_id=contradicted_drafts&space_id=mdemg-dev&limit=25" | jq '.data | {rubric: .rubric.version, items: (.items | length)}'
+```
 
 ---
 
@@ -4059,6 +4180,32 @@ Refresh stale edges in a space.
 ---
 
 ## Metrics & Monitoring
+
+### GET /v1/prometheus
+
+Prometheus text-format exposition of MDEMG's live gauges + counters + histograms. **Not the primary metrics surface** — MDEMG's canonical metrics home is TSDB (queryable via `/v1/metrics/snapshot` for live values, SQL over `metric_samples` for history, or the shipped Grafana dashboards). `/v1/prometheus` exists for operators integrating with an external Prometheus scraper.
+
+**Response (200):** `text/plain; version=0.0.4` — standard Prometheus exposition format.
+
+```bash
+curl -s $MDEMG_BASE_URL/v1/prometheus | head -20
+# Sample lines:
+# HELP mdemg_http_requests_total Total HTTP requests by path/method/status
+# TYPE mdemg_http_requests_total counter
+# mdemg_http_requests_total{path="/healthz",method="GET",status="200"} 4823
+# ...
+```
+
+**Auth:** open — no scope required (same as `/healthz`).
+
+Add to Prometheus config:
+```yaml
+scrape_configs:
+  - job_name: mdemg
+    metrics_path: /v1/prometheus
+    static_configs:
+      - targets: ['localhost:9999']
+```
 
 ### GET /v1/metrics?space_id=X
 

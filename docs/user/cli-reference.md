@@ -2611,6 +2611,303 @@ mdemg data clean --space-id mdemg-dev --dry-run=false --force --limit 5   # dele
 
 ---
 
+## HITL Review
+
+### `mdemg review`
+
+**Synopsis:** `mdemg review <subcommand> [flags]`
+
+Parent command for HITL review datasets. Reads a running mdemg server via HTTP.
+
+Subcommands: `autograde`, `cadence`.
+
+### `mdemg review cadence`
+
+**Synopsis:** `mdemg review cadence [--endpoint URL] [--out-format text|json]`
+
+Renders a compact weekly cadence summary — how much operator attention each dataset needs (pending count, auto-cleared count, operator-graded count over 7d).
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--endpoint` | string | derived from `LISTEN_ADDR` | MDEMG server URL |
+| `--out-format` | string | `text` | Output format: `text` or `json` |
+
+**Example:**
+```bash
+mdemg review cadence
+mdemg review cadence --out-format json | jq '.datasets[] | {id, pending, operator_7d}'
+```
+
+### `mdemg review autograde`
+
+**Synopsis:** `mdemg review autograde --dataset <id> --space-id <id> [--min-confidence F] [--limit N] [--dry-run] [--force] [--endpoint URL]`
+
+LLM-grade pending items in a dataset; writes high-confidence verdicts as auto-grade rows with `grader_id='auto:...'`. **NEVER triggers the substrate reinforcement side-effect** — operator curation is preserved as the only reinforcement path (HITL-CURATION-002 invariant). Auto-dismiss of noise verdicts DOES flip draft status via HITL-AUTO-DISMISS-001's NonReinforcingApplier.
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--dataset` | string | required | Review dataset id (e.g. `contradicted_drafts`) |
+| `--space-id` | string | required | Space to grade |
+| `--min-confidence` | float | `0.80` | Auto-grade only when model confidence is >= this (0-1) |
+| `--limit` | int | `50` | Max pending items to fetch (1-500) |
+| `--dry-run` | bool | `false` | Preview mode — grade + display but don't POST |
+| `--force` | bool | `false` | Re-grade items that already have a grade at the current rubric_version. Needed to backfill after sink-logic changes (HITL-AUTO-DISMISS-001). |
+| `--endpoint` | string | derived | MDEMG server URL |
+
+**Example:**
+```bash
+mdemg review autograde --dataset contradicted_drafts --space-id mdemg-dev --dry-run
+mdemg review autograde --dataset contradicted_drafts --space-id mdemg-dev  # live
+mdemg review autograde --dataset contradicted_drafts --space-id mdemg-dev --force  # backfill after sink change
+```
+
+**See Also:** `docs/features/hitl-auto-dismiss.md`
+
+---
+
+## Symbol Graph Maintenance
+
+### `mdemg symbols`
+
+**Synopsis:** `mdemg symbols <subcommand> [flags]`
+
+Parent for symbol-graph maintenance commands. Currently just `analyze-go-implements`; the shipped `mdemg extract-symbols` stays as a top-level command for backward compat.
+
+### `mdemg symbols analyze-go-implements`
+
+**Synopsis:** `mdemg symbols analyze-go-implements --root <path> --space-id <id> [flags]`
+
+Discover Go's implicit interface satisfaction across a project (via `go/types`) and write `IMPLEMENTS` edges into Neo4j. Go has no `implements` keyword — a struct implements an interface just by having the right method set — so the tree-sitter query path used for other languages CANNOT detect Go IMPLEMENTS. This command uses Go's own type checker to compute the exact match set. GO-IMPLEMENTS-001 + -002.
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--root` | string | required | Project root to analyze |
+| `--space-id` | string | required | Neo4j space to write into |
+| `--neo4j-uri` | string | `bolt://localhost:7687` | Neo4j URI |
+| `--neo4j-user` | string | `neo4j` | Neo4j username |
+| `--neo4j-pass` | string | `testpassword` | Neo4j password |
+| `--dry-run` | bool | `false` | Compute + print pairs without writing |
+| `--dump-pairs` | string | `""` | File path to dump ALL discovered pairs as TSV (source_id\|source_name\|source_path\|target_id\|target_name\|target_path) — GO-IMPLEMENTS-002 gap-audit format |
+
+Generated protobuf files (`*.pb.go` / `*_grpc.pb.go`) are automatically excluded (GO-IMPLEMENTS-002 filter).
+
+**Example:**
+```bash
+mdemg symbols analyze-go-implements --root . --space-id mdemg-dev --dry-run
+mdemg symbols analyze-go-implements --root . --space-id mdemg-dev --dump-pairs /tmp/pairs.tsv
+```
+
+---
+
+## Precision-Weighted Hebbian η (HEBB-ETA-001)
+
+### `mdemg confidence`
+
+**Synopsis:** `mdemg confidence <subcommand> [flags]`
+
+Parent for per-node `ActivationConfidence` commands. See `docs/features/precision-weighted-eta.md`.
+
+### `mdemg confidence backfill`
+
+**Synopsis:** `mdemg confidence backfill --space-id <id> [flags]`
+
+Compute + store per-node `ActivationConfidence [0.05, 1.0]` for every non-archived `MemoryNode` in a space. Runs the formula `sigmoid(α·log(1+n_reinforce) + β·recency_decay − γ·surprise_variance)` and writes `activation_confidence` on the node. Prerequisite for `PRECISION_WEIGHTED_ETA_ENABLED=true` (default off; enabling without backfill silently collapses η to 0.25).
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--space-id` | string | required | Space to backfill |
+| `--neo4j-uri` | string | `$NEO4J_URI` | Neo4j URI |
+| `--neo4j-user` | string | `$NEO4J_USER` | Neo4j user |
+| `--neo4j-pass` | string | `$NEO4J_PASS` | Neo4j password |
+| `--batch-size` | int | `500` | Nodes per batch |
+| `--dry-run` | bool | `false` | Compute + report only; no write |
+
+**Example:**
+```bash
+mdemg confidence backfill --space-id mdemg-dev --dry-run
+mdemg confidence backfill --space-id mdemg-dev
+```
+
+---
+
+## Jiminy Enforcement Controls
+
+### `mdemg jiminy`
+
+**Synopsis:** `mdemg jiminy <subcommand> [flags]`
+
+Parent command for Jiminy enforcement controls (JIMINY-MODE-001 + JIMINY-ENFORCE-003).
+
+Subcommands: `override apply`, `override list`, `override revoke`, `mode`.
+
+### `mdemg jiminy override apply`
+
+**Synopsis:** `mdemg jiminy override apply --constraint <code> --reason <text> [--duration <15m|1h>] [--session-id ID] [--url URL]`
+
+Install a **time-boxed** constraint override — the operator's escape-hatch when Jiminy's classifier throws a false-positive on a WARNED+ escalated constraint. The override suppresses the specific `<code>` for `<duration>`. Written to the session-scoped in-memory map + JSONL audit trail + TSDB `constraint_overrides` hypertable.
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--constraint` | string | required | Constraint code to override |
+| `--reason` | string | required | Human reason (audit trail; also feeds RSIC learning) |
+| `--duration` | string | `15m` | How long the override lasts (e.g. `15m`, `1h`, `2h30m`) |
+| `--session-id` | string | `claude-core` | Session key (overrides are session-scoped, never global) |
+| `--url` | string | derived | MDEMG server URL |
+
+**Example:**
+```bash
+mdemg jiminy override apply --constraint no-direct-main-commits \
+  --reason "shipping v0.11.0-beta.1 tag from main" --duration 30m
+```
+
+### `mdemg jiminy override list`
+
+**Synopsis:** `mdemg jiminy override list [--session-id ID] [--json] [--url URL]`
+
+List currently-active overrides for a session (or all sessions if `--session-id` omitted).
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--session-id` | string | `""` (all) | Filter to specific session |
+| `--json` | bool | `false` | Emit raw JSON |
+| `--url` | string | derived | MDEMG server URL |
+
+### `mdemg jiminy override revoke`
+
+**Synopsis:** `mdemg jiminy override revoke --constraint <code> [--session-id ID] [--url URL]`
+
+Revoke an active override before its scheduled expiry.
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--constraint` | string | required | Constraint code to revoke |
+| `--session-id` | string | `claude-core` | Session key |
+| `--url` | string | derived | MDEMG server URL |
+
+### `mdemg jiminy mode`
+
+**Synopsis:** `mdemg jiminy mode [strict|suggest] [--session-id ID] [--url URL]`
+
+Read the current Jiminy enforcement mode, or set it. `strict` = deny writes that violate a WARNED+ escalated constraint (fail-open if server unreachable + writes marker). `suggest` = surface guidance but never deny (advisory only).
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--session-id` | string | `claude-core` | Session key |
+| `--url` | string | derived | MDEMG server URL |
+
+**Example:**
+```bash
+mdemg jiminy mode                      # read current mode
+mdemg jiminy mode strict               # switch to strict enforcement
+mdemg jiminy mode suggest              # switch back to advisory
+```
+
+**See Also:** `docs/features/jiminy-strict.md`
+
+---
+
+## FT Recursive-Retraining Loop (FT-RECURSIVE-*)
+
+### `mdemg ft-loop`
+
+**Synopsis:** `mdemg ft-loop <subcommand> [flags]`
+
+Observability + operator control surface for the recursive-retraining loop. `mdemg ft-loop --help` for the full subcommand list.
+
+### `mdemg ft-loop promote`
+
+**Synopsis:** `mdemg ft-loop promote --cycle-id <id> [--reject] [--reason <text>]`
+
+Operator-confirm (or reject) a `promote_pending` retrain cycle. The controller runs export→curate→train→convert→gate and halts at `promote_pending`; this command commits the swap (or aborts back to `rolled_back`). FT-RECURSIVE-003 promotion.
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--cycle-id` | string | required | The `promote_pending` cycle to act on |
+| `--reject` | bool | `false` | Reject the cycle (marks `rolled_back`) instead of confirming |
+| `--reason` | string | `""` | Operator reasoning (recorded; required-ish for `--reject`) |
+
+**Example:**
+```bash
+mdemg ft-loop promote --cycle-id cyc_abc123
+mdemg ft-loop promote --cycle-id cyc_abc123 --reject --reason "gate PASS but manual smoke found regression"
+```
+
+### `mdemg ft-loop report-stage`
+
+**Synopsis:** `mdemg ft-loop report-stage --stage <name> --status <success|failure> [--cycle-id ID] [--detail TEXT] [--latency-ms N] [--space-id ID]`
+
+Record a manual retrain-stage outcome to `scheduled_job_events` (jobhealth). Fires a HIGH alert on `failure` via the distinct `ft-loop` service label. Used during operator-run manual retrain cycles so failures never go silent (NOSILENT-001 pattern).
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--stage` | string | required | One of: `capture`, `curate`, `train`, `benchmark`, `gate`, `promote` |
+| `--status` | string | required | `success` or `failure` |
+| `--cycle-id` | string | `""` | Optional cycle id grouping a run's stages |
+| `--detail` | string | `""` | Human/error detail (becomes the alert message on failure) |
+| `--latency-ms` | int64 | `0` | Optional stage wall-clock in ms |
+| `--space-id` | string | `$MDEMG_SPACE_ID` or `mdemg-dev` | Space id |
+
+**Example:**
+```bash
+mdemg ft-loop report-stage --stage capture --status success --cycle-id cyc_abc123 --latency-ms 12000
+mdemg ft-loop report-stage --stage train --status failure --detail "OOM at epoch 2"
+```
+
+---
+
+## Hook Channel Diagnostics
+
+### `mdemg hooks doctor`
+
+**Synopsis:** `mdemg hooks doctor [--space-id ID] [--server-url URL] [--json]`
+
+Diagnose the Claude Code hook channel in the current project. Verifies each installed hook matches its shipped template modulo `{{SPACE_ID}}` (HOOKSYNC-001), checks the server is reachable + serving `/v1/hooks/event`, prints last-seen heartbeat timestamps per hook. Ships as the go-to triage command when the operator suspects hooks aren't firing.
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--space-id` | string | resolved/dirname | Space ID substituted in installed hooks |
+| `--server-url` | string | `http://localhost:9999` | MDEMG server URL |
+| `--json` | bool | `false` | JSON output |
+
+**Example:**
+```bash
+mdemg hooks doctor
+mdemg hooks doctor --json | jq '.hooks[] | select(.status != "healthy")'
+```
+
+**See Also:** `docs/features/hook-channel-health.md`
+
+---
+
+## Guidance Corpus Curation
+
+### `mdemg data curate-guidance`
+
+**Synopsis:** `mdemg data curate-guidance [--space-id ID] [--lookback-hours N] [--min-label-quality Q] [--out-dir PATH] [--dry-run] [--version V] [--min-suggestion-length N] [--against SPEC]`
+
+Build the labeled guidance training corpus from the `guidance_training_rows` TSDB table. Produces a versioned + leak-audited + distribution-summarized `corpus.jsonl` + `manifest.json`. This is the TSDB-sourced curation path (separate from the file-based UAITS `paradigm_router`) — the manifest's `gold_fraction` is the future-trigger signal for the FT-RECURSIVE loop (FT Phases 6/7/9). Requires `psycopg2` in the runtime.
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--space-id` | string | `mdemg-dev` | Space to curate (empty = all) |
+| `--lookback-hours` | int | `4320` (180d) | Evidence window |
+| `--min-label-quality` | string | `real` | Filter by label source (`real` / `heuristic-ok` / `any`) |
+| `--out-dir` | string | `training_data/guidance_corpus` | Output directory |
+| `--version` | string | `v1` | Corpus artifact version dir |
+| `--dry-run` | bool | `false` | Compute + print manifest without writing |
+| `--min-suggestion-length` | int | `40` | Skip SME suggestions shorter than this (chars) |
+| `--against` | string | `""` | Optional UAITS spec path to validate against |
+
+**Example:**
+```bash
+mdemg data curate-guidance --space-id mdemg-dev --dry-run
+mdemg data curate-guidance --space-id mdemg-dev --out-dir training_data/guidance_corpus --version v2
+```
+
+**See Also:** `docs/features/guidance-training-corpus.md`
+
+---
+
 ## Neural Training Commands
 
 These Python CLI entrypoints are installed alongside the `mdemg` binary by the sidecar installer. They operate on training data exported from TSDB and manage cross-encoder model checkpoints via their CLI flags (there is no `NEURAL_MODEL_DIR` env var — the only sidecar env vars are the `NEURAL_`-prefixed pydantic-settings fields in `neural/neural_sidecar/config.py`).
