@@ -201,7 +201,13 @@ Expected: table showing `beta-first` space with a non-zero node count.
 1. Fill in the **[Beta Install Report](https://github.com/reh3376/mdemg/issues/new?template=beta-install-report.yml)** GitHub issue form (mirrors this checklist), OR
 2. Attach this filled-in file to a new issue with the label `beta`.
 
-**If ANY row is ❌** — file a **[Beta Bug Report](https://github.com/reh3376/mdemg/issues/new?template=beta-bug-report.yml)** with the exact test number, expected vs actual, and (if available) attach a diagnostic bundle from `mdemg diagnostics collect` (ships in Sprint A — coming soon).
+**If ANY row is ❌** — file a **[Beta Bug Report](https://github.com/reh3376/mdemg/issues/new?template=beta-bug-report.yml)** with the exact test number, expected vs actual, and attach a diagnostic bundle:
+
+```bash
+mdemg diagnostics collect
+# → writes ~/.mdemg/diagnostics/mdemg-diag-<host>-<ts>.tar.gz
+# → attach that file to your GitHub issue (all secrets are scrubbed automatically)
+```
 
 **If something worked but felt harder than it should have** — file a **[Beta Feature Friction](https://github.com/reh3376/mdemg/issues/new?template=beta-feature-friction.yml)** report. Docs gaps, unclear error messages, ergonomic missteps are all valuable feedback.
 
