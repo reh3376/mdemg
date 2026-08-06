@@ -186,6 +186,13 @@ Use "mdemg <command> --help" for more information about a command.`,
 	hooksCmd.GroupID = "config"
 	rootCmd.AddCommand(hooksCmd)
 
+	// Sprint Beta-Pipeline-A — diagnostic bundle collector for beta testers.
+	// `mdemg diagnostics collect` produces a scrubbed tar.gz that a beta
+	// tester can attach to a GitHub issue.
+	diagnosticsCmd := newDiagnosticsCmd()
+	diagnosticsCmd.GroupID = "config"
+	rootCmd.AddCommand(diagnosticsCmd)
+
 	sidecarCmd := newSidecarCmd()
 	sidecarCmd.GroupID = "config"
 	rootCmd.AddCommand(sidecarCmd)
