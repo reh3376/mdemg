@@ -1,0 +1,110 @@
+name: 🐞 Beta Bug Report (v0.11.0-beta.1)
+description: Report a specific failure or unexpected behavior found during beta testing
+labels: ["beta", "bug", "triage"]
+title: "[Beta Bug] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for finding a bug! Fill in as much as you can — a diagnostic bundle is the fastest path to a fix.
+
+  - type: input
+    id: mdemg-version
+    attributes:
+      label: mdemg --version output
+      placeholder: mdemg version 0.11.0-beta.1
+    validations:
+      required: true
+
+  - type: input
+    id: tier-test
+    attributes:
+      label: Beta plan tier + test number
+      description: e.g. "T2.2" (single observation), "T4.3" (backup). Leave empty if the bug wasn't from a beta plan step.
+      placeholder: "T2.2"
+
+  - type: textarea
+    id: what-you-did
+    attributes:
+      label: What you ran
+      description: The exact command(s), curl, or click sequence.
+      placeholder: |
+        curl -sS -X POST "$MDEMG_BASE_URL/v1/conversation/observe" \
+          -H "Content-Type: application/json" \
+          -d '{"space_id":"beta-test","session_id":"s1","content":"hi","obs_type":"note"}'
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-you-expected
+    attributes:
+      label: What you expected
+      description: The behavior the docs / beta plan / your intuition led you to expect.
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What actually happened
+      description: The exact response, error message, or observed behavior. Copy/paste beats retyping.
+      render: shell
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity (your read)
+      options:
+        - "🔴 Blocker — I can't continue beta testing"
+        - "🟡 Degraded — feature is broken but I can work around it"
+        - "🟢 Cosmetic — output is weird but nothing is broken"
+      default: 1
+    validations:
+      required: true
+
+  - type: dropdown
+    id: reproducible
+    attributes:
+      label: Reproducible?
+      options:
+        - "Every time"
+        - "Sometimes (intermittent)"
+        - "Once, couldn't reproduce"
+      default: 0
+
+  - type: dropdown
+    id: install-shape
+    attributes:
+      label: Install shape
+      options:
+        - "macOS Homebrew (v0.11.0-beta.1)"
+        - "Linux install script"
+        - "WSL2 install script"
+        - "Build from source"
+      default: 0
+
+  - type: dropdown
+    id: embedding-provider
+    attributes:
+      label: EMBEDDING_PROVIDER at time of bug
+      options:
+        - "openai"
+        - "ollama"
+        - "disabled (default when no OPENAI_API_KEY)"
+      default: 2
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostic bundle
+      description: Run `mdemg diagnostics collect` (ships in Sprint A) and attach the zip. If unavailable, paste `docker compose ps`, tail of `~/.mdemg/logs/server.log`, and the failing HTTP response headers.
+      render: shell
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context
+      description: Screenshots, related issue links, workaround you tried, etc.

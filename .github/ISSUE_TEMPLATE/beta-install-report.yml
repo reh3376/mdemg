@@ -1,0 +1,156 @@
+name: 🧪 Beta Install Report (v0.11.0-beta.1)
+description: Structured report of your first install experience — mirrors T1 of the beta plan
+labels: ["beta", "install-report", "triage"]
+title: "[Beta Install] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for testing MDEMG! This form mirrors **Tier 1 (Installation & Core)** of the beta plan.
+        Fill it in as you go through the install. Attaching a diagnostic bundle (see the last field) makes issues 10× easier to reproduce.
+
+        **Total time: ~30 min for T1.**
+
+  - type: input
+    id: os
+    attributes:
+      label: OS + version
+      description: e.g. "macOS 14.4 (Sonoma)" / "Ubuntu 22.04 (WSL2)" / "Fedora 40"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install-method
+    attributes:
+      label: Install method
+      options:
+        - macOS Homebrew (brew trust + tap + install)
+        - Linux install script (curl … install.sh | bash)
+        - WSL2 install script
+        - Build from source
+    validations:
+      required: true
+
+  - type: input
+    id: mdemg-version
+    attributes:
+      label: mdemg --version output
+      description: paste the line — expected `mdemg version 0.11.0-beta.1`
+      placeholder: mdemg version 0.11.0-beta.1
+    validations:
+      required: true
+
+  - type: dropdown
+    id: t1-1-install
+    attributes:
+      label: T1.1 — Installation (brew trust + tap + install)
+      options:
+        - "✅ PASS"
+        - "❌ FAIL"
+        - "⏭ SKIP"
+      default: 0
+    validations:
+      required: true
+
+  - type: dropdown
+    id: t1-2-version
+    attributes:
+      label: T1.2 — Verify Binary (mdemg version)
+      options: ["✅ PASS", "❌ FAIL", "⏭ SKIP"]
+      default: 0
+
+  - type: dropdown
+    id: t1-3-init
+    attributes:
+      label: T1.3 — mdemg init --defaults (produces .env + docker-compose.yml + starts stack)
+      options: ["✅ PASS", "❌ FAIL", "⏭ SKIP"]
+      default: 0
+    validations:
+      required: true
+
+  - type: dropdown
+    id: t1-4-compose
+    attributes:
+      label: T1.4 — Docker Compose lifecycle (all 5 services `Up (healthy)`)
+      options: ["✅ PASS", "❌ FAIL", "⏭ SKIP"]
+      default: 0
+
+  - type: dropdown
+    id: t1-5-migrations
+    attributes:
+      label: T1.5 — Database Migrations (Neo4j + TSDB schema advance)
+      options: ["✅ PASS", "❌ FAIL", "⏭ SKIP"]
+      default: 0
+
+  - type: dropdown
+    id: t1-6-server
+    attributes:
+      label: T1.6 — Server Start (health check succeeds)
+      options: ["✅ PASS", "❌ FAIL", "⏭ SKIP"]
+      default: 0
+
+  - type: dropdown
+    id: t1-7-healthz
+    attributes:
+      label: T1.7 — /healthz returns `status=ok`
+      options: ["✅ PASS", "❌ FAIL", "⏭ SKIP"]
+      default: 0
+
+  - type: dropdown
+    id: t1-8-validate
+    attributes:
+      label: T1.8 — mdemg config validate (PASSED with exit 0)
+      options: ["✅ PASS", "❌ FAIL", "⏭ SKIP"]
+      default: 0
+
+  - type: dropdown
+    id: t1-9-embed
+    attributes:
+      label: T1.9 — Embedding Provider Check
+      options: ["✅ PASS", "❌ FAIL", "⏭ SKIP (disabled mode)"]
+      default: 0
+
+  - type: dropdown
+    id: t1-10-dashboard
+    attributes:
+      label: T1.10 — Browser Dashboard opens at http://localhost:MDEMG_PORT/ui/
+      options: ["✅ PASS", "❌ FAIL", "⏭ SKIP"]
+      default: 0
+
+  - type: dropdown
+    id: t1-11-upgrade
+    attributes:
+      label: T1.11 — mdemg upgrade path works
+      options: ["✅ PASS", "❌ FAIL", "⏭ SKIP"]
+      default: 0
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes — what surprised you, what confused you, where the docs lied
+      description: Free-form. Anything you had to hunt for, retry, or guess.
+      placeholder: |
+        - T1.3 disabled-mode summary was very clear, thanks
+        - Had to rerun `docker compose up -d` after init auto-start timed out
+        - `mdemg config validate` output confused me at first because it said "services not started" — actually this is helpful
+    validations:
+      required: false
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Docker + system info
+      description: paste `docker --version`, `docker compose version`, `sw_vers` (macOS) / `uname -a` (Linux)
+      placeholder: |
+        Docker version 27.3.1
+        Docker Compose version v2.29.7
+        ProductName: macOS, ProductVersion: 14.4.1
+    validations:
+      required: false
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Attach a diagnostic bundle
+      description: If you hit any issue, run `mdemg diagnostics collect` (ships in Sprint A — coming soon) OR paste the last ~50 lines of `~/.mdemg/logs/server.log` here. This makes reproduction 10× faster.
+      render: shell

@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 🧪 Beta Install Checklist (printable)
+    url: https://github.com/reh3376/mdemg/blob/main/docs/beta/install-checklist.md
+    about: Fill in as you install. Submit via the Beta Install Report template below.
+  - name: 📖 Beta Test Plan (62 tests, 7 tiers)
+    url: https://github.com/reh3376/mdemg/blob/main/packaging/homebrew-mdemg/mdemg_beta_testing.md
+    about: The full 90-120 min beta plan. Use with the beta-install-report + beta-bug-report templates.
+  - name: 💬 Email the maintainer directly
+    url: mailto:rogerhenley345@gmail.com
+    about: Prefer email over an issue? Sign up as a beta tester or send private feedback here.
