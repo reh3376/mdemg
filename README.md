@@ -7,7 +7,18 @@
 
 A persistent memory system for AI agents built on Neo4j with native vector indexes. Implements semantic retrieval with hidden layer concept abstraction, recursive self-improvement and Hebbian learning.
 
-> **Key insight**: The critical metric isn't average retrieval score—it's **state survival under context compaction**. Baseline agents forget architectural decisions after compactions. MDEMG maintains decision persistence indefinitely.  If you do a quick review and come to the conclusion that this is just another tool built for small dev teams, please look closer.  I would be happy to engage in discussion related to the mdemg framework, how it works, the problems it solves, and most importantly how can WE make it better.  
+> **Key insight**: The critical metric isn't average retrieval score—it's **state survival under context compaction**. Baseline agents forget architectural decisions after compactions. MDEMG maintains decision persistence indefinitely.
+
+---
+
+## 🧪 Beta Testers — Start Here
+
+**Current beta**: `v0.11.0-beta.1` (2026-08-06). Thank you for testing.
+
+- **Beta test plan** (69 tests across 7 tiers): [`packaging/homebrew-mdemg/mdemg_beta_testing.md`](packaging/homebrew-mdemg/mdemg_beta_testing.md)
+- **Report an issue**: https://github.com/reh3376/mdemg/issues/new/choose
+- **First-run gotcha**: on macOS, run `brew trust reh3376/mdemg` BEFORE `brew install` — Homebrew's default-blocks-untrusted-taps policy will otherwise fail with a Sorbet stack trace
+- **You do NOT need an OpenAI or Ollama key to start** — `mdemg init --defaults` falls back to disabled mode; you can write observations, open the dashboard, and inspect data without any external provider
 
 ---
 
@@ -15,22 +26,23 @@ A persistent memory system for AI agents built on Neo4j with native vector index
 
 ### Prerequisites
 
-- **Docker Desktop** (macOS/Windows) or **Docker Engine** (Linux) with Compose v2
-- **Embedding provider** (choose one):
-  - [OpenAI API key](https://platform.openai.com/api-keys) (recommended, requires account)
-  - [Ollama](https://ollama.com) (local, free, no API key needed)
+- **Docker Desktop** (macOS/Windows) or **Docker Engine** (Linux) with Compose v2, running before `mdemg init`
+- **Embedding provider** (OPTIONAL — MDEMG runs without one in disabled mode):
+  - [OpenAI API key](https://platform.openai.com/api-keys) — simplest path to full features (1 env var)
+  - [Ollama](https://ollama.com) — local & free, requires ~5 GB model download
 
 ### Step 1: Install
 
 ```bash
 # macOS (Homebrew)
+brew trust reh3376/mdemg    # REQUIRED before first install (Homebrew untrusted-tap policy)
 brew tap reh3376/mdemg
 brew install mdemg
 
 # Linux / Windows (WSL2)
 curl -fsSL https://raw.githubusercontent.com/reh3376/mdemg/main/scripts/install.sh | bash
 
-# Verify installation
+# Verify installation — expect v0.11.0-beta.1 for the current beta
 mdemg version
 ```
 
@@ -51,22 +63,53 @@ go build -o bin/mdemg ./cmd/mdemg
 
 ```bash
 cd /path/to/your/project
-mdemg init                  # Interactive setup: scans ports, generates .env, starts Docker stack
+mdemg init --defaults       # Recommended — non-interactive, works with or without OPENAI_API_KEY
 # OR
-mdemg init --quick          # Non-interactive with sensible defaults
+mdemg init                  # Interactive wizard — prompts for OpenAI/Ollama/Jiminy choices
 ```
 
 This will:
 1. Check Docker is available and has adequate resources
 2. Scan for **6 free TCP ports** (all dynamically assigned — no hardcoded defaults)
-3. Generate `.env` with port assignments and credentials
+3. Generate `.env` with port assignments, credentials, and auto-seed `RSIC_PROTECTED_SPACES` with your new space
 4. Create `.mdemg/config.yaml` and `.mdemgignore`
 5. Run `docker compose up -d` (starts all 5 services)
 6. Wait for the MDEMG server health check
 
-> **All ports are dynamic.** Each project gets its own `COMPOSE_PROJECT_NAME` for multi-instance isolation. See `docs/user/quickstart-docker.md` for the full Docker deployment guide.
+> **Without `OPENAI_API_KEY` set**, `mdemg init --defaults` produces a **disabled-mode** config: ingest, dashboard, BM25 retrieval, observations all work; LLM synthesis + Jiminy guidance + vector retrieval need an operator opt-in. The init output prints exactly 2 next-step paths (OpenAI or Ollama) so you can enable the full feature set when ready.
 
-### Step 2b (optional): Pull the local LLM
+Sanity-check the setup:
+
+```bash
+mdemg config validate
+# Expected: "Validation: PASSED" or "Validation: PASSED (services not started — run: docker compose up -d)"
+# Both exit 0. FAILED with exit 1 = real config problem worth reporting.
+```
+
+### Open the Dashboard
+
+Once the stack is running, open the built-in browser dashboard. Find your port in `.env` (`MDEMG_PORT=`) or via `mdemg status`:
+
+```
+http://localhost:${MDEMG_PORT}/ui/
+```
+
+### Step 3: Write your first observation
+
+The smallest possible success signal — works in disabled mode, no embedder required:
+
+```bash
+port=$(grep '^MDEMG_PORT' .env | cut -d= -f2)
+curl -sS -X POST "http://localhost:${port}/v1/conversation/observe" \
+  -H "Content-Type: application/json" \
+  -d '{"space_id":"my-first-space","session_id":"first","content":"MDEMG is running","obs_type":"note"}'
+# Expected: {"obs_id":"...","node_id":"...","surprise_score":0,...}
+```
+
+Then check the dashboard's Memory tab — your observation should appear.
+
+<details>
+<summary>Step 4 (optional): Pull the local LLM for full Jiminy + retrieval features</summary>
 
 For the local-LLM path (`mdemg-llm-v1`, Phase 5 Qwen3-14B fine-tune served via `llama.cpp llama-server`):
 
@@ -76,17 +119,11 @@ mdemg model pull             # RAM-auto picks Q4_K_M / Q5_K_M / Q8_0 quant
 # → prints the MDEMG_MODEL_PATH line to add to .env
 ```
 
-Three quants serve three RAM tiers: Q4_K_M (~9 GB, 16 GB Macs), Q5_K_M (~11 GB, 24 GB — production canonical), Q8_0 (~16 GB, 32+ GB). See [`docs/features/local-model-distribution.md`](docs/features/local-model-distribution.md) for the full Configurability Contract (every value overridable via env or flag — namespace, name, backend, quant allowlist, RAM-tier map, paths).
+Three quants serve three RAM tiers: Q4_K_M (~9 GB, 16 GB Macs), Q5_K_M (~11 GB, 24 GB — production canonical), Q8_0 (~16 GB, 32+ GB). See [`docs/features/local-model-distribution.md`](docs/features/local-model-distribution.md) for the full Configurability Contract.
 
-Skip this step if you're using OpenAI for inference; OpenAI is the framework's fallback.
+Skip this step if you're using OpenAI for inference or running in disabled mode.
 
-### Open the Dashboard
-
-Once the stack is running, open the built-in browser dashboard:
-
-```
-http://localhost:${MDEMG_PORT}/ui/
-```
+</details>
 
 The dashboard has 11 tabs: Status (health + Grafana links + restart), Memory (layer breakdown + export/import), Learning (Hebbian stats + freeze/prune), Config (editable with Save All), Logs (searchable viewer), RSIC (service controls + trigger), Plugins (lifecycle management), Features (service status), Backup (backup + restore), Training Data (fine-tuning data pipeline), and Review (HITL dataset grading). Links to 8 Grafana dashboards for detailed metrics.
 

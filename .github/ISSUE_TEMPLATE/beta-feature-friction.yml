@@ -1,0 +1,56 @@
+name: 💭 Beta Feature Friction (v0.11.0-beta.1)
+description: "Something worked but felt harder than it should have — docs, ergonomics, mental model"
+labels: ["beta", "friction", "docs"]
+title: "[Beta Friction] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For things that **worked** but felt harder than they should have. Documentation gaps, ergonomic missteps, unclear mental models, confusing error messages.
+        These are lower priority than bugs but often more valuable — they surface what a real user experiences vs what the maintainer assumed.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What you were trying to do
+      placeholder: |
+        Wanted to see the outcomes of a specific constraint over the last 24 hours.
+    validations:
+      required: true
+
+  - type: textarea
+    id: friction
+    attributes:
+      label: What made it harder than it should have been
+      placeholder: |
+        - Docs mentioned `constraint_outcomes` but didn't say where to query it
+        - Had to dig into TSDB directly with psql; expected a CLI subcommand
+        - Grafana dashboard exists but URL is nowhere in the beta plan
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-would-help
+    attributes:
+      label: What would have helped (if you have an idea)
+      description: Not required — sometimes the surfacing IS the value. But if you have a concrete suggestion, share.
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category (your best guess)
+      options:
+        - "Documentation gap"
+        - "CLI ergonomics"
+        - "Dashboard / UI"
+        - "Error message clarity"
+        - "Config / .env"
+        - "Install / first-run"
+        - "Other"
+      default: 0
+
+  - type: input
+    id: mdemg-version
+    attributes:
+      label: mdemg --version
+      placeholder: mdemg version 0.11.0-beta.1

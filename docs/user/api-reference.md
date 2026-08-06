@@ -49,13 +49,14 @@ The MDEMG HTTP API is identical on all platforms (macOS, Linux, Windows). Only t
 39. [Plugins & Modules](#plugins--modules)
 40. [System](#system)
 41. [Event Graph Federation](#event-graph-federation)
-41. [Training Data Export](#training-data-export)
-42. [Dashboard / Visualization (internal)](#dashboard--visualization-internal)
-43. [MCP Server Tools](#mcp-server-tools)
-44. [Common Status Codes](#common-status-codes)
-45. [Common Headers](#common-headers)
-46. [Protected Spaces](#protected-spaces)
-43. [Platform-Specific Notes](#platform-specific-notes)
+42. [Training Data Export](#training-data-export)
+43. [Dashboard / Visualization (internal)](#dashboard--visualization-internal)
+44. [MCP Server Tools](#mcp-server-tools)
+45. [Common Status Codes](#common-status-codes)
+46. [Common Headers](#common-headers)
+47. [Protected Spaces](#protected-spaces)
+48. [Platform-Specific Notes](#platform-specific-notes)
+49. [Endpoint Capability Matrix](#endpoint-capability-matrix)
 
 ---
 
@@ -94,7 +95,7 @@ Liveness probe with lightweight subsystem checks. Returns immediately if server 
 ```json
 {
   "status": "ok",
-  "version": "0.6.0",
+  "version": "0.11.0-beta.1",
   "commit": "abc1234",
   "checks": {
     "neo4j": "ok",
@@ -109,7 +110,7 @@ Liveness probe with lightweight subsystem checks. Returns immediately if server 
 ```json
 {
   "status": "degraded",
-  "version": "0.6.0",
+  "version": "0.11.0-beta.1",
   "commit": "abc1234",
   "checks": {
     "neo4j": "no_driver",
@@ -378,6 +379,8 @@ curl -s -X POST http://localhost:9999/v1/memory/retrieve \
   -H "Content-Type: application/json" \
   -d '{"space_id":"demo","query_text":"How does authentication work?","top_k":5}'
 ```
+
+> **Disabled mode (v0.11.0-beta.1)**: works with `EMBEDDING_PROVIDER=disabled` — retrieval gracefully degrades to BM25 lexical scoring only. Response `vector_sim` will be 0 and `activation` may be omitted; other fields (`node_id`, `content`, `bm25_score`, `layer`) behave normally.
 
 ---
 
@@ -1399,7 +1402,9 @@ Capture a conversation observation with surprise detection.
 }
 ```
 
-**Status Codes:** `200 OK`, `400 Bad Request`, `503 Service Unavailable` (no embedder)
+**Status Codes:** `200 OK`, `400 Bad Request`, `499 Client Closed Request` (caller cancellation)
+
+> **Disabled mode (v0.11.0-beta.1)**: works with `EMBEDDING_PROVIDER=disabled` — observation lands (obs_id + node_id returned) but `surprise_score` is 0 and `surprise_factors` are empty (embedder-dependent surprise detection is skipped). No embedding stored on the node.
 
 ```bash
 curl -s -X POST http://localhost:9999/v1/conversation/observe \
@@ -2528,6 +2533,99 @@ Classify a candidate agent output (proposed code or action) against current stri
 
 Fail-open: if the server is unreachable, the hook treats this as `pass`.
 
+### POST /v1/jiminy/override
+
+Install a **time-boxed** constraint override — operator escape-hatch for the Jiminy classifier when it produces a false positive on a WARNED+ escalated constraint (JIMINY-ENFORCE-003). Session-scoped (never global). Duration is REQUIRED (unbounded overrides are refused).
+
+**Request Body:**
+```json
+{
+  "session_id": "claude-core",
+  "constraint_code": "no-direct-main-commits",
+  "reason": "shipping v0.11.0-beta.1 tag from main",
+  "duration": "30m"
+}
+```
+
+**Response (201):**
+```json
+{ "ok": true, "expires_at": "2026-08-06T18:35:00Z" }
+```
+
+**Status Codes:** `201 Created`, `400 Bad Request` (missing required field / bad duration), `503 Service Unavailable` (Jiminy disabled)
+
+```bash
+curl -s -X POST $MDEMG_BASE_URL/v1/jiminy/override \
+  -H "Content-Type: application/json" \
+  -d '{"session_id":"claude-core","constraint_code":"no-direct-main-commits","reason":"shipping v0.11.0-beta.1","duration":"30m"}'
+```
+
+Every apply/revoke/expire writes to (a) the session-scoped in-memory map, (b) `~/.mdemg/jiminy-overrides.jsonl` audit trail (0600 perms), and (c) the `constraint_overrides` TSDB hypertable (queryable by RSIC + UI).
+
+### DELETE /v1/jiminy/override
+
+Revoke an active override before its scheduled expiry.
+
+**Request Body:**
+```json
+{ "session_id": "claude-core", "constraint_code": "no-direct-main-commits" }
+```
+
+**Response (200):** `{ "ok": true, "revoked": true }`
+
+**Status Codes:** `200 OK`, `404 Not Found` (no active override for that session+code)
+
+### GET /v1/jiminy/override
+
+List currently-active overrides. Optional `?session_id=X` filter; omitted = all sessions.
+
+**Response (200):**
+```json
+{
+  "overrides": [
+    {
+      "session_id": "claude-core",
+      "constraint_code": "no-direct-main-commits",
+      "reason": "shipping v0.11.0-beta.1",
+      "applied_at": "2026-08-06T18:05:00Z",
+      "expires_at": "2026-08-06T18:35:00Z"
+    }
+  ]
+}
+```
+
+Always emits `overrides: []` (never null) on empty.
+
+### GET /v1/jiminy/override/history
+
+Return apply/revoke/expire events over a window — feeds the Jiminy tab UI (ENFORCE-UI-OVERRIDES) + the RSIC `enforcement_false_positive_high` pattern. Reads the `constraint_overrides` TSDB hypertable.
+
+**Query params:**
+- `space_id` (default: `RSICWatchdogSpaceID` server config)
+- `hours` (default: `168` = 7 days)
+
+**Response (200):**
+```json
+{
+  "events": [
+    {
+      "time": "2026-08-06T18:05:00Z",
+      "op": "apply",
+      "session_id": "claude-core",
+      "constraint_code": "no-direct-main-commits",
+      "reason": "shipping v0.11.0-beta.1",
+      "expires_at": "2026-08-06T18:35:00Z"
+    }
+  ]
+}
+```
+
+Always emits `events: []` (never null) on empty.
+
+```bash
+curl -s "$MDEMG_BASE_URL/v1/jiminy/override/history?space_id=mdemg-dev&hours=168" | jq .
+```
+
 ### GET /v1/jiminy/latest
 
 Get the most recent guidance entry for a session (used by `prompt-context.sh` to render the current advisory in chat-prompt context). Gated on `JIMINY_ENABLED=true && JIMINY_WARM_ENABLED=true` (warm store is the data source).
@@ -2898,9 +2996,37 @@ Add a comment to an issue.
 Dataset-agnostic human-in-the-loop review surface (HITL-REVIEW-001). All four endpoints require an admin-scoped API key when `AUTH_API_KEYS` is set. See `docs/features/hitl-review.md`.
 
 - `GET /v1/review/datasets` — list registered reviewable datasets with candidate counts.
-- `POST /v1/review/next` — fetch the next ungraded item for a dataset.
+- `GET /v1/review/candidates` — **bulk-fetch** ungraded items for a dataset (used by `mdemg review autograde` CLI; see below).
+- `POST /v1/review/next` — fetch the **next** ungraded item for a dataset (single item; UI-oriented).
 - `POST /v1/review/grade` — submit a rubric grade (optionally reinforcing the live substrate).
 - `POST /v1/review/reverse` — reverse a prior grade's reinforcement.
+
+### GET /v1/review/candidates
+
+Bulk fetch pending review items for a dataset. Used by the autograder (`mdemg review autograde`) to grade a batch in one round-trip; also useful for building custom review UIs.
+
+**Query params:**
+- `dataset_id` (required) — e.g. `contradicted_drafts`, `llm:jiminy.synthesize`, `guidance_corpus`
+- `space_id` (required)
+- `limit` (default: `50`, max: `500`)
+- `exclude_graded` (default: `true`) — skip items with an existing grade at the current rubric_version
+
+**Response (200):**
+```json
+{
+  "data": {
+    "items": [ /* ReviewItem objects */ ],
+    "rubric": { "version": "gr-v1", "kind": "rated", "dimensions": [ ... ] },
+    "autograde_prompt_hint": "1387 chars of dataset-specific classification hints"
+  }
+}
+```
+
+The `autograde_prompt_hint` is per-dataset text spliced into the autograder's LLM system prompt (only present when the dataset implements `AutogradePromptHinter`).
+
+```bash
+curl -s "$MDEMG_BASE_URL/v1/review/candidates?dataset_id=contradicted_drafts&space_id=mdemg-dev&limit=25" | jq '.data | {rubric: .rubric.version, items: (.items | length)}'
+```
 
 ---
 
@@ -4056,6 +4182,32 @@ Refresh stale edges in a space.
 
 ## Metrics & Monitoring
 
+### GET /v1/prometheus
+
+Prometheus text-format exposition of MDEMG's live gauges + counters + histograms. **Not the primary metrics surface** — MDEMG's canonical metrics home is TSDB (queryable via `/v1/metrics/snapshot` for live values, SQL over `metric_samples` for history, or the shipped Grafana dashboards). `/v1/prometheus` exists for operators integrating with an external Prometheus scraper.
+
+**Response (200):** `text/plain; version=0.0.4` — standard Prometheus exposition format.
+
+```bash
+curl -s $MDEMG_BASE_URL/v1/prometheus | head -20
+# Sample lines:
+# HELP mdemg_http_requests_total Total HTTP requests by path/method/status
+# TYPE mdemg_http_requests_total counter
+# mdemg_http_requests_total{path="/healthz",method="GET",status="200"} 4823
+# ...
+```
+
+**Auth:** open — no scope required (same as `/healthz`).
+
+Add to Prometheus config:
+```yaml
+scrape_configs:
+  - job_name: mdemg
+    metrics_path: /v1/prometheus
+    static_configs:
+      - targets: ['localhost:9999']
+```
+
 ### GET /v1/metrics?space_id=X
 
 Graph metrics (node counts, edge counts, hub nodes, etc.).
@@ -4625,8 +4777,9 @@ The MDEMG MCP server provides 20 tools for IDE integration. Start with `mdemg mc
 | `404 Not Found` | Resource not found |
 | `405 Method Not Allowed` | Wrong HTTP method |
 | `409 Conflict` | Concurrent operation (RSIC policy rejection, backup protected) |
+| `499 Client Closed Request` | Caller cancelled the request (nginx-style; deliberately outside the `^5` regex so SLO alerts don't fire on impatient callers). RETRIEVE-CALLER-CANCEL-001. |
 | `500 Internal Server Error` | Server error (details logged, not exposed to client) |
-| `503 Service Unavailable` | Required service not initialized (embedder, scraper, etc.) |
+| `503 Service Unavailable` | Required service not initialized (scraper, LLM, etc.) — note: `/v1/conversation/observe` no longer returns 503 without an embedder as of v0.11.0-beta.1 (works in disabled mode). |
 
 ---
 
@@ -4829,6 +4982,37 @@ Guidance outcomes (constraint effectiveness) in a constraint's graph neighborhoo
 ```
 
 All three array fields (`outcomes`, `neighbor_node_ids`, `neighbor_constraint_codes`) always serialize as `[]` (never `null`) when empty. Outcomes recorded without a `constraint_code` are not joinable and won't appear.
+
+---
+
+## Endpoint Capability Matrix
+
+Quick-reference for beta testers on which endpoints work in which mode. Especially useful for `EMBEDDING_PROVIDER=disabled` installs (the new `mdemg init --defaults` default when no `OPENAI_API_KEY` is set): the "Disabled-mode" column tells you which endpoints degrade gracefully vs which need an operator to configure a provider first.
+
+| Endpoint | Method | Requires embedder | Requires LLM | Auth scope | Disabled-mode behavior |
+|---|---|---|---|---|---|
+| `/healthz` | GET | — | — | open | ✅ works |
+| `/readyz` | GET | — | — | open | ✅ works |
+| `/v1/conversation/observe` | POST | no | no | write | ✅ works — `surprise_score=0`, empty `surprise_factors`, no embedding stored |
+| `/v1/conversation/correct` | POST | no | no | write | ✅ works — same disabled-mode caveats as observe |
+| `/v1/memory/retrieve` | POST | no | no | read | ⚠️ BM25-only — `vector_sim=0`, `activation` may be omitted |
+| `/v1/memory/reflect` | POST | yes | yes | read | ❌ returns limited results (falls back to BM25 candidates) |
+| `/v1/memory/consult` | POST | yes | yes | read | ❌ needs both — degrades to error or empty synthesis |
+| `/v1/memory/ingest/batch` | POST | no | no | write | ✅ works — observations land without embeddings |
+| `/v1/jiminy/*` | * | yes (guide) | yes (synthesize) | read/write | ⚠️ classify/strict/mode surface works; guidance synthesis needs LLM |
+| `/v1/review/*` | * | no | no (autograder-side only) | admin | ✅ platform surface works; the autograder CLI still needs an LLM |
+| `/v1/embedding/health` | GET | — | — | read | reports `provider: disabled` |
+| `/v1/metrics/*` | GET | — | — | read (some admin) | ✅ works |
+| `/v1/prometheus` | GET | — | — | open | ✅ works |
+| `/v1/admin/*` | * | — | — | admin | ✅ works |
+| `/v1/backup/*` | * | — | — | admin | ✅ works |
+
+**Legend**:
+- ✅ = full behavior (or graceful degrade that beta testers can use meaningfully)
+- ⚠️ = works but reduced (documented degradation)
+- ❌ = returns error or empty — needs operator to enable an embedder or LLM
+
+For any endpoint marked ⚠️ or ❌, the fix is `export OPENAI_API_KEY=sk-...` + restart, OR install Ollama + `mdemg init --embedding-provider ollama --defaults`. See the [`mdemg init` next-steps summary](../packaging/homebrew-mdemg/README.md) for both paths.
 
 ---
 
