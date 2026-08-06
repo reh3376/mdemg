@@ -193,13 +193,6 @@ Use "mdemg <command> --help" for more information about a command.`,
 	diagnosticsCmd.GroupID = "config"
 	rootCmd.AddCommand(diagnosticsCmd)
 
-	// Sprint Beta-Pipeline-C — opt-in training-data submission.
-	// `mdemg beta-share` wraps `mdemg data export` with an opt-in
-	// prompt + submission_id receipt + 30-day retention notice.
-	betaShareCmd := newBetaShareCmd()
-	betaShareCmd.GroupID = "config"
-	rootCmd.AddCommand(betaShareCmd)
-
 	sidecarCmd := newSidecarCmd()
 	sidecarCmd.GroupID = "config"
 	rootCmd.AddCommand(sidecarCmd)
