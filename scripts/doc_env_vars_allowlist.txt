@@ -83,3 +83,7 @@ DEEP_DIVE_2026          # HITL-CURATION-002 pin cites the Q4 scoping doc DEEP_DI
 MEASUREMENT_ARTIFACT     # DASHBOARD-TRUTH sprint prose — a triage-classification label, not an env var
 REAL_LOW                 # DASHBOARD-TRUTH sprint prose — triage-classification label alongside MEASUREMENT_ARTIFACT
 REFERENCES_SYMBOL        # RQA-001 disclosed follow-up: hypothesized graph edge label, not shipped code
+---
+# CONVERSATION-EMBEDDER-OPTIONAL-001: anti-pattern placeholders in prose ("if X != nil { CONSTRUCT_ALL } else { LOG_DISABLED }")
+CONSTRUCT_ALL
+LOG_DISABLED

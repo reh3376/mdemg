@@ -312,34 +312,43 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 	gapInt := gaps.NewGapInterviewer(driver)
 	slog.Info("gap interviewer initialized")
 
-	// Initialize conversation service (Phase 1: Observation Capture with Surprise Detection)
-	var convSvc *conversation.Service
-	var ctxCooler *conversation.ContextCooler
-	if emb != nil {
-		convSvc = conversation.NewServiceWithConfig(driver, emb, cfg.VectorIndexName, cfg)
-		// EVENTGRAPH-003 fix: inject the learning service so Observe() triggers
-		// CoactivateSession. This setter had no caller — the conversation
-		// service's learningService stayed nil, so session co-activation
-		// (CO_ACTIVATED_WITH edges between same-session observations) NEVER
-		// fired (0 such edges ever in mdemg-dev). Discovered via EVENTGRAPH-003
-		// live smoke when coactivate_session reinforcement events never landed.
-		convSvc.SetLearningService(lea)
-		slog.Info("conversation service initialized", "vector_index", cfg.VectorIndexName, "constraint_detection", cfg.ConstraintDetectionEnabled)
+	// Initialize conversation service (Phase 1: Observation Capture with Surprise Detection).
+	// CONVERSATION-EMBEDDER-OPTIONAL-001 (2026-08-06): construct the service
+	// UNCONDITIONALLY. The service already handles nil embedder gracefully
+	// (Observe() skips embedding + surprise detection; observations still land
+	// as raw content + metadata + graph nodes). Pre-sprint this block skipped
+	// construction entirely when emb == nil, which meant a fresh install in
+	// EMBEDDING_PROVIDER=disabled mode couldn't write ANY observations —
+	// effectively read-only. Beta blocker B5.
+	convSvc := conversation.NewServiceWithConfig(driver, emb, cfg.VectorIndexName, cfg)
+	// EVENTGRAPH-003 fix: inject the learning service so Observe() triggers
+	// CoactivateSession. This setter had no caller — the conversation
+	// service's learningService stayed nil, so session co-activation
+	// (CO_ACTIVATED_WITH edges between same-session observations) NEVER
+	// fired (0 such edges ever in mdemg-dev). Discovered via EVENTGRAPH-003
+	// live smoke when coactivate_session reinforcement events never landed.
+	convSvc.SetLearningService(lea)
+	slog.Info("conversation service initialized",
+		"vector_index", cfg.VectorIndexName,
+		"constraint_detection", cfg.ConstraintDetectionEnabled,
+		"embedder_available", emb != nil)
 
-		// Phase 14.2 Epic 3: wire ContextCatalog loader so Service.Observe
-		// can compute observe-time fingerprints when CONTEXT_FINGERPRINT_ENABLED.
-		if cfg.ContextFingerprintEnabled {
-			convSvc.SetCatalogLoader(hidden.NewNeo4jLoader(driver))
-			slog.Info("conversation context fingerprint wired", "bit_budget", cfg.ContextFingerprintBitBudget)
-		}
-
-		// Initialize Context Cooler (Phase 3: Graduation logic for volatile observations)
-		ctxCooler = conversation.NewContextCooler(driver, cfg)
-		lea.SetStabilityReinforcer(ctxCooler)
-		slog.Info("context cooler initialized", "graduation_threshold", cfg.CoolerGraduationThreshold, "decay_rate", cfg.CoolerStabilityDecayRate, "constraint_protection", cfg.ConstraintProtectFromDecay)
-	} else {
-		slog.Info("conversation service disabled (requires embedder)")
+	// Phase 14.2 Epic 3: wire ContextCatalog loader so Service.Observe
+	// can compute observe-time fingerprints when CONTEXT_FINGERPRINT_ENABLED.
+	// Only meaningful when we have an embedder to hash against.
+	if cfg.ContextFingerprintEnabled && emb != nil {
+		convSvc.SetCatalogLoader(hidden.NewNeo4jLoader(driver))
+		slog.Info("conversation context fingerprint wired", "bit_budget", cfg.ContextFingerprintBitBudget)
 	}
+
+	// Initialize Context Cooler (Phase 3: Graduation logic for volatile observations).
+	// Doesn't require an embedder — operates on graph-side stability scores.
+	ctxCooler := conversation.NewContextCooler(driver, cfg)
+	lea.SetStabilityReinforcer(ctxCooler)
+	slog.Info("context cooler initialized",
+		"graduation_threshold", cfg.CoolerGraduationThreshold,
+		"decay_rate", cfg.CoolerStabilityDecayRate,
+		"constraint_protection", cfg.ConstraintProtectFromDecay)
 
 	// Initialize APE scheduler
 	var apeSched *ape.Scheduler
