@@ -1,0 +1,135 @@
+name: Beta Issue Auto-Triage
+
+# Sprint Beta-Pipeline-D: cheap-and-cheerful auto-triage for beta-tester
+# issues. Fires when a tester opens (or edits) an issue via one of the 3
+# beta templates (beta-install-report / beta-bug-report /
+# beta-feature-friction — all carry the `beta` label from their frontmatter).
+# The workflow parses the issue body for the template's known fields and
+# applies finer-grained labels (severity:*, os:*) so the maintainer's
+# triage view scans in seconds instead of minutes.
+#
+# On issue OPEN it also posts a one-time acknowledgment comment so the
+# tester knows their submission landed + roughly when they'll hear back.
+# On issue EDIT it re-runs labels only (no duplicate comment).
+#
+# Idempotent: uses `gh label create --force` and `gh issue edit --add-label`
+# — repeat runs on the same issue don't spam labels or comments.
+
+on:
+  issues:
+    types: [opened, edited]
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  triage:
+    # Only run on beta-tagged issues (all 3 templates apply the `beta`
+    # label via their frontmatter). Skips non-beta issues cheaply.
+    if: contains(github.event.issue.labels.*.name, 'beta')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Ensure beta labels exist
+        # Create the label palette idempotently. `--force` upserts. Colors
+        # match a red→yellow→green severity gradient + neutral OS colors.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -e
+          create() { gh label create "$1" --color "$2" --description "$3" --force --repo "$REPO" || true; }
+          create "severity:blocker"    "b60205" "Beta: install/first-hour blocked — tester cannot proceed"
+          create "severity:degraded"   "fbca04" "Beta: works but degraded (perf/UX/partial failure)"
+          create "severity:cosmetic"   "0e8a16" "Beta: cosmetic / typo / small polish"
+          create "os:macos"            "d4c5f9" "Beta: reported on macOS"
+          create "os:linux"            "d4c5f9" "Beta: reported on Linux"
+          create "os:wsl2"             "d4c5f9" "Beta: reported on WSL2"
+          create "install:brew"        "c5def5" "Beta: installed via Homebrew tap"
+          create "install:script"      "c5def5" "Beta: installed via curl … install.sh"
+          create "install:source"      "c5def5" "Beta: built from source"
+
+      - name: Parse issue body + apply labels
+        # Best-effort field extraction. The GH issue-form YAML renders each
+        # form field into the issue body as `### <label>` sections. We
+        # grep for known section headers and their following text lines,
+        # then map to labels. Failures are silent — better to under-label
+        # than mis-label; maintainer refines by hand.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          ISSUE_NUM: ${{ github.event.issue.number }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+        run: |
+          set -e
+          add() {
+            gh issue edit "$ISSUE_NUM" --repo "$REPO" --add-label "$1" || true
+          }
+
+          BODY_LC="$(printf '%s' "$ISSUE_BODY" | tr '[:upper:]' '[:lower:]')"
+
+          # OS detection — reads the "OS + version" input field
+          case "$BODY_LC" in
+            *macos*|*darwin*|*sonoma*|*ventura*|*sequoia*) add "os:macos" ;;
+          esac
+          case "$BODY_LC" in
+            *ubuntu*|*fedora*|*debian*|*linux*) add "os:linux" ;;
+          esac
+          case "$BODY_LC" in
+            *wsl*) add "os:wsl2" ;;
+          esac
+
+          # Install method — reads the "Install method" dropdown
+          case "$BODY_LC" in
+            *"macos homebrew"*|*"brew trust"*|*"brew install"*) add "install:brew" ;;
+            *"linux install script"*|*"install.sh"*) add "install:script" ;;
+            *"wsl2 install script"*) add "install:script" ;;
+            *"build from source"*) add "install:source" ;;
+          esac
+
+          # Severity — reads the bug-report severity dropdown OR install-report
+          # T-checkbox failures. Any ❌ in an install-report row → blocker.
+          case "$BODY_LC" in
+            *"blocker"*|*"blocked"*|*"cannot proceed"*) add "severity:blocker" ;;
+            *"degraded"*|*"partial failure"*|*"works but"*) add "severity:degraded" ;;
+            *"cosmetic"*|*"typo"*|*"small polish"*) add "severity:cosmetic" ;;
+          esac
+          # Install-report shorthand: presence of "❌ FAIL" implies at least
+          # degraded; presence in T1.1-T1.3 (install/version/init) implies blocker.
+          case "$ISSUE_BODY" in
+            *"T1.1"*"❌"*|*"T1.2"*"❌"*|*"T1.3"*"❌"*) add "severity:blocker" ;;
+          esac
+          case "$ISSUE_BODY" in
+            *"❌ FAIL"*) add "severity:degraded" ;;
+          esac
+
+      - name: Post welcome comment (first-touch only)
+        # Only comment on OPEN, not on EDIT — we don't want to spam a
+        # tester's inbox when they revise their report. `github.event.action`
+        # is `opened` on first fire, `edited` on subsequent fires.
+        if: github.event.action == 'opened'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          ISSUE_NUM: ${{ github.event.issue.number }}
+        run: |
+          gh issue comment "$ISSUE_NUM" --repo "$REPO" --body "$(cat <<'EOF'
+          Thanks for the beta report! I'll get to it within 2 business days.
+
+          **If you haven't already, attaching a diagnostic bundle 10× speeds up my triage:**
+          ```bash
+          mdemg diagnostics collect
+          # → writes ~/.mdemg/diagnostics/mdemg-diag-<host>-<ts>.tar.gz
+          # → drag that file into a reply on this issue
+          ```
+
+          The bundle is scrubbed automatically (api_key / abs_path / env_secret / email / neo4j_cred). Shell env-var references like \`\$PGPASSWORD\` are preserved as references.
+
+          Auto-triage labels have been applied based on your report's fields. If a label looks wrong, feel free to correct it — I'll re-scan on your next edit.
+
+          — Roger
+          EOF
+          )"
