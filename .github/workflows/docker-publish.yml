@@ -74,10 +74,17 @@ jobs:
         uses: docker/metadata-action@v6
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          # DOCKER-TAG-PREFIX-001 (2026-08-07): a `pattern=v{{version}}`
+          # semver rule silently drops the literal `v` on prerelease tags
+          # (v6 behavior — v0.11.0-beta.2 → :0.11.0-beta.2, no v-prefix).
+          # Emit BOTH forms via {{raw}} + {{version}} so any consumer
+          # reference (:v0.11.0-beta.2 OR :0.11.0-beta.2) resolves.
           tags: |
             type=ref,event=branch
-            type=semver,pattern=v{{version}}
+            type=semver,pattern={{raw}}
+            type=semver,pattern={{version}}
             type=semver,pattern=v{{major}}.{{minor}}
+            type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push MDEMG server
@@ -97,10 +104,14 @@ jobs:
         uses: docker/metadata-action@v6
         with:
           images: ${{ env.REGISTRY }}/${{ github.repository }}-neural-sidecar
+          # DOCKER-TAG-PREFIX-001 — see main-image metadata step for the
+          # `v{{version}}` prerelease-normalization gotcha.
           tags: |
             type=ref,event=branch
-            type=semver,pattern=v{{version}}
+            type=semver,pattern={{raw}}
+            type=semver,pattern={{version}}
             type=semver,pattern=v{{major}}.{{minor}}
+            type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push neural-sidecar
