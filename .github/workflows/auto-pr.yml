@@ -64,15 +64,30 @@ jobs:
       - name: Build PR body from commits
         if: steps.check.outputs.exists == 'false' && steps.diff.outputs.empty == 'false'
         id: body
+        # GitHub PR body max = 65,536 chars. A dev branch with hundreds of
+        # commits ahead of main (squash merges never advance the merge base,
+        # so the log grows) blew past that on 2026-08-07 and failed the run
+        # (GraphQL: "Body is too long"). Cap at the most recent 40 commits
+        # and add a "…and N more" line if truncated. If 40 headlines ever
+        # exceed 65k chars themselves, further capping is fine — the PR
+        # body is a courtesy, the git log is the source of truth.
         run: |
-          COMMIT_LOG=$(git log origin/main..HEAD --pretty=format:"- %s" 2>/dev/null || echo "- Initial dev branch push")
+          TOTAL=$(git rev-list --count origin/main..HEAD 2>/dev/null || echo 0)
+          if [ "$TOTAL" -gt 40 ]; then
+            COMMIT_LOG=$(git log origin/main..HEAD --pretty=format:"- %s" --max-count=40)
+            REMAINDER=$((TOTAL - 40))
+            # shellcheck disable=SC2016 # backticks are literal for markdown output
+            COMMIT_LOG=$(printf '%s\n- _(…and %s earlier commits — full log via `git log origin/main..HEAD`)_\n' "$COMMIT_LOG" "$REMAINDER")
+          else
+            COMMIT_LOG=$(git log origin/main..HEAD --pretty=format:"- %s" 2>/dev/null || echo "- Initial dev branch push")
+          fi
           {
             echo "body<<PREOF"
             echo "## Summary"
             echo ""
             echo "Development branch changes from \`${{ github.ref_name }}\`."
             echo ""
-            echo "### Commits"
+            echo "### Commits (most recent ${TOTAL})"
             echo "$COMMIT_LOG"
             echo ""
             echo "---"
