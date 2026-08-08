@@ -36,6 +36,58 @@ func (d *guidanceDataset) Rubric() review.Rubric {
 }
 func (d *guidanceDataset) Sink() review.ReinforcementSink { return d.sink }
 
+// AutogradePromptHint teaches the autograder guidance-dataset typology: what
+// outcome_type values mean, what guidance_type says about the row, and how to
+// judge the `outcome_label_correctness` rubric dim against the item's
+// AutoLabel + Context. Mirrors contradictedDraftsDataset's per-dataset hint
+// pattern (HITL-CURATION-002 E1) — the generic LLM prompt gives noisy grades
+// on this dataset because the rubric axis is CORRECTNESS OF THE AUTO-LABEL,
+// not correctness of the guidance itself.
+//
+// HITL-CURATION-003 (2026-08-08); implements review.AutogradePromptHinter.
+func (d *guidanceDataset) AutogradePromptHint() string {
+	return `You are grading GUIDANCE INTERACTIONS from Jiminy — each item is a
+tuple of (surfaced guidance, the agent's next action, an auto-classified
+outcome label). The rubric dim ` + "`outcome_label_correctness`" + ` measures
+whether the AUTO-LABEL was RIGHT about what happened, NOT whether the
+guidance itself was good.
+
+Fields you see:
+  * Content         = the guidance text Jiminy surfaced (a constraint /
+                      correction / pattern / learning / concept / decision)
+  * Context         = the agent's action_summary immediately after the surface
+  * AutoLabel       = the classifier's outcome: one of
+                      followed | ignored | contradicted | partial_compliance
+                      (not_applicable rows are already filtered at write time)
+  * Stratum         = the guidance_type — actionable classes are
+                      "constraint" and "correction"; abstract classes are
+                      "pattern" / "learning" / "concept" / "decision"
+
+Score ` + "`outcome_label_correctness`" + ` (0-4):
+  * 4 = auto-label clearly right (action obviously followed / obviously
+        ignored the guidance)
+  * 3 = auto-label right but action is ambiguous or partial
+  * 2 = UNCLEAR — you cannot tell from Content + Context whether the label
+        is right; the item lacks the information needed to judge
+  * 1 = auto-label likely wrong (action appears to do the opposite of what
+        the label claims)
+  * 0 = auto-label clearly wrong (action directly contradicts the label)
+
+Common misclassifications the label often gets wrong:
+  * Abstract guidance (Stratum in pattern/learning/concept/decision) labeled
+    "followed" when the action doesn't actually apply the abstraction — this
+    is usually NA-eligible; score LOW (0-1) unless the action clearly does
+    apply the abstraction
+  * "must_not" constraints labeled "ignored" when the action simply didn't
+    touch the mechanism — the rule wasn't violated because it wasn't in
+    scope; score LOW (0-1) — a true violation would touch what the rule
+    forbids
+  * "correction" items where the auto-label rewards the corrected behavior
+    even when the action pre-dates the correction being visible — score
+    based on whether the action reflects the corrected behavior, not
+    whether the correction was in the guidance corpus at action time`
+}
+
 // guidanceItemCols selects everything a human SME needs to judge the auto
 // verdict: the guidance + action text, plus the auto-classifier's full picture
 // (how it was labeled + how confident) and the guidance's provenance.
@@ -93,6 +145,19 @@ func (d *guidanceDataset) FetchCandidates(ctx context.Context, q review.Candidat
 	if limit <= 0 {
 		limit = 200
 	}
+	// Order switches on sample strategy (HITL-CURATION-003):
+	//   default / "newest"          → DESC (matches interactive-CLI attention)
+	//   "oldest-ungraded"           → ASC  (starvation-free backfill for the
+	//                                       scheduled autograder — the
+	//                                       LEFT JOIN + IS NULL predicate
+	//                                       already ensures "ungraded"; the
+	//                                       ASC order pulls the oldest first
+	//                                       so low-classifier-confidence tail
+	//                                       rows aren't permanently starved)
+	order := "DESC"
+	if q.SampleStrategy == review.SampleStrategyOldestUngraded {
+		order = "ASC"
+	}
 	rows, err := d.pool.Query(ctx, `
 		SELECT `+guidanceItemCols+`
 		FROM guidance_training_rows g
@@ -100,7 +165,7 @@ func (d *guidanceDataset) FetchCandidates(ctx context.Context, q review.Candidat
 		  ON r.dataset_id = 'guidance' AND r.item_id = g.row_id
 		 AND r.reversed = FALSE AND r.rubric_version = $2
 		WHERE g.space_id = $1 AND r.item_id IS NULL
-		ORDER BY g.time DESC
+		ORDER BY g.time `+order+`
 		LIMIT $3`, q.SpaceID, d.rubricVersion, limit)
 	if err != nil {
 		return nil, err

@@ -75,6 +75,38 @@ func (s GuidanceSink) Apply(ctx context.Context, g Grade) (ReinforcementDetail, 
 	return d, nil
 }
 
+// ApplyNonReinforcing lets the scheduled autograder drain unclear-verdict rows
+// (dim `outcome_label_correctness` == 2, where Apply itself returns
+// "noop:unclear") from the operator queue's current-rubric-version filter. Any
+// other verdict returns ok=false so the row stays operator-actionable — the
+// reinforcing verdicts (dim <=1 or >=3) mutate substrate and are operator-only
+// under the HITL-CURATION-002 invariant.
+//
+// ⚠️ This gating is load-bearing (HITL-CURATION-003 arch rule): NonReinforcingApplier
+// sinks MUST NOT return ok=true for verdicts whose Apply path would produce
+// substrate mutation. FetchCandidates excludes any row with a non-reversed
+// grade at the current rubric_version, so a naive "handle everything" ok=true
+// would silently drain operator visibility for zero corpus benefit beyond the
+// raw grade row.
+//
+// HITL-CURATION-003 (2026-08-08).
+func (s GuidanceSink) ApplyNonReinforcing(_ context.Context, g Grade) (ReinforcementDetail, bool, error) {
+	if correctedOutcome(g) != "" {
+		// dim <=1 or >=3 — Apply would mutate; operator-only.
+		return ReinforcementDetail{}, false, nil
+	}
+	// dim == 2 (or missing) — Apply itself returns "noop:unclear". Safe to
+	// mark handled: the grade row lands, the operator queue advances, and
+	// zero substrate is touched.
+	return ReinforcementDetail{
+		SinkID:     "guidance",
+		GradeID:    g.GradeID,
+		Verb:       "guidance:autograde:noop:unclear",
+		PriorState: map[string]any{},
+		Applied:    map[string]any{},
+	}, true, nil
+}
+
 func (s GuidanceSink) Reverse(ctx context.Context, detail ReinforcementDetail) error {
 	if s.R == nil {
 		return fmt.Errorf("guidance sink: reinforcer not wired")

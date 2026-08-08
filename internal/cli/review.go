@@ -174,6 +174,7 @@ func newReviewAutogradeCmd() *cobra.Command {
 	var dryRun bool
 	var force bool
 	var endpoint string
+	var sampleStrategy string
 	cmd := &cobra.Command{
 		Use:   "autograde",
 		Short: "LLM-grade pending items in a dataset; never reinforces the substrate",
@@ -203,13 +204,14 @@ substrate. Only operator-confirmed grades do that.
 				endpoint = resolveEndpoint()
 			}
 			return runReviewAutograde(cmd.Context(), autogradeOpts{
-				endpoint:      endpoint,
-				datasetID:     datasetID,
-				spaceID:       spaceID,
-				minConfidence: minConfidence,
-				limit:         limit,
-				dryRun:        dryRun,
-				force:         force,
+				endpoint:       endpoint,
+				datasetID:      datasetID,
+				spaceID:        spaceID,
+				minConfidence:  minConfidence,
+				limit:          limit,
+				dryRun:         dryRun,
+				force:          force,
+				sampleStrategy: sampleStrategy,
 			})
 		},
 	}
@@ -220,17 +222,19 @@ substrate. Only operator-confirmed grades do that.
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Preview mode — grade + display but don't POST")
 	cmd.Flags().BoolVar(&force, "force", false, "Re-grade items that already have a grade at the current rubric_version (needed to backfill after sink logic changes, e.g. HITL-AUTO-DISMISS-001)")
 	cmd.Flags().StringVar(&endpoint, "endpoint", "", "mdemg server (default: from LISTEN_ADDR in .env)")
+	cmd.Flags().StringVar(&sampleStrategy, "sample-strategy", "", "Candidate ordering hint: 'newest' (default) or 'oldest-ungraded' (starvation-free backfill for scheduled runs — HITL-CURATION-003)")
 	return cmd
 }
 
 type autogradeOpts struct {
-	endpoint      string
-	datasetID     string
-	spaceID       string
-	minConfidence float64
-	limit         int
-	dryRun        bool
-	force         bool
+	endpoint       string
+	datasetID      string
+	spaceID        string
+	minConfidence  float64
+	limit          int
+	dryRun         bool
+	force          bool
+	sampleStrategy string
 }
 
 func runReviewAutograde(ctx context.Context, opt autogradeOpts) error {
@@ -241,6 +245,11 @@ func runReviewAutograde(ctx context.Context, opt autogradeOpts) error {
 	fmt.Printf("Endpoint:       %s\n", opt.endpoint)
 	fmt.Printf("Min confidence: %.2f\n", opt.minConfidence)
 	fmt.Printf("Limit:          %d\n", opt.limit)
+	sampleStrategyDisplay := opt.sampleStrategy
+	if sampleStrategyDisplay == "" {
+		sampleStrategyDisplay = "newest (default)"
+	}
+	fmt.Printf("Sample:         %s\n", sampleStrategyDisplay)
 	if opt.dryRun {
 		fmt.Println("Mode:           DRY RUN (no grades will be written)")
 	} else {
@@ -250,7 +259,7 @@ func runReviewAutograde(ctx context.Context, opt autogradeOpts) error {
 	fmt.Println()
 
 	// 1. Fetch candidates + rubric + dataset hint via /v1/review/candidates
-	cands, rubric, hint, err := fetchCandidates(ctx, opt.endpoint, opt.datasetID, opt.spaceID, opt.limit)
+	cands, rubric, hint, err := fetchCandidates(ctx, opt.endpoint, opt.datasetID, opt.spaceID, opt.limit, opt.sampleStrategy)
 	if err != nil {
 		return fmt.Errorf("fetch candidates: %w", err)
 	}
@@ -376,9 +385,12 @@ func shortBinarySHA() string {
 // autograde_prompt_hint, error). The hint is empty for datasets that don't
 // implement AutogradePromptHinter — the autograder falls through to the
 // generic prompt in that case.
-func fetchCandidates(ctx context.Context, endpoint, datasetID, spaceID string, limit int) ([]review.ReviewItem, review.Rubric, string, error) {
+func fetchCandidates(ctx context.Context, endpoint, datasetID, spaceID string, limit int, sampleStrategy string) ([]review.ReviewItem, review.Rubric, string, error) {
 	url := fmt.Sprintf("%s/v1/review/candidates?dataset_id=%s&space_id=%s&limit=%d",
 		strings.TrimSuffix(endpoint, "/"), datasetID, spaceID, limit)
+	if sampleStrategy != "" {
+		url += "&sample_strategy=" + sampleStrategy
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, review.Rubric{}, "", err

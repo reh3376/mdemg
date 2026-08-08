@@ -171,8 +171,14 @@ func (s *Server) handleReviewCandidates(w http.ResponseWriter, r *http.Request) 
 			limit = n
 		}
 	}
+	// HITL-CURATION-003: sample_strategy passes through to CandidateQuery
+	// so the scheduler subprocess can request oldest-ungraded ordering for
+	// starvation-free backfill without changing the interactive CLI default.
+	// Unknown values are ignored by datasets (empty string = default).
+	strategy := r.URL.Query().Get("sample_strategy")
 	cands, err := d.FetchCandidates(r.Context(), review.CandidateQuery{
 		SpaceID: spaceID, Limit: limit, ExcludeGraded: true,
+		SampleStrategy: strategy,
 	})
 	if err != nil {
 		writeInternalError(w, err, "review fetch candidates")
@@ -301,6 +307,14 @@ func (s *Server) handleReviewGrade(w http.ResponseWriter, r *http.Request) {
 
 	applied := false
 	detailJSON := ""
+	// gradeRecorded: default true so gold-only sinks (NoopSink for llm:*
+	// datasets, and any sink that doesn't opt into NonReinforcingApplier)
+	// continue to persist grades as historical review_grades rows exactly
+	// as pre-HITL-CURATION-003. The ONLY case that flips this to false is
+	// when a sink implements NonReinforcingApplier AND explicitly refuses
+	// the verdict (handled=false) — that signals "operator MUST see this
+	// row; skip the write so FetchCandidates doesn't filter it out."
+	gradeRecorded := true
 	if reinforce {
 		detail, aerr := d.Sink().Apply(r.Context(), grade)
 		if aerr != nil {
@@ -328,16 +342,27 @@ func (s *Server) handleReviewGrade(w http.ResponseWriter, r *http.Request) {
 			if b, mErr := json.Marshal(detail); mErr == nil {
 				detailJSON = string(b)
 			}
+		} else {
+			// HITL-CURATION-003: sink refused (verdict is reinforceable —
+			// Apply would mutate). Skip the Record write so the row stays
+			// operator-actionable via FetchCandidates' current-rubric-version
+			// filter. Return 200 with grade_recorded=false so autograder can
+			// distinguish "written to corpus" from "skipped as reinforceable."
+			gradeRecorded = false
 		}
 	}
 
-	dimsJSON, _ := json.Marshal(dims)
-	s.reviewWriter.Record(reviewGradeRow(grade, string(dimsJSON), applied, detailJSON, "", s.cfg.InstanceID, req.SuggestedGuidance))
+	if gradeRecorded {
+		dimsJSON, _ := json.Marshal(dims)
+		s.reviewWriter.Record(reviewGradeRow(grade, string(dimsJSON), applied, detailJSON, "", s.cfg.InstanceID, req.SuggestedGuidance))
+	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"data": map[string]any{
-			"grade_id": grade.GradeID, "gold_score": gold,
+			"grade_id":              grade.GradeID,
+			"gold_score":            gold,
 			"reinforcement_applied": applied,
+			"grade_recorded":        gradeRecorded,
 		},
 	})
 }

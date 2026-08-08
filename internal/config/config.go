@@ -1309,7 +1309,7 @@ type Config struct {
 	ReviewAutogradeScheduleEnabled         bool     // REVIEW_AUTOGRADE_SCHEDULE_ENABLED — run the autograder on a schedule (default: false; opt-in)
 	ReviewAutogradeScheduleIntervalHours   int      // REVIEW_AUTOGRADE_SCHEDULE_INTERVAL_HOURS — cadence between runs (default: 6)
 	ReviewAutogradeScheduleInitialDelayMin int      // REVIEW_AUTOGRADE_SCHEDULE_INITIAL_DELAY_MIN — startup delay before first run (default: 15)
-	ReviewAutogradeScheduleDatasets        []string // REVIEW_AUTOGRADE_SCHEDULE_DATASETS — comma-separated dataset ids (default: "contradicted_drafts")
+	ReviewAutogradeScheduleDatasets        []string // REVIEW_AUTOGRADE_SCHEDULE_DATASETS — comma-separated dataset ids (default: "contradicted_drafts"; HITL-CURATION-003 makes "guidance" opt-in — add via env override once the scheduled cost/value is measured; llm:* datasets remain manual pending a separate sprint's cost analysis)
 	ReviewAutogradeScheduleMinConfidence   float64  // REVIEW_AUTOGRADE_SCHEDULE_MIN_CONFIDENCE — confidence floor for auto-grades (default: 0.80, matches CLI default)
 	ReviewAutogradeScheduleLimit           int      // REVIEW_AUTOGRADE_SCHEDULE_LIMIT — max items per dataset per run (default: 50)
 
