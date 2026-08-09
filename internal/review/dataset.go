@@ -57,4 +57,17 @@ type CandidateQuery struct {
 	Strata          []string // dimensions to stratify across
 	UncertaintyBand float64  // prefer items whose AutoScore is within this band of 0.5
 	ExcludeGraded   bool     // skip items already graded at the current rubric_version
+	// SampleStrategy hints at ordering — "" or "newest" (default: newest-first,
+	// matches interactive-CLI attention) vs "oldest-ungraded" (starvation-free
+	// backfill for the scheduled autograder; see HITL-CURATION-003). Datasets
+	// whose FetchCandidates ignores order (e.g. contradicted_drafts is
+	// pending-status-ordered) may silently ignore this hint.
+	SampleStrategy string
 }
+
+// Sample strategy constants — kept as strings (not typed enum) so the CLI
+// flag and HTTP query param can pass through without conversion.
+const (
+	SampleStrategyNewest         = "newest"
+	SampleStrategyOldestUngraded = "oldest-ungraded"
+)

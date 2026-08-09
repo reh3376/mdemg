@@ -128,7 +128,60 @@ variant is a candidate follow-up.
 idempotent — the endpoint's existing `LatestGradeForItem` gate returns
 409 on already-graded items, which the CLI treats as success.
 
-## Sprint reference
+## Extending to the guidance dataset (HITL-CURATION-003, 2026-08-08)
+
+Opt-in via `.env`:
+
+```
+REVIEW_AUTOGRADE_SCHEDULE_DATASETS=contradicted_drafts,guidance
+```
+
+Code default stays `contradicted_drafts` only — per HEBB-ETA-001's rule
+that behavior-changing defaults ship off in both code AND `.env` to avoid
+surprising operators on binary upgrade.
+
+**How guidance auto-grading differs from contradicted-drafts auto-grading:**
+
+- Guidance sink is trust-EMA + confidence-nudge (`GuidanceSink` at
+  `internal/review/sink_guidance.go`); every reinforceable verdict
+  (`outcome_label_correctness` dim ≤1 or ≥3) mutates the running
+  substrate.
+- Contradicted-drafts sink is L0-obs-mint on approve (dim ≥3), row-status
+  cleanup on dismiss (dim ≤1) — approve mutates substrate, dismiss doesn't.
+- Autograded guidance rows use the same `NonReinforcingApplier` interface
+  as contradicted-drafts, but with STRICTER gating: only dim==2 (unclear —
+  where `Apply` itself no-ops) drains via `handled=true`. All other verdicts
+  return `handled=false` so the row stays operator-actionable.
+
+**Why the strict gating**: The handler skips `reviewWriter.Record` when
+the sink returns `handled=false`. If it didn't (as was true pre-Epic-6
+mid-sprint discovery), `guidanceDataset.FetchCandidates`' LEFT JOIN on
+`review_grades.rubric_version = current` would hide every autograded row
+from the operator queue regardless of the sink's refuse signal, silently
+draining operator visibility for zero corpus benefit. Both layers (sink
+refuse + handler skip) are required to preserve queue visibility.
+
+**Sample strategy for starvation-free backfill**: scheduled runs pass
+`--sample-strategy=oldest-ungraded` (see `internal/review/schedule.go`).
+Without this, combined with the autograder's `MinConfidence=0.80` gate,
+low-classifier-confidence tail rows would permanently starve. Interactive
+CLI defaults to `newest` (matches operator triage attention).
+
+**Response shape** on `/v1/review/grade` gains `grade_recorded: bool`
+alongside `reinforcement_applied: bool`. Autograder callers can now
+distinguish:
+
+- `reinforcement_applied=true`: substrate was mutated (operator-only path)
+- `reinforcement_applied=false, grade_recorded=true`: written to corpus,
+  no substrate touch (autograded dim==2 unclear rows)
+- `reinforcement_applied=false, grade_recorded=false`: sink refused — row
+  is reinforceable-verdict; operator must confirm (row stays in queue)
+
+Sprint reference:
+Plan: `docs/development/hitl-curation-003/sprint_plan.md`
+Post: `docs/development/hitl-curation-003/post.md`
+
+## Sprint reference (arc origin)
 
 Plan: `docs/development/hitl-curation-002/sprint_plan.md`
 Post: `docs/development/hitl-curation-002/post.md`

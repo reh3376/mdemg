@@ -153,6 +153,12 @@ func (s *AutogradeScheduler) runOne(ctx context.Context, dataset string) error {
 		"--space-id", s.cfg.SpaceID,
 		"--min-confidence", fmt.Sprintf("%.2f", minConf),
 		"--limit", fmt.Sprintf("%d", limit),
+		// HITL-CURATION-003: scheduled runs always use starvation-free
+		// backfill (oldest-ungraded) — the newest-first default is for the
+		// interactive CLI where operators attend to recency. Without this,
+		// combined with the autograder's MinConfidence floor, low-confidence
+		// tail rows would permanently starve.
+		"--sample-strategy", SampleStrategyOldestUngraded,
 	}
 	if s.cfg.Endpoint != "" {
 		args = append(args, "--endpoint", s.cfg.Endpoint)

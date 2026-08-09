@@ -74,9 +74,44 @@ func TestAutogradeScheduler_RunOne_BuildsCorrectArgs(t *testing.T) {
 		"--space-id", "mdemg-dev",
 		"--min-confidence", "0.85",
 		"--limit", "100",
+		// HITL-CURATION-003: scheduled runs always request oldest-ungraded
+		// ordering for starvation-free backfill (see runOne).
+		"--sample-strategy", SampleStrategyOldestUngraded,
 		"--endpoint", "http://127.0.0.1:9999"}
 	if strings.Join(capturedArgs, " ") != strings.Join(want, " ") {
 		t.Errorf("args mismatch:\ngot:  %v\nwant: %v", capturedArgs, want)
+	}
+}
+
+// TestAutogradeScheduler_RunOne_AlwaysOldestUngraded — HITL-CURATION-003
+// regression pin: the scheduled loop MUST always pass
+// `--sample-strategy=oldest-ungraded` so the autograder doesn't sit on the
+// same newest-N rows every 6h and starve low-classifier-confidence tail
+// rows forever. Removing the flag would silently reintroduce the
+// starvation class the sprint fixed.
+func TestAutogradeScheduler_RunOne_AlwaysOldestUngraded(t *testing.T) {
+	var capturedArgs []string
+	s := NewAutogradeScheduler(AutogradeScheduleConfig{
+		Enabled: true, Datasets: []string{"x"}, SpaceID: "y",
+		MinConfidence: 0.8, Limit: 10, MdemgBin: "/x",
+	}, nil)
+	s.runCmd = func(_ context.Context, _ string, args []string) error {
+		capturedArgs = args
+		return nil
+	}
+	if err := s.runOne(context.Background(), "x"); err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for i, a := range capturedArgs {
+		if a == "--sample-strategy" && i+1 < len(capturedArgs) && capturedArgs[i+1] == SampleStrategyOldestUngraded {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("scheduled autograde MUST pass --sample-strategy=%s (HITL-CURATION-003); got args: %v",
+			SampleStrategyOldestUngraded, capturedArgs)
 	}
 }
 
