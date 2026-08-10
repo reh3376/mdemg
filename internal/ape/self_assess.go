@@ -851,7 +851,7 @@ func (a *Assessor) publishGuidanceMetrics(spaceID string, stats JiminyStatsResul
 	m := metrics.Metrics()
 
 	m.JiminyFollowRate(spaceID).Set(stats.FollowRate)
-	m.JiminyConstraintEffectiveness(spaceID).Set(stats.ConstraintEffRate)
+	// jiminy_constraint_effectiveness retired METRICS-DEPRECATE-JIMINY-CONSTRAINT-EFF-001 (2026-08-10).
 	m.JiminySourceDiversity(spaceID).Set(stats.SourceDiversity)
 	m.JiminyTotalIssued(spaceID).Set(float64(stats.TotalGuidanceIssued))
 	m.JiminyTotalFollowed(spaceID).Set(float64(stats.TotalFollowed))
