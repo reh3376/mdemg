@@ -66,7 +66,9 @@ Designed for use with launchd/systemd timers (see mdemg service install).`,
 				SpaceID:    spaceID,
 				From:       time.Now().Add(-24 * time.Hour),
 				To:         time.Now().UTC(),
-				Tables:     []string{"llm_interactions", "retrieval_events", "embedding_events"},
+				// B5a: guidance_training_rows added as the 4th default table
+				// (corpus table, consumed by beta-import into the retrain flow).
+				Tables:     []string{"llm_interactions", "retrieval_events", "embedding_events", "guidance_training_rows"},
 				InstanceID: instanceID,
 				OutputPath: outputPath,
 			}

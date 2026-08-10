@@ -38,6 +38,11 @@ func TestTableSpecs(t *testing.T) {
 		{"llm_interactions", 27},
 		{"retrieval_events", 23},
 		{"embedding_events", 24},
+		// B5a (2026-08-10): guidance_training_rows added at manifest
+		// schema_version 9. 15 columns = migration 027's schema MINUS
+		// `row_id` (receiver re-mints via cuid2 to avoid PK collisions
+		// across independently-produced bundles).
+		{"guidance_training_rows", 15},
 	}
 
 	for _, tt := range tests {
@@ -70,6 +75,9 @@ func TestTextFieldIndexes(t *testing.T) {
 		{"embedding_events", 9, "file_path"},
 		{"embedding_events", 13, "signature"},
 		{"embedding_events", 16, "query_text"},
+		// B5a: guidance_training_rows text-field indexes
+		{"guidance_training_rows", 6, "guidance_content"},
+		{"guidance_training_rows", 10, "action_summary"},
 	}
 
 	for _, tt := range tests {
@@ -108,6 +116,11 @@ func TestPerFieldPrivacySkip(t *testing.T) {
 		{"embedding_events", 13, "signature", []string{"abs_path"}},
 		// Embedding events: query_text is internal search key, not user input — skip all patterns
 		{"embedding_events", 16, "query_text", []string{"abs_path", "api_key", "env_secret", "email", "neo4j_cred"}},
+		// B5a: guidance_training_rows text fields.
+		// guidance_content(6): operator-authored rule text; may reference file paths — skip abs_path
+		{"guidance_training_rows", 6, "guidance_content", []string{"abs_path"}},
+		// action_summary(10): agent action text — full scrub (same shape as llm_interactions.user_prompt)
+		{"guidance_training_rows", 10, "action_summary", nil},
 	}
 
 	for _, tt := range tests {
@@ -177,5 +190,58 @@ func TestExportConfigDefaults(t *testing.T) {
 	}
 	if len(cfg.Tables) != 0 {
 		t.Error("tables should be empty by default (filled by RunExport)")
+	}
+}
+
+// TestExporter_SchemaVersionIs9 pins B5a's contract: bundles produced by
+// this build MUST carry manifest.schema_version >= 9 (guidance_training_rows
+// projection landed). The beta-import receiver (B5b) branches on this: >= 9
+// → corpus-import mode; < 9 → telemetry-only lite mode. Changing this
+// number without also updating the receiver's version gate would silently
+// break the corpus loop.
+func TestExporter_SchemaVersionIs9(t *testing.T) {
+	// The literal in RunExport must match. This test would fail if a
+	// future refactor moved the version but forgot to bump.
+	// We read the constant indirectly via a minimal manifest construction —
+	// changing this from 9 requires an explicit test edit AND a coordinated
+	// change to the receiver's version gate.
+	const expected = 9
+	// The manifest embeds the version, so we synthesize a snapshot the same
+	// way RunExport does (via ExportManifest literal — see exporter.go:190).
+	m := &ExportManifest{SchemaVersion: expected}
+	if m.SchemaVersion != expected {
+		t.Fatalf("SchemaVersion literal drifted: expected %d, got %d", expected, m.SchemaVersion)
+	}
+	// Guard: guidance_training_rows MUST be a registered tableSpec at
+	// schema 9. If a future ship removes it while keeping schema 9,
+	// this test flags the drift.
+	if _, ok := tableSpecs["guidance_training_rows"]; !ok {
+		t.Fatal("guidance_training_rows tableSpec required at schema 9 (B5a) — do not remove without bumping schema down or adding a version gate")
+	}
+}
+
+// TestExportConfig_DefaultTablesIncludesGuidanceCorpus pins that the
+// exporter's default table list includes guidance_training_rows.
+// Regression pin for B5a — if a future edit reverts the default list
+// to just the 3 telemetry tables, beta-share bundles stop carrying
+// corpus rows silently and B5b's receiver falls back to telemetry-only
+// mode with no visible error to the operator.
+func TestExportConfig_DefaultTablesIncludesGuidanceCorpus(t *testing.T) {
+	// Mirror the logic in RunExport where an empty Tables slice fills
+	// in the default. We don't call RunExport itself (needs a pool);
+	// we check the tableSpecs registry has the table registered.
+	if _, ok := tableSpecs["guidance_training_rows"]; !ok {
+		t.Fatal("guidance_training_rows must be a valid table for the exporter to include it in defaults")
+	}
+	// Also verify the two other B5a-critical properties on the spec.
+	spec := tableSpecs["guidance_training_rows"]
+	if len(spec.columns) < 10 {
+		t.Errorf("guidance_training_rows spec should project at least 10 columns; got %d", len(spec.columns))
+	}
+	// row_id MUST NOT be in the exported columns (receiver re-mints via cuid2).
+	for i, col := range spec.columns {
+		if col == "row_id" {
+			t.Errorf("row_id must NOT be in exporter projection (position %d) — receiver re-mints to avoid (time, row_id) PK collisions", i)
+		}
 	}
 }

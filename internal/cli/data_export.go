@@ -145,8 +145,8 @@ detected, the export is blocked and no archive is created.`,
 	cmd.Flags().StringVar(&instanceID, "instance-id", "", "Instance identifier (default: all instances)")
 	cmd.Flags().StringVar(&since, "since", "", "Start time (RFC3339, default: 180 days ago)")
 	cmd.Flags().StringVar(&until, "until", "", "End time (RFC3339, default: now)")
-	cmd.Flags().StringSliceVar(&tables, "tables", []string{"llm_interactions", "retrieval_events", "embedding_events"},
-		"Tables to export")
+	cmd.Flags().StringSliceVar(&tables, "tables", []string{"llm_interactions", "retrieval_events", "embedding_events", "guidance_training_rows"},
+		"Tables to export (B5a added guidance_training_rows as the 4th default; the beta-import receiver consumes it into the local retrain corpus)")
 	cmd.Flags().BoolVar(&excludeEmbedding, "exclude-embedding", false, "Skip embedding_events table")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Show row counts without exporting")
 	cmd.Flags().BoolVar(&noValidate, "no-validate", false, "Skip post-export validation hint")
