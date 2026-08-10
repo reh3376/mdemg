@@ -24,7 +24,7 @@ type ExportConfig struct {
 	SpaceID    string
 	From       time.Time
 	To         time.Time
-	Tables     []string // e.g. ["llm_interactions", "retrieval_events", "embedding_events"]
+	Tables     []string // e.g. ["llm_interactions", "retrieval_events", "embedding_events", "guidance_training_rows"]
 	InstanceID string
 	OutputPath string
 }
@@ -153,10 +153,34 @@ var embeddingEventsSpec = tableSpec{
 	},
 }
 
+// guidanceTrainingRowsSpec projects the corpus rows that the receiver
+// (mdemg beta-import, sprint B5) imports into the local
+// guidance_training_rows table for retrain use. Added at manifest
+// schema_version 9. Excludes `row_id` from the projection because the
+// receiver re-mints it via cuid2.Generate() to avoid the (time, row_id)
+// PRIMARY KEY collisions across independently-produced bundles.
+//
+// Text fields for privacy re-scrub:
+//   guidance_content (col 6): operator-authored constraint/correction text —
+//     may reference file paths + code snippets that survived write-time scrub.
+//   action_summary   (col 10): agent action text — same shape as
+//     llm_interactions.user_prompt; needs full scrub.
+var guidanceTrainingRowsSpec = tableSpec{
+	columns: []string{
+		"time", "space_id", "session_id", "instance_id",
+		"guidance_id", "guidance_type", "guidance_content",
+		"source_node_id", "source_role_type", "source_layer",
+		"action_summary", "outcome_type", "similarity",
+		"classifier_source", "constraint_code",
+	},
+	textFields: map[int][]string{6: {"abs_path"}, 10: nil},
+}
+
 var tableSpecs = map[string]tableSpec{
-	"llm_interactions": llmInteractionsSpec,
-	"retrieval_events": retrievalEventsSpec,
-	"embedding_events": embeddingEventsSpec,
+	"llm_interactions":       llmInteractionsSpec,
+	"retrieval_events":       retrievalEventsSpec,
+	"embedding_events":       embeddingEventsSpec,
+	"guidance_training_rows": guidanceTrainingRowsSpec,
 }
 
 // RunExport executes the training data export pipeline.
@@ -167,7 +191,10 @@ func RunExport(ctx context.Context, pool *pgxpool.Pool, cfg ExportConfig, versio
 		return nil, fmt.Errorf("space_id is required")
 	}
 	if len(cfg.Tables) == 0 {
-		cfg.Tables = []string{"llm_interactions", "retrieval_events", "embedding_events"}
+		// B5a: guidance_training_rows added as the corpus-carrying 4th
+		// default. beta-import (B5b) consumes it into the local retrain
+		// corpus with per-tester space attribution.
+		cfg.Tables = []string{"llm_interactions", "retrieval_events", "embedding_events", "guidance_training_rows"}
 	}
 
 	// Validate requested tables
@@ -194,7 +221,10 @@ func RunExport(ctx context.Context, pool *pgxpool.Pool, cfg ExportConfig, versio
 		SpaceID:       cfg.SpaceID,
 		MDEMGVersion:  version,
 		MDEMGCommit:   commit,
-		SchemaVersion: 8,
+		// Schema 9 (B5a, 2026-08-10): added guidance_training_rows to the
+		// export projection. beta-import receiver requires >= 9 to run
+		// corpus-import mode; older bundles fall back to telemetry-only.
+		SchemaVersion: 9,
 		ExportedAt:    now.Format(time.RFC3339),
 		DataRange: ExportDataRange{
 			From: cfg.From.Format(time.RFC3339),
@@ -513,7 +543,10 @@ func DryRunExport(ctx context.Context, pool *pgxpool.Pool, cfg ExportConfig) (ma
 		return nil, fmt.Errorf("space_id is required")
 	}
 	if len(cfg.Tables) == 0 {
-		cfg.Tables = []string{"llm_interactions", "retrieval_events", "embedding_events"}
+		// B5a: guidance_training_rows added as the corpus-carrying 4th
+		// default. beta-import (B5b) consumes it into the local retrain
+		// corpus with per-tester space attribution.
+		cfg.Tables = []string{"llm_interactions", "retrieval_events", "embedding_events", "guidance_training_rows"}
 	}
 
 	counts := make(map[string]int64)
