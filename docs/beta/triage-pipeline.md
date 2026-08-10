@@ -25,6 +25,16 @@ Maintainer triages using labels + digest
    - reads all open `beta`-labelled issues
    - updates a single rolling tracker issue (label `beta-digest`)
    - snapshot table + top blockers + last-7d activity
+
+If tester attached an `mdemg beta-share` bundle:
+         │
+         ▼
+.github/workflows/beta-submission-indexer.yml            ← Sprint B3 (2026-08-10)
+   - fires on issues:[opened, edited] + nightly 06:00 UTC
+   - scans issue body for "Submission ID: <cuid2>" pattern
+   - records to a rolling tracker issue (label `beta-submissions`)
+     with 30-day expiry per submission (retention promise)
+   - posts one-time receipt comment on the tester's issue
 ```
 
 ## Labels used by auto-triage
@@ -46,6 +56,7 @@ Maintainer triages using labels + digest
 | `install:script` | Installed via curl `install.sh` | Auto-triage body scan |
 | `install:source` | Built from source | Auto-triage body scan |
 | `beta-digest` | Pinned digest tracker | Digest workflow (auto-created on first run) |
+| `beta-submissions` | Pinned submission-registry tracker (B3) | Submission-indexer workflow (auto-created on first submission) |
 
 ## Manual triage overrides
 

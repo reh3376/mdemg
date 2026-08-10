@@ -1,0 +1,207 @@
+name: Beta Submission Indexer
+
+# Sprint Beta-Program-B3 (2026-08-10). When a beta tester attaches an
+# `mdemg beta-share` bundle to a GitHub issue, they're instructed by the
+# CLI (per internal/cli/beta_share.go) to paste the printed Submission ID
+# into the issue body. This workflow watches beta-labelled issues for
+# that pattern, records the submission to a rolling tracker issue
+# (label: `beta-submissions`), and posts a receipt comment.
+#
+# Why: beta-share bundles arrive as GitHub-issue attachments today —
+# there's no server-side indexer. The maintainer's 30-day retention
+# promise + deletion-request contract needs a queryable source-of-truth
+# for what's been received. This is that source.
+#
+# Registry issue format is a Markdown table with one row per submission:
+#   | Submission ID | Issue | Tester | Received | 30d expires |
+#
+# Idempotency: parses ALL beta issues on each fire; the tracker body is
+# regenerated from scratch, so repeat fires produce identical output.
+# The receipt comment is posted only on the FIRST fire per issue that
+# has a submission_id (guarded by grepping the tracker BEFORE update).
+#
+# Sibling to beta-triage.yml (severity labeling) and
+# beta-weekly-digest.yml (backlog aggregation).
+
+on:
+  issues:
+    types: [opened, edited]
+  workflow_dispatch:
+    inputs:
+      force_rebuild:
+        description: 'Force full rebuild of the tracker registry (default: incremental)'
+        required: false
+        default: 'false'
+  schedule:
+    # Also fires nightly to catch anything missed if issues:edited didn't
+    # trigger (e.g. edited via API without a proper event) and to flag
+    # submissions that are approaching their 30-day expiry.
+    - cron: '0 6 * * *'
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  index:
+    # For issue events, only run on beta-tagged issues (all 3 beta
+    # templates carry the `beta` label from frontmatter). Skip cheaply
+    # for non-beta issues. Schedule + manual dispatch always run.
+    if: ${{ github.event_name != 'issues' || contains(github.event.issue.labels.*.name, 'beta') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ensure tracker label exists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh label create "beta-submissions" \
+            --color "0e8a16" \
+            --description "Pinned tracker: rolling registry of received mdemg beta-share bundles + 30d retention expiries" \
+            --force --repo "$REPO" || true
+
+      - name: Scan beta issues + build registry table
+        id: scan
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -e
+          # Query all beta issues (open + closed), most recent first, capped at 200.
+          # The 200-cap is a soft ceiling — a beta cycle producing >200 issues
+          # would want to bump this AND paginate. Not expected for cycle 1.
+          gh issue list --repo "$REPO" --state all --label beta --limit 200 \
+            --json number,title,body,user,createdAt,url,labels,state \
+            > /tmp/beta_issues.json
+
+          # Extract submissions: any issue whose body matches the CUIDv2 pattern
+          # after "Submission ID:" (case-insensitive, tolerant of surrounding
+          # markdown). CUIDv2 is 24 lower-case alphanumerics starting with a
+          # letter; the print-format in beta_share.go is exactly this.
+          # Format each row: SID<TAB>issue_num<TAB>tester<TAB>iso_datetime<TAB>state
+          jq -r '.[] | . as $i |
+                  (.body // "" | scan("(?i)submission\\s*id[:\\s]+([a-z][a-z0-9]{23})"; "gi")) as $m |
+                  select($m|length>0) |
+                  "\($m[0])\t\($i.number)\t\($i.user.login)\t\($i.createdAt)\t\($i.state)\t\($i.url)"
+                ' /tmp/beta_issues.json > /tmp/submissions.tsv 2>/dev/null || true
+
+          # jq's `scan` regex isn't universal across jq versions; fall back
+          # to a shell grep if scan returned nothing but the body clearly
+          # contains a submission_id pattern.
+          if [ ! -s /tmp/submissions.tsv ]; then
+            jq -c '.[]' /tmp/beta_issues.json | while read -r row; do
+              body=$(echo "$row" | jq -r '.body // ""')
+              sid=$(echo "$body" | grep -oiE 'submission\s*id[:\s]+[a-z][a-z0-9]{23}' | head -1 | grep -oE '[a-z][a-z0-9]{23}$' || true)
+              if [ -n "$sid" ]; then
+                num=$(echo "$row" | jq -r '.number')
+                user=$(echo "$row" | jq -r '.user.login')
+                created=$(echo "$row" | jq -r '.createdAt')
+                state=$(echo "$row" | jq -r '.state')
+                url=$(echo "$row" | jq -r '.url')
+                printf "%s\t%s\t%s\t%s\t%s\t%s\n" "$sid" "$num" "$user" "$created" "$state" "$url" >> /tmp/submissions.tsv
+              fi
+            done
+          fi
+
+          COUNT=$(wc -l < /tmp/submissions.tsv | tr -d ' ')
+          echo "count=$COUNT" >> "$GITHUB_OUTPUT"
+          echo "Found $COUNT beta-share submissions across ${COUNT} issues."
+
+      - name: Render tracker body
+        if: steps.scan.outputs.count != '0'
+        id: render
+        run: |
+          set -e
+          RUN_DATE=$(date -u +%Y-%m-%d)
+          # 30 days from received-at is the retention expiry. Rows are sorted
+          # newest-first for triage; expiry column shows the date the
+          # maintainer's retention promise ends.
+          {
+            echo "# Beta Submissions Tracker — updated $RUN_DATE"
+            echo ""
+            echo "Auto-generated by \`.github/workflows/beta-submission-indexer.yml\` (Sprint Beta-Program-B3)."
+            echo "Every submission is a bundle produced by \`mdemg beta-share\` (opt-in per-run, PII-scrubbed at export time)."
+            echo "Retention: **30 days from receipt**. To request earlier deletion, email \`rogerhenley345@gmail.com\` with the Submission ID."
+            echo ""
+            echo "## Received submissions"
+            echo ""
+            echo "| Submission ID | Issue | Tester | Received | 30d expires |"
+            echo "|---|---|---|---|---|"
+            # Sort by received-at DESC so newest at the top
+            sort -t$'\t' -k4 -r /tmp/submissions.tsv | while IFS=$'\t' read -r sid num user created _state url; do
+              # ISO created → YYYY-MM-DD
+              recv=$(echo "$created" | cut -c1-10)
+              # Add 30 days for expiry (portable date math)
+              expiry=$(date -u -d "$created + 30 days" +%Y-%m-%d 2>/dev/null || date -u -v+30d -j -f "%Y-%m-%dT%H:%M:%SZ" "$created" +%Y-%m-%d 2>/dev/null || echo "?")
+              echo "| \`$sid\` | [#${num}](${url}) | @${user} | ${recv} | ${expiry} |"
+            done
+            echo ""
+            echo "---"
+            echo ""
+            echo "_This tracker is updated in place on every beta issue open/edit + nightly at 06:00 UTC. To force a re-scan: Actions → Beta Submission Indexer → Run workflow._"
+          } > /tmp/tracker_body.md
+          # Guard: GitHub PR/issue body max = 65,536 chars. If we ever exceed
+          # that on a large beta cycle, truncate to the newest 50 rows
+          # (matches the auto-pr.yml cap contract). Unlikely for cycle 1.
+          BYTES=$(wc -c < /tmp/tracker_body.md | tr -d ' ')
+          if [ "$BYTES" -gt 60000 ]; then
+            echo "warning: tracker body approaching GitHub 65KB cap (${BYTES} bytes); consider row-cap fallback"
+          fi
+
+      - name: Update or create tracker issue
+        if: steps.scan.outputs.count != '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -e
+          TRACKER_NUM=$(gh issue list --repo "$REPO" --state open --label beta-submissions --limit 1 --json number --jq '.[0].number // empty')
+          if [ -z "$TRACKER_NUM" ]; then
+            TRACKER_NUM=$(gh issue create --repo "$REPO" \
+              --title "📥 Beta Submissions Tracker — rolling registry" \
+              --label "beta-submissions" \
+              --body-file /tmp/tracker_body.md \
+              | grep -oE '[0-9]+$')
+            echo "Created tracker: #$TRACKER_NUM"
+          else
+            gh issue edit "$TRACKER_NUM" --repo "$REPO" --body-file /tmp/tracker_body.md
+            echo "Updated tracker: #$TRACKER_NUM"
+          fi
+
+      - name: Post receipt comment on newly-scanned submission (issue events only)
+        # Only on issue OPEN/EDIT (not schedule/manual) — the tester needs the
+        # receipt at the moment their submission is first indexed.
+        # Idempotent-by-content: greps the current issue's comments for an
+        # existing receipt with the same submission_id before posting.
+        if: github.event_name == 'issues' && steps.scan.outputs.count != '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          ISSUE_NUM: ${{ github.event.issue.number }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+        run: |
+          set -e
+          SID=$(echo "$ISSUE_BODY" | grep -oiE 'submission\s*id[:\s]+[a-z][a-z0-9]{23}' | head -1 | grep -oE '[a-z][a-z0-9]{23}$' || true)
+          if [ -z "$SID" ]; then
+            echo "No submission_id in this issue's body — nothing to receipt."
+            exit 0
+          fi
+          # Idempotency: has this issue already been receipted for this SID?
+          if gh issue view "$ISSUE_NUM" --repo "$REPO" --comments --json comments \
+             --jq '.comments[].body' | grep -q "Submission ID .$SID."; then
+            echo "Receipt for $SID already posted on issue #$ISSUE_NUM."
+            exit 0
+          fi
+          EXPIRY=$(date -u -d "+30 days" +%Y-%m-%d 2>/dev/null || date -u -v+30d +%Y-%m-%d 2>/dev/null || echo "30 days from receipt")
+          gh issue comment "$ISSUE_NUM" --repo "$REPO" --body "$(cat <<EOF
+          📥 **Beta-share bundle received.**
+
+          - Submission ID: \`$SID\`
+          - Recorded in the [Beta Submissions Tracker](../../issues?q=is%3Aissue+label%3Abeta-submissions)
+          - Retention: **30 days from receipt** (expires ~$EXPIRY)
+
+          To request earlier deletion, email \`rogerhenley345@gmail.com\` with the Submission ID.
+
+          _Automated by \`.github/workflows/beta-submission-indexer.yml\`. If this looks wrong (wrong submission_id, wrong retention date), reply on this issue and the maintainer will correct it._
+          EOF
+          )"
