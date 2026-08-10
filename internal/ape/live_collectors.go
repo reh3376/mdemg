@@ -334,7 +334,7 @@ func (lc *LiveCollectors) publishGuidanceGauges(stats JiminyStatsResult) {
 	sid := lc.spaceID
 
 	m.JiminyFollowRate(sid).Set(stats.FollowRate)
-	m.JiminyConstraintEffectiveness(sid).Set(stats.ConstraintEffRate)
+	// jiminy_constraint_effectiveness retired METRICS-DEPRECATE-JIMINY-CONSTRAINT-EFF-001 (2026-08-10).
 	m.JiminySourceDiversity(sid).Set(stats.SourceDiversity)
 	m.JiminyTotalIssued(sid).Set(float64(stats.TotalGuidanceIssued))
 	m.JiminyTotalFollowed(sid).Set(float64(stats.TotalFollowed))

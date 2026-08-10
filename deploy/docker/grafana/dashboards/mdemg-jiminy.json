@@ -31,7 +31,7 @@
       "panels": []
     },
     {
-      "title": "Guidance Health (green ≥0.28 target)",
+      "title": "Guidance Health (green \u22650.28 target)",
       "description": "Composite: 0.5*follow_rate + 0.3*constraint_eff + 0.2*source_diversity (self_assess.go:504-516). DASHBOARD-TRUTH-003 (2026-08-01) recalibrated bands: pre-fix thresholds red<0.4 / green>=0.7 were calibrated for the legacy 'follow rate >= 90%' world, structurally unreachable under the honest post-JIMINY-ACTIONABILITY-COMPLIANCE-CREDIT-001 steady state (ceiling ~= 0.5*0.15 + 0.3*0.22 + 0.2*0.76 = 0.29). New bands: red<0.20 = collapse; yellow>=0.20 = pre-flip steady state; green>=0.28 = post-corpus-lift target zone (matches the honest ceiling +/- the diversity variance).",
       "type": "stat",
       "gridPos": {
@@ -75,7 +75,7 @@
               },
               {
                 "color": "yellow",
-                "value": 0.20
+                "value": 0.2
               },
               {
                 "color": "green",
@@ -303,7 +303,7 @@
               },
               {
                 "color": "light-green",
-                "value": 0.10
+                "value": 0.1
               },
               {
                 "color": "green",
@@ -371,7 +371,7 @@
     },
     {
       "title": "Auto-compact AVG interval (LONGER=BETTER)",
-      "description": "Average interval between Claude auto-compact events (pre-compact hook → compact_event_ts). Computed over DISTINCT event timestamps of the LAST 10 events regardless of dashboard window — compactions are rare (days apart), so a windowed query read 'no value' on any range narrower than ~2 events, and the gauge's repeated flush rows previously inflated COUNT(*) (interval understated). LONGER is BETTER: frequent compaction means context pressure. DASHBOARD-TRUTH-003 (2026-08-01): copy-fix from the j17 twin panel that DASHBOARD-TRUTH-002 already fixed 2026-07-21.",
+      "description": "Average interval between Claude auto-compact events (pre-compact hook \u2192 compact_event_ts). Computed over DISTINCT event timestamps of the LAST 10 events regardless of dashboard window \u2014 compactions are rare (days apart), so a windowed query read 'no value' on any range narrower than ~2 events, and the gauge's repeated flush rows previously inflated COUNT(*) (interval understated). LONGER is BETTER: frequent compaction means context pressure. DASHBOARD-TRUTH-003 (2026-08-01): copy-fix from the j17 twin panel that DASHBOARD-TRUTH-002 already fixed 2026-07-21.",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -482,7 +482,7 @@
     },
     {
       "title": "Outcome Distribution",
-      "description": "DASHBOARD-TRUTH-001: honest WINDOWED outcome counts from constraint_outcomes over the dashboard time range. Previously read the mdemg_jiminy_*_total Neo4j gauges, which are lifetime-cumulative AND multi-credit (stats.go: a guidance_id is credited to 'followed' if ANY of its edges is followed) — they showed ~0.73 followed while the honest windowed follow rate was ~0.16.",
+      "description": "DASHBOARD-TRUTH-001: honest WINDOWED outcome counts from constraint_outcomes over the dashboard time range. Previously read the mdemg_jiminy_*_total Neo4j gauges, which are lifetime-cumulative AND multi-credit (stats.go: a guidance_id is credited to 'followed' if ANY of its edges is followed) \u2014 they showed ~0.73 followed while the honest windowed follow rate was ~0.16.",
       "type": "piechart",
       "gridPos": {
         "h": 8,
@@ -732,7 +732,7 @@
     },
     {
       "title": "Outcome Trends",
-      "description": "DASHBOARD-TRUTH-001: per-hour WINDOWED outcome counts from constraint_outcomes (time_bucket over the dashboard range). Previously stacked the mdemg_jiminy_*_total Neo4j gauges — lifetime-cumulative multi-credit counters (stats.go), not a trend of outcomes in the interval.",
+      "description": "DASHBOARD-TRUTH-001: per-hour WINDOWED outcome counts from constraint_outcomes (time_bucket over the dashboard range). Previously stacked the mdemg_jiminy_*_total Neo4j gauges \u2014 lifetime-cumulative multi-credit counters (stats.go), not a trend of outcomes in the interval.",
       "type": "timeseries",
       "gridPos": {
         "h": 8,
@@ -920,7 +920,7 @@
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT bucket AS time, metric_name AS metric, avg_value AS value FROM metrics_hourly WHERE metric_name IN ('mdemg_jiminy_follow_rate','mdemg_jiminy_constraint_effectiveness','mdemg_jiminy_source_diversity') AND space_id = '$space_id' AND $__timeFilter(bucket) ORDER BY bucket",
+          "rawSql": "SELECT bucket AS time, metric_name AS metric, avg_value AS value FROM metrics_hourly WHERE metric_name IN ('mdemg_jiminy_follow_rate','mdemg_jiminy_source_diversity') AND space_id = '$space_id' AND $__timeFilter(bucket) ORDER BY bucket",
           "format": "time_series"
         }
       ],
@@ -947,18 +947,6 @@
               {
                 "id": "displayName",
                 "value": "Follow Rate"
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "mdemg_jiminy_constraint_effectiveness"
-            },
-            "properties": [
-              {
-                "id": "displayName",
-                "value": "Constraint Effectiveness"
               }
             ]
           },

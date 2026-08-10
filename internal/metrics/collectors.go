@@ -249,8 +249,13 @@ type StandardMetrics struct {
 	J17NLILatencyMs func(spaceID string) *Histogram       // mdemg_j17_nli_latency_ms{space_id} — wall time of each NLI comprehension call attempt
 
 	// Jiminy guidance metrics (published after each assessment)
-	JiminyFollowRate              func(spaceID string) *Gauge
-	JiminyConstraintEffectiveness func(spaceID string) *Gauge
+	JiminyFollowRate func(spaceID string) *Gauge
+	// JiminyConstraintEffectiveness RETIRED 2026-08-10
+	// (METRICS-DEPRECATE-JIMINY-CONSTRAINT-EFF-001). Was a lifetime-cumulative
+	// multi-credit gauge (DASHBOARD-TRUTH-001 flagged the honesty issue,
+	// DASHBOARD-TRUTH-003 E4 deleted the dishonest panel). Current dashboards
+	// read constraint_outcomes directly with windowed queries for the honest
+	// rate. Do NOT reintroduce this lifetime-cumulative gauge.
 	// JIMINY-ACTIONABILITY-001 — surfaced-composition observability (the fraction
 	// of the surfaced guidance set that is the actionable vs abstraction class —
 	// what Lever A directly moves).
@@ -764,10 +769,8 @@ func NewStandardMetrics(r *Registry) *StandardMetrics {
 		return r.NewGauge("jiminy_surfaced_abstraction_fraction", "Fraction of the surfaced guidance set that is the abstraction class (pattern/learning/concept/…) — JIMINY-ACTIONABILITY-001",
 			map[string]string{"space_id": spaceID})
 	}
-	m.JiminyConstraintEffectiveness = func(spaceID string) *Gauge {
-		return r.NewGauge("jiminy_constraint_effectiveness", "Constraint effectiveness rate (0-1)",
-			map[string]string{"space_id": spaceID})
-	}
+	// jiminy_constraint_effectiveness gauge retired 2026-08-10
+	// (METRICS-DEPRECATE-JIMINY-CONSTRAINT-EFF-001). See field-decl comment.
 	m.JiminySourceDiversity = func(spaceID string) *Gauge {
 		return r.NewGauge("jiminy_source_diversity", "Source diversity score (0-1)",
 			map[string]string{"space_id": spaceID})
