@@ -183,7 +183,27 @@ def main():
 
     if verdict == "deny":
         reason = data.get("denial_reason", "Strict mode: constraint violation detected")
-        _deny(f"[/strict] {reason}")
+        # JIMINY-CLASSIFY-ESCALATION-INSPECT-001 (2026-08-10): surface the
+        # violated_codes prominently so operators can copy-paste an override
+        # command without inspecting the raw JSON. The response's
+        # violated_codes field is authoritative — DenialReason may include
+        # `[code=X]` annotations too but codes are the operator override key.
+        codes = data.get("violated_codes") or []
+        if codes:
+            # Cap displayed codes at 5 to keep the banner readable; elide the rest.
+            shown = codes[:5]
+            more = len(codes) - len(shown)
+            code_list = ", ".join(shown)
+            if more > 0:
+                code_list += f" (+{more} more)"
+            first_code = shown[0]
+            override_hint = (
+                f"\n[operator] to override: mdemg jiminy override apply "
+                f"--constraint {first_code} --duration 30m --reason \"<why>\""
+            )
+            _deny(f"[/strict] BLOCKED (codes: {code_list}) {reason}{override_hint}")
+        else:
+            _deny(f"[/strict] {reason}")
 
     # Pass — allow the action
     sys.exit(0)

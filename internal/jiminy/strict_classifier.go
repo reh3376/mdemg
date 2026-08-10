@@ -81,8 +81,21 @@ func (c *StrictClassifier) Classify(ctx context.Context, req ClassifyRequest) (C
 
 		// Graduated: only WARNED+ triggers denial
 		if escLevel == EscalationWarned || escLevel == EscalationEscalated || escLevel == EscalationBlocked {
-			// Extract constraint code from content if available
-			code := extractConstraintCode(item.Content)
+			// JIMINY-CLASSIFY-ESCALATION-INSPECT-001 (2026-08-10): read the
+			// real constraint_code from the evaluator item (populated from
+			// Neo4j's constraint_code property). Previously this called a
+			// buggy extractConstraintCode(content) helper that pulled the
+			// `[must]`/`[should]` severity marker prefix off the content
+			// string and treated THAT as the code — so overrides on `must`
+			// would silently apply to every must-severity rule instead of
+			// the specific offending one. If the source node lacks a code
+			// (legacy Neo4j rows), fall back to `node:<source_node>` so
+			// the operator can still target the specific finding via the
+			// pseudo-code.
+			code := item.ConstraintCode
+			if code == "" && item.SourceNode != "" {
+				code = "node:" + item.SourceNode
+			}
 			if code != "" {
 				violatedCodes = append(violatedCodes, code)
 			}
@@ -143,8 +156,23 @@ func (c *StrictClassifier) Classify(ctx context.Context, req ClassifyRequest) (C
 			}, nil
 		}
 
+		// JIMINY-CLASSIFY-ESCALATION-INSPECT-001: prepend [code=X] to each
+		// reason so operators reading the block message can see which
+		// constraint_code(s) to target with `mdemg jiminy override apply
+		// --constraint <CODE>`. Codes and reasons zip pairwise when both
+		// arrays are the same length; if lengths diverge (extract-failure
+		// branch merged reasons without codes), fall back to naked reasons.
+		annotatedReasons := make([]string, 0, len(unoverriddenReasons))
+		if len(unoverriddenCodes) == len(unoverriddenReasons) {
+			for i, r := range unoverriddenReasons {
+				annotatedReasons = append(annotatedReasons,
+					fmt.Sprintf("[code=%s] %s", unoverriddenCodes[i], r))
+			}
+		} else {
+			annotatedReasons = unoverriddenReasons
+		}
 		reason := fmt.Sprintf("Constraint violation (%s): %s",
-			maxEscLevel, strings.Join(unoverriddenReasons, "; "))
+			maxEscLevel, strings.Join(annotatedReasons, "; "))
 		if len(overrideAnnotations) > 0 {
 			// Partial override: annotate but still deny.
 			reason = fmt.Sprintf("%s (partial-override-suppressed: %s)", reason, strings.Join(overrideAnnotations, "; "))
@@ -165,22 +193,3 @@ func (c *StrictClassifier) Classify(ctx context.Context, req ClassifyRequest) (C
 	}, nil
 }
 
-// extractConstraintCode tries to extract a constraint code from content text.
-// Looks for patterns like [CODE123] or CODE123: at the beginning.
-func extractConstraintCode(content string) string {
-	// Check for [CODE] pattern
-	if len(content) > 2 && content[0] == '[' {
-		end := strings.IndexByte(content, ']')
-		if end > 0 && end < 30 {
-			return content[1:end]
-		}
-	}
-	// Check for CODE: pattern at start
-	if idx := strings.Index(content, ": "); idx > 0 && idx < 30 {
-		candidate := content[:idx]
-		if len(candidate) >= 3 && !strings.Contains(candidate, " ") {
-			return candidate
-		}
-	}
-	return ""
-}

@@ -253,6 +253,14 @@ type EvaluationItem struct {
 	Content     string       `json:"content"`
 	Severity    string       `json:"severity"` // "low", "medium", "high"
 	SourceNode  string       `json:"source_node,omitempty"`
+	// ConstraintCode is the mnemonic code from the source Neo4j constraint node
+	// (JIMINY-CLASSIFY-ESCALATION-INSPECT-001 2026-08-10). Populated when the
+	// evaluator MATCHes a role_type='constraint' or role_type='correction' node
+	// with a non-empty constraint_code property. Used by strict_classifier to
+	// build ViolatedCodes so operator overrides target the correct rule.
+	// Falls back to empty when the source node doesn't carry a code — the
+	// strict classifier substitutes `node:<source_node>` in that path.
+	ConstraintCode string       `json:"constraint_code,omitempty"`
 	Reasoning   string       `json:"reasoning,omitempty"`   // J13: LLM reasoning for the finding
 	Remediation string       `json:"remediation,omitempty"` // J13: suggested remediation
 }
