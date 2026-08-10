@@ -1286,7 +1286,7 @@ type Config struct {
 	// "Follow rate on guidance that SHOULD have been followed" (actionable
 	// constraint/correction types) — excludes correctly-ignored advisory items.
 	GuidanceShouldFollowRateFloor     float64 // GUIDANCE_SHOULD_FOLLOW_RATE_FLOOR — alert when actionable-compliance rate drops below this (default: 0.05 — must sit BELOW the ~0.10-0.14 by-design steady state so only genuine collapse fires; was 0.5 pre-JIMINY-ACTIONABILITY-INVERSION-001 verdict; 0 disables the rule)
-	JiminyFollowRateAlertFloor        float64 // JIMINY_FOLLOW_RATE_ALERT_FLOOR — alert when the raw `mdemg_jiminy_follow_rate` gauge drops below this (default: 0.15 — post-JIMINY-CORPUS-001 raw steady state ~0.30; 0.15 sits below so only genuine collapse fires; was hardcoded 0.30 which flapped on healthy substrate — HEBB-ETA-001 live-caught. 0 disables the rule)
+	JiminyFollowRateAlertFloor        float64 // JIMINY_FOLLOW_RATE_ALERT_FLOOR — alert when the raw `mdemg_jiminy_follow_rate` gauge drops below this (default: 0.05 per JIMINY-HEURISTIC-DEFAULT-001; investigation at docs/development/jiminy-follow-rate-decline-2026-08-10/. 0 disables the rule)
 	JiminyFeedbackDropThreshold       int     // JIMINY_FEEDBACK_DROP_THRESHOLD — alert when dropped feedbacks over the lookback exceed this (default: 20 — post-JIMINY-TRACKER-TTL-001 fix drops should be ~0; a non-zero drop rate is a real regression signal). 0 disables.
 	JiminyFeedbackDropLookbackMin     int     // JIMINY_FEEDBACK_DROP_LOOKBACK_MIN — window for the drop counter (default: 60 min)
 	GuidanceShouldFollowLookbackHours int     // GUIDANCE_SHOULD_FOLLOW_LOOKBACK_HOURS — window for the should-follow rate (default: 168 = 7d, floor: 1)
@@ -3880,7 +3880,7 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	jiminyFollowRateAlertFloor, err := atof("JIMINY_FOLLOW_RATE_ALERT_FLOOR", 0.15)
+	jiminyFollowRateAlertFloor, err := atof("JIMINY_FOLLOW_RATE_ALERT_FLOOR", 0.05)
 	if err != nil {
 		return Config{}, err
 	}

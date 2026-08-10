@@ -4,11 +4,93 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"mdemg/internal/plugins"
 	"mdemg/internal/plugins/scaffold"
 )
+
+// pluginIDSafeRe restricts pluginID (parsed from the URL path) to
+// characters that cannot escape a filepath.Join boundary. No dots
+// (blocks ".." traversal), no slashes (blocks nested-path injection),
+// no path separators of any flavor. Alphanumerics + `-` + `_` cover
+// every realistic plugin naming convention.
+//
+// PLUGIN-PATH-INJECTION-FIX (2026-08-10, CodeQL alert #22 critical):
+// prior code used `pluginID` directly in filepath.Join(PluginsDir, pluginID)
+// with zero validation, allowing a request like
+// `POST /v1/plugins/..%2F..%2F..%2Fetc/validate` to resolve pluginDir
+// to arbitrary filesystem locations and trigger exec of arbitrary
+// binaries via handlePluginValidate → ValidateProtoCompliance.
+var pluginIDSafeRe = regexp.MustCompile(`^[a-zA-Z0-9_-]{1,64}$`)
+
+// validatePluginID returns nil iff pluginID matches pluginIDSafeRe.
+// Handlers MUST call this before using pluginID in any path
+// construction. Returns a 400-ready error message.
+func validatePluginID(pluginID string) error {
+	if pluginID == "" {
+		return errPluginIDEmpty
+	}
+	if !pluginIDSafeRe.MatchString(pluginID) {
+		return errPluginIDUnsafe
+	}
+	return nil
+}
+
+// verifyPluginBinaryInside is the belt-and-suspenders containment
+// check after building binaryPath via filepath.Join. Even with a
+// validated pluginID, a symlink inside the plugin dir could escape;
+// this check catches that class. Returns nil if binaryPath resolves
+// to a location strictly inside pluginsDir; otherwise the path-
+// escape error.
+func verifyPluginBinaryInside(pluginsDir, binaryPath string) error {
+	absDir, err := filepath.Abs(pluginsDir)
+	if err != nil {
+		return err
+	}
+	absBin, err := filepath.Abs(binaryPath)
+	if err != nil {
+		return err
+	}
+	// Canonicalize BOTH sides via EvalSymlinks so the containment
+	// comparison is apples-to-apples. Required because macOS resolves
+	// /var/folders/* → /private/var/folders/*: without this, an
+	// operator whose PluginsDir is symlinked (or lives under /var)
+	// would see every legit binary rejected as "outside", and the fix
+	// would silently break every plugin ops path. Live-caught by the
+	// pin test TestVerifyPluginBinaryInside/accepts_inside_binary
+	// during the PLUGIN-PATH-INJECTION-FIX build.
+	//
+	// Ignore not-exist errors from EvalSymlinks — the caller
+	// separately verifies binary existence via os.Stat; here we care
+	// only about the path SHAPE. Fall back to the abs form when the
+	// path doesn't exist yet.
+	if resolved, err := filepath.EvalSymlinks(absDir); err == nil {
+		absDir = resolved
+	}
+	if resolved, err := filepath.EvalSymlinks(absBin); err == nil {
+		absBin = resolved
+	}
+	if !strings.HasPrefix(absBin+string(os.PathSeparator), absDir+string(os.PathSeparator)) && absBin != absDir {
+		return errPluginBinaryOutsideDir
+	}
+	return nil
+}
+
+// Errors returned by the plugin-path validators. Named so callers
+// can `errors.Is` against them for testable error handling.
+var (
+	errPluginIDEmpty         = &pluginPathError{"plugin_id is required"}
+	errPluginIDUnsafe        = &pluginPathError{"plugin_id must match ^[a-zA-Z0-9_-]{1,64}$ (no dots, no slashes, no path separators)"}
+	errPluginBinaryOutsideDir = &pluginPathError{"plugin binary path resolves outside the plugins directory (rejected)"}
+)
+
+// pluginPathError is a lightweight sentinel type — small enough to
+// inline; supports errors.Is via pointer identity.
+type pluginPathError struct{ msg string }
+
+func (e *pluginPathError) Error() string { return e.msg }
 
 // PluginCreateRequest is the request body for POST /v1/plugins/create
 type PluginCreateRequest struct {
@@ -258,6 +340,15 @@ func (s *Server) handlePluginDetail(w http.ResponseWriter, r *http.Request, plug
 		return
 	}
 
+	// PLUGIN-PATH-INJECTION-FIX (2026-08-10): validate pluginID before
+	// using in filepath.Join — same class as handlePluginValidate. This
+	// handler doesn't exec but does os.Stat + os.ReadFile which could
+	// probe/leak arbitrary filesystem locations without validation.
+	if err := validatePluginID(pluginID); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+		return
+	}
+
 	// Try to find the plugin directory
 	pluginDir := filepath.Join(s.cfg.PluginsDir, pluginID)
 	manifestPath := filepath.Join(pluginDir, "manifest.json")
@@ -336,6 +427,15 @@ func (s *Server) handlePluginValidate(w http.ResponseWriter, r *http.Request, pl
 		return
 	}
 
+	// PLUGIN-PATH-INJECTION-FIX (2026-08-10, CodeQL alert #22 critical):
+	// pluginID from URL path MUST be validated before any filepath op.
+	// Without this, `POST /v1/plugins/..%2F..%2F..%2Fetc/validate` would
+	// escape s.cfg.PluginsDir and trigger exec of arbitrary binaries.
+	if err := validatePluginID(pluginID); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+		return
+	}
+
 	// Find the plugin directory
 	pluginDir := filepath.Join(s.cfg.PluginsDir, pluginID)
 	manifestPath := filepath.Join(pluginDir, "manifest.json")
@@ -387,6 +487,18 @@ func (s *Server) handlePluginValidate(w http.ResponseWriter, r *http.Request, pl
 		}
 		resp.Valid = false
 		writeJSON(w, http.StatusOK, map[string]any{"data": resp})
+		return
+	}
+
+	// PLUGIN-PATH-INJECTION-FIX belt-and-suspenders (2026-08-10):
+	// pluginID passed validatePluginID above, but the manifest's
+	// Binary field is plugin-author-provided and could be
+	// "../../../usr/bin/rm" — verify the final binaryPath still
+	// resolves inside s.cfg.PluginsDir before handing to exec.
+	if err := verifyPluginBinaryInside(s.cfg.PluginsDir, binaryPath); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{
+			"error": "plugin manifest.binary rejected: " + err.Error(),
+		})
 		return
 	}
 
@@ -477,6 +589,14 @@ func (s *Server) handlePluginOperation(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handlePluginLifecycle(w http.ResponseWriter, r *http.Request, pluginID, action string) {
 	if r.Method != http.MethodPost {
 		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+		return
+	}
+	// PLUGIN-PATH-INJECTION-FIX (2026-08-10): validate pluginID.
+	// Downstream: s.pluginMgr.{Start,Stop,Restart}(pluginID) likely uses
+	// pluginID to construct plugin paths; validate at the handler surface
+	// so untrusted URL segments never reach path-building code.
+	if err := validatePluginID(pluginID); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return
 	}
 	if s.pluginMgr == nil {

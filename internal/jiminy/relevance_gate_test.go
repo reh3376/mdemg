@@ -101,8 +101,9 @@ func TestRelevanceGate_Tier2BandUnchanged(t *testing.T) {
 
 	cr := oc.Classify(context.Background(), item, "added error handling to handler.go")
 
-	if cr.Outcome != OutcomePartialCompliance {
-		t.Errorf("expected partial_compliance for sim=0.35 (uncertain band, LLM off), got %s", cr.Outcome)
+	// JIMINY-HEURISTIC-DEFAULT-001: uncertain-band heuristic default is now Ignored.
+	if cr.Outcome != OutcomeIgnored {
+		t.Errorf("expected ignored for sim=0.35 (uncertain band, LLM off, post-JIMINY-HEURISTIC-DEFAULT-001), got %s", cr.Outcome)
 	}
 }
 

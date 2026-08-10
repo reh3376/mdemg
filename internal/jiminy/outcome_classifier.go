@@ -356,7 +356,17 @@ func (oc *OutcomeClassifier) Classify(ctx context.Context, item GuidanceItem, ac
 	if similarity >= oc.highThreshold {
 		return ClassificationResult{Outcome: OutcomeFollowed, Confidence: similarity, Source: "heuristic"}
 	}
-	return ClassificationResult{Outcome: OutcomePartialCompliance, Confidence: similarity, Source: "heuristic"}
+	// JIMINY-HEURISTIC-DEFAULT-001 (2026-08-10): default UNKNOWN → OutcomeIgnored,
+	// NOT OutcomePartialCompliance. The gauge weights partial=0.5 credit; defaulting
+	// unknown/parse-fail cases to 0.5 credit systematically inflated
+	// mdemg_jiminy_follow_rate whenever the heuristic fallback fired. When LLM
+	// stability improved and the heuristic mix dropped from ~50% to ~5%, the gauge
+	// deflated by ~10pp — an inverse coupling that mis-read as "substrate quality
+	// declined" (see docs/development/jiminy-follow-rate-decline-2026-08-10/).
+	// OutcomeIgnored is the conservative default: classifier improvements EARN
+	// credit rather than defaulting to it. Historical rows keep partial_compliance
+	// (honest snapshots of the classifier's behavior at their time).
+	return ClassificationResult{Outcome: OutcomeIgnored, Confidence: similarity, Source: "heuristic"}
 }
 
 // llmClassify uses an LLM to determine the outcome for uncertain cases (J14 upgraded).

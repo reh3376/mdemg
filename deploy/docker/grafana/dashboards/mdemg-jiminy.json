@@ -87,8 +87,8 @@
       }
     },
     {
-      "title": "Follow Rate (honest 15-25% by design)",
-      "description": "Raw jiminy follow rate over ALL guidance types (constraint/correction/pattern/concept/learning/decision). JIMINY-CEILING-INVESTIGATION-001 (2026-07-29) established that the raw rate's honest ceiling is 15-25% under proper measurement, NOT >90% (the corpus is ~50% correctly-ignored advisory abstractions by design). DASHBOARD-TRUTH-003 (2026-08-01) recalibrated: pre-fix thresholds red<0.4 / green>=0.7 flagged a healthy substrate as critical every render. New bands: red null (any value shown is not-collapse); yellow>=0.05 = collapse floor matches the guidance_should_follow_rate_low alert; green>=0.15 = the honest steady-state pinned in CLAUDE.md. See Actionable Compliance Rate panel for the constraint/correction-only slice (the metric that actually maps to actionable-guidance follow-rate).",
+      "title": "Follow Rate (honest ~12% post-heuristic-fix)",
+      "description": "Raw jiminy follow rate over ALL guidance types (constraint/correction/pattern/concept/learning/decision). PRIOR NOTE: was inflated whenever the heuristic classifier fallback fired (heuristic defaulted UNKNOWN verdicts to partial_compliance = 0.5 credit \u2014 see internal/jiminy/outcome_classifier.go). JIMINY-HEURISTIC-DEFAULT-001 (2026-08-10) changed the heuristic default to ignored (0 credit); investigation at docs/development/jiminy-follow-rate-decline-2026-08-10/. Post-fix honest steady state is ~11-12% (matches the Actionable Compliance Rate panel). Bands: red null (any value shown is not-collapse); yellow>=0.05 = matches JIMINY_FOLLOW_RATE_ALERT_FLOOR (post-fix default); green>=0.10 = normal operating range. See Actionable Compliance Rate panel for the constraint/correction-only slice.",
       "type": "stat",
       "gridPos": {
         "h": 4,
