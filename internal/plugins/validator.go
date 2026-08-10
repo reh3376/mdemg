@@ -273,6 +273,13 @@ func ValidateProtoCompliance(binaryPath string, moduleType string) (*ProtoValida
 		return result, nil
 	}
 
+	// Normalize the binary path — filepath.Clean strips `..` traversal
+	// tokens and normalizes separators. The path is operator-provided (via
+	// the `mdemg module validate <path>` CLI) so this is defense-in-depth
+	// against typos, not a security boundary — the operator's intent IS to
+	// exec this binary.
+	binaryPath = filepath.Clean(binaryPath)
+
 	// Check binary exists and is executable
 	if _, err := os.Stat(binaryPath); err != nil {
 		result.Valid = false
@@ -288,6 +295,15 @@ func ValidateProtoCompliance(binaryPath string, moduleType string) (*ProtoValida
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
+	// #nosec G204 — CodeQL go/command-injection false-positive-with-context.
+	// binaryPath is operator-provided via the `mdemg module validate <path>`
+	// CLI or programmatic caller. This function's ENTIRE purpose is to exec
+	// operator-specified plugin binaries + probe their gRPC surface. It is
+	// not reachable from any network-facing HTTP handler. The trust model is
+	// "operator ran a local CLI intending to launch this binary" — same
+	// level as `go run <path>` or `./<path>`. filepath.Clean above catches
+	// typo-class path issues; a malicious path would already require local
+	// shell access, at which point cmd.Exec is not the attack surface.
 	cmd := exec.CommandContext(ctx, binaryPath, "--socket", socketPath)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
