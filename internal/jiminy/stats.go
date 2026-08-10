@@ -116,6 +116,7 @@ func (sc *StatsCollector) computeConstraintEffectivenessRate(ctx context.Context
 
 	cypher := `
 	MATCH (c:MemoryNode {space_id: $spaceId, role_type: 'constraint'})-[r:GUIDANCE_OUTCOME]-()
+	WHERE NOT coalesce(c.is_archived, false)  // JIMINY-ARCHIVED-CODE-FILTER-001
 	WITH c, count(r) AS surfaced,
 	     sum(CASE WHEN r.outcome_type = 'followed' THEN 1.0 ELSE 0.0 END) AS followed,
 	     sum(CASE WHEN r.outcome_type = 'partial_compliance' THEN 0.5 ELSE 0.0 END) AS partial_half
