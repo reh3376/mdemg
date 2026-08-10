@@ -14,6 +14,12 @@ on:
       - 'cmd/extract-symbols/**'
       - 'docs/lang-parser/**'
 
+# Minimum GITHUB_TOKEN scope: `contents: read` covers actions/checkout;
+# parser tests run + read + do not write to the repo.
+# CodeQL: actions/missing-workflow-permissions.
+permissions:
+  contents: read
+
 env:
   GO_VERSION: '1.26'
   PYTHON_VERSION: '3.11'

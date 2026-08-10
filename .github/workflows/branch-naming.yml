@@ -9,6 +9,12 @@ on:
       - 'release/**'
       - gh-pages
 
+# Minimum GITHUB_TOKEN scope: `contents: read` — the job only reads
+# GITHUB_REF_NAME and greps it against a regex. No repo I/O needed.
+# CodeQL: actions/missing-workflow-permissions.
+permissions:
+  contents: read
+
 jobs:
   validate-branch-name:
     name: Validate Branch Name
