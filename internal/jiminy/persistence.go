@@ -72,8 +72,9 @@ func (ps *PersistenceStore) PersistGuidanceOutcome(
 	// (not obs_type), so we check both properties.
 	cypher := `
 		MATCH (src:MemoryNode {node_id: $targetNodeID, space_id: $spaceID})
-		WHERE src.obs_type IN ['constraint', 'correction', 'pattern', 'learning']
-		   OR src.role_type = 'constraint'
+		WHERE (src.obs_type IN ['constraint', 'correction', 'pattern', 'learning']
+		   OR src.role_type = 'constraint')
+		  AND NOT coalesce(src.is_archived, false)  // JIMINY-ARCHIVED-CODE-FILTER-001
 		CREATE (src)-[r:GUIDANCE_OUTCOME {
 			guidance_id:   $guidanceID,
 			outcome_type:  $outcomeType,
@@ -130,6 +131,7 @@ func (ps *PersistenceStore) FindConstraintCodeForNode(ctx context.Context, space
 			MATCH (c:MemoryNode {space_id: $spaceID, node_id: $nid})
 			WHERE c.role_type IN ['constraint', 'correction']
 			  AND c.constraint_code IS NOT NULL AND c.constraint_code <> ''
+			  AND NOT coalesce(c.is_archived, false)  // JIMINY-ARCHIVED-CODE-FILTER-001
 			RETURN c.constraint_code AS code
 			LIMIT 1`,
 			map[string]any{"spaceID": spaceID, "nid": nodeID})
@@ -158,6 +160,7 @@ func (ps *PersistenceStore) findConstraintNodeID(ctx context.Context, spaceID, c
 	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 		res, txErr := tx.Run(ctx, `
 			MATCH (c:MemoryNode {space_id: $spaceID, role_type: 'constraint', constraint_code: $code})
+			WHERE NOT coalesce(c.is_archived, false)  // JIMINY-ARCHIVED-CODE-FILTER-001
 			RETURN c.node_id AS cid
 			LIMIT 1`,
 			map[string]any{"spaceID": spaceID, "code": constraintCode})
@@ -185,6 +188,7 @@ func (ps *PersistenceStore) GetConstraintEffectiveness(ctx context.Context, spac
 
 	cypher := `
 		MATCH (c:MemoryNode {space_id: $spaceID, role_type: 'constraint'})
+		WHERE NOT coalesce(c.is_archived, false)  // JIMINY-ARCHIVED-CODE-FILTER-001
 		OPTIONAL MATCH (c)-[r:GUIDANCE_OUTCOME]-()
 		RETURN
 			c.node_id    AS node_id,

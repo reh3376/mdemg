@@ -3129,6 +3129,8 @@ func (s *Service) GetGlossary(ctx context.Context, spaceID string) map[string]st
 		cypher := `
 			MATCH (n:MemoryNode)
 			WHERE n.space_id = $spaceId AND n.constraint_code IS NOT NULL AND n.constraint_code <> ''
+			  AND n.role_type IN ['constraint', 'correction']
+			  AND NOT coalesce(n.is_archived, false)  // JIMINY-ARCHIVED-CODE-FILTER-001
 			RETURN n.constraint_code AS code, COALESCE(n.summary, LEFT(n.content, 80)) AS summary
 		`
 		res, err := tx.Run(ctx, cypher, map[string]any{"spaceId": spaceID})
@@ -3165,7 +3167,22 @@ type constraintCodeEntry struct {
 	Words   map[string]bool // significant words for matching
 }
 
-// loadSpaceConstraintCodes loads all constraint codes for a space from Neo4j.
+// loadSpaceConstraintCodes loads all constraint codes for a space from Neo4j
+// for the keyword-overlap fallback matcher (matchConstraintCode).
+//
+// ⚠️ JIMINY-ARCHIVED-CODE-FILTER-001 (2026-08-10): filter archived nodes AND
+// gate role_type. The prior query was overly loose (WHERE space_id AND
+// constraint_code IS NOT NULL), which pulled in archived constraint nodes +
+// even archived conversation_observations that happened to carry a
+// constraint_code property. When the vector-index path (which correctly
+// filters archived) returned no match, the fallback keyword matcher would
+// then assign an ARCHIVED constraint's code to a fresh guidance item, and
+// downstream constraint_outcomes analytics dragged the follow rate against
+// codes with zero live nodes (live-caught on 2026-08-08: auto-9f5134a1a0c3
+// had 4 archived + 1 archived nodes, 0 live, still producing 17 outcomes/day).
+// The two vector-index-path guards (matchConstraintCodeByEmbedding +
+// fetchActionableCandidates) already filter is_archived; this closes the
+// fallback path.
 func (s *Service) loadSpaceConstraintCodes(ctx context.Context, spaceID string) []constraintCodeEntry {
 	if s.driver == nil {
 		return nil
@@ -3179,6 +3196,8 @@ func (s *Service) loadSpaceConstraintCodes(ctx context.Context, spaceID string) 
 			MATCH (c:MemoryNode)
 			WHERE c.space_id = $spaceId
 			  AND c.constraint_code IS NOT NULL AND c.constraint_code <> ''
+			  AND c.role_type IN ['constraint', 'correction']
+			  AND NOT coalesce(c.is_archived, false)
 			RETURN DISTINCT c.constraint_code AS code, c.content AS content
 		`, map[string]any{"spaceId": spaceID})
 		if err != nil {
