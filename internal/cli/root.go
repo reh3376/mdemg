@@ -203,6 +203,21 @@ Use "mdemg <command> --help" for more information about a command.`,
 	betaShareCmd.GroupID = "config"
 	rootCmd.AddCommand(betaShareCmd)
 
+	// Sprint B5b (2026-08-10) — receiver counterpart to beta-share.
+	// `mdemg beta-import <bundle.tar.gz>` unpacks + verifies + imports
+	// the guidance corpus rows into space_id=beta-tester-<submission_id>
+	// with per-tester attribution.
+	betaImportCmd := newBetaImportCmd()
+	betaImportCmd.GroupID = "config"
+	rootCmd.AddCommand(betaImportCmd)
+
+	// Sprint B5c — retention janitor for beta-tester bundles.
+	// `mdemg beta-janitor {delete,sweep}` — one-off + bulk cleanup
+	// keyed on space_id LIKE 'beta-tester-%'.
+	betaJanitorCmd := newBetaJanitorCmd()
+	betaJanitorCmd.GroupID = "config"
+	rootCmd.AddCommand(betaJanitorCmd)
+
 	sidecarCmd := newSidecarCmd()
 	sidecarCmd.GroupID = "config"
 	rootCmd.AddCommand(sidecarCmd)
