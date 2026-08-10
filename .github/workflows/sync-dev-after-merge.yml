@@ -59,7 +59,7 @@ jobs:
 
       - name: Checkout dev branch
         if: steps.target.outputs.exists == 'true'
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           ref: ${{ steps.target.outputs.branch }}
           fetch-depth: 0
