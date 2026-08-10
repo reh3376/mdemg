@@ -45,16 +45,24 @@ func newTestClassifier(embedder *sequenceEmbedder, llmEnabled bool) *OutcomeClas
 	})
 }
 
-func TestHeuristicFallback_PartialCompliance(t *testing.T) {
-	// Similarity 0.4 is in the uncertain range (0.20-0.55) — should be partial_compliance
+func TestHeuristicFallback_UncertainDefaultsToIgnored(t *testing.T) {
+	// JIMINY-HEURISTIC-DEFAULT-001 (2026-08-10): uncertain-range verdicts
+	// (in [lowThreshold, highThreshold)) with no negation and LLM disabled
+	// now default to OutcomeIgnored (was OutcomePartialCompliance). Rationale:
+	// the gauge weights partial=0.5 credit; defaulting UNKNOWN to half-credit
+	// inflated mdemg_jiminy_follow_rate whenever the heuristic fired. See
+	// docs/development/jiminy-follow-rate-decline-2026-08-10/INVESTIGATION.md.
 	emb := &sequenceEmbedder{targetSim: 0.4}
 	oc := newTestClassifier(emb, false)
 	item := GuidanceItem{Content: "ensure error handling uses structured logging", Type: GuidanceConstraint}
 
 	cr := oc.Classify(context.Background(), item, "added error handling to handler.go")
 
-	if cr.Outcome != OutcomePartialCompliance {
-		t.Errorf("expected partial_compliance for similarity=0.4, got %s", cr.Outcome)
+	if cr.Outcome != OutcomeIgnored {
+		t.Errorf("expected ignored (post-JIMINY-HEURISTIC-DEFAULT-001) for similarity=0.4, got %s", cr.Outcome)
+	}
+	if cr.Source != "heuristic" {
+		t.Errorf("expected source=heuristic, got %s", cr.Source)
 	}
 	if math.Abs(cr.Confidence-0.4) > 0.05 {
 		t.Errorf("expected confidence ~0.4, got %f", cr.Confidence)
@@ -110,8 +118,9 @@ func TestHeuristicFallback_LLMDisabled(t *testing.T) {
 
 	cr := oc.Classify(context.Background(), item, "implemented identifier generation using cuid2 package")
 
-	if cr.Outcome != OutcomePartialCompliance {
-		t.Errorf("expected partial_compliance for similarity=0.35 with LLM disabled, got %s", cr.Outcome)
+	// JIMINY-HEURISTIC-DEFAULT-001 (2026-08-10): default is now ignored, not partial_compliance.
+	if cr.Outcome != OutcomeIgnored {
+		t.Errorf("expected ignored (post-JIMINY-HEURISTIC-DEFAULT-001) for similarity=0.35 with LLM disabled, got %s", cr.Outcome)
 	}
 }
 
@@ -149,8 +158,9 @@ func TestNotApplicable_BoundaryAtLowThreshold(t *testing.T) {
 	cr := oc.Classify(context.Background(), item, "wrote error handling code")
 
 	// 0.20 is >= lowThreshold, so it enters the uncertain range → partial_compliance (LLM disabled)
-	if cr.Outcome != OutcomePartialCompliance {
-		t.Errorf("expected partial_compliance at boundary sim=0.20, got %s", cr.Outcome)
+	// JIMINY-HEURISTIC-DEFAULT-001: default changed to Ignored.
+	if cr.Outcome != OutcomeIgnored {
+		t.Errorf("expected ignored at boundary sim=0.20 (post-JIMINY-HEURISTIC-DEFAULT-001), got %s", cr.Outcome)
 	}
 }
 
