@@ -9,6 +9,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/nrednav/cuid2"
+	"mdemg/internal/llmclient"
 )
 
 // RetrievalEventRow is the TSDB-side representation of a retrieval pipeline event.
@@ -81,6 +82,15 @@ func (w *RetrievalEventWriter) flushLoop() {
 }
 
 // Record buffers a retrieval event row.
+//
+// EXPORT-SCRUB-INTAKE-001 (2026-08-11): scrubs QueryText at INTAKE time so
+// the row is clean-by-construction and the export scan-gate never blocks
+// on a workspace-path false-positive. Skip list matches
+// `retrievalEventsSpec.textFields[4] = {"abs_path"}` in exporter.go
+// EXACTLY (must stay in sync): queries reference file paths BY DESIGN
+// (retrieval by file-path is a legitimate query shape), so abs_path
+// stays raw; api_key / env_secret / email / neo4j_cred still scrub if
+// they somehow appear in a query.
 func (w *RetrievalEventWriter) Record(event RetrievalEventRow) {
 	if event.EventID == "" {
 		event.EventID = cuid2.Generate()
@@ -88,6 +98,8 @@ func (w *RetrievalEventWriter) Record(event RetrievalEventRow) {
 	if event.Time.IsZero() {
 		event.Time = time.Now()
 	}
+	// Intake scrub — abs_path skipped (matches export spec).
+	event.QueryText = llmclient.ScrubStringExcluding(event.QueryText, []string{"abs_path"})
 	w.mu.Lock()
 	w.buffer = append(w.buffer, event)
 	w.mu.Unlock()

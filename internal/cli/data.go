@@ -44,6 +44,7 @@ func newDataCmd() *cobra.Command {
 	cmd.AddCommand(newDataCurateGuidanceCmd())
 	cmd.AddCommand(newDataValidateCmd())
 	cmd.AddCommand(newDataCleanCmd())
+	cmd.AddCommand(newDataScrubExportTablesCmd()) // EXPORT-SCRUB-INTAKE-001
 
 	return cmd
 }
