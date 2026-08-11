@@ -25,6 +25,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/nrednav/cuid2"
+	"mdemg/internal/llmclient"
 )
 
 // GuidanceTrainingRow mirrors the V0027 guidance_training_rows columns. The
@@ -124,6 +125,20 @@ func (w *GuidanceTrainingRowsWriter) flushLoop() {
 // Record buffers one row. Stamps RowID (CUIDv2) + Time if unset. Applies FIFO
 // eviction when the buffer is at cap. Non-blocking; the feedback hot path must
 // never wait on the TSDB writer.
+//
+// EXPORT-SCRUB-INTAKE-001 (2026-08-11): scrubs the two operator-visible text
+// fields at INTAKE time so the row is clean-by-construction and the export
+// scan-gate never blocks on a workspace-path false-positive. Skip lists
+// match `guidanceTrainingRowsSpec.textFields` in `internal/tsdb/exporter.go`
+// exactly (must stay in sync — see feature doc EXPORT-SCRUB-INTAKE-001):
+//   - ActionSummary: full scrub (nil skip list). Captured post-tool-observe
+//     bash output legitimately contains /Users/... paths that the operator
+//     would want redacted before the row ships in an export bundle. Same
+//     policy as llm_interactions.UserPrompt / Response (via llmclient.Scrub
+//     at intake).
+//   - GuidanceContent: abs_path SKIPPED. Operator-authored constraint /
+//     correction rules can legitimately reference file paths; scrubbing
+//     them out would lose context. Matches the export spec's skip list.
 func (w *GuidanceTrainingRowsWriter) Record(row GuidanceTrainingRow) {
 	if row.RowID == "" {
 		row.RowID = cuid2.Generate()
@@ -131,6 +146,9 @@ func (w *GuidanceTrainingRowsWriter) Record(row GuidanceTrainingRow) {
 	if row.Time.IsZero() {
 		row.Time = time.Now()
 	}
+	// Intake scrub — parity with llm_interactions via llmclient.Scrub().
+	row.ActionSummary = llmclient.ScrubStringExcluding(row.ActionSummary, nil)
+	row.GuidanceContent = llmclient.ScrubStringExcluding(row.GuidanceContent, []string{"abs_path"})
 	w.mu.Lock()
 	if w.maxBufferSize > 0 && len(w.buffer) >= w.maxBufferSize {
 		evict := len(w.buffer) - w.maxBufferSize + 1

@@ -3,6 +3,7 @@ package tsdb
 import (
 	"context"
 	"errors"
+	"strings"
 	"regexp"
 	"testing"
 	"time"
@@ -178,5 +179,89 @@ func TestGuidanceTrainingWriter_Close_DrainsBuffer(t *testing.T) {
 	}
 	if len(pool.lastCall().rows) != 4 {
 		t.Errorf("final-flush rows = %d, want 4", len(pool.lastCall().rows))
+	}
+}
+
+
+// EXPORT-SCRUB-INTAKE-001 (2026-08-11) pin tests: assert Record scrubs
+// action_summary + guidance_content at intake time per the writer's
+// contract with the exporter (block-on-scrub-diff gate).
+
+func TestGuidanceTrainingWriter_Record_ScrubsAbsPathInActionSummary(t *testing.T) {
+	pool := &fakePool{}
+	w := NewGuidanceTrainingRowsWriter(pool, time.Hour, 0)
+	defer w.Close()
+
+	row := sampleGuidanceRow()
+	row.ActionSummary = "Ran command in /Users/tester/workspace/myrepo/pkg/foo.go and saw output"
+	w.Record(row)
+	if err := w.Flush(context.Background()); err != nil {
+		t.Fatalf("Flush error: %v", err)
+	}
+	// action_summary is column 11 (per top-of-file comment).
+	got, ok := pool.lastCall().rows[0][11].(string)
+	if !ok {
+		t.Fatalf("action_summary not string: %T", pool.lastCall().rows[0][11])
+	}
+	if got == "" {
+		t.Fatal("action_summary empty after Record")
+	}
+	// Post-scrub: /Users/tester/workspace/myrepo/pkg/foo.go should be
+	// replaced by /[PATH]/... — the raw username + workspace-parent stripped.
+	if got == row.ActionSummary {
+		t.Fatalf("action_summary was NOT scrubbed at intake — got raw %q; the export gate will re-block this class if intake doesn't scrub", got)
+	}
+	if !strings.Contains(got, "[PATH]") {
+		t.Fatalf("scrubbed action_summary should contain [PATH] marker, got %q", got)
+	}
+	if strings.Contains(got, "/Users/tester/workspace/myrepo") {
+		t.Fatalf("scrubbed action_summary still contains raw workspace path: %q", got)
+	}
+}
+
+func TestGuidanceTrainingWriter_Record_PreservesAbsPathInGuidanceContent(t *testing.T) {
+	pool := &fakePool{}
+	w := NewGuidanceTrainingRowsWriter(pool, time.Hour, 0)
+	defer w.Close()
+
+	row := sampleGuidanceRow()
+	// Operator-authored constraint that legitimately references a workspace
+	// path. GuidanceContent is skipped for abs_path per the export spec, so
+	// intake must preserve it (else the operator's rule loses semantic
+	// context in every stored row).
+	row.GuidanceContent = "Never edit /Users/reh3376/mdemg/CLAUDE.md without running lint first"
+	w.Record(row)
+	if err := w.Flush(context.Background()); err != nil {
+		t.Fatalf("Flush error: %v", err)
+	}
+	// guidance_content is column 7.
+	got, ok := pool.lastCall().rows[0][7].(string)
+	if !ok {
+		t.Fatalf("guidance_content not string: %T", pool.lastCall().rows[0][7])
+	}
+	if got != row.GuidanceContent {
+		t.Fatalf("guidance_content was scrubbed at intake — abs_path SHOULD be preserved per the export spec's skip list. got %q want %q", got, row.GuidanceContent)
+	}
+}
+
+func TestGuidanceTrainingWriter_Record_StillScrubsApiKeyInGuidanceContent(t *testing.T) {
+	// GuidanceContent skips abs_path ONLY — api_key, email, etc still scrub.
+	// Assert the skip list is targeted, not blanket-off.
+	pool := &fakePool{}
+	w := NewGuidanceTrainingRowsWriter(pool, time.Hour, 0)
+	defer w.Close()
+
+	row := sampleGuidanceRow()
+	row.GuidanceContent = "The OpenAI API key sk-abc1234567890abcdefghij must never appear in code"
+	w.Record(row)
+	if err := w.Flush(context.Background()); err != nil {
+		t.Fatalf("Flush error: %v", err)
+	}
+	got, _ := pool.lastCall().rows[0][7].(string)
+	if strings.Contains(got, "sk-abc1234567890abcdefghij") {
+		t.Fatalf("guidance_content STILL contains raw api key after scrub — skip list must not disable api_key: %q", got)
+	}
+	if !strings.Contains(got, "[REDACTED_KEY]") {
+		t.Fatalf("api key not properly redacted in guidance_content: %q", got)
 	}
 }

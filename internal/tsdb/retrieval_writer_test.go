@@ -262,16 +262,25 @@ func TestRetrievalWriter_ColumnValuePositions(t *testing.T) {
 	}
 }
 
-func TestRetrievalWriter_NoPrivacyScrub(t *testing.T) {
+func TestRetrievalWriter_IntakeScrub(t *testing.T) {
+	// EXPORT-SCRUB-INTAKE-001 (2026-08-11): supersedes the prior
+	// TestRetrievalWriter_NoPrivacyScrub. The retrieval writer NOW scrubs
+	// at intake time (skip list matches retrievalEventsSpec.textFields
+	// = {"abs_path"}). Rationale: queries reference file paths BY DESIGN
+	// (retrieval-by-file-path is a legit shape), but api keys, env
+	// secrets, emails, neo4j creds landing in query_text are always
+	// leaks — never intended, always safe to redact. Matches the
+	// llm_interactions.UserPrompt intake-scrub policy.
 	pool := &mockPool{}
 	w := newTestRetrievalWriter(pool)
 
 	apiKey := "sk-HvPliFZCy8ohpHoZZ1wUy0EY5ltXXXXX"
+	absPath := "/Users/tester/workspace/pkg/foo.go"
 	w.Record(RetrievalEventRow{
 		Time:      time.Now(),
 		SpaceID:   "test",
 		CallSite:  "test",
-		QueryText: fmt.Sprintf("find %s in config", apiKey),
+		QueryText: fmt.Sprintf("find %s referenced from %s", apiKey, absPath),
 		QueryHash: "hash",
 	})
 
@@ -285,9 +294,17 @@ func TestRetrievalWriter_NoPrivacyScrub(t *testing.T) {
 	v := pool.calls[0].Values[0]
 	qt, _ := v[4].(string)
 
-	// Retrieval writer does NOT scrub — API key should survive
-	if !strings.Contains(qt, apiKey) {
-		t.Errorf("position [4] query_text: API key was incorrectly scrubbed, got %q", qt)
+	// api_key MUST be redacted at intake (post-EXPORT-SCRUB-INTAKE-001).
+	if strings.Contains(qt, apiKey) {
+		t.Errorf("query_text still contains raw api key — intake scrub failed: %q", qt)
+	}
+	if !strings.Contains(qt, "[REDACTED_KEY]") {
+		t.Errorf("api key not properly redacted: %q", qt)
+	}
+	// abs_path MUST be preserved (matches export spec's abs_path skip —
+	// queries reference file paths by design).
+	if !strings.Contains(qt, absPath) {
+		t.Errorf("abs_path was scrubbed — should be preserved per retrievalEventsSpec.textFields skip list: %q", qt)
 	}
 }
 
