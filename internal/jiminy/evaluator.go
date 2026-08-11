@@ -375,6 +375,7 @@ func (e *Evaluator) findMatchingConstraints(ctx context.Context, spaceID string,
 	  AND sim > 0.4
 	RETURN c.node_id AS node_id, c.name AS name,
 	       c.constraint_type AS constraint_type,
+	       c.constraint_code AS constraint_code,
 	       c.content AS content, sim
 	ORDER BY sim DESC LIMIT $maxResults`
 
@@ -395,6 +396,7 @@ func (e *Evaluator) findMatchingConstraints(ctx context.Context, spaceID string,
 			nodeID, _ := rec.Get("node_id")
 			name, _ := rec.Get("name")
 			cType, _ := rec.Get("constraint_type")
+			cCode, _ := rec.Get("constraint_code")
 			content, _ := rec.Get("content")
 			sim, _ := rec.Get("sim")
 
@@ -411,10 +413,11 @@ func (e *Evaluator) findMatchingConstraints(ctx context.Context, spaceID string,
 
 			simVal := asFloat64Val(sim)
 			items = append(items, EvaluationItem{
-				Type:       GuidanceConstraint,
-				Content:    fmt.Sprintf("[%s] %s (sim: %.2f)", cTypeStr, desc, simVal),
-				Severity:   severity,
-				SourceNode: asStringVal(nodeID),
+				Type:           GuidanceConstraint,
+				Content:        fmt.Sprintf("[%s] %s (sim: %.2f)", cTypeStr, desc, simVal),
+				Severity:       severity,
+				SourceNode:     asStringVal(nodeID),
+				ConstraintCode: asStringVal(cCode),
 			})
 		}
 		return items, res.Err()
@@ -449,6 +452,7 @@ func (e *Evaluator) findMatchingCorrections(ctx context.Context, spaceID string,
 	  AND c.obs_type = 'correction'
 	  AND sim > 0.5
 	RETURN c.node_id AS node_id, c.name AS name,
+	       c.constraint_code AS constraint_code,
 	       c.content AS content, c.summary AS summary, sim
 	ORDER BY sim DESC LIMIT 5`
 
@@ -466,6 +470,7 @@ func (e *Evaluator) findMatchingCorrections(ctx context.Context, spaceID string,
 		for res.Next(ctx) {
 			rec := res.Record()
 			nodeID, _ := rec.Get("node_id")
+			cCode, _ := rec.Get("constraint_code")
 			content, _ := rec.Get("content")
 			summary, _ := rec.Get("summary")
 			sim, _ := rec.Get("sim")
@@ -477,10 +482,11 @@ func (e *Evaluator) findMatchingCorrections(ctx context.Context, spaceID string,
 
 			simVal := asFloat64Val(sim)
 			items = append(items, EvaluationItem{
-				Type:       GuidanceCorrection,
-				Content:    fmt.Sprintf("Prior correction: %s (sim: %.2f)", desc, simVal),
-				Severity:   "medium",
-				SourceNode: asStringVal(nodeID),
+				Type:           GuidanceCorrection,
+				Content:        fmt.Sprintf("Prior correction: %s (sim: %.2f)", desc, simVal),
+				Severity:       "medium",
+				SourceNode:     asStringVal(nodeID),
+				ConstraintCode: asStringVal(cCode),
 			})
 		}
 		return items, res.Err()

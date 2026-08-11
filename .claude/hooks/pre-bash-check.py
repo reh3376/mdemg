@@ -262,7 +262,13 @@ def check_jiminy_bash(input_data: dict, command: str) -> Optional[str]:
     data = result.get("data", {})
     verdict = data.get("verdict", "pass")
     if verdict == "deny":
-        return data.get("denial_reason", "Strict mode: constraint violation detected")
+        # JIMINY-CLASSIFY-ESCALATION-INSPECT-001 (2026-08-10): return (reason, codes)
+        # so main() can surface the actual constraint codes in the deny banner —
+        # operators need the code to run `mdemg jiminy override apply --constraint X`.
+        return (
+            data.get("denial_reason", "Strict mode: constraint violation detected"),
+            data.get("violated_codes") or [],
+        )
     return None
 
 
@@ -291,9 +297,24 @@ def main():
         )
 
     # 2) JIMINY-ENFORCE-002: consult Jiminy (fail-open) — new
-    reason = check_jiminy_bash(input_data, command)
-    if reason:
-        _deny(f"[/strict] {reason}")
+    result = check_jiminy_bash(input_data, command)
+    if result:
+        reason, codes = result
+        if codes:
+            # Cap displayed codes at 5 to keep the banner readable (JIMINY-CLASSIFY-ESCALATION-INSPECT-001).
+            shown = codes[:5]
+            more = len(codes) - len(shown)
+            code_list = ", ".join(shown)
+            if more > 0:
+                code_list += f" (+{more} more)"
+            first_code = shown[0]
+            override_hint = (
+                f"\n[operator] to override: mdemg jiminy override apply "
+                f"--constraint {first_code} --duration 30m --reason \"<why>\""
+            )
+            _deny(f"[/strict] BLOCKED (codes: {code_list}) {reason}{override_hint}")
+        else:
+            _deny(f"[/strict] {reason}")
 
     # Both checks passed: allow silently
     sys.exit(0)
