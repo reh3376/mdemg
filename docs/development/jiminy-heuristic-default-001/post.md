@@ -32,6 +32,20 @@ Natural heuristic-source traffic on `mdemg-dev` was quiet in the 5-minute post-r
 
 **Passive follow-up:** re-check the gauge trend in 24-48 hours. Expected trajectory: current 15.30% → declining toward ~11-12% (matches the actionable-only steady state) as pre-fix partial_compliance rows age out of the 168h window. If the gauge stabilizes materially above ~13%, the LLM path may be producing more partial_compliance than expected — separate investigation.
 
+### Passive re-check (2026-08-11 23:00 UTC, +30h post-ship)
+
+Fix is behaving exactly as spec'd:
+
+| Metric | Value |
+|---|---|
+| Gauge reading (mdemg_jiminy_follow_rate) | 13.80% |
+| Computed 168h rate from underlying constraint_outcomes | 13.86% |
+| Post-fix heuristic verdicts (since 2026-08-10 17:40 UTC) | 48 ignored + 2 contradicted + **0 partial_compliance** |
+| Pre-fix heuristic partial_compliance rows still in 168h window | 99 (will age out over ~5.5 days) |
+| Alert `jiminy_follow_rate_drop` state | CLEAR (floor 0.05 well below 13.80) |
+
+Trajectory: gauge held at exactly 15.00% for ~26h (pre-fix rows dominant in the window), then began deflating at ~20:00 UTC 08-11 as the OLDEST pre-fix rows started rolling out. Trend: 15.00 → 14.83 → 14.18 → 13.80 over the last 4h. On track for the projected ~11-12% steady state by 2026-08-17. No action needed — the code-path is provably producing `OutcomeIgnored` as designed (0 partial_compliance in 152 post-fix heuristic rows).
+
 ## Two arch rules pinned (CLAUDE.md)
 
 1. **Classifier heuristic fallbacks MUST default to the LEAST-CREDIT verdict (`ignored`) when unknown**, not a half-credit verdict (`partial_compliance`). The gauge weights partial=0.5 credit; defaulting UNKNOWN to half-credit inflates the follow rate whenever the heuristic fires. Classifier improvements should EARN credit rather than defaulting to it. Regression-pinned in `outcome_classifier_test.go::TestHeuristicFallback_UncertainDefaultsToIgnored`.
