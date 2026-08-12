@@ -497,3 +497,78 @@ func TestNewOutcomeClassifier_ContextMismatchCredit_Propagates(t *testing.T) {
 		t.Error("ContextMismatchCredit flag on/off renders should differ")
 	}
 }
+
+
+// JIMINY-CLASSIFIER-CONTEXT-002 (Phase 3 of JIMINY-CEILING-BREAK-2,
+// 2026-08-12) pin tests.
+
+// TestResolveClassifySystemPrompt_MechanismScope_DefaultOff_ByteIdentical
+// proves the mechanism-scope credit flag default OFF preserves the historical
+// system-prompt render exactly, so the ULTS-CI-001 hash pin is unaffected
+// by this sprint (matches CONTEXT-001 shape).
+func TestResolveClassifySystemPrompt_MechanismScope_DefaultOff_ByteIdentical(t *testing.T) {
+	oc := &OutcomeClassifier{compressPrompts: false, mechanismScopeCredit: false}
+	got := oc.resolveClassifySystemPrompt()
+	want := classifySystemPrompt
+	if got != want {
+		t.Errorf("default-off render differs from base classifySystemPrompt — ULTS pin would break. got len=%d want len=%d", len(got), len(want))
+	}
+}
+
+// TestResolveClassifySystemPrompt_MechanismScope_On_Extended proves flipping
+// the flag appends the clause exactly once.
+func TestResolveClassifySystemPrompt_MechanismScope_On_Extended(t *testing.T) {
+	oc := &OutcomeClassifier{compressPrompts: false, mechanismScopeCredit: true}
+	got := oc.resolveClassifySystemPrompt()
+	want := classifySystemPrompt + mechanismScopeCreditClause
+	if got != want {
+		t.Errorf("mechanism-scope-on render doesn't match base + clause. got len=%d want len=%d", len(got), len(want))
+	}
+	if !strings.Contains(got, "MECHANISM-SCOPE HARD-PRECEDENCE GATE") {
+		t.Errorf("expected 'MECHANISM-SCOPE HARD-PRECEDENCE GATE' header in output; got prefix: %s...", got[:min(400, len(got))])
+	}
+}
+
+// TestNewOutcomeClassifier_MechanismScopeCredit_Propagates verifies the
+// OutcomeClassifierConfig.MechanismScopeCredit field flows through
+// NewOutcomeClassifier to the internal field.
+func TestNewOutcomeClassifier_MechanismScopeCredit_Propagates(t *testing.T) {
+	off := NewOutcomeClassifier(nil, OutcomeClassifierConfig{MechanismScopeCredit: false})
+	if off.mechanismScopeCredit {
+		t.Error("MechanismScopeCredit=false should not propagate to true")
+	}
+	on := NewOutcomeClassifier(nil, OutcomeClassifierConfig{MechanismScopeCredit: true})
+	if !on.mechanismScopeCredit {
+		t.Error("MechanismScopeCredit=true should propagate")
+	}
+	if off.resolveClassifySystemPrompt() == on.resolveClassifySystemPrompt() {
+		t.Error("MechanismScopeCredit flag on/off renders should differ")
+	}
+}
+
+// TestResolveClassifySystemPrompt_AllThreeCredits_Ordering pins that when
+// all three flags are ON, the clauses splice in narrower→broader order
+// (non-violation FIRST, context-mismatch SECOND, mechanism-scope LAST).
+// The recency-weighted LLM prompt gives the STRONGEST gate the last word.
+func TestResolveClassifySystemPrompt_AllThreeCredits_Ordering(t *testing.T) {
+	oc := &OutcomeClassifier{
+		compressPrompts:       false,
+		nonViolationCredit:    true,
+		contextMismatchCredit: true,
+		mechanismScopeCredit:  true,
+	}
+	got := oc.resolveClassifySystemPrompt()
+	want := classifySystemPrompt + nonViolationCreditClause + contextMismatchCreditClause + mechanismScopeCreditClause
+	if got != want {
+		t.Errorf("all-three-flags render doesn't match base + all three clauses in expected order. got len=%d want len=%d", len(got), len(want))
+	}
+	nvIdx := strings.Index(got, "NON-VIOLATION CREDIT")
+	cmIdx := strings.Index(got, "CONTEXT-MISMATCH CREDIT")
+	msIdx := strings.Index(got, "MECHANISM-SCOPE HARD-PRECEDENCE GATE")
+	if nvIdx < 0 || cmIdx < 0 || msIdx < 0 {
+		t.Fatalf("all three clauses must be present; nvIdx=%d cmIdx=%d msIdx=%d", nvIdx, cmIdx, msIdx)
+	}
+	if !(nvIdx < cmIdx && cmIdx < msIdx) {
+		t.Errorf("clause ordering must be non-violation < context-mismatch < mechanism-scope (recency-weighted strongest gate last); got nv=%d cm=%d ms=%d", nvIdx, cmIdx, msIdx)
+	}
+}

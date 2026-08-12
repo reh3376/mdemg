@@ -140,6 +140,7 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext, consultant Co
 			CompressPrompts:        cfg.JiminyClassifyCompress,
 			NonViolationCredit:     cfg.JiminyNonViolationCreditEnabled,
 			ContextMismatchCredit:  cfg.JiminyContextMismatchCreditEnabled,
+			MechanismScopeCredit:   cfg.JiminyMechanismScopeCreditEnabled,
 			Tier1BypassEnabled:     cfg.JiminyTier1BypassEnabled,
 		})
 		slog.Info("jiminy: semantic outcome classifier enabled",
@@ -148,6 +149,7 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext, consultant Co
 			"llm_enabled", cfg.JiminyOutcomeLLMEnabled, "cache_size", cfg.JiminyOutcomeCacheSize,
 			"nonviolation_credit", cfg.JiminyNonViolationCreditEnabled,
 			"context_mismatch_credit", cfg.JiminyContextMismatchCreditEnabled,
+			"mechanism_scope_credit", cfg.JiminyMechanismScopeCreditEnabled,
 			"tier1_bypass", cfg.JiminyTier1BypassEnabled)
 	}
 
@@ -1226,6 +1228,21 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 				added++
 			}
 			debug["leverc_actionable_merged"] = added
+		}
+	}
+
+	// LEVER-C-TIGHTEN-002 (JIMINY-CEILING-BREAK-2 Phase 2, 2026-08-12):
+	// scope-gate filter — suppress surfaced items whose derived action-scope
+	// families don't intersect the request-side scope. Addresses the ceiling
+	// data showing similarity is NOT a discriminator for follow-vs-ignore
+	// (both cluster at 0.8-0.9 sim); the discriminator is action-context
+	// match. Safe defaults: items with no derived scope surface anywhere;
+	// requests with no derived scope receive all items.
+	if s.cfg.JiminyScopeGateEnabled {
+		kept, drops := applyScopeGate(items, req, true)
+		items = kept
+		if drops > 0 {
+			debug["scope_gate_drops"] = drops
 		}
 	}
 

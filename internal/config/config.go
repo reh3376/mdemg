@@ -339,6 +339,7 @@ type Config struct {
 	JiminyGuidanceConstraintBiasEnabled bool    // JIMINY_GUIDANCE_CONSTRAINT_BIAS_ENABLED — Lever C: fetch top-K constraint/correction nodes by embedding similarity and merge into the guidance pool (default: false). Addresses the Epic-4 finding that retrieval surfaces no actionable candidates for most contexts.
 	JiminyGuidanceConstraintIncludeTopK int     // JIMINY_GUIDANCE_CONSTRAINT_INCLUDE_TOPK — how many actionable nodes to merge (default: 4 — LEVER-C-TIGHTEN-001 tightened 5→4; TSDB 7d actionable fraction 0.342 vs 0.30 quota → 5 over-supplied slightly; 4 gives ~2.7 survivors after 32% attrition, quota-safe via cooldown fallback)
 	JiminyGuidanceConstraintSimFloor    float64 // JIMINY_GUIDANCE_CONSTRAINT_SIM_FLOOR — cosine (vector-index) similarity floor for a merged actionable node — STABLE [0,1] scale, NOT the RRF score (RRF-SCALE-001-safe). 0 disables the floor. (default: 0.45 — LEVER-C-TIGHTEN-001 tightened 0.30→0.45; TSDB 7d: 0/257 followed below downstream-sim 0.40, all 78 followed events ≥0.50 (77 ≥0.60); 0.45 conservative "kill the tail, keep the head" cutoff)
+	JiminyScopeGateEnabled              bool    // JIMINY_SCOPE_GATE_ENABLED — LEVER-C-TIGHTEN-002 (JIMINY-CEILING-BREAK-2 Phase 2, 2026-08-12): suppress a surfaced constraint iff its derived action-scope families (git/file_mutation/bash/schema/identifier/testing/process_docs/llm_config/cms) do not intersect the request-side scope. Addresses ceiling-data showing similarity is not a discriminator for follow-vs-ignore (both cluster at 0.8-0.9 sim); the discriminator is action-context match. Safe-defaults: items with no derived scope surface anywhere; requests with no derived scope receive all items. Default false in code; enable in .env after live smoke.
 	// JIMINY-OUTCOME-001 — minimum vector-index cosine similarity for an embedding-based
 	// constraint-code match. Concept-abstracted guidance rarely shares 3+ literal words
 	// with raw constraint text, so keyword matching missed everything and the Neo4j
@@ -407,6 +408,7 @@ type Config struct {
 	JiminyClassifyCompress          bool    // JIMINY_CLASSIFY_COMPRESS — compress outcome classification prompts (default: true)
 	JiminyNonViolationCreditEnabled bool    // JIMINY_NONVIOLATION_CREDIT_ENABLED — extend tier-2 LLM classifier prompt with a "non-violation credit for must_not" clause. Routes unrelated-context ignored verdicts to not_applicable (already filtered from constraint_outcomes by the writer gate). Predicted to lift constraint follow rate 10%→~20% by shrinking the actionable denominator. Default false; operator runs the 3-day A/B recipe (docs/development/jiminy-actionability-compliance-credit-001/ab_recipe.md) before flipping (JIMINY-ACTIONABILITY-COMPLIANCE-CREDIT-001).
 	JiminyContextMismatchCreditEnabled bool // JIMINY_CONTEXT_MISMATCH_CREDIT_ENABLED — extend tier-2 LLM classifier prompt with a generalized "context-mismatch credit" clause (any constraint type, not just must_not). Routes context-mismatched verdicts (git rule + file-write action, code rule + read-only-query action, etc.) to not_applicable. Predicted to lift 11%→35-50% per JIMINY-CEILING-INVESTIGATION-001 evidence (8/16 samples were context mismatch). Default false; operator flips after live smoke (JIMINY-CLASSIFIER-CONTEXT-001).
+	JiminyMechanismScopeCreditEnabled  bool // JIMINY_MECHANISM_SCOPE_CREDIT_ENABLED — LEVER extension (JIMINY-CLASSIFIER-CONTEXT-002, Phase 3 of JIMINY-CEILING-BREAK-2, 2026-08-12): hard-precedence mechanism-scope gate. Extends tier-2 LLM classifier prompt to check mechanism-verb match FIRST; if the action didn't invoke the constraint's mechanism, outcome=not_applicable unconditionally regardless of surface similarity. Attacks CONTEXT-001 residual actionable-denominator mislabels. Default false in code; operator flips in .env after live smoke.
 	JiminyDedupSimilarityThreshold  float64 // JIMINY_DEDUP_SIMILARITY_THRESHOLD — semantic dedup cosine threshold (default: 0.85)
 	JiminyCorrectionDecayRate       float64 // JIMINY_CORRECTION_DECAY_RATE — time-decay lambda for corrections (default: 0.01)
 	J17TicketCacheSize              int     // J17_TICKET_CACHE_SIZE — max entries in ticket LRU cache (default: 1000)
@@ -2874,6 +2876,7 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	jiminyScopeGateEnabled := getBool("JIMINY_SCOPE_GATE_ENABLED", false)
 	jiminyMinConfidence, err := atof("JIMINY_MIN_CONFIDENCE", 0.3)
 	if err != nil {
 		return Config{}, err
@@ -3004,6 +3007,7 @@ func FromEnv() (Config, error) {
 	// after running the 3-day A/B recipe to verify the predicted lift.
 	jiminyNonViolationCreditEnabled := getBool("JIMINY_NONVIOLATION_CREDIT_ENABLED", false)
 	jiminyContextMismatchCreditEnabled := getBool("JIMINY_CONTEXT_MISMATCH_CREDIT_ENABLED", false)
+	jiminyMechanismScopeCreditEnabled := getBool("JIMINY_MECHANISM_SCOPE_CREDIT_ENABLED", false)
 	jiminyDedupSimilarityThreshold, err := atof("JIMINY_DEDUP_SIMILARITY_THRESHOLD", 0.85)
 	if err != nil {
 		return Config{}, err
@@ -5971,6 +5975,7 @@ func FromEnv() (Config, error) {
 		JiminyGuidanceConstraintBiasEnabled:       getBool("JIMINY_GUIDANCE_CONSTRAINT_BIAS_ENABLED", false),
 		JiminyGuidanceConstraintIncludeTopK:       jiminyGuidanceConstraintIncludeTopK,
 		JiminyGuidanceConstraintSimFloor:          jiminyGuidanceConstraintSimFloor,
+		JiminyScopeGateEnabled:                    jiminyScopeGateEnabled,
 		JiminyMinConfidence:                       jiminyMinConfidence,
 		JiminySignalStrengthWeight:                jiminySignalStrengthWeight,
 		JiminyConstraintCodeSimThreshold:          jiminyConstraintCodeSimThreshold,
@@ -6013,6 +6018,7 @@ func FromEnv() (Config, error) {
 		JiminyClassifyCompress:          jiminyClassifyCompress,
 		JiminyNonViolationCreditEnabled: jiminyNonViolationCreditEnabled,
 		JiminyContextMismatchCreditEnabled: jiminyContextMismatchCreditEnabled,
+		JiminyMechanismScopeCreditEnabled:  jiminyMechanismScopeCreditEnabled,
 		JiminyDedupSimilarityThreshold:  jiminyDedupSimilarityThreshold,
 		JiminyCorrectionDecayRate:       jiminyCorrectionDecayRate,
 		J17TicketCacheSize:              j17TicketCacheSize,

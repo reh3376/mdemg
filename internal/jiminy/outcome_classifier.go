@@ -111,6 +111,57 @@ CONTEXT-MISMATCH CREDIT for any constraint type:
 - Use "ignored" ONLY when the constraint DOES govern the action's context AND the agent had opportunity to comply but didn't.
 This rule generalizes non-violation credit to all constraint types where surface similarity fires but context differs.`
 
+// mechanismScopeCreditClause is appended to the classifier system prompt
+// when OutcomeClassifierConfig.MechanismScopeCredit is true
+// (JIMINY-CLASSIFIER-CONTEXT-002, Phase 3 of JIMINY-CEILING-BREAK-2).
+//
+// Strengthens CONTEXT-001's context-mismatch clause with a HARD-PRECEDENCE
+// mechanism-scope gate: before assigning any outcome, the classifier is
+// instructed to check whether the agent's action invoked the mechanism-verb
+// the constraint governs. If not, the outcome is `not_applicable`
+// unconditionally — no surface similarity, keyword overlap, or topic
+// relatedness can override.
+//
+// This mirrors the LEVER-C-TIGHTEN-002 scope-gate on the SURFACING side —
+// applying the same mental model to the CLASSIFICATION side. After Phase 2
+// suppresses most out-of-scope items at surfacing, the ones that DO reach
+// the classifier are more likely relevant; this clause catches the residual
+// misclassifications on items that slipped through the surface-side gate.
+//
+// Evidence base: JIMINY-CLASSIFIER-CONTEXT-001 delivered only +3pp vs
+// predicted +18-25pp because 88% of NA routing landed on advisory guidance
+// (outside the actionable denominator). The remaining actionable-denominator
+// mislabels are items where the mechanism-verb didn't appear in the action
+// but the LLM still labeled ignored on topic-similarity grounds. The hard-
+// precedence gate closes that class.
+//
+// Default OFF; operator flips JIMINY_MECHANISM_SCOPE_CREDIT_ENABLED=true
+// in .env after live smoke. Same pattern + gating as the two prior
+// clauses (JIMINY-ACTIONABILITY-COMPLIANCE-CREDIT-001 shape).
+//
+//nolint:gosec // G101 false-positive: "CREDIT" in prose content is not a credential.
+const mechanismScopeCreditClause = `
+
+MECHANISM-SCOPE HARD-PRECEDENCE GATE:
+Before assigning ANY outcome (followed / partial_compliance / ignored / contradicted), first check whether the agent's action invoked the MECHANISM the constraint governs.
+- Identify the constraint's mechanism-verb(s): the specific action-verbs indicating what the rule regulates. Examples:
+  * git rules ("never commit to main", "no stash for release") → mechanism-verbs: commit, push, merge, branch, rebase, stash, checkout
+  * identifier rules ("use CUIDv2") → mechanism-verbs: generate id, mint identifier, create UUID, new ID
+  * schema rules ("never alter schema without migration") → mechanism-verbs: ALTER TABLE, DROP, migration, schema-change
+  * documentation rules ("mandatory sprint plan format", "mermaid over ASCII") → mechanism-verbs: author markdown, write doc, produce sprint plan
+  * pre-commit rules ("run lint before commit", "e2e before commit") → mechanism-verbs: preparing a commit / about to commit
+  * language-specific rules → mechanism-verb: writing/editing in that language
+- Check whether the agent's action-text contains any mechanism-verb OR describes performing that mechanism.
+- If NO mechanism-verb match → outcome = "not_applicable" UNCONDITIONALLY. No amount of surface similarity, keyword overlap, or topic relatedness can override this. The rule cannot have been followed OR ignored if the action didn't touch its mechanism.
+- Only proceed to followed / ignored / partial / contradicted determination AFTER passing the mechanism-scope gate (mechanism WAS invoked).
+- Examples of correct hard-precedence application:
+  * Constraint "never commit to main" + action "answered a question in chat" → not_applicable (no git commit occurred, no matter how much the discussion mentioned "commit")
+  * Constraint "use CUIDv2 for identifiers" + action "restarted mdemg via launchctl" → not_applicable (no identifier generated, even though the action affects an app that uses identifiers)
+  * Constraint "mandatory sprint plan format" + action "read a config file" → not_applicable (no sprint plan authored)
+  * Constraint "run lint before commit" + action "wrote a bash script" → not_applicable (no commit or preparation to commit)
+This is the strongest gate — it precedes both non-violation credit and context-mismatch credit. When mechanism-scope fails, the outcome is settled without needing to invoke either of those.`
+
+
 // resolveClassifySystemPrompt returns the effective system prompt for tier-2
 // classification. When nonViolationCredit and/or contextMismatchCredit are
 // true, appends the corresponding extension clause(s). Default-off path
@@ -132,6 +183,9 @@ func (oc *OutcomeClassifier) resolveClassifySystemPrompt() string {
 	}
 	if oc.contextMismatchCredit {
 		out += contextMismatchCreditClause
+	}
+	if oc.mechanismScopeCredit {
+		out += mechanismScopeCreditClause
 	}
 	return out
 }
@@ -160,6 +214,7 @@ type OutcomeClassifier struct {
 	naThreshold        float64 // JIMINY-CORPUS-001 Epic 4 relevance gate: below this = not_applicable; [this, low) = ignored. ≤0 disables (whole sub-LOW tail is not_applicable)
 	nonViolationCredit bool    // JIMINY-ACTIONABILITY-COMPLIANCE-CREDIT-001: when true, LLM classifier prompt gets an extended clause telling the LLM to classify must_not-type constraints as not_applicable (not ignored) when the action didn't touch the constraint's mechanism. Routes ~50% of current unrelated-context ignored verdicts to not_applicable, which the shipped writer gate (service.go:1730,1762) filters from constraint_outcomes. Predicted to lift constraint follow rate 10%→~20%. Default false; operator runs 3-day A/B before flipping.
 	contextMismatchCredit bool // JIMINY-CLASSIFIER-CONTEXT-001: generalizes non-violation credit to ANY constraint type where the rule is durable but doesn't govern the action's context (git rule + file-write action, code rule + read-only-query action, workflow-step rule + different-step action, language-specific rule + different-language action, or the "rule" is a session log / phase description not a real rule). Predicted to lift 11% → 35-50%; JIMINY-CEILING-INVESTIGATION-001 evidence base (8/16 samples were context mismatch, 7/16 surface mismatch, 0/16 genuine ignore). Default false; operator flips after live smoke.
+	mechanismScopeCredit bool // JIMINY-CLASSIFIER-CONTEXT-002 (Phase 3 of JIMINY-CEILING-BREAK-2, 2026-08-12): hard-precedence mechanism-scope gate. When true, LLM classifier prompt gets a clause instructing it to check mechanism-verb match FIRST; if the action didn't invoke the constraint's mechanism, outcome=not_applicable unconditionally regardless of surface similarity. Attacks CONTEXT-001's residual actionable-denominator mislabels where mechanism-verb absent but LLM still labeled ignored on topic-similarity grounds. Default false; operator flips after live smoke.
 	tier1BypassEnabled bool    // JIMINY-TIER1-BYPASS-001: when true, tier1 (embedding-similarity) is bypassed for the follow/ignore decision. Only the sub-naThreshold → NotApplicable pre-gate stays tier1. All other cases route to LLM tier2. Addresses JIMINY-CEILING-INVESTIGATION-001 defect B: embedding sim between rule text + action text is functionally blind to follows (1% follow rate on 102 real-durable-rule tier1 events). Default false; operator flips after live smoke.
 	maxTokens          int     // J14: max tokens for LLM classification
 
@@ -188,6 +243,7 @@ type OutcomeClassifierConfig struct {
 	CompressPrompts        bool    // J17-PC: compress classification prompts to reduce tokens
 	NonViolationCredit     bool    // JIMINY-ACTIONABILITY-COMPLIANCE-CREDIT-001: extend classifier prompt with must_not non-violation credit clause. Default false.
 	ContextMismatchCredit  bool    // JIMINY-CLASSIFIER-CONTEXT-001: extend classifier prompt with generalized context-mismatch credit clause. Default false.
+	MechanismScopeCredit   bool    // JIMINY-CLASSIFIER-CONTEXT-002: extend classifier prompt with hard-precedence mechanism-scope gate clause. Default false.
 	Tier1BypassEnabled     bool    // JIMINY-TIER1-BYPASS-001: bypass tier1 for follow/ignore decisions; keep tier1 only as the sub-naThreshold pre-gate for not_applicable. Default false.
 }
 
@@ -208,6 +264,7 @@ func NewOutcomeClassifier(embedder embeddings.Embedder, cfg OutcomeClassifierCon
 		maxTokens:          cfg.MaxTokens,
 		nonViolationCredit:    cfg.NonViolationCredit,
 		contextMismatchCredit: cfg.ContextMismatchCredit,
+		mechanismScopeCredit:  cfg.MechanismScopeCredit,
 		tier1BypassEnabled:    cfg.Tier1BypassEnabled,
 		cacheMap:           make(map[string]*list.Element),
 		cacheList:          list.New(),
