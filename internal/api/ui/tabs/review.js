@@ -246,7 +246,17 @@ function renderItem() {
             metaRow('session', m.session_id),
             metaRow('guidance id', m.guidance_id))));
 
+    // HITL-AUTOGRADE-PREVIEW-001: async fetch autograder proposal; radios
+    // start blank + get pre-filled when the response lands (typically 1-3s
+    // for the LLM call). Operator can override any radio before/after arrival
+    // by clicking OR pressing 0-4. Fire-and-forget from renderItem — if the
+    // request fails or times out, the operator gets blank radios (safe fallback).
+    const autogradeStatusEl = h('span', { id: 'review-autograde-status', style: { fontSize: '12px', color: '#888', marginLeft: '10px' } }, 'autograde-preview: fetching…');
+
     const form = h('div', { className: 'card', id: 'review-form' });
+    // Header row: autograde-preview status (fetching / pre-filled / unavailable)
+    form.append(h('div', { style: { padding: '6px 0', marginBottom: '4px', fontSize: '12px' } },
+        h('strong', {}, 'Autograde preview: '), autogradeStatusEl));
     const inputs = {};
     currentDimensionInputs = inputs; // JIMINY-HITL-VELOCITY-001: expose to keyboard handler
     for (const dim of (currentRubric && currentRubric.dimensions) || []) {
@@ -276,6 +286,50 @@ function renderItem() {
         h('label', {}, reinforce, ' reinforce the live system (reversible)')));
 
     const status = h('div', { className: 'muted', id: 'review-status' });
+    // HITL-AUTOGRADE-PREVIEW-001: kick off async autograde preview.
+    // Fire-and-forget: if it fails, radios stay blank (safe fallback).
+    api.reviewAutogradePreview(currentDataset, it.item_id, spaceId())
+        .then((resp) => {
+            const data = (resp && resp.data) || {};
+            // Guard: item might have changed while the LLM was thinking.
+            if (currentItem !== it || !currentDimensionInputs) return;
+            if (!data.available) {
+                autogradeStatusEl.textContent = 'autograde unavailable (no LLM endpoint)';
+                autogradeStatusEl.style.color = '#a80';
+                return;
+            }
+            const dims = data.dimensions || {};
+            let filled = 0;
+            for (const [key, val] of Object.entries(dims)) {
+                const radios = container.querySelectorAll(`input[type="radio"][name="${key}"]`);
+                for (const r of radios) {
+                    if (r.value === String(val)) {
+                        r.checked = true;
+                        currentDimensionInputs[key] = val;
+                        filled++;
+                        break;
+                    }
+                }
+            }
+            if (filled > 0) {
+                const conf = (data.confidence != null) ? ` (conf ${Number(data.confidence).toFixed(2)})` : '';
+                const reason = data.skipped_reason ? ` — ${data.skipped_reason}` : '';
+                autogradeStatusEl.textContent = `pre-filled ${filled}/${(currentRubric.dimensions || []).length} dims${conf}${reason}`;
+                autogradeStatusEl.style.color = '#8fc';
+                if (data.rationale) {
+                    autogradeStatusEl.title = 'rationale: ' + data.rationale;
+                }
+            } else {
+                autogradeStatusEl.textContent = data.skipped_reason || 'autograder returned no proposal';
+                autogradeStatusEl.style.color = '#a80';
+            }
+        })
+        .catch((err) => {
+            if (currentItem !== it) return;
+            autogradeStatusEl.textContent = 'autograde error: ' + (err.message || err);
+            autogradeStatusEl.style.color = '#c66';
+        });
+
     form.append(h('div', {},
         btn('Preview (dry-run)', async () => {
             status.textContent = 'previewing…';
