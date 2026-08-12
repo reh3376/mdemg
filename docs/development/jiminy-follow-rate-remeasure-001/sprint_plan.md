@@ -1,3 +1,7 @@
+> ⚠️ **TRAJECTORY ANNOTATION (added 2026-08-12 by FRAMING-HYGIENE-SWEEP-001):** the framing in this doc calls the current follow-rate "honest steady state" / "not urgent" / "expected". That framing was **superseded** by the operator directive of 2026-08-11 ("If the main LLM is only following 10-13% of Jiminy's guidance this entire project is a complete failure") — the arc that owns the ≥80% target is [`docs/development/jiminy-ceiling-break-2/`](../jiminy-ceiling-break-2/README.md). Sprint history preserved below for context; do NOT act on the "not urgent" / "by design" conclusions in the body — those conclusions are wrong per the current architectural directive.
+
+---
+
 # JIMINY-FOLLOW-RATE-REMEASURE-001 — Sprint Plan
 
 ## 1. Header & Metadata
