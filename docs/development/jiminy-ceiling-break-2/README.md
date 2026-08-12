@@ -106,6 +106,62 @@ To be done as part of Phase 2 kickoff:
 - **Phase 1: SHIPPED** — JIMINY-CORPUS-003 tombstoned 31 nodes + verified strict-mode default. Passive re-check 2026-08-18.
 - Phase 2-5: queued, this arc doc owns the plan.
 
+## Baseline snapshot (2026-08-12 18:17 UTC — arc Phases 1-4a + arc-adjacents SHIPPED)
+
+Captured immediately after the framing hygiene sweep landed (all shipped Phase-1-through-4a work is live on mdemg-dev). This snapshot is the AUTHORITATIVE "before" for the 2026-08-19 passive re-check window rollover.
+
+### Corpus (live, non-archived)
+
+| role_type | actionable | informational | total |
+|---|---:|---:|---:|
+| constraint | 26 | 7 | 33 |
+| correction | 2 | 1 | 3 |
+| **total** | **28** | **8** | **36** |
+
+Pre-arc (before JIMINY-CORPUS-003 + JIMINY-CORRECTION-CORPUS-001): 64 constraints + 39 corrections = 103 nodes. Post-arc: **36 nodes → 65% cut**. Of the surviving 36, 8 (22%) are marked informational and correctly excluded from actionable follow-rate accounting via the JIMINY-INFORMATIONAL-CATEGORY-001 override path.
+
+### Follow-rate signal (7d window, `constraint_outcomes`, filtered to `guidance_type IN ('constraint','correction')`)
+
+| Metric | Value |
+|---|---:|
+| Actionable outcomes (7d) | 1412 |
+| Followed | 166 |
+| Partial compliance | 41 |
+| Ignored | 1199 |
+| Contradicted | 2 |
+| Not applicable | 0 (already filtered at writer gate) |
+| **Actionable follow rate** | **13.25%** |
+| `mdemg_jiminy_follow_rate` gauge | 14.00% |
+| Total (all guidance types, 7d) | 2358 |
+
+### What the 2026-08-19 re-check will measure
+
+The 168h rolling window will have fully rolled off pre-arc outcomes (JIMINY-CORPUS-003 tombstones from 2026-08-11 ~20:00 UTC; JIMINY-CORRECTION-CORPUS-001 tombstones from 2026-08-12 ~14:00 UTC). Attribution of the delta:
+
+- **Corpus purges** (JIMINY-CORPUS-003 + JIMINY-CORRECTION-CORPUS-001): projected +8-15pp (tombstoned codes stop generating ignored outcomes as historical rows age out)
+- **Scope-gate** (LEVER-C-TIGHTEN-002): projected +5-10pp (constraints stop surfacing on unrelated-context queries; ignored count drops proportionally)
+- **Mechanism-scope classifier gate** (JIMINY-CLASSIFIER-CONTEXT-002): projected +5-10pp (LLM verdicts route more items to `not_applicable`, shrinking actionable denominator)
+- **Informational category** (JIMINY-INFORMATIONAL-CATEGORY-001): projected +0.6pp (7 meta-rule outcomes routed to NA; small because meta rules are low-volume)
+- **Correction dedup** (CREATE-CORRECTION-DEDUP-001): 0pp direct — prevents re-accumulation of the 24-DUP class; measurable via `SkippedDup` counter, not follow rate
+- **Composite projected**: **13.25% → 22-35% by 2026-08-19**
+
+If actual delta is <50% of projected on any lever, arc pauses per the JIMINY-CEILING-BREAK-2 measurement-discipline rule and re-diagnoses. If actual matches or exceeds, Phase 4b (classifier retrain, gated on corpus growth via keyboard-driven HITL Velocity UI) becomes the next fire.
+
+### Composite arc shipped 2026-08-11 → 2026-08-12 (13 sprints in ~14 hours)
+
+| # | Sprint | Commit | Nature |
+|---|---|---|---|
+| 1 | JIMINY-CORPUS-003 | `ebef90a2` | 31 constraints tombstoned |
+| 2 | LEVER-C-TIGHTEN-002 | `ee10d28a` | scope-gate at surfacing |
+| 3 | JIMINY-CLASSIFIER-CONTEXT-002 | `c3ba063a` | mechanism-scope gate at classify |
+| 4a | JIMINY-HITL-VELOCITY-001 | `1ae6e358` | keyboard-driven bulk review |
+| adj | JIMINY-INFORMATIONAL-CATEGORY-001 | `dab5628a` | is_informational property |
+| adj | JIMINY-CORRECTION-CORPUS-001 | `6fda2ec3` | 35 corrections tombstoned |
+| adj | CREATE-CORRECTION-DEDUP-001 | `f796fd27` | promoter dedup |
+| adj | FRAMING-HYGIENE-SWEEP-001 | `9b494f0f` | trajectory language everywhere |
+
+Total: 8 shipped sprints (12 including the security + beta + investigation + queue + measurement sprints from earlier session-day).
+
 ## Documents Accessed
 
 - Operator directive 2026-08-11 (both mid-turn messages: "complete failure" + ">80% target")
