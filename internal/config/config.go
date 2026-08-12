@@ -346,6 +346,21 @@ type Config struct {
 	// GUIDANCE_OUTCOME edge sink went dormant; embedding match links them. Keyword
 	// matching remains the fallback. (default: 0.55)
 	JiminyConstraintCodeSimThreshold float64 // JIMINY_CONSTRAINT_CODE_SIM_THRESHOLD
+
+	// JIMINY_CORRECTION_DEDUP_ENABLED — CREATE-CORRECTION-DEDUP-001 (2026-08-12):
+	// at correction-promotion time (CreateCorrectionNodes), skip creating a new
+	// role_type='correction' node when a similar-content live constraint OR
+	// correction already exists (cosine sim above threshold). Prevents the
+	// 24-DUP class purged by JIMINY-CORRECTION-CORPUS-001 from re-accumulating.
+	// Default true; safe (only skips promotions when a specific high-similarity
+	// live node exists — never blocks a truly-novel correction).
+	JiminyCorrectionDedupEnabled       bool
+	// JIMINY_CORRECTION_DEDUP_SIM_THRESHOLD — cosine similarity threshold above
+	// which a candidate correction is treated as a DUPLICATE of an existing
+	// live constraint/correction and skipped. Default 0.75 (conservative:
+	// "same rule" not "topically related"; the constraint-code-match threshold
+	// 0.55 is looser). 0 or negative disables the check regardless of enabled flag.
+	JiminyCorrectionDedupSimThreshold  float64
 	// DORMANT-CENSUS-001 — blend weight for the Hebbian signal strength
 	// (ape.SignalLearner.GetStrength, V0024-persisted) in the Guide() sort:
 	// within equal priority, items order by (1-w)·confidence + w·strength.
@@ -2882,6 +2897,11 @@ func FromEnv() (Config, error) {
 		return Config{}, err
 	}
 	jiminyConstraintCodeSimThreshold, err := atof("JIMINY_CONSTRAINT_CODE_SIM_THRESHOLD", DefaultJiminyConstraintCodeSimThreshold)
+	if err != nil {
+		return Config{}, err
+	}
+	jiminyCorrectionDedupEnabled := getBool("JIMINY_CORRECTION_DEDUP_ENABLED", true)
+	jiminyCorrectionDedupSimThreshold, err := atof("JIMINY_CORRECTION_DEDUP_SIM_THRESHOLD", 0.75)
 	if err != nil {
 		return Config{}, err
 	}
@@ -5979,6 +5999,8 @@ func FromEnv() (Config, error) {
 		JiminyMinConfidence:                       jiminyMinConfidence,
 		JiminySignalStrengthWeight:                jiminySignalStrengthWeight,
 		JiminyConstraintCodeSimThreshold:          jiminyConstraintCodeSimThreshold,
+		JiminyCorrectionDedupEnabled:              jiminyCorrectionDedupEnabled,
+		JiminyCorrectionDedupSimThreshold:         jiminyCorrectionDedupSimThreshold,
 		JiminyIncludeFrontiers:                    jiminyIncludeFrontiers,
 		JiminyFrontierMinSim:                      jiminyFrontierMinSim,
 		JiminyEffectivenessTTLSec:                 jiminyEffectivenessTTLSec,

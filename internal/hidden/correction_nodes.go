@@ -30,10 +30,11 @@ import (
 
 // CorrectionNodeResult tracks what happened during correction node creation.
 type CorrectionNodeResult struct {
-	Created  int `json:"created"`
-	Updated  int `json:"updated"`
-	Linked   int `json:"linked"`
-	Rejected int `json:"rejected"` // JIMINY-CORRECTION-PRODUCER-001: observations blocked by the promotion gate
+	Created     int `json:"created"`
+	Updated     int `json:"updated"`
+	Linked      int `json:"linked"`
+	Rejected    int `json:"rejected"`    // JIMINY-CORRECTION-PRODUCER-001: observations blocked by the promotion gate
+	SkippedDup  int `json:"skipped_dup"` // CREATE-CORRECTION-DEDUP-001 (2026-08-12): promotions skipped because a similar-content live constraint/correction already exists
 }
 
 // CreateCorrectionNodes promotes L0 obs_type='correction' observations to
@@ -204,6 +205,52 @@ func (s *Service) CreateCorrectionNodes(ctx context.Context, spaceID string) (*C
 				}
 				res.Updated++
 			} else {
+				// CREATE-CORRECTION-DEDUP-001 (2026-08-12): before minting a new
+				// correction node, check whether a similar-content live constraint
+				// OR correction already exists. If yes, skip promotion — prevents
+				// the 24-DUP class purged by JIMINY-CORRECTION-CORPUS-001 from
+				// re-accumulating. Requires embedding on the obs; falls through
+				// to normal create when embedding is empty (safe: name-based
+				// idempotency above already caught the identity-dup case).
+				if s.cfg.JiminyCorrectionDedupEnabled && s.cfg.JiminyCorrectionDedupSimThreshold > 0 && len(obs.embedding) > 0 {
+					dedupCypher := `
+						CALL db.index.vector.queryNodes('memNodeEmbedding', 5, $embedding)
+						YIELD node AS n, score AS sim
+						WHERE n.space_id = $spaceId
+						  AND n.role_type IN ['constraint','correction']
+						  AND NOT coalesce(n.is_archived, false)
+						  AND sim >= $threshold
+						RETURN n.node_id AS nid, n.constraint_code AS code, n.role_type AS role, sim
+						ORDER BY sim DESC LIMIT 1
+					`
+					dedupRes, err := tx.Run(ctx, dedupCypher, map[string]any{
+						"spaceId":   spaceID,
+						"embedding": obs.embedding,
+						"threshold": s.cfg.JiminyCorrectionDedupSimThreshold,
+					})
+					if err != nil {
+						// Non-fatal: log + fall through to normal create. Better to
+						// mint a possible dup than fail the whole consolidation.
+						slog.Warn("correction dedup query failed; proceeding with create", "error", err, "obs_id", obs.nodeID)
+					} else if dedupRes.Next(ctx) {
+						rec := dedupRes.Record()
+						nid, _ := rec.Get("nid")
+						code, _ := rec.Get("code")
+						role, _ := rec.Get("role")
+						sim, _ := rec.Get("sim")
+						slog.Info("correction promotion skipped: duplicate of existing live node",
+							"obs_id", obs.nodeID,
+							"obs_name", cName,
+							"dup_node_id", fmt.Sprintf("%v", nid),
+							"dup_code", fmt.Sprintf("%v", code),
+							"dup_role", fmt.Sprintf("%v", role),
+							"similarity", fmt.Sprintf("%v", sim),
+							"threshold", s.cfg.JiminyCorrectionDedupSimThreshold,
+						)
+						res.SkippedDup++
+						continue // to next obs in the outer loop
+					}
+				}
 				correctionNodeID = cuid2.Generate()
 				now := time.Now().UTC().Format(time.RFC3339)
 

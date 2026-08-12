@@ -21,6 +21,7 @@ func newJiminyCmd() *cobra.Command {
 	}
 	cmd.AddCommand(newJiminyModeCmd())
 	cmd.AddCommand(newJiminyOverrideCmd())
+	cmd.AddCommand(newJiminyConstraintCmd()) // JIMINY-INFORMATIONAL-CATEGORY-001
 	return cmd
 }
 
