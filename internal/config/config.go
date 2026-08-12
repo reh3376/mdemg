@@ -339,6 +339,7 @@ type Config struct {
 	JiminyGuidanceConstraintBiasEnabled bool    // JIMINY_GUIDANCE_CONSTRAINT_BIAS_ENABLED — Lever C: fetch top-K constraint/correction nodes by embedding similarity and merge into the guidance pool (default: false). Addresses the Epic-4 finding that retrieval surfaces no actionable candidates for most contexts.
 	JiminyGuidanceConstraintIncludeTopK int     // JIMINY_GUIDANCE_CONSTRAINT_INCLUDE_TOPK — how many actionable nodes to merge (default: 4 — LEVER-C-TIGHTEN-001 tightened 5→4; TSDB 7d actionable fraction 0.342 vs 0.30 quota → 5 over-supplied slightly; 4 gives ~2.7 survivors after 32% attrition, quota-safe via cooldown fallback)
 	JiminyGuidanceConstraintSimFloor    float64 // JIMINY_GUIDANCE_CONSTRAINT_SIM_FLOOR — cosine (vector-index) similarity floor for a merged actionable node — STABLE [0,1] scale, NOT the RRF score (RRF-SCALE-001-safe). 0 disables the floor. (default: 0.45 — LEVER-C-TIGHTEN-001 tightened 0.30→0.45; TSDB 7d: 0/257 followed below downstream-sim 0.40, all 78 followed events ≥0.50 (77 ≥0.60); 0.45 conservative "kill the tail, keep the head" cutoff)
+	JiminyScopeGateEnabled              bool    // JIMINY_SCOPE_GATE_ENABLED — LEVER-C-TIGHTEN-002 (JIMINY-CEILING-BREAK-2 Phase 2, 2026-08-12): suppress a surfaced constraint iff its derived action-scope families (git/file_mutation/bash/schema/identifier/testing/process_docs/llm_config/cms) do not intersect the request-side scope. Addresses ceiling-data showing similarity is not a discriminator for follow-vs-ignore (both cluster at 0.8-0.9 sim); the discriminator is action-context match. Safe-defaults: items with no derived scope surface anywhere; requests with no derived scope receive all items. Default false in code; enable in .env after live smoke.
 	// JIMINY-OUTCOME-001 — minimum vector-index cosine similarity for an embedding-based
 	// constraint-code match. Concept-abstracted guidance rarely shares 3+ literal words
 	// with raw constraint text, so keyword matching missed everything and the Neo4j
@@ -2874,6 +2875,7 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	jiminyScopeGateEnabled := getBool("JIMINY_SCOPE_GATE_ENABLED", false)
 	jiminyMinConfidence, err := atof("JIMINY_MIN_CONFIDENCE", 0.3)
 	if err != nil {
 		return Config{}, err
@@ -5971,6 +5973,7 @@ func FromEnv() (Config, error) {
 		JiminyGuidanceConstraintBiasEnabled:       getBool("JIMINY_GUIDANCE_CONSTRAINT_BIAS_ENABLED", false),
 		JiminyGuidanceConstraintIncludeTopK:       jiminyGuidanceConstraintIncludeTopK,
 		JiminyGuidanceConstraintSimFloor:          jiminyGuidanceConstraintSimFloor,
+		JiminyScopeGateEnabled:                    jiminyScopeGateEnabled,
 		JiminyMinConfidence:                       jiminyMinConfidence,
 		JiminySignalStrengthWeight:                jiminySignalStrengthWeight,
 		JiminyConstraintCodeSimThreshold:          jiminyConstraintCodeSimThreshold,

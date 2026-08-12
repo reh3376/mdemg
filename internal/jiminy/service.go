@@ -1229,6 +1229,21 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 		}
 	}
 
+	// LEVER-C-TIGHTEN-002 (JIMINY-CEILING-BREAK-2 Phase 2, 2026-08-12):
+	// scope-gate filter — suppress surfaced items whose derived action-scope
+	// families don't intersect the request-side scope. Addresses the ceiling
+	// data showing similarity is NOT a discriminator for follow-vs-ignore
+	// (both cluster at 0.8-0.9 sim); the discriminator is action-context
+	// match. Safe defaults: items with no derived scope surface anywhere;
+	// requests with no derived scope receive all items.
+	if s.cfg.JiminyScopeGateEnabled {
+		kept, drops := applyScopeGate(items, req, true)
+		items = kept
+		if drops > 0 {
+			debug["scope_gate_drops"] = drops
+		}
+	}
+
 	// Normalize structured metadata to natural language for embedding similarity.
 	// Ingested summaries use a keyword-list format ("Module: X. Related to: a, b")
 	// that embeds into a different semantic region than action descriptions, producing
