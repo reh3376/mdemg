@@ -205,7 +205,7 @@ func getHandlerTemplate(mt ModuleType) string {
 
 // GenerateManifest creates a manifest.json content for the plugin
 func GenerateManifest(cfg Config) ([]byte, error) {
-	manifest := map[string]interface{}{
+	manifest := map[string]any{
 		"id":      cfg.ModuleID,
 		"name":    cfg.Name,
 		"version": cfg.Version,
@@ -215,16 +215,16 @@ func GenerateManifest(cfg Config) ([]byte, error) {
 
 	switch cfg.Type {
 	case ModuleTypeIngestion:
-		manifest["capabilities"] = map[string]interface{}{
+		manifest["capabilities"] = map[string]any{
 			"ingestion_sources": []string{cfg.ModuleID + "://"},
 			"content_types":     []string{"application/x-" + cfg.ModuleID},
 		}
 	case ModuleTypeReasoning:
-		manifest["capabilities"] = map[string]interface{}{
+		manifest["capabilities"] = map[string]any{
 			"pattern_detectors": []string{"custom_ranking"},
 		}
 	case ModuleTypeAPE:
-		manifest["capabilities"] = map[string]interface{}{
+		manifest["capabilities"] = map[string]any{
 			"event_triggers": []string{"session_end"},
 		}
 	}
