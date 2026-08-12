@@ -126,8 +126,22 @@ function showStatus(type, message) {
     area.prepend(el);
 }
 
+// SEC-TRANCHE-3: exportId is a server-minted CUIDv2 (lower-case
+// alphanumeric, ~24 chars). Defend against a compromised server response
+// by refusing anything that doesn't match the expected shape before it
+// reaches `window.location`, DOM IDs, or fetch URLs.
+const EXPORT_ID_RE = /^[a-z0-9]{20,32}$/;
+
+function isValidExportId(id) {
+    return typeof id === 'string' && EXPORT_ID_RE.test(id);
+}
+
 function startStatusPolling(exportId) {
     stopPolling();
+    if (!isValidExportId(exportId)) {
+        showStatus('error', 'Invalid export ID (rejected client-side)');
+        return;
+    }
 
     const poll = async () => {
         try {
@@ -164,6 +178,13 @@ function startStatusPolling(exportId) {
                 items.push(infoRow('Privacy', `${data.result.privacy || 0} violations`));
 
                 const dlBtn = btn('Download', () => {
+                    // SEC-TRANCHE-3: re-validate exportId immediately before
+                    // navigation — defence in depth vs a compromised server
+                    // response mutating the polling closure.
+                    if (!isValidExportId(exportId)) {
+                        showStatus('error', 'Invalid export ID (download refused)');
+                        return;
+                    }
                     window.location = api.trainingDataDownloadURL(exportId);
                 });
                 items.push(h('div', { className: 'mt-sm' }, dlBtn));

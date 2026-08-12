@@ -63,6 +63,13 @@ func (s *Service) Rerank(ctx context.Context, req RerankRequest) (*RerankResult,
 	if returnK <= 0 {
 		returnK = len(req.Candidates)
 	}
+	// SEC-TRANCHE-3: defensive cap on the allocation driven by returnK.
+	// `req.ReturnK` and `len(req.Candidates)` are both effectively
+	// operator-tunable; hard cap so a request cannot force a huge
+	// preallocation on `results`/`rerankScores` below.
+	if returnK > 10000 {
+		returnK = 10000
+	}
 
 	// LLM-HEALTH-INVESTIGATION-001 E2 + NEURAL-RERANK-PRECHECK-001: pre-check
 	// the CALLER'S deadline before dispatching. If remaining < min budget the

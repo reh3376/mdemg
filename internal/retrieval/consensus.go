@@ -254,6 +254,13 @@ func Aggregate(ctx context.Context, cols []Column, q ColumnQuery, opts Consensus
 	if limit > len(all) {
 		limit = len(all)
 	}
+	// SEC-TRANCHE-3: defensive cap on allocation size — even though
+	// `limit` is bounded by `len(all)` (candidate pool size, itself
+	// bounded by upstream retrieval config), a future refactor that
+	// widened this ceiling would blow up memory. Hard cap at 10000.
+	if limit > 10000 {
+		limit = 10000
+	}
 	ranked := make([]Candidate, 0, limit)
 	var consensusSum float64
 	for _, s := range all[:limit] {

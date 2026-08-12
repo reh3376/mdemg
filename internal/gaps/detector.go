@@ -491,19 +491,24 @@ func extractDataSourceReferences(text string) []string {
 		pattern string
 		name    string
 	}{
-		{`slack://\S+`, "slack"},
-		{`jira://\S+`, "jira"},
-		{`confluence://\S+`, "confluence"},
-		{`github\.com/\S+`, "github"},
-		{`gitlab\.com/\S+`, "gitlab"},
-		{`notion\.so/\S+`, "notion"},
-		{`linear\.app/\S+`, "linear"},
-		{`asana\.com/\S+`, "asana"},
-		{`trello\.com/\S+`, "trello"},
-		{`docs\.google\.com/\S+`, "google_docs"},
-		{`drive\.google\.com/\S+`, "google_drive"},
-		{`dropbox\.com/\S+`, "dropbox"},
-		{`figma\.com/\S+`, "figma"},
+		// SEC-TRANCHE-3: anchor each host pattern with a leading word
+		// boundary so `evilgithub.com/…` (arbitrary hosts before the target)
+		// does not match the `github` integration name. Trailing `\S+`
+		// stays greedy — we only want to force the LEFT side of the URL
+		// authority to be a real boundary.
+		{`\bslack://\S+`, "slack"},
+		{`\bjira://\S+`, "jira"},
+		{`\bconfluence://\S+`, "confluence"},
+		{`\bgithub\.com/\S+`, "github"},
+		{`\bgitlab\.com/\S+`, "gitlab"},
+		{`\bnotion\.so/\S+`, "notion"},
+		{`\blinear\.app/\S+`, "linear"},
+		{`\basana\.com/\S+`, "asana"},
+		{`\btrello\.com/\S+`, "trello"},
+		{`\bdocs\.google\.com/\S+`, "google_docs"},
+		{`\bdrive\.google\.com/\S+`, "google_drive"},
+		{`\bdropbox\.com/\S+`, "dropbox"},
+		{`\bfigma\.com/\S+`, "figma"},
 	}
 
 	for _, p := range patterns {

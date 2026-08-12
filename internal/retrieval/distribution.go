@@ -367,6 +367,12 @@ func (m *DistributionMonitor) GetHistory(spaceID string, limit int) []ScoreDistr
 	if limit <= 0 || limit > len(history) {
 		limit = len(history)
 	}
+	// SEC-TRANCHE-3: defensive cap. `limit` is bounded by `len(history)`
+	// but `history` grows unbounded across a long-running server; cap so
+	// a caller passing `limit=MaxInt` cannot force a huge allocation.
+	if limit > 10000 {
+		limit = 10000
+	}
 
 	// Return most recent
 	result := make([]ScoreDistribution, limit)

@@ -194,6 +194,12 @@ func SetDefaultFailureThreshold(n int) {
 	if n <= 0 {
 		n = 3
 	}
+	// SEC-TRANCHE-3: cap before int32 conversion. Env-var derived
+	// (LLM_CONSECUTIVE_FAILURE_THRESHOLD); a huge value would truncate.
+	// 1_000_000 is far above any realistic alert threshold.
+	if n > 1_000_000 {
+		n = 1_000_000
+	}
 	defaultFailureThreshold = int32(n)
 }
 

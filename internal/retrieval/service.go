@@ -1368,7 +1368,14 @@ ORDER BY score DESC`
 		if err != nil {
 			return nil, err
 		}
-		cands := make([]Candidate, 0, k)
+		// SEC-TRANCHE-3: defensive cap on preallocation. `k` comes from
+		// the caller (retrieval top-K, typically ≤200); cap in case a
+		// downstream caller passes an oversized value.
+		allocK := k
+		if allocK > 10000 {
+			allocK = 10000
+		}
+		cands := make([]Candidate, 0, allocK)
 		for res.Next(ctx) {
 			rec := res.Record()
 			nid, _ := rec.Get("node_id")
