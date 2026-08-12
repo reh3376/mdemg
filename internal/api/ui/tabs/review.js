@@ -15,12 +15,136 @@ let suggestedEl = null;
 let reinforceDefault = false;
 let sessionGraded = 0;
 
+// JIMINY-HITL-VELOCITY-001 (2026-08-12): keyboard-driven fast mode.
+let keyHandlerBound = false;
+let currentDimensionInputs = null; // set by renderItem; used by keyboard handler to pre-fill all dims
+let autoAdvanceTimer = null;
+
 function spaceId() { return state.get('selectedSpace') || 'mdemg-dev'; }
 
 export function render(el) {
     container = el;
     clear(container, sectionHeader('Human-in-the-Loop Review'), h('p', { className: 'muted' }, 'Loading datasets…'));
+    bindKeyboardHandler();
     loadDatasets();
+}
+
+// JIMINY-HITL-VELOCITY-001: keyboard-driven bulk review. Idempotent — safe
+// to call on every tab render.
+function bindKeyboardHandler() {
+    if (keyHandlerBound) return;
+    document.addEventListener('keydown', handleReviewKey);
+    keyHandlerBound = true;
+}
+
+function isReviewTabActive() {
+    // Only fire when the review container is in the DOM AND visible.
+    if (!container || !container.isConnected) return false;
+    // If a text field / textarea has focus, defer to normal typing behavior.
+    const ae = document.activeElement;
+    if (ae && (ae.tagName === 'INPUT' && ae.type !== 'radio' && ae.type !== 'checkbox' || ae.tagName === 'TEXTAREA')) {
+        return false;
+    }
+    return true;
+}
+
+function setAllDimensions(value) {
+    if (!currentDimensionInputs || !currentRubric) return false;
+    let count = 0;
+    for (const dim of (currentRubric.dimensions || [])) {
+        const radios = container.querySelectorAll(`input[type="radio"][name="${dim.key}"]`);
+        for (const r of radios) {
+            if (r.value === String(value)) {
+                r.checked = true;
+                currentDimensionInputs[dim.key] = value;
+                count++;
+                break;
+            }
+        }
+    }
+    return count > 0;
+}
+
+function clickIfPresent(id) {
+    const el = document.getElementById(id);
+    if (!el) return false;
+    el.click();
+    return true;
+}
+
+function toggleHelpOverlay() {
+    const existing = document.getElementById('review-help-overlay');
+    if (existing) { existing.remove(); return; }
+    const overlay = h('div', {
+        id: 'review-help-overlay',
+        style: {
+            position: 'fixed', top: '20%', left: '50%', transform: 'translateX(-50%)',
+            background: '#1a1a1a', border: '1px solid #4a90e2', padding: '20px', borderRadius: '6px',
+            zIndex: '9999', fontSize: '13px', lineHeight: '1.6', color: '#e0e0e0',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.5)', maxWidth: '480px',
+        },
+    },
+        h('h4', { style: { margin: '0 0 12px', color: '#4a90e2' } }, 'Keyboard shortcuts (Review tab)'),
+        h('div', {},
+            h('kbd', {}, '0'), '..', h('kbd', {}, '4'), ' — set every rubric dimension to that value', h('br'),
+            h('kbd', {}, 'Space'), ' / ', h('kbd', {}, 'Enter'), ' — submit the current grade', h('br'),
+            h('kbd', {}, 'n'), ' — load next item (works post-submit)', h('br'),
+            h('kbd', {}, 'u'), ' — reverse (undo) the last grade (works post-submit, before auto-advance)', h('br'),
+            h('kbd', {}, '?'), ' — toggle this help', h('br'),
+            h('kbd', {}, 'Esc'), ' — close this help / cancel auto-advance'),
+        h('div', { style: { marginTop: '12px', fontSize: '11px', color: '#888' } },
+            'Fast-mode tip: read the item → press a number key → space → auto-advance. Grade differ per-dimension by clicking a radio before pressing space. Text fields (suggested-guidance box) do not intercept shortcuts.'));
+    document.body.append(overlay);
+}
+
+function cancelAutoAdvance() {
+    if (autoAdvanceTimer) { clearTimeout(autoAdvanceTimer); autoAdvanceTimer = null; }
+}
+
+function handleReviewKey(e) {
+    if (!isReviewTabActive()) return;
+    // '?' toggles help regardless of shift key state.
+    if (e.key === '?' || (e.key === '/' && e.shiftKey)) {
+        e.preventDefault(); toggleHelpOverlay(); return;
+    }
+    if (e.key === 'Escape') {
+        const overlay = document.getElementById('review-help-overlay');
+        if (overlay) { overlay.remove(); e.preventDefault(); return; }
+        if (autoAdvanceTimer) { cancelAutoAdvance(); e.preventDefault(); return; }
+    }
+    // Number keys 0-4 set all dimensions to that value.
+    if (e.key >= '0' && e.key <= '4' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        if (setAllDimensions(parseInt(e.key, 10))) { e.preventDefault(); return; }
+    }
+    // Space / Enter submits.
+    if ((e.key === ' ' || e.key === 'Enter') && !e.ctrlKey && !e.metaKey) {
+        // Only if we have an active item (not on post-submit state).
+        if (currentDimensionInputs) {
+            e.preventDefault();
+            const btns = container.querySelectorAll('button');
+            for (const b of btns) {
+                if (b.textContent === 'Submit grade') { b.click(); return; }
+            }
+        }
+    }
+    // 'n' loads next item.
+    if (e.key === 'n' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        cancelAutoAdvance();
+        const btns = container.querySelectorAll('button');
+        for (const b of btns) {
+            if (b.textContent && b.textContent.startsWith('Next item')) { e.preventDefault(); b.click(); return; }
+        }
+        // Fallback: if no next-button visible, load directly.
+        if (currentDataset) { e.preventDefault(); loadNext(); }
+    }
+    // 'u' reverses last grade.
+    if (e.key === 'u' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        cancelAutoAdvance();
+        const btns = container.querySelectorAll('button');
+        for (const b of btns) {
+            if (b.textContent === 'Reverse last grade') { e.preventDefault(); b.click(); return; }
+        }
+    }
 }
 
 async function loadDatasets() {
@@ -88,6 +212,7 @@ async function loadNext() {
 }
 
 function renderItem() {
+    cancelAutoAdvance();
     const work = document.getElementById('review-work');
     work.innerHTML = '';
     const it = currentItem;
@@ -97,6 +222,10 @@ function renderItem() {
     const metaRow = (k, v) => h('div', {},
         h('span', { style: { color: '#888', display: 'inline-block', minWidth: '140px' } }, k), h('span', {}, v || '—'));
     const remaining = (datasets.find(d => d.id === currentDataset) || {}).candidate_count;
+    // JIMINY-HITL-VELOCITY-001: prominent session counter (velocity feedback)
+    work.append(h('div', {
+        style: { padding: '6px 10px', margin: '0 0 8px', background: '#1a2c1a', border: '1px solid #4a8', borderRadius: '4px', color: '#8fc', fontFamily: 'monospace', fontSize: '13px' },
+    }, `Session graded: ${sessionGraded}   ·   Shortcuts: 0-4 grade · space submit · n next · u undo · ? help`));
     work.append(h('div', { className: 'card', id: 'review-item' },
         h('div', { className: 'muted', id: 'review-progress' },
             `item ${it.item_id} · recorded ${m.recorded_at || '?'} · ${sessionGraded} graded this session` +
@@ -119,6 +248,7 @@ function renderItem() {
 
     const form = h('div', { className: 'card', id: 'review-form' });
     const inputs = {};
+    currentDimensionInputs = inputs; // JIMINY-HITL-VELOCITY-001: expose to keyboard handler
     for (const dim of (currentRubric && currentRubric.dimensions) || []) {
         const radios = h('div', {});
         for (let lvl = 0; lvl <= 4; lvl++) {
@@ -161,8 +291,12 @@ function renderItem() {
                 const r = (await api.reviewGrade(gradeBody(inputs, false, reinforce.checked))).data;
                 lastGradeId = r.grade_id;
                 sessionGraded += 1;
-                status.textContent = `✓ graded ${r.grade_id} · gold ${r.gold_score} · reinforced ${r.reinforcement_applied}`;
+                status.textContent = `✓ graded ${r.grade_id} · gold ${r.gold_score} · reinforced ${r.reinforcement_applied}   (auto-advance in 400ms — press u to reverse, n to advance now, esc to cancel)`;
+                currentDimensionInputs = null; // gate keyboard 'space' until next item loads
                 renderAfter();
+                // JIMINY-HITL-VELOCITY-001: auto-advance for keyboard-only bulk flow
+                cancelAutoAdvance();
+                autoAdvanceTimer = setTimeout(() => { autoAdvanceTimer = null; loadNext(); }, 400);
             } catch (e) { status.textContent = 'error: ' + e.message; }
         }, 'primary'),
         status));
