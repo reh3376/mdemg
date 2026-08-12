@@ -3,7 +3,6 @@ package backup
 import (
 	"context"
 	"fmt"
-	"path/filepath"
 	"time"
 
 	pb "mdemg/api/transferpb"
@@ -46,8 +45,15 @@ func (s *Service) runPartialBackup(ctx context.Context, job *jobs.Job, record *B
 		allResult.Chunks = append(allResult.Chunks, result.Chunks...)
 	}
 
-	// Write combined .mdemg file.
-	outPath := filepath.Join(s.cfg.StorageDir, record.BackupID+".mdemg")
+	// Write combined .mdemg file. SEC-TRANCHE-2: server-generated
+	// BackupID from Trigger() (`bk-<ts>-<type>`) is safe by
+	// construction, but route through safeBackupPath uniformly (same
+	// rationale as writeManifest — defense against a future refactor
+	// widening the input surface + closes CodeQL flow).
+	outPath, err := s.safeBackupPath(record.BackupID + ".mdemg")
+	if err != nil {
+		return fmt.Errorf("invalid backup id: %w", err)
+	}
 	if err := transfer.WriteFile(outPath, &allResult); err != nil {
 		return fmt.Errorf("write mdemg file: %w", err)
 	}

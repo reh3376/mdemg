@@ -17,6 +17,7 @@ import (
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"mdemg/internal/jobs"
+	"mdemg/internal/pathsafe"
 	"mdemg/internal/transfer"
 )
 
@@ -137,8 +138,17 @@ func (s *Service) ListBackups(backupType string, limit int) ([]BackupManifest, e
 
 // DeleteBackup removes a backup artifact and its manifest from disk.
 func (s *Service) DeleteBackup(backupID string) error {
-	// Find and remove the manifest.
-	manifestPath := filepath.Join(s.cfg.StorageDir, backupID+".manifest.json")
+	// SEC-TRANCHE-2 (2026-08-11): backupID reaches here from
+	// DELETE /v1/backup/{id} via handleBackupByID with no upstream
+	// validation. A malicious id like "../../etc/hosts" would let
+	// os.Remove unlink arbitrary files matching the .manifest.json /
+	// .dump / .mdemg suffixes. Route every filepath.Join through
+	// pathsafe.SafeJoinUnderDir so CodeQL sees a recognized sanitizer
+	// AND the class is closed at the trust boundary.
+	manifestPath, err := s.safeBackupPath(backupID + ".manifest.json")
+	if err != nil {
+		return fmt.Errorf("invalid backup id: %w", err)
+	}
 	if _, err := os.Stat(manifestPath); os.IsNotExist(err) {
 		return fmt.Errorf("backup %q not found", backupID)
 	}
@@ -157,7 +167,12 @@ func (s *Service) DeleteBackup(backupID string) error {
 	// Delete data file(s).
 	dataExts := []string{".dump", ".mdemg"}
 	for _, ext := range dataExts {
-		p := filepath.Join(s.cfg.StorageDir, backupID+ext)
+		p, sErr := s.safeBackupPath(backupID + ext)
+		if sErr != nil {
+			// safeBackupPath rejected on this ext — impossible given
+			// backupID was already accepted above, but stay defensive.
+			continue
+		}
 		_ = os.Remove(p)
 	}
 
@@ -165,9 +180,27 @@ func (s *Service) DeleteBackup(backupID string) error {
 	return os.Remove(manifestPath)
 }
 
+// safeBackupPath joins a backup-artifact filename under s.cfg.StorageDir
+// with SEC-TRANCHE-2 pathsafe.SafeJoinUnderDir containment. Every
+// filepath.Join(s.cfg.StorageDir, ...) sink in this file that consumes
+// an untrusted-derived name (backupID from HTTP path) MUST route through
+// this helper. Server-constructed IDs (e.g. `bk-<ts>-<type>`) route
+// through it too for uniformity (guards against a future refactor that
+// widens the input surface).
+func (s *Service) safeBackupPath(name string) (string, error) {
+	return pathsafe.SafeJoinUnderDir(s.cfg.StorageDir, name)
+}
+
 // writeManifest writes a manifest sidecar JSON file for a backup.
 func (s *Service) writeManifest(record *BackupRecord, manifest BackupManifest) error {
-	path := filepath.Join(s.cfg.StorageDir, record.BackupID+".manifest.json")
+	// SEC-TRANCHE-2: record.BackupID is server-generated in Trigger()
+	// as `bk-<timestamp>-<type>` so it's safe by construction, but
+	// route through safeBackupPath uniformly (belt-and-suspenders +
+	// closes CodeQL flow).
+	path, err := s.safeBackupPath(record.BackupID + ".manifest.json")
+	if err != nil {
+		return fmt.Errorf("invalid backup id: %w", err)
+	}
 	data, err := json.MarshalIndent(manifest, "", "  ")
 	if err != nil {
 		return fmt.Errorf("marshal manifest: %w", err)
@@ -177,7 +210,13 @@ func (s *Service) writeManifest(record *BackupRecord, manifest BackupManifest) e
 
 // loadManifest reads a manifest from disk.
 func (s *Service) loadManifest(backupID string) (*BackupManifest, error) {
-	path := filepath.Join(s.cfg.StorageDir, backupID+".manifest.json")
+	// SEC-TRANCHE-2: backupID reaches here from HTTP paths
+	// (handleBackupStatus, handleBackupManifest, handleBackupRestore)
+	// with no upstream validation. Sanitize at the sink.
+	path, err := s.safeBackupPath(backupID + ".manifest.json")
+	if err != nil {
+		return nil, fmt.Errorf("invalid backup id: %w", err)
+	}
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read manifest: %w", err)
