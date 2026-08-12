@@ -6,9 +6,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"text/template"
+
+	"mdemg/internal/pathsafe"
 )
 
 // ModuleType represents the type of MDEMG module
@@ -101,7 +102,17 @@ func Generate(cfg Config) (*Result, error) {
 		cfg.Version = "1.0.0"
 	}
 
-	pluginDir := filepath.Join(cfg.OutputDir, cfg.ModuleID)
+	// SEC-TRANCHE-2 (2026-08-11): scaffold is reachable from
+	// HTTP POST /v1/plugins/create (handlePluginCreate). cfg.Name is
+	// user JSON; ToModuleID only lowercases + hyphenates (does NOT
+	// strip `.` or `/`), so a name like "../../etc/passwd" produces
+	// a ModuleID that filepath.Join would resolve outside OutputDir.
+	// Route through pathsafe.SafeJoinUnderDir — same containment
+	// contract as the plugin_handlers.go paths.
+	pluginDir, err := pathsafe.SafeJoinUnderDir(cfg.OutputDir, cfg.ModuleID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid module id %q for output dir %q: %w", cfg.ModuleID, cfg.OutputDir, err)
+	}
 
 	// Create plugin directory
 	if err := os.MkdirAll(pluginDir, 0755); err != nil {
@@ -128,7 +139,14 @@ func Generate(cfg Config) (*Result, error) {
 	}
 
 	for _, f := range files {
-		path := filepath.Join(pluginDir, f.name)
+		// SEC-TRANCHE-2 (2026-08-11): f.name comes from the local
+		// files slice (hardcoded literals), so this is defense-in-
+		// depth against a future refactor introducing dynamic names.
+		// Uniform pattern with the pluginDir join above.
+		path, err := pathsafe.SafeJoinUnderDir(pluginDir, f.name)
+		if err != nil {
+			return nil, fmt.Errorf("invalid scaffold file name %q: %w", f.name, err)
+		}
 		content, err := executeTemplate(f.name, f.template, cfg)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate %s: %w", f.name, err)

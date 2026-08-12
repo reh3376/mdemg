@@ -7,7 +7,6 @@ import (
 	"maps"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"time"
 
 	pb "mdemg/api/transferpb"
@@ -78,9 +77,21 @@ func (s *Service) runRestore(ctx context.Context, job *jobs.Job, req RestoreRequ
 		}
 	}
 
-	// Detect format: try .mdemg first (logical), then .dump (legacy physical).
-	mdemgPath := filepath.Join(s.cfg.StorageDir, req.BackupID+".mdemg")
-	dumpPath := filepath.Join(s.cfg.StorageDir, req.BackupID+".dump")
+	// Detect format: try .mdemg first (logical), then .dump (legacy
+	// physical). SEC-TRANCHE-2 (2026-08-11): req.BackupID reaches here
+	// from POST /v1/backup/restore with no upstream validation; without
+	// safeBackupPath containment, `"../../etc/hosts"` would let the
+	// os.Stat probes surface arbitrary-filesystem existence to the
+	// caller (info-leak) and, if the extension happened to match,
+	// trigger the restore path against attacker-controlled data.
+	mdemgPath, err := s.safeBackupPath(req.BackupID + ".mdemg")
+	if err != nil {
+		return nil, fmt.Errorf("invalid backup id: %w", err)
+	}
+	dumpPath, err := s.safeBackupPath(req.BackupID + ".dump")
+	if err != nil {
+		return nil, fmt.Errorf("invalid backup id: %w", err)
+	}
 
 	if _, err := os.Stat(mdemgPath); err == nil {
 		return s.restoreFromMdemg(ctx, job, mdemgPath, manifest)

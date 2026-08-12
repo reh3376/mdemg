@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 
+	"mdemg/internal/pathsafe"
 	"mdemg/internal/plugins"
 	"mdemg/internal/plugins/scaffold"
 )
@@ -349,8 +350,16 @@ func (s *Server) handlePluginDetail(w http.ResponseWriter, r *http.Request, plug
 		return
 	}
 
-	// Try to find the plugin directory
-	pluginDir := filepath.Join(s.cfg.PluginsDir, pluginID)
+	// SEC-TRANCHE-2 (2026-08-11): route the join through
+	// pathsafe.SafeJoinUnderDir so CodeQL's path-injection detector
+	// sees a recognized sanitizer. validatePluginID above catches
+	// malicious IDs early with a specific error; SafeJoinUnderDir is
+	// the CodeQL-visible containment check.
+	pluginDir, err := pathsafe.SafeJoinUnderDir(s.cfg.PluginsDir, pluginID)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid plugin id: " + err.Error()})
+		return
+	}
 	manifestPath := filepath.Join(pluginDir, "manifest.json")
 
 	if _, err := os.Stat(manifestPath); os.IsNotExist(err) {
@@ -436,8 +445,16 @@ func (s *Server) handlePluginValidate(w http.ResponseWriter, r *http.Request, pl
 		return
 	}
 
-	// Find the plugin directory
-	pluginDir := filepath.Join(s.cfg.PluginsDir, pluginID)
+	// SEC-TRANCHE-2 (2026-08-11): CodeQL-recognized sanitizer via
+	// filepath.Clean + strings.HasPrefix containment check. The regex
+	// validation above is redundant defense-in-depth (validatePluginID
+	// gives a clearer error message for the common empty/bad-charset
+	// cases); SafeJoinUnderDir is what CodeQL's data-flow closes on.
+	pluginDir, err := pathsafe.SafeJoinUnderDir(s.cfg.PluginsDir, pluginID)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid plugin id: " + err.Error()})
+		return
+	}
 	manifestPath := filepath.Join(pluginDir, "manifest.json")
 
 	if _, err := os.Stat(manifestPath); os.IsNotExist(err) {
@@ -461,7 +478,15 @@ func (s *Server) handlePluginValidate(w http.ResponseWriter, r *http.Request, pl
 		resp.Valid = false
 		// Still need to provide proto validation info if manifest failed due to missing binary
 		if manifestValidation.Manifest != nil && manifestValidation.Manifest.Binary != "" {
-			binaryPath := filepath.Join(pluginDir, manifestValidation.Manifest.Binary)
+			// SEC-TRANCHE-2 (2026-08-11): even in the error-message
+			// branch, sanitize through pathsafe. Rendering an unsanitized
+			// attacker-controlled path in an error string is a minor
+			// info-leak (not exec), but the pattern must be uniform so a
+			// future refactor doesn't accidentally exec it.
+			binaryPath, _ := pathsafe.SafeJoinUnderDir(pluginDir, manifestValidation.Manifest.Binary)
+			if binaryPath == "" {
+				binaryPath = "<rejected>"
+			}
 			resp.Proto = &plugins.ProtoValidation{
 				ValidationResult: plugins.ValidationResult{
 					Valid:    false,
@@ -474,8 +499,23 @@ func (s *Server) handlePluginValidate(w http.ResponseWriter, r *http.Request, pl
 		return
 	}
 
-	// Check if binary exists for proto validation
-	binaryPath := filepath.Join(pluginDir, manifestValidation.Manifest.Binary)
+	// SEC-TRANCHE-2 (2026-08-11): manifest.Binary is plugin-author-
+	// provided and could be "../../../usr/bin/rm". Route through
+	// pathsafe.SafeJoinUnderDir with the plugin's OWN dir as base so
+	// the binary MUST resolve inside its containing plugin — same
+	// safety envelope as verifyPluginBinaryInside (kept above for
+	// callers that still reference it) but as one CodeQL-recognized
+	// sanitizer call rather than a join-then-verify pair. Reject
+	// BEFORE the os.Stat so a malicious Binary can't even probe
+	// arbitrary filesystem locations for existence.
+	binaryPath, err := pathsafe.SafeJoinUnderDir(pluginDir, manifestValidation.Manifest.Binary)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{
+			"error": "plugin manifest.binary rejected: " + err.Error(),
+		})
+		return
+	}
+
 	if _, err := os.Stat(binaryPath); os.IsNotExist(err) {
 		// Binary doesn't exist yet - skip proto validation
 		resp.Proto = &plugins.ProtoValidation{
@@ -487,18 +527,6 @@ func (s *Server) handlePluginValidate(w http.ResponseWriter, r *http.Request, pl
 		}
 		resp.Valid = false
 		writeJSON(w, http.StatusOK, map[string]any{"data": resp})
-		return
-	}
-
-	// PLUGIN-PATH-INJECTION-FIX belt-and-suspenders (2026-08-10):
-	// pluginID passed validatePluginID above, but the manifest's
-	// Binary field is plugin-author-provided and could be
-	// "../../../usr/bin/rm" — verify the final binaryPath still
-	// resolves inside s.cfg.PluginsDir before handing to exec.
-	if err := verifyPluginBinaryInside(s.cfg.PluginsDir, binaryPath); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{
-			"error": "plugin manifest.binary rejected: " + err.Error(),
-		})
 		return
 	}
 
