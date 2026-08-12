@@ -1873,6 +1873,18 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 		trustScoreForFeedback = s.trustScorer.GetScore(feedbackSessionID)
 	}
 
+	// JIMINY-INFORMATIONAL-CATEGORY-001 (2026-08-12): batch-lookup which
+	// source_node_ids are marked is_informational=true. One Cypher round-trip
+	// per RecordOutcome; the map is used inside the loop to override the
+	// classifier verdict to OutcomeNotApplicable for informational items so
+	// they don't count against actionable follow rate. Empty map on driver-
+	// nil or query error (safe default: no override → normal grading).
+	var informationalIDs []string
+	for _, it := range items {
+		informationalIDs = append(informationalIDs, it.SourceNodes...)
+	}
+	informationalSet := s.loadInformationalNodeSet(ctx, informationalIDs)
+
 	for _, item := range items {
 		var cr ClassificationResult
 
@@ -1897,6 +1909,24 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 
 		// Alias for downstream use
 		outcome := cr.Outcome
+
+		// JIMINY-INFORMATIONAL-CATEGORY-001: override to OutcomeNotApplicable
+		// when the item's source node is marked is_informational=true. All
+		// downstream gates already check `outcome != OutcomeNotApplicable`;
+		// the override flows through them as if the classifier had returned
+		// NA natively — no changes needed to escalation, protocol metrics,
+		// persistence, outcome-writer, or contradicted-bridge gates.
+		if len(informationalSet) > 0 && len(item.SourceNodes) > 0 && outcome != OutcomeNotApplicable {
+			for _, nodeID := range item.SourceNodes {
+				if informationalSet[nodeID] {
+					outcome = OutcomeNotApplicable
+					// Update the results slot too so the caller sees the honest verdict.
+					results[len(results)-1].Outcome = OutcomeNotApplicable
+					results[len(results)-1].Reasoning = "source node marked informational (JIMINY-INFORMATIONAL-CATEGORY-001)"
+					break
+				}
+			}
+		}
 
 		// J12: Feed escalation tracker with outcome (skip not_applicable — topically unrelated)
 		if s.escalation != nil && len(item.SourceNodes) > 0 && outcome != OutcomeNotApplicable {
@@ -3182,6 +3212,74 @@ type constraintCodeEntry struct {
 	Code    string
 	Content string
 	Words   map[string]bool // significant words for matching
+}
+
+// loadInformationalNodeSet returns the set of source_node_ids (from the
+// given candidate ids) whose Neo4j MemoryNode has is_informational=true.
+//
+// JIMINY-INFORMATIONAL-CATEGORY-001 (2026-08-12): informational-marked
+// nodes are excluded from actionable follow-rate accounting by RecordOutcome,
+// which overrides the classifier's verdict to OutcomeNotApplicable when the
+// item's source is in this set. The existing NotApplicable gates
+// (service.go:1902,1927,1954,1986,2090) then flow the item through as if
+// the classifier itself returned NA — no changes needed to those gates.
+//
+// Batched: one Cypher round-trip per RecordOutcome invocation. Missing node
+// or missing property → treated as NOT informational (safe default; false
+// positives are the class we WANT — better to grade a real rule than to
+// silently skip one).
+func (s *Service) loadInformationalNodeSet(ctx context.Context, nodeIDs []string) map[string]bool {
+	out := make(map[string]bool)
+	if s.driver == nil || len(nodeIDs) == 0 {
+		return out
+	}
+	// Dedup input.
+	uniq := make(map[string]bool, len(nodeIDs))
+	for _, id := range nodeIDs {
+		if id != "" {
+			uniq[id] = true
+		}
+	}
+	if len(uniq) == 0 {
+		return out
+	}
+	ids := make([]string, 0, len(uniq))
+	for id := range uniq {
+		ids = append(ids, id)
+	}
+
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx) //nolint:errcheck
+
+	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, `
+			MATCH (n:MemoryNode)
+			WHERE n.node_id IN $ids
+			  AND coalesce(n.is_informational, false) = true
+			RETURN n.node_id AS id
+		`, map[string]any{"ids": ids})
+		if err != nil {
+			return nil, err
+		}
+		set := make(map[string]bool)
+		for res.Next(ctx) {
+			rec := res.Record()
+			if v, ok := rec.Get("id"); ok {
+				if id, _ := v.(string); id != "" {
+					set[id] = true
+				}
+			}
+		}
+		return set, res.Err()
+	})
+	if err != nil {
+		slog.Warn("jiminy: loadInformationalNodeSet failed (defaulting to no-informational)", "error", err)
+		return out
+	}
+	if m, ok := result.(map[string]bool); ok {
+		return m
+	}
+	return out
 }
 
 // loadSpaceConstraintCodes loads all constraint codes for a space from Neo4j
