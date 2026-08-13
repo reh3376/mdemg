@@ -15,8 +15,17 @@ import (
 	"mdemg/internal/circuitbreaker"
 	"mdemg/internal/encoding"
 	"mdemg/internal/llmclient"
+	"mdemg/internal/metrics"
 	"mdemg/internal/models"
 )
+
+// rerankTemperature is the fixed temperature for rerank_cross LLM calls
+// (RERANK-LENGTH-STRICT-001, 2026-08-13). Reranking is a relevance-scoring
+// task — the correct temperature is 0 (deterministic). Pre-fix, the call
+// omitted Temperature so the LLM used its server-side default (typically
+// 0.8), producing Fable's observed nondeterminism ("same query + candidates
+// gives different score arrays across rows").
+var rerankTemperature = 0.0
 
 const rerankCrossSystemPrompt = `You are a relevance judge for a code knowledge base. Rate how relevant each candidate is to answering a query. Score from 0.0 (irrelevant) to 1.0 (perfectly answers the query). Consider: Does this code/document directly help answer the question? Return ONLY a JSON array of scores in order. Do not include any other text or explanation.`
 
@@ -171,6 +180,55 @@ func (s *Service) Rerank(ctx context.Context, req RerankRequest) (*RerankResult,
 		scores, tokensUsed, err = s.rerankWithOpenAI(timeoutCtx, systemPrompt, prompt, req.SpaceID)
 	}
 
+	// RERANK-LENGTH-STRICT-001 (2026-08-13): length-mismatch observability
+	// + one corrective retry. If the initial call returned a valid parse
+	// but the array length ≠ candidate count, log a WARN, increment the
+	// length-mismatch counter (by reason: short/long), and retry ONCE
+	// with a corrective prompt. If the retry recovers a matching length,
+	// swap in the corrected scores + increment the retry_recovered counter.
+	// If the retry still mismatches, keep the original scores + let the
+	// downstream `if i < len(scores)` guard default missing entries to
+	// 0.5. Retry is single-attempt to bound worst-case latency.
+	//
+	// Applies only to LLM providers (openai/ollama); neural + jina paths
+	// return their own length-bounded outputs by construction.
+	if err == nil && len(scores) != topN && (s.cfg.RerankProvider == "openai" || s.cfg.RerankProvider == "ollama" || s.cfg.RerankProvider == "") {
+		reason := "short"
+		if len(scores) > topN {
+			reason = "long"
+		}
+		slog.Warn("rerank: length mismatch",
+			"provider", s.cfg.RerankProvider,
+			"expected", topN,
+			"got", len(scores),
+			"reason", reason,
+			"space_id", req.SpaceID,
+		)
+		metrics.Metrics().RetrievalRerankLengthMismatch(reason).Inc()
+
+		// One corrective retry with the expected count named verbatim.
+		retryPrompt := buildRerankRetryPrompt(prompt, topN, len(scores))
+		var retryScores []float64
+		var retryTokens int
+		var retryErr error
+		switch s.cfg.RerankProvider {
+		case "openai", "":
+			retryScores, retryTokens, retryErr = s.rerankWithOpenAI(timeoutCtx, systemPrompt, retryPrompt, req.SpaceID)
+		case "ollama":
+			retryScores, retryTokens, retryErr = s.rerankWithOllama(timeoutCtx, systemPrompt, retryPrompt, req.SpaceID)
+		}
+		if retryErr == nil && len(retryScores) == topN {
+			slog.Info("rerank: length mismatch recovered via corrective retry",
+				"provider", s.cfg.RerankProvider,
+				"expected", topN,
+				"space_id", req.SpaceID,
+			)
+			metrics.Metrics().RetrievalRerankLengthMismatch("retry_recovered").Inc()
+			scores = retryScores
+			tokensUsed += retryTokens
+		}
+	}
+
 	if err != nil {
 		// Return original results on error
 		return &RerankResult{
@@ -289,6 +347,29 @@ func buildRerankPrompt(query string, candidates []models.RetrieveResult, compres
 		}
 	}
 
+	// RERANK-LENGTH-STRICT-001 (2026-08-13): explicit count-of-scores
+	// contract at the bottom of the user prompt. The system prompt says
+	// "Return ONLY a JSON array of scores in order" but doesn't name N,
+	// and Fable HITL pass 2 observed the LLM returning 15-cand queries as
+	// 16-17-score arrays. Naming N in the immediate context of the
+	// candidates list (bottom of prompt) shifts LLM attention to the
+	// count constraint at generation time.
+	sb.WriteString(fmt.Sprintf("\nReturn exactly %d scores in a JSON array, one per candidate, in the same order as the candidates above.\n", len(candidates)))
+
+	return sb.String()
+}
+
+// buildRerankRetryPrompt constructs a corrective user prompt for the
+// RERANK-LENGTH-STRICT-001 one-retry pathway. Fires only when the initial
+// call returned a scores array whose length differs from the candidate
+// count. The retry names both the previous count and the expected count
+// verbatim, plus re-appends the required count contract.
+func buildRerankRetryPrompt(originalPrompt string, expected, got int) string {
+	var sb strings.Builder
+	sb.WriteString("Your previous response returned ")
+	sb.WriteString(fmt.Sprintf("%d scores but there are %d candidates. ", got, expected))
+	sb.WriteString(fmt.Sprintf("Return exactly %d scores, one per candidate, in the same order as the candidates.\n\n", expected))
+	sb.WriteString(originalPrompt)
 	return sb.String()
 }
 
@@ -330,7 +411,8 @@ func (s *Service) doRerankWithOpenAI(ctx context.Context, systemPrompt, prompt, 
 	}
 
 	content, _, tokens, err := client.CompleteWithUsage(ctx, msgs, llmclient.CompleteOpts{
-		MaxTokens: 2000, // Reasoning models consume tokens for internal thought
+		MaxTokens:   2000, // Reasoning models consume tokens for internal thought
+		Temperature: &rerankTemperature, // RERANK-LENGTH-STRICT-001: deterministic scoring
 	})
 	if err != nil {
 		return nil, 0, err
@@ -381,7 +463,9 @@ func (s *Service) doRerankWithOllama(ctx context.Context, systemPrompt, prompt, 
 		{Role: "user", Content: prompt},
 	}
 
-	content, err := client.Complete(ctx, msgs, llmclient.CompleteOpts{})
+	content, err := client.Complete(ctx, msgs, llmclient.CompleteOpts{
+		Temperature: &rerankTemperature, // RERANK-LENGTH-STRICT-001: deterministic scoring
+	})
 	if err != nil {
 		return nil, 0, err
 	}

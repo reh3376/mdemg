@@ -13,7 +13,7 @@ import (
 // reviewGradeRow maps a review.Grade (+ marshalled jsonb + audit fields) to the
 // tsdb row shape (keeps internal/tsdb free of internal/review). reversesGradeID
 // non-empty marks a reversal row; the original is flagged via MarkReversed.
-func reviewGradeRow(g review.Grade, dimsJSON string, applied bool, detailJSON, reversesGradeID, instanceID, suggested string) tsdb.ReviewGradeRow {
+func reviewGradeRow(g review.Grade, dimsJSON string, applied bool, detailJSON, reversesGradeID, instanceID, suggested, notes string) tsdb.ReviewGradeRow {
 	return tsdb.ReviewGradeRow{
 		GradeID:                 g.GradeID,
 		DatasetID:               g.DatasetID,
@@ -29,6 +29,7 @@ func reviewGradeRow(g review.Grade, dimsJSON string, applied bool, detailJSON, r
 		ReversesGradeID:         reversesGradeID,
 		InstanceID:              instanceID,
 		SuggestedGuidance:       suggested,
+		Notes:                   notes,
 	}
 }
 
@@ -219,6 +220,7 @@ type reviewGradeRequest struct {
 	DryRun            *bool  `json:"dry_run,omitempty"`
 	Force             bool   `json:"force,omitempty"`
 	SuggestedGuidance string `json:"suggested_guidance,omitempty"` // SME corrective example
+	Notes             string `json:"notes,omitempty"`              // REVIEW-GRADE-NOTES-FIELD-001: grader reasoning per grade
 }
 
 // POST /v1/review/grade
@@ -260,7 +262,27 @@ func (s *Server) handleReviewGrade(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	item, _, _ := d.FetchItem(r.Context(), req.SpaceID, req.ItemID)
+	// REVIEW-GRADE-VALIDATE-ITEM-ID-001 (2026-08-13): validate item_id
+	// exists in the dataset BEFORE writing. Pre-fix, this call captured
+	// only `item` and discarded the `found` return, so any arbitrary
+	// item_id passed validation and landed as an orphan row in
+	// review_grades (no join back to a real item; retrain-corpus
+	// pollution; false grade counts). FetchItem is a per-dataset read
+	// (LEFT JOIN semantics vary) — treat error same as not-found for
+	// safety; the caller sees a clean 404 either way.
+	item, found, fetchErr := d.FetchItem(r.Context(), req.SpaceID, req.ItemID)
+	if fetchErr != nil {
+		writeInternalError(w, fetchErr, "review fetch item for validation")
+		return
+	}
+	if !found {
+		writeJSON(w, http.StatusNotFound, map[string]any{
+			"error":      "unknown item_id in dataset " + req.DatasetID,
+			"dataset_id": req.DatasetID,
+			"item_id":    req.ItemID,
+		})
+		return
+	}
 	grade := review.Grade{
 		GradeID: cuid2.Generate(), DatasetID: req.DatasetID, ItemID: req.ItemID,
 		SpaceID: req.SpaceID, GraderID: req.GraderID, RubricVersion: rb.Version,
@@ -354,7 +376,7 @@ func (s *Server) handleReviewGrade(w http.ResponseWriter, r *http.Request) {
 
 	if gradeRecorded {
 		dimsJSON, _ := json.Marshal(dims)
-		s.reviewWriter.Record(reviewGradeRow(grade, string(dimsJSON), applied, detailJSON, "", s.cfg.InstanceID, req.SuggestedGuidance))
+		s.reviewWriter.Record(reviewGradeRow(grade, string(dimsJSON), applied, detailJSON, "", s.cfg.InstanceID, req.SuggestedGuidance, req.Notes))
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -418,7 +440,7 @@ func (s *Server) handleReviewReverse(w http.ResponseWriter, r *http.Request) {
 		SpaceID: row.SpaceID, GraderID: "reversal", RubricVersion: row.RubricVersion,
 		GoldScore: row.GoldScore,
 	}
-	s.reviewWriter.Record(reviewGradeRow(rev, "{}", false, "", req.GradeID, s.cfg.InstanceID, ""))
+	s.reviewWriter.Record(reviewGradeRow(rev, "{}", false, "", req.GradeID, s.cfg.InstanceID, "", ""))
 	if err := s.reviewWriter.MarkReversed(r.Context(), req.GradeID); err != nil {
 		writeInternalError(w, err, "review mark reversed")
 		return

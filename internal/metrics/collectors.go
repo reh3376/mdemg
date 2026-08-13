@@ -298,6 +298,17 @@ type StandardMetrics struct {
 	RetrievalColumnLatency     func(column string) *Histogram       // mdemg_retrieval_column_latency_seconds{column}
 	RetrievalColumnFailedTotal func(column, reason string) *Counter // mdemg_retrieval_column_failed_total{column,reason}
 
+	// RERANK-LENGTH-STRICT-001 (2026-08-13): observability for
+	// rerank_cross length-mismatch class. LLM occasionally returns a JSON
+	// array whose length ≠ candidate count. The parse succeeds; the Rerank
+	// site's `if i < len(scores)` guard defaults missing scores to 0.5 +
+	// silently drops extras. Pre-fix, every one of these landed as a
+	// permanently poisoned RRF fusion score with zero observability.
+	// Reasons: "short" (fewer scores than candidates), "long" (more), or
+	// "retry_recovered" (initial call was mismatched but the corrective
+	// retry produced a matching-length response).
+	RetrievalRerankLengthMismatch func(reason string) *Counter // mdemg_retrieval_rerank_length_mismatch_total{reason}
+
 	// Phase 14 Epic 1 — Note 06 sparse activation gate. Populated only when
 	// cfg.SparseRetrievalEnabled is true (or per-request override sets it).
 	// Histograms over per-call gate behavior — V0020 sparse_gate_metrics
@@ -874,6 +885,13 @@ func NewStandardMetrics(r *Registry) *StandardMetrics {
 		return r.NewCounter("retrieval_column_failed_total",
 			"Total per-column retrieval failures (column timed out, errored, or returned empty)",
 			map[string]string{"column": column, "reason": reason})
+	}
+
+	// RERANK-LENGTH-STRICT-001 (2026-08-13): rerank_cross length-mismatch counter.
+	m.RetrievalRerankLengthMismatch = func(reason string) *Counter {
+		return r.NewCounter("retrieval_rerank_length_mismatch_total",
+			"rerank_cross LLM returned a scores array whose length ≠ candidate count. reason ∈ {short,long,retry_recovered}",
+			map[string]string{"reason": reason})
 	}
 
 	// Phase 14 Epic 1 — Note 06 sparse activation gate metrics.

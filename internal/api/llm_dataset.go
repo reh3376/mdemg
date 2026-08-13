@@ -164,6 +164,13 @@ func (d llmCallSiteDataset) FetchCandidates(ctx context.Context, q review.Candid
 	if limit <= 0 {
 		limit = 200
 	}
+	// REVIEW-CANDIDATES-EXCLUDE-ERROR-ROWS-001 (2026-08-13): exclude rows
+	// that are ungradeable-by-construction — LLM caller-cancellations
+	// (LLM-HEALTH-INVESTIGATION-001 tags these with 'caller_canceled:'
+	// prefix; the alert-rule already filters them out of the error-rate
+	// signal, and the retrain pipeline won't consume them) and rows with
+	// empty response text (nothing to grade). Wastes per-item grader
+	// reasoning cost if they surface in the queue.
 	rows, err := d.pool.Query(ctx, `
 		SELECT `+llmItemCols+`
 		FROM llm_interactions i
@@ -172,6 +179,8 @@ func (d llmCallSiteDataset) FetchCandidates(ctx context.Context, q review.Candid
 		 AND r.reversed = FALSE AND r.rubric_version = $2
 		WHERE i.task_name = $1 AND (i.space_id = $3 OR $3 = '') AND r.item_id IS NULL
 		  AND i.trace_id <> ''
+		  AND (i.error IS NULL OR i.error = '' OR i.error NOT LIKE 'caller_canceled:%')
+		  AND i.response IS NOT NULL AND LENGTH(i.response) > 0
 		ORDER BY i.time DESC
 		LIMIT $5`, d.site.task, d.rubricVersion, q.SpaceID, d.ID(), limit)
 	if err != nil {
