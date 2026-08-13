@@ -26,6 +26,7 @@ import base64
 import json
 import os
 import re
+import subprocess
 import sys
 import time
 import urllib.error
@@ -272,6 +273,106 @@ def check_jiminy_bash(input_data: dict, command: str) -> Optional[str]:
     return None
 
 
+# --- PRE-COMMIT-INVENTORY-GATE-001 (2026-08-13): fail-CLOSED gate on git commit ---
+# Blocks `git commit` when the staged diff includes a file that requires a
+# paired DORMANT-CENSUS-* inventory adjudication AND the corresponding
+# verifier script fails. Prevents the class that hit PR 614 (route inventory
+# miss) + PR 615 (metric inventory miss) BEFORE the commit lands, instead
+# of waiting for CI to red-line the merge.
+#
+# Trigger files → verifier → inventory pair:
+#   internal/api/server.go        → verify_route_consumers.py   → route_consumer_inventory.json
+#   internal/metrics/collectors.go → verify_metrics_consumers.py → metrics_consumer_inventory.json
+#   internal/tsdb/migrations/*.sql → verify_tsdb_consumers.py    → tsdb_consumer_inventory.json
+#
+# Fail-CLOSED philosophy: if the verifier fails, block the commit. This is
+# the deliberate inversion of the JIMINY-ENFORCE-002 fail-open shape —
+# there, an unreachable Jiminy server would wedge Bash forever; here, an
+# unreachable verifier means we can't confirm the inventory is honest, and
+# the correct posture for "can't confirm inventory" is to hold the commit.
+# Verifier-missing / git-missing / other exceptions fail-CLOSED with a
+# clear message + suggested fix; --no-verify has no effect (this hook is
+# PreToolUse Claude-side, not git's own pre-commit).
+_INVENTORY_CHECKS = [
+    (
+        re.compile(r"^internal/api/server\.go$"),
+        "scripts/verify_route_consumers.py",
+        "docs/api/route_consumer_inventory.json",
+        "route",
+    ),
+    (
+        re.compile(r"^internal/metrics/collectors\.go$"),
+        "scripts/verify_metrics_consumers.py",
+        "docs/api/metrics_consumer_inventory.json",
+        "metric",
+    ),
+    (
+        re.compile(r"^internal/tsdb/migrations/\d+_[\w-]+\.sql$"),
+        "scripts/verify_tsdb_consumers.py",
+        "docs/api/tsdb_consumer_inventory.json",
+        "tsdb table",
+    ),
+]
+
+
+def check_inventory_adjudication(command: str) -> Optional[str]:
+    """Return a reason string to BLOCK the git commit, or None to allow.
+    Fires only on `git commit` commands (not amend/status/log/diff)."""
+    if not re.match(r"^\s*git\s+commit\b", command):
+        return None
+    try:
+        result = subprocess.run(
+            ["git", "diff", "--cached", "--name-only"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+    except (FileNotFoundError, subprocess.SubprocessError, OSError) as e:
+        return f"PRE-COMMIT-INVENTORY-GATE: cannot inspect staged files (git error: {e}); refusing to commit blind. Run `git status` to diagnose."
+    if result.returncode != 0:
+        return f"PRE-COMMIT-INVENTORY-GATE: `git diff --cached --name-only` returned {result.returncode}: {result.stderr.strip()}; refusing to commit blind."
+    staged = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+    if not staged:
+        return None  # nothing staged; git commit itself will complain
+    triggered = []
+    for pattern, verifier, inventory, kind in _INVENTORY_CHECKS:
+        if any(pattern.match(f) for f in staged):
+            triggered.append((verifier, inventory, kind))
+    if not triggered:
+        return None
+    for verifier, inventory, kind in triggered:
+        if not os.path.isfile(verifier):
+            return f"PRE-COMMIT-INVENTORY-GATE: {kind} inventory verifier not found at {verifier}; refusing to commit blind."
+        try:
+            r = subprocess.run(
+                ["python3", verifier],
+                capture_output=True,
+                text=True,
+                timeout=30,
+                check=False,
+            )
+        except (subprocess.SubprocessError, OSError) as e:
+            return f"PRE-COMMIT-INVENTORY-GATE: {kind} verifier ({verifier}) failed to run: {e}. Refusing to commit blind."
+        if r.returncode != 0:
+            output = (r.stdout.strip() + "\n" + r.stderr.strip()).strip()
+            return (
+                f"COMMIT BLOCKED — {kind} inventory adjudication missing.\n"
+                f"\n"
+                f"Verifier: {verifier}\n"
+                f"{output}\n"
+                f"\n"
+                f"To fix:\n"
+                f"  1. python3 {verifier} --generate\n"
+                f"  2. Edit {inventory} — set the new entry's disposition + notes\n"
+                f"  3. git add {inventory}\n"
+                f"  4. git commit again\n"
+                f"\n"
+                f"(PRE-COMMIT-INVENTORY-GATE-001 — enforces DORMANT-CENSUS-001/002/003 forcing functions BEFORE commit lands, not at CI.)"
+            )
+    return None
+
+
 def main():
     try:
         input_data = json.load(sys.stdin)
@@ -296,7 +397,15 @@ def main():
             f"You MUST ask the user for explicit confirmation before running this."
         )
 
-    # 2) JIMINY-ENFORCE-002: consult Jiminy (fail-open) — new
+    # 2) PRE-COMMIT-INVENTORY-GATE-001: git-commit inventory adjudication (fail-closed)
+    #    Blocks when staged files include DORMANT-CENSUS-* trigger files AND
+    #    the paired verifier fails. Catches the class that hit PR 614 + 615
+    #    BEFORE the commit lands (instead of waiting for CI to red-line merge).
+    inv_reason = check_inventory_adjudication(command)
+    if inv_reason:
+        _deny(inv_reason)
+
+    # 3) JIMINY-ENFORCE-002: consult Jiminy (fail-open) — new
     result = check_jiminy_bash(input_data, command)
     if result:
         reason, codes = result
