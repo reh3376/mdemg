@@ -934,6 +934,22 @@
         "j17_resume.uats.json"
       ]
     },
+    "/v1/jiminy/rules": {
+      "consumers": [
+        "ui:api.js"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "JIMINY-RULES-UI-001 Epic 2 (2026-08-13): GET-only list endpoint for the Rules tab. Query params: space_id (required), type (constraint|correction), severity (must|must_not|should|note), category (actionable|informational), scope (LEVER-C-TIGHTEN-002 family), include_archived (bool), limit (capped at JiminyRulesListMaxLimit). READ-only + arc-safe. UI wiring lands in Epic 4. Backend at internal/api/handlers_jiminy_rules.go::handleRulesList.",
+      "uats_specs": []
+    },
+    "/v1/jiminy/rules/": {
+      "consumers": [
+        "ui:api.js"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "JIMINY-RULES-UI-001 Epic 2 (2026-08-13): GET-only detail endpoint at /v1/jiminy/rules/{code}. Returns rule + recent enforcement outcomes from constraint_outcomes (last JiminyRulesOutcomesLookbackHours, default 168 = 7d). Trailing-slash mux registration mirrors handleResolveConstraintConflict shape; path-parse via strings.TrimPrefix in internal/api/handlers_jiminy_rules.go::handleRulesDetail. Epic 3 will add the tombstone POST via this same prefix.",
+      "uats_specs": []
+    },
     "/v1/jiminy/strict": {
       "consumers": [
         "mcp:jiminy_strict"
@@ -1526,7 +1542,7 @@
         "ui:api.js"
       ],
       "disposition": "ACTIVE",
-      "notes": "HITL-AUTOGRADE-PREVIEW-001 (2026-08-12): internal/api/ui/api.js reviewAutogradePreview() → tabs/review.js pre-fills rubric radios on item load with an LLM autograder proposal so the operator only needs to accept-as-is or override per dimension. READ-ONLY on substrate; does NOT write to review_grades or constraint_outcomes (measurement-window safe). Response shape {dimensions, confidence, rationale, available:bool}; UI falls back gracefully on available:false.",
+      "notes": "HITL-AUTOGRADE-PREVIEW-001 (2026-08-12): internal/api/ui/api.js reviewAutogradePreview() \u2192 tabs/review.js pre-fills rubric radios on item load with an LLM autograder proposal so the operator only needs to accept-as-is or override per dimension. READ-ONLY on substrate; does NOT write to review_grades or constraint_outcomes (measurement-window safe). Response shape {dimensions, confidence, rationale, available:bool}; UI falls back gracefully on available:false.",
       "uats_specs": []
     },
     "/v1/review/candidates": {

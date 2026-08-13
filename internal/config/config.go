@@ -1308,6 +1308,13 @@ type Config struct {
 	JiminyFeedbackDropLookbackMin     int     // JIMINY_FEEDBACK_DROP_LOOKBACK_MIN — window for the drop counter (default: 60 min)
 	GuidanceShouldFollowLookbackHours int     // GUIDANCE_SHOULD_FOLLOW_LOOKBACK_HOURS — window for the should-follow rate (default: 168 = 7d, floor: 1)
 
+	// JIMINY-RULES-UI-001 (2026-08-13) — /v1/jiminy/rules/* endpoints + /ui/rules tab.
+	// See docs/development/jiminy-rules-ui-001/sprint_plan.md.
+	JiminyRulesUIWriteEnabled        bool    // JIMINY_RULES_UI_WRITE_ENABLED — master flag for POST /v1/jiminy/rules (create) + POST /v1/jiminy/rules/{code}/tombstone; default false during JIMINY-CEILING-BREAK-2 arc window through 2026-08-19; operator flips to true post-arc
+	JiminyRulesDedupSimThreshold     float64 // JIMINY_RULES_DEDUP_SIM_THRESHOLD — cosine similarity threshold for dedup-warn on POST /v1/jiminy/rules (default 0.75 per CREATE-CORRECTION-DEDUP-001; ≥ this on any live constraint/correction node returns 409 with similar_rules unless ?override_dedup=true)
+	JiminyRulesListMaxLimit          int     // JIMINY_RULES_LIST_MAX_LIMIT — max page size for GET /v1/jiminy/rules ?limit=N (default 200)
+	JiminyRulesOutcomesLookbackHours int     // JIMINY_RULES_OUTCOMES_LOOKBACK_HOURS — window for recent enforcement outcomes on GET /v1/jiminy/rules/{code} detail (default 168 = 7d)
+
 	// HITL-REVIEW-001 — general-purpose human-in-the-loop review + live-reinforcement platform.
 	ReviewEnabled                    bool    // REVIEW_ENABLED — enable the /v1/review/* surface + UI tab (default: true)
 	ReviewWriterFlushIntervalSec     int     // REVIEW_WRITER_FLUSH_INTERVAL_SEC — review_grades writer flush cadence (default: 15, floor: 5)
@@ -3938,6 +3945,30 @@ func FromEnv() (Config, error) {
 		guidanceShouldFollowLookbackHours = 1 // floor
 	}
 
+	// JIMINY-RULES-UI-001 (2026-08-13) — /v1/jiminy/rules/* endpoints + /ui/rules tab.
+	jiminyRulesUIWriteEnabled := getBool("JIMINY_RULES_UI_WRITE_ENABLED", false)
+	jiminyRulesDedupSimThreshold, err := atof("JIMINY_RULES_DEDUP_SIM_THRESHOLD", 0.75)
+	if err != nil {
+		return Config{}, err
+	}
+	if jiminyRulesDedupSimThreshold < 0 || jiminyRulesDedupSimThreshold > 1 {
+		jiminyRulesDedupSimThreshold = 0.75 // out-of-range → default
+	}
+	jiminyRulesListMaxLimit, err := atoi("JIMINY_RULES_LIST_MAX_LIMIT", 200)
+	if err != nil {
+		return Config{}, err
+	}
+	if jiminyRulesListMaxLimit < 1 {
+		jiminyRulesListMaxLimit = 200 // floor → default
+	}
+	jiminyRulesOutcomesLookbackHours, err := atoi("JIMINY_RULES_OUTCOMES_LOOKBACK_HOURS", 168)
+	if err != nil {
+		return Config{}, err
+	}
+	if jiminyRulesOutcomesLookbackHours < 1 {
+		jiminyRulesOutcomesLookbackHours = 1
+	}
+
 	// HITL-REVIEW-001 — review platform config.
 	reviewEnabled := getBool("REVIEW_ENABLED", true)
 	reviewWriterFlushIntervalSec, err := atoi("REVIEW_WRITER_FLUSH_INTERVAL_SEC", 15)
@@ -6333,6 +6364,10 @@ func FromEnv() (Config, error) {
 		JiminyFeedbackDropThreshold:                    jiminyFeedbackDropThreshold,
 		JiminyFeedbackDropLookbackMin:                  jiminyFeedbackDropLookbackMin,
 		GuidanceShouldFollowLookbackHours:              guidanceShouldFollowLookbackHours,
+		JiminyRulesUIWriteEnabled:                      jiminyRulesUIWriteEnabled,
+		JiminyRulesDedupSimThreshold:                   jiminyRulesDedupSimThreshold,
+		JiminyRulesListMaxLimit:                        jiminyRulesListMaxLimit,
+		JiminyRulesOutcomesLookbackHours:               jiminyRulesOutcomesLookbackHours,
 		ReviewEnabled:                                  reviewEnabled,
 		ReviewWriterFlushIntervalSec:                   reviewWriterFlushIntervalSec,
 		ReviewWriterBufferSize:                         reviewWriterBufferSize,

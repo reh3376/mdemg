@@ -2883,6 +2883,13 @@ func (s *Server) Routes() http.Handler {
 	// + future RSIC action-execution reads. Separate path so it doesn't collide
 	// with the active-list GET on /v1/jiminy/override.
 	mux.HandleFunc("/v1/jiminy/override/history", s.handleJiminyOverrideHistory)
+	// JIMINY-RULES-UI-001 Epic 2 (2026-08-13): READ-only endpoints for the
+	// /ui/rules tab. WRITE endpoints (create + tombstone) land in Epic 3
+	// behind JiminyRulesUIWriteEnabled flag. Trailing slash on the list
+	// path is intentional — Go stdlib mux prefix-matches on the /{code}
+	// detail path via handleRulesDetail's TrimPrefix parse.
+	mux.HandleFunc("/v1/jiminy/rules", s.handleRulesList)
+	mux.HandleFunc("/v1/jiminy/rules/", s.handleRulesDetail)
 	mux.HandleFunc("/v1/jiminy/reformulate", s.handleJiminyReformulate)
 	mux.HandleFunc("/v1/jiminy/classify", s.handleJiminyClassify)
 	mux.HandleFunc("/v1/jiminy/extension", s.handleJ17Extension)
