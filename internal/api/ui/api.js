@@ -174,3 +174,42 @@ export const jiminyOverrideHistory = (spaceID, hours) => {
     if (hours) q.set('hours', String(hours));
     return get('/v1/jiminy/override/history' + (q.toString() ? '?' + q.toString() : ''));
 };
+
+// JIMINY-RULES-UI-001 (2026-08-13) — Rules tab: list + detail (READ)
+// and create + tombstone (WRITE, flag-gated by JiminyRulesUIWriteEnabled).
+export const rulesList = (spaceID, filters = {}) => {
+    const q = new URLSearchParams();
+    q.set('space_id', spaceID);
+    if (filters.type) q.set('type', filters.type);
+    if (filters.severity) q.set('severity', filters.severity);
+    if (filters.category) q.set('category', filters.category);
+    if (filters.scope) q.set('scope', filters.scope);
+    if (filters.include_archived) q.set('include_archived', 'true');
+    if (filters.limit) q.set('limit', String(filters.limit));
+    return get('/v1/jiminy/rules?' + q.toString());
+};
+export const rulesDetail = (code, spaceID) => {
+    const q = spaceID ? `?space_id=${encodeURIComponent(spaceID)}` : '';
+    return get(`/v1/jiminy/rules/${encodeURIComponent(code)}${q}`);
+};
+// rulesCreate returns the response (200 with node_id + code on happy
+// path; 409 with similar_rules on dedup-hit; 503 when write flag off).
+// Caller inspects HTTP status via a try/catch on the throw shape.
+export const rulesCreate = async (body, overrideDedup = false) => {
+    const q = overrideDedup ? '?override_dedup=true' : '';
+    const res = await fetch(_baseURL + '/v1/jiminy/rules' + q, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) {
+        const err = new Error(payload.error || `${res.status} ${res.statusText}`);
+        err.status = res.status;
+        err.payload = payload;
+        throw err;
+    }
+    return payload;
+};
+export const rulesTombstone = (code, spaceID, reason) =>
+    post(`/v1/jiminy/rules/${encodeURIComponent(code)}/tombstone`, { space_id: spaceID, reason });
