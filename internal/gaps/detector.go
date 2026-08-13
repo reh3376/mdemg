@@ -499,7 +499,7 @@ func extractDataSourceReferences(text string) []string {
 		{`\bslack://\S+`, "slack"},
 		{`\bjira://\S+`, "jira"},
 		{`\bconfluence://\S+`, "confluence"},
-		{`\bgithub\.com/\S+`, "github"},
+		{`(?:^|[\s(]|https?://)github\.com/\S+`, "github"},
 		{`\bgitlab\.com/\S+`, "gitlab"},
 		{`\bnotion\.so/\S+`, "notion"},
 		{`\blinear\.app/\S+`, "linear"},
