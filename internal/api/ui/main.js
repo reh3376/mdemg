@@ -13,6 +13,7 @@ import { render as renderBackup } from './tabs/backup.js';
 import { render as renderTraining } from './tabs/training_data.js';
 import { render as renderReview } from './tabs/review.js';
 import { render as renderJiminy } from './tabs/jiminy.js';
+import { render as renderRules } from './tabs/rules.js';
 
 const TABS = {
     status:   { render: renderStatus,   label: 'Status' },
@@ -27,6 +28,7 @@ const TABS = {
     training: { render: renderTraining, label: 'Training Data' },
     review:   { render: renderReview,   label: 'Review' },
     jiminy:   { render: renderJiminy,   label: 'Jiminy' },
+    rules:    { render: renderRules,    label: 'Rules' },
 };
 
 let activeTab = 'status';
