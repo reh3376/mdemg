@@ -206,6 +206,18 @@ func (w *ContradictedDraftsWriter) Flush(ctx context.Context) error {
 // FetchPendingBySpace returns up to `limit` pending drafts for the given
 // space, newest first. Flushes first for read-your-writes on freshly-emitted
 // drafts.
+//
+// REVIEW-CANDIDATES-DEDUP-409-001 (2026-08-13): LEFT JOIN review_grades
+// filtered on (dataset_id='contradicted_drafts', item_id, rubric_version,
+// NOT reversed) so drafts that were reviewed but whose sink refused to
+// mutate substrate (auto-grader on reinforceable verdict, per
+// HITL-CURATION-002 invariant) don't re-surface in the candidate queue.
+// Draft.status stays 'pending' in those cases (the substrate-mutation
+// path never fired), so the pre-fix status-only filter re-served them
+// forever and the /v1/review/grade endpoint 409'd on the item_id +
+// rubric_version + grader_id idempotency. Reversed grades stay eligible
+// for re-grading (reversed=FALSE predicate). Mirrors the shipped
+// llm_dataset + guidance_dataset LEFT JOIN pattern.
 func (w *ContradictedDraftsWriter) FetchPendingBySpace(ctx context.Context, spaceID string, limit int) ([]ContradictedDraftRow, error) {
 	if err := w.Flush(ctx); err != nil {
 		return nil, err
@@ -214,15 +226,20 @@ func (w *ContradictedDraftsWriter) FetchPendingBySpace(ctx context.Context, spac
 		limit = 50
 	}
 	rows, err := w.pool.Query(ctx, `
-		SELECT time, id, space_id, guidance_id, guidance_type,
-		       source_node_id, guidance_content, action_summary,
-		       similarity, action_hash, draft_incorrect, draft_correct,
-		       status, session_id, applied_at,
-		       COALESCE(applied_obs_id, ''), COALESCE(instance_id, ''),
-		       COALESCE(applied_node_id, '')
-		FROM contradicted_correction_drafts
-		WHERE space_id = $1 AND status = 'pending'
-		ORDER BY time DESC LIMIT $2`, spaceID, limit)
+		SELECT d.time, d.id, d.space_id, d.guidance_id, d.guidance_type,
+		       d.source_node_id, d.guidance_content, d.action_summary,
+		       d.similarity, d.action_hash, d.draft_incorrect, d.draft_correct,
+		       d.status, d.session_id, d.applied_at,
+		       COALESCE(d.applied_obs_id, ''), COALESCE(d.instance_id, ''),
+		       COALESCE(d.applied_node_id, '')
+		FROM contradicted_correction_drafts d
+		LEFT JOIN review_grades r
+		  ON r.dataset_id = 'contradicted_drafts'
+		 AND r.item_id = d.id
+		 AND r.reversed = FALSE
+		 AND r.rubric_version = 'gr-v1'
+		WHERE d.space_id = $1 AND d.status = 'pending' AND r.item_id IS NULL
+		ORDER BY d.time DESC LIMIT $2`, spaceID, limit)
 	if err != nil {
 		return nil, err
 	}
