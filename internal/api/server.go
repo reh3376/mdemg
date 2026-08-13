@@ -3246,7 +3246,14 @@ func readJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(dst); err != nil {
 		slog.Error("readJSON decode failed", "error", err)
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid request body"})
+		// REVIEW-GRADE-NOTES-FIELD-001 (2026-08-13): surface the actual
+		// decode error text so callers can see the offending field name.
+		// The pre-fix opaque "invalid request body" forced every debug into a
+		// server-log tail — one-shot for the operator became a two-round
+		// trip. Decode errors from encoding/json carry only structural
+		// information (field name, line/col, expected type) — no request
+		// body content leaks, so exposing the message is safe.
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
 		return false
 	}
 	return true

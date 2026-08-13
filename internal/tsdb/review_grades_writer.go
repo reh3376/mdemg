@@ -50,6 +50,7 @@ type ReviewGradeRow struct {
 	ReversesGradeID         string // "" → NULL
 	InstanceID              string
 	SuggestedGuidance       string // SME corrective example (NOT NULL DEFAULT '')
+	Notes                   string // REVIEW-GRADE-NOTES-FIELD-001: grader reasoning (NOT NULL DEFAULT '')
 }
 
 // ReviewGradesWriter buffers review_grades rows and flushes via CopyFrom.
@@ -142,6 +143,7 @@ func (w *ReviewGradesWriter) Flush(ctx context.Context) error {
 			nullableString(r.ReinforcementDetailJSON),
 			r.Reversed, nullableString(r.ReversesGradeID),
 			nullableString(r.InstanceID), r.SuggestedGuidance,
+			r.Notes,
 		})
 	}
 	_, err := w.pool.CopyFrom(ctx,
@@ -151,6 +153,7 @@ func (w *ReviewGradesWriter) Flush(ctx context.Context) error {
 			"gold_score", "gold_dimensions", "grader_id", "rubric_version",
 			"graded_at", "reinforcement_applied", "reinforcement_detail",
 			"reversed", "reverses_grade_id", "instance_id", "suggested_guidance",
+			"notes",
 		},
 		pgx.CopyFromRows(rows),
 	)
