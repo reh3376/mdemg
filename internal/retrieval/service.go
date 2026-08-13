@@ -1368,11 +1368,13 @@ ORDER BY score DESC`
 		if err != nil {
 			return nil, err
 		}
-		// SEC-TRANCHE-3: defensive cap on preallocation. `k` comes from
-		// the caller (retrieval top-K, typically ≤200); cap in case a
-		// downstream caller passes an oversized value.
+		// SEC-TRANCHE-3: defensive bounds on preallocation. `k` comes from
+		// the caller (retrieval top-K, typically ≤200); clamp in case a
+		// downstream caller passes an invalid/oversized value.
 		allocK := k
-		if allocK > 10000 {
+		if allocK < 0 {
+			allocK = 0
+		} else if allocK > 10000 {
 			allocK = 10000
 		}
 		cands := make([]Candidate, 0, allocK)
