@@ -508,7 +508,7 @@ func extractDataSourceReferences(text string) []string {
 		{`(?:^|[\s(])docs\.google\.com/\S+`, "google_docs"},
 		{`\bdrive\.google\.com/\S+`, "google_drive"},
 		{`(?:^|\s)dropbox\.com/\S+(?:$|\s)`, "dropbox"},
-		{`\bfigma\.com/\S+`, "figma"},
+		{`(?:^|[\s(])figma\.com/\S+`, "figma"},
 	}
 
 	for _, p := range patterns {
