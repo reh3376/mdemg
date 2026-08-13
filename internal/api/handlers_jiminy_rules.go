@@ -4,12 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"github.com/nrednav/cuid2"
 )
 
 // JIMINY-RULES-UI-001 Epic 2 — READ-only endpoints for the /ui/rules tab.
@@ -53,10 +55,18 @@ type rulesOutcomeBucket struct {
 //   include_archived — bool ("true" | "false", default false)
 //   limit            — int, capped at JiminyRulesListMaxLimit (default 200)
 func (s *Server) handleRulesList(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
+	switch r.Method {
+	case http.MethodGet:
+		s.doRulesList(w, r)
+	case http.MethodPost:
+		// JIMINY-RULES-UI-001 Epic 3: create endpoint, flag-gated
+		s.doRulesCreate(w, r)
+	default:
 		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
-		return
 	}
+}
+
+func (s *Server) doRulesList(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	spaceID := q.Get("space_id")
 	if spaceID == "" {
@@ -168,14 +178,31 @@ func (s *Server) handleRulesList(w http.ResponseWriter, r *http.Request) {
 // Returns the single rule + last-N-hours outcome-count buckets from
 // constraint_outcomes (N = JiminyRulesOutcomesLookbackHours; default 168 = 7d).
 func (s *Server) handleRulesDetail(w http.ResponseWriter, r *http.Request) {
+	// Path shape: /v1/jiminy/rules/{code}   (GET → detail)
+	//         or  /v1/jiminy/rules/{code}/tombstone   (POST → tombstone, Epic 3)
+	suffix := strings.TrimPrefix(r.URL.Path, "/v1/jiminy/rules/")
+	parts := strings.SplitN(suffix, "/", 2)
+	code := parts[0]
+	subpath := ""
+	if len(parts) == 2 {
+		subpath = parts[1]
+	}
+
+	if subpath == "tombstone" {
+		if r.Method != http.MethodPost {
+			writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed (POST required for tombstone)"})
+			return
+		}
+		s.doRulesTombstone(w, r, code)
+		return
+	}
+	if subpath != "" {
+		writeJSON(w, http.StatusNotFound, map[string]any{"error": "unknown subpath: " + subpath})
+		return
+	}
 	if r.Method != http.MethodGet {
 		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
 		return
-	}
-	code := strings.TrimPrefix(r.URL.Path, "/v1/jiminy/rules/")
-	// Strip any trailing slash / subpath (defensive; no shipped subpath today)
-	if i := strings.Index(code, "/"); i >= 0 {
-		code = code[:i]
 	}
 	if code == "" {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "constraint_code is required in path"})
@@ -357,3 +384,397 @@ func recordToRulesItem(rec *neo4j.Record) rulesListItem {
 	}
 	return item
 }
+
+// --- JIMINY-RULES-UI-001 Epic 3: WRITE endpoints (flag-gated) ---
+//
+// Both create + tombstone are gated by JiminyRulesUIWriteEnabled which
+// defaults FALSE — WRITE mutations stay off during the JIMINY-CEILING-BREAK-2
+// arc window (through 2026-08-19). Operator flips to true in `.env` when
+// ready. When flag is off, both endpoints return 503 with a named-flag
+// error so the UI can surface a clean "disabled" state.
+
+// Allowed enums (validated in doRulesCreate). Rejects anything else with a
+// clear per-field 400. Reusing the shipped substrate's value sets means no
+// migration is needed — writes land on existing MemoryNode role_type +
+// constraint_type indexes.
+var (
+	rulesAllowedRoleTypes       = map[string]bool{"constraint": true, "correction": true}
+	rulesAllowedConstraintTypes = map[string]bool{"must": true, "must_not": true, "should": true, "note": true}
+)
+
+type rulesCreateRequest struct {
+	SpaceID         string `json:"space_id"`
+	RoleType        string `json:"role_type"`
+	ConstraintType  string `json:"constraint_type"`
+	IsInformational bool   `json:"is_informational"`
+	Content         string `json:"content"`
+	Scope           string `json:"scope,omitempty"`
+	// ConstraintCode is optional; if empty we mint auto-<8char>. If
+	// operator-supplied, use verbatim (mnemonic like "no-direct-main-commits").
+	ConstraintCode string `json:"constraint_code,omitempty"`
+}
+
+type rulesSimilarRule struct {
+	NodeID         string  `json:"node_id"`
+	ConstraintCode string  `json:"constraint_code"`
+	RoleType       string  `json:"role_type"`
+	Similarity     float64 `json:"similarity"`
+	ContentHead    string  `json:"content_head"` // first 200 chars for operator preview
+}
+
+func (s *Server) doRulesCreate(w http.ResponseWriter, r *http.Request) {
+	if !s.cfg.JiminyRulesUIWriteEnabled {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{
+			"error": "rule creation is currently disabled (set JIMINY_RULES_UI_WRITE_ENABLED=true in .env + restart to enable; disabled by default during JIMINY-CEILING-BREAK-2 arc window through 2026-08-19)",
+		})
+		return
+	}
+	var req rulesCreateRequest
+	if !readJSON(w, r, &req) {
+		return
+	}
+	// Validate required + enum fields BEFORE dependency checks.
+	if req.SpaceID == "" {
+		req.SpaceID = s.cfg.RSICWatchdogSpaceID
+	}
+	if req.SpaceID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "space_id is required"})
+		return
+	}
+	if !rulesAllowedRoleTypes[req.RoleType] {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "role_type must be one of: constraint, correction"})
+		return
+	}
+	if !rulesAllowedConstraintTypes[req.ConstraintType] {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "constraint_type must be one of: must, must_not, should, note"})
+		return
+	}
+	if strings.TrimSpace(req.Content) == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "content is required"})
+		return
+	}
+	if s.driver == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "Neo4j driver not available"})
+		return
+	}
+
+	overrideDedup := strings.EqualFold(r.URL.Query().Get("override_dedup"), "true")
+
+	// Dedup gate: cosine similarity ≥ JiminyRulesDedupSimThreshold on any
+	// live constraint/correction. Mirrors CREATE-CORRECTION-DEDUP-001 shape.
+	// Skipped when embedder unavailable OR threshold ≤ 0 OR override=true.
+	similar := []rulesSimilarRule{}
+	if s.embedder != nil && s.cfg.JiminyRulesDedupSimThreshold > 0 && !overrideDedup {
+		emb, embErr := s.embedder.Embed(r.Context(), req.Content)
+		if embErr != nil {
+			// Non-fatal: log + proceed (better to mint a possible dup than
+			// block a legitimate create on a transient embed error).
+			slog.Warn("rules dedup: embed failed, proceeding without dedup check", "error", embErr)
+		} else if len(emb) > 0 {
+			hits, hitsErr := s.fetchSimilarRules(r.Context(), req.SpaceID, emb, s.cfg.JiminyRulesDedupSimThreshold, 5)
+			if hitsErr != nil {
+				slog.Warn("rules dedup: query failed, proceeding without dedup check", "error", hitsErr)
+			}
+			similar = hits
+		}
+	}
+	if len(similar) > 0 {
+		writeJSON(w, http.StatusConflict, map[string]any{
+			"data": map[string]any{
+				"similar_rules": similar,
+			},
+			"error": fmt.Sprintf("similar rules exist (%d with similarity ≥ %.2f); retry with ?override_dedup=true to bypass", len(similar), s.cfg.JiminyRulesDedupSimThreshold),
+		})
+		return
+	}
+
+	// Mint identifiers.
+	nodeID := cuid2.Generate()
+	code := strings.TrimSpace(req.ConstraintCode)
+	if code == "" {
+		// Auto-mint: "auto-" + first 12 chars of a fresh CUIDv2. Matches
+		// the shipped BootstrapCodes convention (CORRECTION-CODE-GEN-001).
+		full := cuid2.Generate()
+		if len(full) > 12 {
+			code = "auto-" + full[:12]
+		} else {
+			code = "auto-" + full
+		}
+	}
+	now := time.Now().UTC().Format(time.RFC3339)
+
+	// Embed for the persistent node so downstream retrieval + future dedup
+	// have vectors on this node. Non-fatal on embed error — write without
+	// the embedding property, and the shipped consolidation embed-backfill
+	// path will fill it later.
+	var embedding []float32
+	if s.embedder != nil {
+		if e, err := s.embedder.Embed(r.Context(), req.Content); err == nil {
+			embedding = e
+		}
+	}
+
+	// Build CREATE Cypher. Two variants — with vs without embedding — mirror
+	// CreateCorrectionNodes's shape at hidden/correction_nodes.go.
+	baseProps := `{
+		space_id: $spaceId,
+		node_id: $nodeId,
+		role_type: $roleType,
+		constraint_code: $code,
+		constraint_type: $constraintType,
+		is_informational: $isInformational,
+		name: $name,
+		content: $content,
+		scope: $scope,
+		layer: 1,
+		confidence: 0.90,
+		tags: $tags,
+		created_at: datetime($now),
+		updated_at: datetime($now),
+		volatile: false,
+		is_archived: false`
+	if len(embedding) > 0 {
+		baseProps += `,
+		embedding: $embedding`
+	}
+	cypher := `CREATE (n:MemoryNode ` + baseProps + `
+	}) RETURN n.node_id AS node_id, n.constraint_code AS constraint_code`
+	params := map[string]any{
+		"spaceId":         req.SpaceID,
+		"nodeId":          nodeID,
+		"roleType":        req.RoleType,
+		"code":            code,
+		"constraintType":  req.ConstraintType,
+		"isInformational": req.IsInformational,
+		"name":            code, // human handle mirrors the code
+		"content":         req.Content,
+		"scope":           req.Scope,
+		"tags":            []string{req.RoleType, "ui_authored"},
+		"now":             now,
+	}
+	if len(embedding) > 0 {
+		params["embedding"] = embedding
+	}
+
+	session := s.driver.NewSession(r.Context(), neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer session.Close(r.Context())
+	_, err := session.ExecuteWrite(r.Context(), func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(r.Context(), cypher, params)
+		if err != nil {
+			return nil, err
+		}
+		if _, err := res.Consume(r.Context()); err != nil {
+			return nil, err
+		}
+		return nil, nil
+	})
+	if err != nil {
+		writeInternalError(w, err, "rules create")
+		return
+	}
+	slog.Info("jiminy_rules: rule created via UI",
+		"space_id", req.SpaceID,
+		"node_id", nodeID,
+		"constraint_code", code,
+		"role_type", req.RoleType,
+		"constraint_type", req.ConstraintType,
+		"is_informational", req.IsInformational,
+	)
+	writeJSON(w, http.StatusOK, map[string]any{
+		"data": map[string]any{
+			"node_id":         nodeID,
+			"constraint_code": code,
+			"similar_count":   0,
+		},
+	})
+}
+
+// fetchSimilarRules runs the shipped memNodeEmbedding vector-index query
+// filtered to live constraint/correction nodes ≥ threshold similarity.
+// Mirrors CREATE-CORRECTION-DEDUP-001's dedup shape.
+func (s *Server) fetchSimilarRules(ctx context.Context, spaceID string, embedding []float32, threshold float64, topK int) ([]rulesSimilarRule, error) {
+	if topK <= 0 {
+		topK = 5
+	}
+	session := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer session.Close(ctx)
+	cypher := `
+		CALL db.index.vector.queryNodes('memNodeEmbedding', $topK, $embedding)
+		YIELD node AS n, score AS sim
+		WHERE n.space_id = $spaceId
+		  AND n.role_type IN ['constraint','correction']
+		  AND NOT coalesce(n.is_archived, false)
+		  AND sim >= $threshold
+		RETURN n.node_id AS nid,
+		       coalesce(n.constraint_code, '') AS code,
+		       n.role_type AS role,
+		       coalesce(n.content, '') AS content,
+		       sim
+		ORDER BY sim DESC LIMIT $topK
+	`
+	result, err := session.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, cypher, map[string]any{
+			"spaceId":   spaceID,
+			"embedding": embedding,
+			"threshold": threshold,
+			"topK":      int64(topK),
+		})
+		if err != nil {
+			return nil, err
+		}
+		return res.Collect(ctx)
+	})
+	if err != nil {
+		return nil, err
+	}
+	records := result.([]*neo4j.Record)
+	out := make([]rulesSimilarRule, 0, len(records))
+	for _, rec := range records {
+		item := rulesSimilarRule{}
+		if v, ok := rec.Get("nid"); ok {
+			item.NodeID, _ = v.(string)
+		}
+		if v, ok := rec.Get("code"); ok {
+			item.ConstraintCode, _ = v.(string)
+		}
+		if v, ok := rec.Get("role"); ok {
+			item.RoleType, _ = v.(string)
+		}
+		if v, ok := rec.Get("sim"); ok {
+			if f, ok := v.(float64); ok {
+				item.Similarity = f
+			}
+		}
+		if v, ok := rec.Get("content"); ok {
+			if s, ok := v.(string); ok {
+				if len(s) > 200 {
+					s = s[:200]
+				}
+				item.ContentHead = s
+			}
+		}
+		out = append(out, item)
+	}
+	return out, nil
+}
+
+type rulesTombstoneRequest struct {
+	SpaceID string `json:"space_id,omitempty"`
+	Reason  string `json:"reason,omitempty"`
+}
+
+// doRulesTombstone soft-deletes a rule (is_archived=true + archive_reason
+// + archived_at). Reversible via direct Cypher (deliberate: keeps the
+// un-tombstone path operator-gated + prevents accidental resurrection).
+// Path: /v1/jiminy/rules/{code}/tombstone
+func (s *Server) doRulesTombstone(w http.ResponseWriter, r *http.Request, code string) {
+	if !s.cfg.JiminyRulesUIWriteEnabled {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{
+			"error": "rule mutation is currently disabled (set JIMINY_RULES_UI_WRITE_ENABLED=true in .env + restart to enable)",
+		})
+		return
+	}
+	if code == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "constraint_code is required in path"})
+		return
+	}
+	var req rulesTombstoneRequest
+	// Body optional — allow empty JSON for a "just tombstone it" flow.
+	if r.ContentLength > 0 {
+		if !readJSON(w, r, &req) {
+			return
+		}
+	}
+	if req.SpaceID == "" {
+		req.SpaceID = s.cfg.RSICWatchdogSpaceID
+	}
+	if req.SpaceID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "space_id is required (body or RSIC_WATCHDOG_SPACE_ID fallback)"})
+		return
+	}
+	if s.driver == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "Neo4j driver not available"})
+		return
+	}
+	reason := strings.TrimSpace(req.Reason)
+	if reason == "" {
+		reason = "ui_tombstone_" + time.Now().UTC().Format("20060102T150405Z")
+	}
+
+	// Locate the rule first so we can distinguish "not found" from
+	// "already tombstoned" in the response — operator wants both signals.
+	rule, found, err := s.fetchRuleByCode(r.Context(), req.SpaceID, code)
+	if err != nil {
+		writeInternalError(w, err, "rules tombstone: fetch")
+		return
+	}
+	if !found {
+		writeJSON(w, http.StatusNotFound, map[string]any{
+			"error":           "rule not found",
+			"space_id":        req.SpaceID,
+			"constraint_code": code,
+		})
+		return
+	}
+	previousState := "active"
+	if rule.IsArchived {
+		previousState = "already_archived"
+	}
+
+	// Set is_archived=true + archive_reason + archived_at. Idempotent —
+	// re-tombstoning a tombstoned rule just refreshes archive_reason.
+	cypher := `MATCH (n:MemoryNode)
+		WHERE n.space_id = $spaceId
+		  AND n.constraint_code = $code
+		  AND n.role_type IN ['constraint','correction']
+		SET n.is_archived = true,
+		    n.archive_reason = $reason,
+		    n.archived_at = datetime($now),
+		    n.updated_at = datetime($now)
+		RETURN n.node_id AS node_id`
+	now := time.Now().UTC().Format(time.RFC3339)
+	_, err = func() (any, error) {
+		session := s.driver.NewSession(r.Context(), neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+		defer session.Close(r.Context())
+		return session.ExecuteWrite(r.Context(), func(tx neo4j.ManagedTransaction) (any, error) {
+			res, err := tx.Run(r.Context(), cypher, map[string]any{
+				"spaceId": req.SpaceID,
+				"code":    code,
+				"reason":  reason,
+				"now":     now,
+			})
+			if err != nil {
+				return nil, err
+			}
+			if _, err := res.Consume(r.Context()); err != nil {
+				return nil, err
+			}
+			return nil, nil
+		})
+	}()
+	if err != nil {
+		writeInternalError(w, err, "rules tombstone: write")
+		return
+	}
+	slog.Info("jiminy_rules: rule tombstoned via UI",
+		"space_id", req.SpaceID,
+		"node_id", rule.NodeID,
+		"constraint_code", code,
+		"reason", reason,
+		"previous_state", previousState,
+	)
+	writeJSON(w, http.StatusOK, map[string]any{
+		"data": map[string]any{
+			"node_id":        rule.NodeID,
+			"constraint_code": code,
+			"archive_reason": reason,
+			"previous_state": previousState,
+		},
+	})
+}
+
+// Ensure the errors + strconv imports don't go unused in edge builds.
+var (
+	_ = errors.New
+	_ = strconv.Atoi
+)

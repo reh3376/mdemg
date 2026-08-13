@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"mdemg/internal/config"
@@ -24,12 +25,11 @@ func newRulesTestServer(t *testing.T) *Server {
 	}}
 }
 
-// TestRulesList_MethodNotAllowed pins the shape: GET-only handler must
-// reject POST/PUT/DELETE/PATCH. Regression guard against a copy-paste
-// error that widens the method set.
+// TestRulesList_MethodNotAllowed pins the method dispatch: after Epic 3,
+// GET → list, POST → create (flag-gated); PUT/DELETE/PATCH still 405.
 func TestRulesList_MethodNotAllowed(t *testing.T) {
 	s := newRulesTestServer(t)
-	for _, m := range []string{http.MethodPost, http.MethodPut, http.MethodDelete, http.MethodPatch} {
+	for _, m := range []string{http.MethodPut, http.MethodDelete, http.MethodPatch} {
 		rec := httptest.NewRecorder()
 		s.handleRulesList(rec, httptest.NewRequest(m, "/v1/jiminy/rules", nil))
 		if rec.Code != http.StatusMethodNotAllowed {
@@ -38,7 +38,9 @@ func TestRulesList_MethodNotAllowed(t *testing.T) {
 	}
 }
 
-// TestRulesDetail_MethodNotAllowed same-shape pin for the detail path.
+// TestRulesDetail_MethodNotAllowed same-shape pin. After Epic 3 GET →
+// detail; PUT/DELETE/PATCH still 405 on the {code} path (POST is only
+// valid on the /tombstone subpath — that's tested separately).
 func TestRulesDetail_MethodNotAllowed(t *testing.T) {
 	s := newRulesTestServer(t)
 	for _, m := range []string{http.MethodPost, http.MethodPut, http.MethodDelete, http.MethodPatch} {
@@ -115,5 +117,117 @@ func TestRulesDetail_TrimsPathSuffix(t *testing.T) {
 	// Should be 503 (nil driver), NOT 400 (empty code)
 	if rec.Code == http.StatusBadRequest {
 		t.Errorf("path-parse should tolerate subpaths; got 400: %s", rec.Body.String())
+	}
+}
+
+// --- JIMINY-RULES-UI-001 Epic 3 pin tests ---
+
+func newRulesTestServerWithWriteFlag(t *testing.T, writeEnabled bool) *Server {
+	t.Helper()
+	return &Server{cfg: config.Config{
+		RSICWatchdogSpaceID:              "mdemg-dev",
+		JiminyRulesListMaxLimit:          200,
+		JiminyRulesOutcomesLookbackHours: 168,
+		JiminyRulesUIWriteEnabled:        writeEnabled,
+		JiminyRulesDedupSimThreshold:     0.75,
+	}}
+}
+
+// TestRulesCreate_FlagOffReturns503 pins the arc-safety contract: with
+// JiminyRulesUIWriteEnabled=false (the default during the JIMINY-CEILING-BREAK-2
+// arc window), POST /v1/jiminy/rules MUST return 503 with a named-flag
+// error. Regression here → an operator flipping the flag off would find
+// their edits silently landing anyway.
+func TestRulesCreate_FlagOffReturns503(t *testing.T) {
+	s := newRulesTestServerWithWriteFlag(t, false)
+	rec := httptest.NewRecorder()
+	body := `{"space_id":"mdemg-dev","role_type":"constraint","constraint_type":"must","content":"test"}`
+	s.handleRulesList(rec, httptest.NewRequest(http.MethodPost, "/v1/jiminy/rules", strings.NewReader(body)))
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("POST with flag off → %d, want 503 (%s)", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "JIMINY_RULES_UI_WRITE_ENABLED") {
+		t.Errorf("503 body should name the flag; got: %s", rec.Body.String())
+	}
+}
+
+// TestRulesTombstone_FlagOffReturns503 same arc-safety pin for tombstone.
+func TestRulesTombstone_FlagOffReturns503(t *testing.T) {
+	s := newRulesTestServerWithWriteFlag(t, false)
+	rec := httptest.NewRecorder()
+	body := `{"space_id":"mdemg-dev","reason":"test"}`
+	s.handleRulesDetail(rec, httptest.NewRequest(http.MethodPost, "/v1/jiminy/rules/some-code/tombstone", strings.NewReader(body)))
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("POST tombstone with flag off → %d, want 503 (%s)", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "JIMINY_RULES_UI_WRITE_ENABLED") {
+		t.Errorf("503 body should name the flag; got: %s", rec.Body.String())
+	}
+}
+
+// TestRulesCreate_ValidatesRoleType pins the enum-guard: role_type must
+// be one of {constraint, correction}. Regression would allow writing
+// nodes with an arbitrary role_type value → substrate corruption.
+func TestRulesCreate_ValidatesRoleType(t *testing.T) {
+	s := newRulesTestServerWithWriteFlag(t, true)
+	rec := httptest.NewRecorder()
+	body := `{"space_id":"mdemg-dev","role_type":"bogus-type","constraint_type":"must","content":"test"}`
+	s.handleRulesList(rec, httptest.NewRequest(http.MethodPost, "/v1/jiminy/rules", strings.NewReader(body)))
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("bogus role_type → %d, want 400 (%s)", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "role_type must be one of") {
+		t.Errorf("400 body should name the allowed values; got: %s", rec.Body.String())
+	}
+}
+
+// TestRulesCreate_ValidatesConstraintType same-shape enum pin.
+func TestRulesCreate_ValidatesConstraintType(t *testing.T) {
+	s := newRulesTestServerWithWriteFlag(t, true)
+	rec := httptest.NewRecorder()
+	body := `{"space_id":"mdemg-dev","role_type":"constraint","constraint_type":"maybe","content":"test"}`
+	s.handleRulesList(rec, httptest.NewRequest(http.MethodPost, "/v1/jiminy/rules", strings.NewReader(body)))
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("bogus constraint_type → %d, want 400 (%s)", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "must, must_not, should, note") {
+		t.Errorf("400 body should name the allowed values; got: %s", rec.Body.String())
+	}
+}
+
+// TestRulesCreate_RejectsEmptyContent pins that content is required.
+// Whitespace-only content is treated as empty (strings.TrimSpace).
+func TestRulesCreate_RejectsEmptyContent(t *testing.T) {
+	s := newRulesTestServerWithWriteFlag(t, true)
+	for _, empty := range []string{"", "   ", "\n\t"} {
+		rec := httptest.NewRecorder()
+		body := `{"space_id":"mdemg-dev","role_type":"constraint","constraint_type":"must","content":"` + empty + `"}`
+		s.handleRulesList(rec, httptest.NewRequest(http.MethodPost, "/v1/jiminy/rules", strings.NewReader(body)))
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("content=%q → %d, want 400 (%s)", empty, rec.Code, rec.Body.String())
+		}
+	}
+}
+
+// TestRulesTombstone_UnknownSubpath pins that a POST to an unknown
+// subpath (e.g. /{code}/frobnicate) returns 404, NOT 405 (405 would
+// imply the subpath exists but wrong method).
+func TestRulesTombstone_UnknownSubpath(t *testing.T) {
+	s := newRulesTestServerWithWriteFlag(t, true)
+	rec := httptest.NewRecorder()
+	s.handleRulesDetail(rec, httptest.NewRequest(http.MethodPost, "/v1/jiminy/rules/some-code/frobnicate", nil))
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("unknown subpath → %d, want 404 (%s)", rec.Code, rec.Body.String())
+	}
+}
+
+// TestRulesTombstone_WrongMethodOnTombstonePath — /tombstone requires POST.
+// GET /some-code/tombstone should return 405 (not 200-detail-of-tombstone).
+func TestRulesTombstone_WrongMethodOnTombstonePath(t *testing.T) {
+	s := newRulesTestServerWithWriteFlag(t, true)
+	rec := httptest.NewRecorder()
+	s.handleRulesDetail(rec, httptest.NewRequest(http.MethodGet, "/v1/jiminy/rules/some-code/tombstone", nil))
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("GET on /tombstone → %d, want 405 (%s)", rec.Code, rec.Body.String())
 	}
 }
