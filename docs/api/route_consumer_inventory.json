@@ -1521,6 +1521,14 @@
       "notes": "Prometheus exposition endpoint; no scrape configured (Grafana provisioned against TSDB - see mdemg-graph-topology.json:454 \"no Prometheus scrape endpoint on mdemg\"). Ops surface.",
       "uats_specs": []
     },
+    "/v1/review/autograde-preview": {
+      "consumers": [
+        "ui:api.js"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "HITL-AUTOGRADE-PREVIEW-001 (2026-08-12): internal/api/ui/api.js reviewAutogradePreview() → tabs/review.js pre-fills rubric radios on item load with an LLM autograder proposal so the operator only needs to accept-as-is or override per dimension. READ-ONLY on substrate; does NOT write to review_grades or constraint_outcomes (measurement-window safe). Response shape {dimensions, confidence, rationale, available:bool}; UI falls back gracefully on available:false.",
+      "uats_specs": []
+    },
     "/v1/review/candidates": {
       "consumers": [
         "cli:mdemg review autograde"
