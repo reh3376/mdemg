@@ -505,7 +505,7 @@ func extractDataSourceReferences(text string) []string {
 		{`\blinear\.app/\S+`, "linear"},
 		{`\bhttps?://(?:www\.)?asana\.com/\S+`, "asana"},
 		{`\btrello\.com/\S+`, "trello"},
-		{`\bdocs\.google\.com/\S+`, "google_docs"},
+		{`(?:^|[\s(])docs\.google\.com/\S+`, "google_docs"},
 		{`\bdrive\.google\.com/\S+`, "google_drive"},
 		{`\bdropbox\.com/\S+`, "dropbox"},
 		{`\bfigma\.com/\S+`, "figma"},
