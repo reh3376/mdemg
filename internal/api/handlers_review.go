@@ -262,7 +262,27 @@ func (s *Server) handleReviewGrade(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	item, _, _ := d.FetchItem(r.Context(), req.SpaceID, req.ItemID)
+	// REVIEW-GRADE-VALIDATE-ITEM-ID-001 (2026-08-13): validate item_id
+	// exists in the dataset BEFORE writing. Pre-fix, this call captured
+	// only `item` and discarded the `found` return, so any arbitrary
+	// item_id passed validation and landed as an orphan row in
+	// review_grades (no join back to a real item; retrain-corpus
+	// pollution; false grade counts). FetchItem is a per-dataset read
+	// (LEFT JOIN semantics vary) — treat error same as not-found for
+	// safety; the caller sees a clean 404 either way.
+	item, found, fetchErr := d.FetchItem(r.Context(), req.SpaceID, req.ItemID)
+	if fetchErr != nil {
+		writeInternalError(w, fetchErr, "review fetch item for validation")
+		return
+	}
+	if !found {
+		writeJSON(w, http.StatusNotFound, map[string]any{
+			"error":      "unknown item_id in dataset " + req.DatasetID,
+			"dataset_id": req.DatasetID,
+			"item_id":    req.ItemID,
+		})
+		return
+	}
 	grade := review.Grade{
 		GradeID: cuid2.Generate(), DatasetID: req.DatasetID, ItemID: req.ItemID,
 		SpaceID: req.SpaceID, GraderID: req.GraderID, RubricVersion: rb.Version,
