@@ -273,6 +273,75 @@ func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsStr(s, substr))
 }
 
+// TestScrub_IsIdempotent pins the SCRUB-IDEMPOTENT-001 (2026-08-13)
+// contract: every scrub pattern MUST reach a fixed point in one pass.
+// Intake runs a single pass; the export scan-gate re-checks by comparing
+// stored == Scrub(stored). A non-idempotent scrub silently blocks
+// export-auto forever on any row whose second pass differs from the first.
+//
+// The realistic corpus below covers the two documented failure classes
+// (SCRUB-IDEMPOTENT-001 pre-fix): closing-paren consumption
+// (password=neo4jPass() -> password=[REDACTED]) with `)` left behind, then
+// re-scrubbed) and closing-quote consumption (api_key=os.getenv("KEY")
+// leaves `KEY")` behind then re-scrubbed). If either regresses, this test
+// catches the class immediately.
+func TestScrub_IsIdempotent(t *testing.T) {
+	cases := []string{
+		// Pre-fix failure class 1: closing paren consumed by greedy value class
+		`if password==""`,
+		`\tif password="" {`,
+		`password=neo4jPass()`,
+		`password=os.Getenv("NEO4J_PASSWORD")`,
+		// Pre-fix failure class 2: string-literal argument to getter
+		`api_key = os.getenv("OPENAI_API_KEY")`,
+		`token=cfg.Get("AUTH_TOKEN")`,
+		`SECRET = os.environ["JWT_SECRET"]`,
+		// Value that begins with a bracket (looks like our own placeholder)
+		`password=[REDACTED])`,
+		`api_key=[REDACTED]OPENAI_API_KEY")`,
+		`password=[REDACTED]`,
+		`password=[REDACTED_KEY]`,
+		// Multi-secret line
+		`db=postgres://user:pass@host && export API_KEY=abc123 SECRET=xyz789`,
+		// Shell env-var references (SCRUB-ENV-REF-001 preserves these)
+		`PGPASSWORD=$TSDB_PASSWORD`,
+		`PGPASSWORD=${TSDB_PASSWORD:-default}`,
+		// Real secret + real path + real email together
+		`sk-1234567890abcdefghijklmnop authored by user@example.com in /Users/foo/bar/baz.go`,
+		// Neo4j URI already-scrubbed form
+		`neo4j://[REDACTED]@localhost:7687`,
+		// Empty and clean strings
+		``,
+		`nothing to scrub here — plain text about databases`,
+	}
+	for _, in := range cases {
+		once := ScrubStringExcluding(in, nil)
+		twice := ScrubStringExcluding(once, nil)
+		if once != twice {
+			t.Errorf("Scrub is NOT idempotent on input:\n  in:    %q\n  once:  %q\n  twice: %q", in, once, twice)
+		}
+	}
+}
+
+// TestScrub_PlaceholderPreserved locks in the SCRUB-IDEMPOTENT-001
+// belt-and-suspenders defense: even if the regex value class later
+// widens for a legitimate reason, the placeholder-preserve branch in
+// scrubEnvSecret ensures previously-redacted values stay put.
+func TestScrub_PlaceholderPreserved(t *testing.T) {
+	cases := []string{
+		`password=[REDACTED]`,
+		`API_KEY=[REDACTED]`,
+		`token=[REDACTED_KEY]`,
+		`SECRET=[REDACTED_something]`,
+	}
+	for _, in := range cases {
+		out := ScrubStringExcluding(in, nil)
+		if out != in {
+			t.Errorf("placeholder-preserve failed:\n  in:  %q\n  out: %q", in, out)
+		}
+	}
+}
+
 func containsStr(s, sub string) bool {
 	for i := 0; i <= len(s)-len(sub); i++ {
 		if s[i:i+len(sub)] == sub {

@@ -148,47 +148,53 @@ func runDataScrubExportTables(ctx context.Context, cmd *cobra.Command, spaceID s
 
 	fmt.Fprintf(cmd.OutOrStdout(), "\nScanned:  %d rows\n", scanned)
 	fmt.Fprintf(cmd.OutOrStdout(), "Dirty:    %d rows (need scrub)\n", len(dirties))
+	// SCRUB-IDEMPOTENT-001 (2026-08-13): do NOT early-return when the
+	// guidance_training_rows branch is clean — the retrieval_events and
+	// llm_interactions branches below MUST still run. The previous
+	// early-return silently skipped them.
 	if len(dirties) == 0 {
-		fmt.Fprintln(cmd.OutOrStdout(), "\n(nothing to do — no rows contain unscrubbed PII)")
-		return nil
+		fmt.Fprintln(cmd.OutOrStdout(), "(nothing to do in guidance_training_rows)")
 	}
 
-	// Preview first 3 dirties.
-	fmt.Fprintln(cmd.OutOrStdout(), "\nSample (first 3):")
-	for i, d := range dirties {
-		if i >= 3 {
-			break
+	// Guidance-specific preview + apply. Only runs when dirties > 0 —
+	// pre-fix (before SCRUB-IDEMPOTENT-001) this returned early on the
+	// empty case, silently skipping the retrieval_events + llm_interactions
+	// branches. Also drops the dry-run early-return so dry-run now walks
+	// ALL three branches (retrieval + llm branches have their own dry-run
+	// guards that DON'T return early).
+	if len(dirties) > 0 {
+		fmt.Fprintln(cmd.OutOrStdout(), "\nSample (first 3):")
+		for i, d := range dirties {
+			if i >= 3 {
+				break
+			}
+			fmt.Fprintf(cmd.OutOrStdout(), "  row_id=%s\n", d.id)
+			if d.changedAction {
+				fmt.Fprintf(cmd.OutOrStdout(), "    action_summary: %q → %q\n", short(d.oldAction, 80), short(d.newAction, 80))
+			}
+			if d.changedGC {
+				fmt.Fprintf(cmd.OutOrStdout(), "    guidance_content: %q → %q\n", short(d.oldGC, 80), short(d.newGC, 80))
+			}
 		}
-		fmt.Fprintf(cmd.OutOrStdout(), "  row_id=%s\n", d.id)
-		if d.changedAction {
-			fmt.Fprintf(cmd.OutOrStdout(), "    action_summary: %q → %q\n", short(d.oldAction, 80), short(d.newAction, 80))
-		}
-		if d.changedGC {
-			fmt.Fprintf(cmd.OutOrStdout(), "    guidance_content: %q → %q\n", short(d.oldGC, 80), short(d.newGC, 80))
+		if dryRun {
+			fmt.Fprintf(cmd.OutOrStdout(), "(dry-run — %d guidance_training_rows dirty rows would be scrubbed)\n", len(dirties))
+		} else {
+			updateSQL := `UPDATE guidance_training_rows
+			              SET action_summary = $2, guidance_content = $3
+			              WHERE row_id = $1 AND space_id = $4`
+			var applied int
+			for _, d := range dirties {
+				tag, err := client.Pool().Exec(ctx, updateSQL, d.id, d.newAction, d.newGC, spaceID)
+				if err != nil {
+					return fmt.Errorf("update row_id=%s: %w", d.id, err)
+				}
+				if tag.RowsAffected() > 0 {
+					applied++
+				}
+			}
+			fmt.Fprintf(cmd.OutOrStdout(), "✓ Scrubbed %d/%d dirty rows in guidance_training_rows for space=%q\n", applied, len(dirties), spaceID)
 		}
 	}
-
-	if dryRun {
-		fmt.Fprintf(cmd.OutOrStdout(), "\n(dry-run — no rows written; re-run with --yes to apply the scrub to all %d dirty rows)\n", len(dirties))
-		return nil
-	}
-
-	// APPLY. UPDATE-in-place per row. Bounded by the scanned set (we don't
-	// re-scan; we UPDATE by row_id + time via the primary key).
-	updateSQL := `UPDATE guidance_training_rows
-	              SET action_summary = $2, guidance_content = $3
-	              WHERE row_id = $1 AND space_id = $4`
-	var applied int
-	for _, d := range dirties {
-		tag, err := client.Pool().Exec(ctx, updateSQL, d.id, d.newAction, d.newGC, spaceID)
-		if err != nil {
-			return fmt.Errorf("update row_id=%s: %w", d.id, err)
-		}
-		if tag.RowsAffected() > 0 {
-			applied++
-		}
-	}
-	fmt.Fprintf(cmd.OutOrStdout(), "\n✓ Scrubbed %d/%d dirty rows in guidance_training_rows for space=%q\n", applied, len(dirties), spaceID)
 
 	// EXPORT-SCRUB-INTAKE-001 E2b: also scrub retrieval_events.query_text.
 	// Same pattern; skip list matches retrievalEventsSpec.textFields (abs_path).
@@ -229,32 +235,108 @@ func runDataScrubExportTables(ctx context.Context, cmd *cobra.Command, spaceID s
 	fmt.Fprintf(cmd.OutOrStdout(), "Scanned:  %d rows\nDirty:    %d rows\n", retScanned, len(retDirties))
 	if len(retDirties) == 0 {
 		fmt.Fprintln(cmd.OutOrStdout(), "(nothing to do in retrieval_events)")
+	} else {
+		fmt.Fprintln(cmd.OutOrStdout(), "Sample (first 3):")
+		for i, d := range retDirties {
+			if i >= 3 {
+				break
+			}
+			fmt.Fprintf(cmd.OutOrStdout(), "  event_id=%s\n    query_text: %q → %q\n", d.id, short(d.oldQT, 80), short(d.newQT, 80))
+		}
+		if dryRun {
+			fmt.Fprintf(cmd.OutOrStdout(), "(dry-run — would scrub %d retrieval_events rows)\n", len(retDirties))
+		} else {
+			retUpdateSQL := `UPDATE retrieval_events SET query_text = $2 WHERE event_id = $1 AND space_id = $3`
+			var retApplied int
+			for _, d := range retDirties {
+				tag, err := client.Pool().Exec(ctx, retUpdateSQL, d.id, d.newQT, spaceID)
+				if err != nil {
+					return fmt.Errorf("update retrieval event_id=%s: %w", d.id, err)
+				}
+				if tag.RowsAffected() > 0 {
+					retApplied++
+				}
+			}
+			fmt.Fprintf(cmd.OutOrStdout(), "✓ Scrubbed %d/%d dirty rows in retrieval_events for space=%q\n", retApplied, len(retDirties), spaceID)
+		}
+	}
+
+	// SCRUB-IDEMPOTENT-001 E4 (2026-08-13): also scrub
+	// llm_interactions.user_prompt. Same predicate as the exporter's spec
+	// (textFields[6] = nil = apply ALL patterns). Historical rows
+	// pre-dating SCRUB-IDEMPOTENT-001's regex tightening got stored with
+	// non-idempotent scrub output; the shipped intake scrub still runs
+	// only one pass so those need a manual sweep.
+	fmt.Fprintln(cmd.OutOrStdout(), "\n--- llm_interactions.user_prompt ---")
+	llmScanSQL := `SELECT trace_id, user_prompt FROM llm_interactions
+	               WHERE space_id = $1 AND time >= now() - $2::interval AND user_prompt IS NOT NULL`
+	llmScanArgs := []any{spaceID, interval}
+	if limit > 0 {
+		llmScanSQL += fmt.Sprintf(" LIMIT %d", limit)
+	}
+	llmRows, err := client.Pool().Query(ctx, llmScanSQL, llmScanArgs...)
+	if err != nil {
+		return fmt.Errorf("scan llm_interactions: %w", err)
+	}
+	type llmDirty struct {
+		id     string
+		oldUP  string
+		newUP  string
+	}
+	var llmDirties []llmDirty
+	var llmScanned int
+	for llmRows.Next() {
+		var id, up string
+		if err := llmRows.Scan(&id, &up); err != nil {
+			llmRows.Close()
+			return fmt.Errorf("scan llm row: %w", err)
+		}
+		llmScanned++
+		newUP := llmclient.ScrubStringExcluding(up, nil) // full scrub, matches exporter textFields[6]=nil
+		if newUP != up {
+			llmDirties = append(llmDirties, llmDirty{id: id, oldUP: up, newUP: newUP})
+		}
+	}
+	llmRows.Close()
+	if err := llmRows.Err(); err != nil {
+		return fmt.Errorf("scan llm iter: %w", err)
+	}
+	fmt.Fprintf(cmd.OutOrStdout(), "Scanned:  %d rows\nDirty:    %d rows\n", llmScanned, len(llmDirties))
+	if len(llmDirties) == 0 {
+		fmt.Fprintln(cmd.OutOrStdout(), "(nothing to do in llm_interactions)")
 		return nil
 	}
 	// Preview
 	fmt.Fprintln(cmd.OutOrStdout(), "Sample (first 3):")
-	for i, d := range retDirties {
+	for i, d := range llmDirties {
 		if i >= 3 {
 			break
 		}
-		fmt.Fprintf(cmd.OutOrStdout(), "  event_id=%s\n    query_text: %q → %q\n", d.id, short(d.oldQT, 80), short(d.newQT, 80))
+		fmt.Fprintf(cmd.OutOrStdout(), "  trace_id=%s\n    user_prompt: %q → %q\n", d.id, short(d.oldUP, 80), short(d.newUP, 80))
 	}
 	if dryRun {
-		fmt.Fprintf(cmd.OutOrStdout(), "(dry-run — would scrub %d retrieval_events rows)\n", len(retDirties))
+		fmt.Fprintf(cmd.OutOrStdout(), "(dry-run — would scrub %d llm_interactions rows)\n", len(llmDirties))
 		return nil
 	}
-	retUpdateSQL := `UPDATE retrieval_events SET query_text = $2 WHERE event_id = $1 AND space_id = $3`
-	var retApplied int
-	for _, d := range retDirties {
-		tag, err := client.Pool().Exec(ctx, retUpdateSQL, d.id, d.newQT, spaceID)
+	// TimescaleDB: historical llm_interactions chunks are compressed; raise
+	// the per-txn decompression cap for this session so UPDATEs on old
+	// chunks don't fail with SQLSTATE 53400. Best-effort; the UPDATEs below
+	// still surface any real errors per row.
+	if _, err := client.Pool().Exec(ctx, `SET timescaledb.max_tuples_decompressed_per_dml_transaction = 0`); err != nil {
+		fmt.Fprintf(cmd.OutOrStdout(), "(warn: could not raise decompression cap: %v)\n", err)
+	}
+	llmUpdateSQL := `UPDATE llm_interactions SET user_prompt = $2 WHERE trace_id = $1 AND space_id = $3`
+	var llmApplied int
+	for _, d := range llmDirties {
+		tag, err := client.Pool().Exec(ctx, llmUpdateSQL, d.id, d.newUP, spaceID)
 		if err != nil {
-			return fmt.Errorf("update retrieval event_id=%s: %w", d.id, err)
+			return fmt.Errorf("update llm trace_id=%s: %w", d.id, err)
 		}
 		if tag.RowsAffected() > 0 {
-			retApplied++
+			llmApplied++
 		}
 	}
-	fmt.Fprintf(cmd.OutOrStdout(), "✓ Scrubbed %d/%d dirty rows in retrieval_events for space=%q\n", retApplied, len(retDirties), spaceID)
+	fmt.Fprintf(cmd.OutOrStdout(), "✓ Scrubbed %d/%d dirty rows in llm_interactions for space=%q\n", llmApplied, len(llmDirties), spaceID)
 	return nil
 }
 
