@@ -1055,6 +1055,163 @@
         }
       },
       "description": "Fraction of the surfaced guidance set that is the actionable class (constraint/correction) vs abstraction (pattern/learning/concept). Lever A moves this; target rises toward the actionable class."
+    },
+    {
+      "type": "row",
+      "title": "JIMINY-CEILING-BREAK-2 Arc Trajectory",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 51
+      },
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "Actionable Follow Rate \u2014 Arc Trajectory (baseline 13.25% \u2192 target \u226580%)",
+      "description": "ARC-TRAJECTORY-PANEL-001 (2026-08-12): live trajectory of the JIMINY-CEILING-BREAK-2 arc. Blue = actionable follow rate over the dashboard time range (1h buckets over constraint_outcomes filtered to guidance_type IN ('constraint','correction'), followed=1.0 + partial=0.5). Orange dashed = baseline (13.25%) at arc-shipping-complete moment (2026-08-12 18:17 UTC, captured in commit a142fca3). Threshold line at 80% is the arc target \u2014 do NOT normalize any current-value framing as 'by design'; the arc actively lifts this. Passive re-check windows: T+72h 2026-08-15, T+168h 2026-08-19. See docs/development/jiminy-ceiling-break-2/README.md.",
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 52
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "timescaledb"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT time_bucket('1 hour', time) AS time,   ROUND(100.0 * (SUM(CASE outcome_type WHEN 'followed' THEN 1.0                           WHEN 'partial_compliance' THEN 0.5                           ELSE 0.0 END) / NULLIF(COUNT(*),0))::numeric, 2)   AS \"Actionable Follow Rate (%)\" FROM constraint_outcomes WHERE space_id = '$space_id'   AND guidance_type IN ('constraint','correction')   AND outcome_type IN ('followed','partial_compliance','ignored','contradicted')   AND $__timeFilter(time) GROUP BY 1 ORDER BY 1"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "postgres",
+            "uid": "timescaledb"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT time_bucket('1 hour', time) AS time,   13.25 AS \"Baseline (2026-08-12 18:17 UTC)\" FROM constraint_outcomes WHERE space_id = '$space_id'   AND $__timeFilter(time) GROUP BY 1 ORDER BY 1"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "pointSize": 4,
+            "spanNulls": true,
+            "thresholdsStyle": {
+              "mode": "line"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 20
+              },
+              {
+                "color": "yellow",
+                "value": 40
+              },
+              {
+                "color": "green",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Baseline (2026-08-12 18:17 UTC)"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "orange"
+                }
+              },
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    10,
+                    10
+                  ]
+                }
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 1
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Actionable Follow Rate (%)"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 2
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "min",
+            "max",
+            "mean"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
     }
   ],
   "schemaVersion": 39,

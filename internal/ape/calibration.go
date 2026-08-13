@@ -316,6 +316,12 @@ func (c *Calibrator) getHistoryLocked(limit int) []CycleOutcome {
 	if limit <= 0 || limit > len(c.cycleHistory) {
 		limit = len(c.cycleHistory)
 	}
+	// SEC-TRANCHE-3: defensive cap on the return slice. `cycleHistory`
+	// grows unbounded over the server's lifetime; hard cap keeps a
+	// caller-supplied `limit` from forcing a large allocation.
+	if limit > 10000 {
+		limit = 10000
+	}
 	start := len(c.cycleHistory) - limit
 	out := make([]CycleOutcome, limit)
 	copy(out, c.cycleHistory[start:])

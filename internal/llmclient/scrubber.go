@@ -12,8 +12,22 @@ var (
 	// Absolute paths: /Users/*, /home/*, C:\Users\*
 	absPathPattern = regexp.MustCompile(`(?:/Users/[^\s"']+|/home/[^\s"']+|[A-Z]:\\\\Users\\\\[^\s"']+)`)
 
-	// Environment secrets: VAR=value patterns for known sensitive vars
-	envSecretPattern = regexp.MustCompile(`(?i)(PASSWORD|SECRET|TOKEN|API_KEY|PRIVATE_KEY)\s*[=:]\s*["']?([^\s"',;]+)["']?`)
+	// Environment secrets: VAR=value patterns for known sensitive vars.
+	//
+	// Value class excludes ) and ] on top of the original whitespace/quote
+	// /comma/semicolon terminators. Rationale (SCRUB-IDEMPOTENT-001,
+	// 2026-08-13): with the older `[^\s"',;]+` class, intake-scrubbing
+	// `api_key = os.getenv("KEY")` produced `api_key=[REDACTED]KEY")`,
+	// which a second scrub pass rewrote to `api_key=[REDACTED])`, and a
+	// third to `api_key=[REDACTED]`. Intake runs ONE pass, so the export
+	// scan-gate always saw a diff and blocked export-auto in a loop.
+	// Excluding `)` and `]` (paired with the `isRedactedPlaceholder`
+	// preserve branch in scrubEnvSecret) makes the regex reach a fixed
+	// point after one pass. `{` `}` `<` `>` remain in the value class so
+	// SCRUB-ENV-REF-001's `${VAR}` / `${VAR:-default}` shell-ref
+	// preservation continues to work — narrowing further breaks those.
+	// Real secrets rarely contain ) or ] so the truncation risk is low.
+	envSecretPattern = regexp.MustCompile(`(?i)(PASSWORD|SECRET|TOKEN|API_KEY|PRIVATE_KEY)\s*[=:]\s*["']?([^\s"',;)\]]+)["']?`)
 
 	// Email addresses
 	emailPattern = regexp.MustCompile(`[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}`)
@@ -90,8 +104,21 @@ func scrubEnvSecret(s string) string {
 		if isShellEnvVarRef(value) {
 			return match // preserve — the value is a reference, not a secret
 		}
+		if isRedactedPlaceholder(value) {
+			return match // preserve — value is ALREADY a scrub placeholder (idempotency)
+		}
 		return name + "=[REDACTED]"
 	})
+}
+
+// isRedactedPlaceholder reports whether the captured value is already one
+// of the scrub replacement placeholders. Defense-in-depth against
+// idempotency drift when the regex value-class change alone doesn't fully
+// close the loop (SCRUB-IDEMPOTENT-001, 2026-08-13). Preserving these
+// prevents re-scrubbing from consuming trailing characters that weren't
+// part of the original secret.
+func isRedactedPlaceholder(v string) bool {
+	return strings.HasPrefix(v, "[REDACTED")
 }
 
 // isShellEnvVarRef reports whether a captured "value" is a shell env-var

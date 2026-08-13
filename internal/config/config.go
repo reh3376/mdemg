@@ -1706,6 +1706,17 @@ func FromEnv() (Config, error) {
 		}
 		return n, nil
 	}
+	atoi32 := func(k string, def int32) (int32, error) {
+		v := strings.TrimSpace(os.Getenv(k))
+		if v == "" {
+			return def, nil
+		}
+		n, err := strconv.ParseInt(v, 10, 32)
+		if err != nil {
+			return 0, fmt.Errorf("%s must be int32: %w", k, err)
+		}
+		return int32(n), nil
+	}
 	atof := func(k string, def float64) (float64, error) {
 		v := strings.TrimSpace(os.Getenv(k))
 		if v == "" {
@@ -5252,10 +5263,11 @@ func FromEnv() (Config, error) {
 	tsdbPassword := get("TSDB_PASSWORD", "mdemg_metrics")
 	tsdbDatabase := get("TSDB_DATABASE", "mdemg_metrics")
 	tsdbSSLMode := get("TSDB_SSL_MODE", "disable")
-	tsdbMaxConns, err := atoi("TSDB_MAX_CONNS", 10)
+	tsdbMaxConns32, err := atoi32("TSDB_MAX_CONNS", 10)
 	if err != nil {
 		return Config{}, err
 	}
+	tsdbMaxConns := int(tsdbMaxConns32)
 	tsdbFlushIntervalSec, err := atoi("TSDB_FLUSH_INTERVAL_SEC", 60)
 	if err != nil {
 		return Config{}, err

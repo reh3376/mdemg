@@ -156,7 +156,19 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 			Password: cfg.TSDBPassword,
 			Database: cfg.TSDBDatabase,
 			SSLMode:  cfg.TSDBSSLMode,
-			MaxConns: int32(cfg.TSDBMaxConns),
+			// SEC-TRANCHE-3: bounds-check before int32 conversion. Env-var
+			// derived; a huge or negative value would truncate weirdly. 4096
+			// is far above any realistic pgxpool cap.
+			MaxConns: func() int32 {
+				n := cfg.TSDBMaxConns
+				if n < 1 {
+					n = 10
+				}
+				if n > 4096 {
+					n = 4096
+				}
+				return int32(n)
+			}(),
 		}
 		tc, tsdbErr := tsdb.NewClient(context.Background(), tsdbCfg)
 		if tsdbErr != nil {

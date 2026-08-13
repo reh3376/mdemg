@@ -132,6 +132,11 @@ export const reviewDatasets = (spaceId) => get(`/v1/review/datasets?space_id=${e
 export const reviewNext = (datasetId, spaceId) => get(`/v1/review/next?dataset_id=${encodeURIComponent(datasetId)}&space_id=${encodeURIComponent(spaceId)}`);
 export const reviewGrade = (body) => post('/v1/review/grade', body);
 export const reviewReverse = (gradeId) => post('/v1/review/reverse', { grade_id: gradeId });
+// HITL-AUTOGRADE-PREVIEW-001: get the autograder's proposed grades for an
+// item WITHOUT recording. UI pre-fills rubric radios from the response so
+// operator hits `space` to accept-as-is or `0-4` to override per-dimension.
+export const reviewAutogradePreview = (datasetId, itemId, spaceId) =>
+    post('/v1/review/autograde-preview', { dataset_id: datasetId, item_id: itemId, space_id: spaceId });
 
 // --- Server ---
 export const serverRestart = () => post('/v1/admin/restart', null);

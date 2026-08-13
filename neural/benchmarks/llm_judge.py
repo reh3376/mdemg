@@ -23,7 +23,21 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
+from urllib.parse import urlparse
 from urllib.request import Request, urlopen
+
+
+def _is_openai_endpoint(base_url: str) -> bool:
+    """SEC-TRANCHE-3: return True iff *base_url*'s hostname IS `api.openai.com`
+    (or a subdomain of it). Substring-in-string is unsafe:
+    ``api.openai.com`` also matches ``api.openai.com.evil.example.com`` or
+    ``evil.com/?spoof=api.openai.com``. Parse the URL and compare hostnames.
+    """
+    try:
+        host = (urlparse(base_url).hostname or "").lower()
+    except (ValueError, AttributeError):
+        return False
+    return host == "api.openai.com" or host.endswith(".openai.com")
 
 
 class JudgeError(RuntimeError):
@@ -168,7 +182,7 @@ def judge(
             f"judge.latency_budget_ms={latency_budget_ms} < 15000 (MEMORY rule)"
         )
 
-    is_openai = "api.openai.com" in base_url
+    is_openai = _is_openai_endpoint(base_url)
     token_key = "max_completion_tokens" if is_openai else "max_tokens"
 
     body: dict[str, Any] = {

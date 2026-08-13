@@ -226,7 +226,14 @@ func extractLinks(html, baseURL string) []string {
 			continue
 		}
 		href := strings.TrimSpace(m[1])
-		if href == "" || strings.HasPrefix(href, "#") || strings.HasPrefix(href, "javascript:") {
+		// SEC-TRANCHE-3: also reject data: and vbscript: schemes
+		// (XSS-adjacent). Normalize to lowercase before prefix-checking so
+		// `JavaScript:` etc. cannot slip past.
+		lowerHref := strings.ToLower(href)
+		if href == "" || strings.HasPrefix(href, "#") ||
+			strings.HasPrefix(lowerHref, "javascript:") ||
+			strings.HasPrefix(lowerHref, "data:") ||
+			strings.HasPrefix(lowerHref, "vbscript:") {
 			continue
 		}
 

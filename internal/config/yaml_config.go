@@ -1156,9 +1156,22 @@ func EffectiveConfig(yamlPath string) []ConfigSource {
 }
 
 // isSensitive returns true for env vars that contain secrets.
+//
+// SEC-TRANCHE-3: widened to cover every credential-shaped env var this
+// process touches. `mdemg config show` masks these with `****`; extending
+// the list closes a class of "add a new secret env var + forget to mask
+// it" incidents. When adding a new env var whose value is a password,
+// token, API key, or JWT secret, add it here in the same commit.
 func isSensitive(envVar string) bool {
 	switch envVar {
-	case "NEO4J_PASS", "OPENAI_API_KEY":
+	case "NEO4J_PASS",
+		"OPENAI_API_KEY",
+		"AUTH_API_KEYS",
+		"AUTH_JWT_SECRET",
+		"LINEAR_WEBHOOK_SECRET",
+		"TSDB_PASSWORD",
+		"RERANK_JINA_API_KEY",
+		"GRAFANA_PASSWORD":
 		return true
 	}
 	return false

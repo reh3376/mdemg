@@ -181,6 +181,11 @@ type Server struct {
 	reviewWriter             *tsdb.ReviewGradesWriter
 	contradictedDraftWriter  *tsdb.ContradictedDraftsWriter // JIMINY-CONTRADICTED-BRIDGE-001
 	reviewRegistry           *review.Registry
+	// HITL-AUTOGRADE-PREVIEW-001 (2026-08-12): lazily-built autograder for the
+	// /v1/review/autograde-preview endpoint. Server holds a singleton; first-
+	// request constructs, subsequent requests reuse. Guarded by reviewAutograderMu.
+	reviewAutograder         *review.Autograder
+	reviewAutograderMu       sync.Mutex
 	llmEndpointHealthWriter  *tsdb.LLMEndpointHealthWriter
 
 	// DOCKER-P2: Browser dashboard log buffer
@@ -3035,6 +3040,7 @@ func (s *Server) Routes() http.Handler {
 	mux.Handle("/v1/review/candidates", scopedHandler(auth.ScopeAdminSpaces, s.handleReviewCandidates))
 	mux.Handle("/v1/review/grade", scopedHandler(auth.ScopeAdminSpaces, s.handleReviewGrade))
 	mux.Handle("/v1/review/reverse", scopedHandler(auth.ScopeAdminSpaces, s.handleReviewReverse))
+	mux.Handle("/v1/review/autograde-preview", scopedHandler(auth.ScopeAdminSpaces, s.handleReviewAutogradePreview)) // HITL-AUTOGRADE-PREVIEW-001
 	mux.HandleFunc("/v1/eventgraph/reinforcement-neighborhood", s.handleEventgraphReinforcementNeighborhood)
 	mux.HandleFunc("/v1/eventgraph/guidance-outcome-neighborhood", s.handleEventgraphGuidanceOutcomeNeighborhood)
 	mux.Handle("/ui/", http.StripPrefix("/ui/", uiHandler()))

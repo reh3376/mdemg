@@ -45,6 +45,12 @@ func (l *enforcementEventLog) Recent(n int) []enforcementEvent {
 	if n <= 0 || n > len(l.events) {
 		n = len(l.events)
 	}
+	// SEC-TRANCHE-3: defensive cap. `n` is bounded by `len(l.events)`
+	// which is bounded by `l.maxLen`; still cap to keep the allocation
+	// bounded regardless of future refactors to `maxLen`.
+	if n > 10000 {
+		n = 10000
+	}
 	start := len(l.events) - n
 	if start < 0 {
 		start = 0
