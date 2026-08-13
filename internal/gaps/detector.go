@@ -503,7 +503,7 @@ func extractDataSourceReferences(text string) []string {
 		{`\bgitlab\.com/\S+`, "gitlab"},
 		{`\bnotion\.so/\S+`, "notion"},
 		{`\blinear\.app/\S+`, "linear"},
-		{`\basana\.com/\S+`, "asana"},
+		{`\bhttps?://(?:www\.)?asana\.com/\S+`, "asana"},
 		{`\btrello\.com/\S+`, "trello"},
 		{`\bdocs\.google\.com/\S+`, "google_docs"},
 		{`\bdrive\.google\.com/\S+`, "google_drive"},
