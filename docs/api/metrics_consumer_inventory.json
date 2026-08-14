@@ -11,7 +11,7 @@
         "internal/cli/grafana_templates/staged/dashboards/mdemg-overview.json",
         "internal/cli/grafana_templates/staged/provisioning/alerting/alerts.yml"
       ],
-      "declaration": "internal/metrics/collectors.go:383",
+      "declaration": "internal/metrics/collectors.go:391",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
@@ -31,42 +31,42 @@
         "internal/cli/grafana_templates/staged/dashboards/mdemg-overview.json",
         "internal/cli/grafana_templates/staged/provisioning/alerting/alerts.yml"
       ],
-      "declaration": "internal/metrics/collectors.go:377",
+      "declaration": "internal/metrics/collectors.go:385",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
     },
     "cms_dedup_merge_failures_total": {
       "consumers": [],
-      "declaration": "internal/metrics/collectors.go:436",
+      "declaration": "internal/metrics/collectors.go:447",
       "disposition": "IN_USE_TSDB_ONLY",
       "notes": "Auto-generate: no direct dashboard/alert/reader hit; flushed to TSDB metric_samples by internal/metrics/recorder.go. Operator: re-adjudicate to DORMANT_TO_REMOVE if a downstream review confirms no consumer value.",
       "type": "counter"
     },
     "cms_embedding_failures_total": {
       "consumers": [],
-      "declaration": "internal/metrics/collectors.go:435",
+      "declaration": "internal/metrics/collectors.go:446",
       "disposition": "IN_USE_TSDB_ONLY",
       "notes": "Auto-generate: no direct dashboard/alert/reader hit; flushed to TSDB metric_samples by internal/metrics/recorder.go. Operator: re-adjudicate to DORMANT_TO_REMOVE if a downstream review confirms no consumer value.",
       "type": "counter"
     },
     "cms_observe_total": {
       "consumers": [],
-      "declaration": "internal/metrics/collectors.go:433",
+      "declaration": "internal/metrics/collectors.go:444",
       "disposition": "IN_USE_TSDB_ONLY",
       "notes": "Auto-generate: no direct dashboard/alert/reader hit; flushed to TSDB metric_samples by internal/metrics/recorder.go. Operator: re-adjudicate to DORMANT_TO_REMOVE if a downstream review confirms no consumer value.",
       "type": "counter"
     },
     "cms_stability_update_failures_total": {
       "consumers": [],
-      "declaration": "internal/metrics/collectors.go:440",
+      "declaration": "internal/metrics/collectors.go:451",
       "disposition": "IN_USE_TSDB_ONLY",
       "notes": "Auto-generate: no direct dashboard/alert/reader hit; flushed to TSDB metric_samples by internal/metrics/recorder.go. Operator: re-adjudicate to DORMANT_TO_REMOVE if a downstream review confirms no consumer value.",
       "type": "counter"
     },
     "cms_writejson_failures_total": {
       "consumers": [],
-      "declaration": "internal/metrics/collectors.go:439",
+      "declaration": "internal/metrics/collectors.go:450",
       "disposition": "IN_USE_TSDB_ONLY",
       "notes": "Auto-generate: no direct dashboard/alert/reader hit; flushed to TSDB metric_samples by internal/metrics/recorder.go. Operator: re-adjudicate to DORMANT_TO_REMOVE if a downstream review confirms no consumer value.",
       "type": "counter"
@@ -78,21 +78,21 @@
         "internal/cli/grafana_templates/staged/dashboards/mdemg-j17.json",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-jiminy.json"
       ],
-      "declaration": "internal/metrics/collectors.go:810",
+      "declaration": "internal/metrics/collectors.go:821",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
     },
     "consolidation_phase_duration_seconds": {
       "consumers": [],
-      "declaration": "internal/metrics/collectors.go:423",
+      "declaration": "internal/metrics/collectors.go:434",
       "disposition": "IN_USE_TSDB_ONLY",
       "notes": "Auto-generate: no direct dashboard/alert/reader hit; flushed to TSDB metric_samples by internal/metrics/recorder.go. Operator: re-adjudicate to DORMANT_TO_REMOVE if a downstream review confirms no consumer value.",
       "type": "gauge"
     },
     "embedding_batches_total": {
       "consumers": [],
-      "declaration": "internal/metrics/collectors.go:388",
+      "declaration": "internal/metrics/collectors.go:396",
       "disposition": "IN_USE_TSDB_ONLY",
       "notes": "Auto-generate: no direct dashboard/alert/reader hit; flushed to TSDB metric_samples by internal/metrics/recorder.go. Operator: re-adjudicate to DORMANT_TO_REMOVE if a downstream review confirms no consumer value.",
       "type": "counter"
@@ -103,7 +103,7 @@
         "docs/tests/uobs/specs/prometheus_metrics.uobs.json",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-overview.json"
       ],
-      "declaration": "internal/metrics/collectors.go:387",
+      "declaration": "internal/metrics/collectors.go:395",
       "disposition": "IN_USE",
       "notes": "",
       "type": "histogram"
@@ -112,14 +112,14 @@
       "consumers": [
         "internal/alert/rules.go"
       ],
-      "declaration": "internal/metrics/collectors.go:420",
+      "declaration": "internal/metrics/collectors.go:431",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
     },
     "eventgraph_writer_flush_failure_total": {
       "consumers": [],
-      "declaration": "internal/metrics/collectors.go:918",
+      "declaration": "internal/metrics/collectors.go:929",
       "disposition": "IN_USE_TSDB_ONLY",
       "notes": "Auto-generate: no direct dashboard/alert/reader hit; flushed to TSDB metric_samples by internal/metrics/recorder.go. Operator: re-adjudicate to DORMANT_TO_REMOVE if a downstream review confirms no consumer value.",
       "type": "counter"
@@ -128,14 +128,14 @@
       "consumers": [
         "internal/tsdb/reinforcement_writer.go"
       ],
-      "declaration": "internal/metrics/collectors.go:915",
+      "declaration": "internal/metrics/collectors.go:926",
       "disposition": "IN_USE",
       "notes": "",
       "type": "counter"
     },
     "eventgraph_writer_rows_enqueued_total": {
       "consumers": [],
-      "declaration": "internal/metrics/collectors.go:912",
+      "declaration": "internal/metrics/collectors.go:923",
       "disposition": "IN_USE_TSDB_ONLY",
       "notes": "Auto-generate: no direct dashboard/alert/reader hit; flushed to TSDB metric_samples by internal/metrics/recorder.go. Operator: re-adjudicate to DORMANT_TO_REMOVE if a downstream review confirms no consumer value.",
       "type": "counter"
@@ -144,49 +144,49 @@
       "consumers": [
         "internal/alert/rules.go"
       ],
-      "declaration": "internal/metrics/collectors.go:841",
+      "declaration": "internal/metrics/collectors.go:852",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
     },
     "guardrail_producer_total": {
       "consumers": [],
-      "declaration": "internal/metrics/collectors.go:837",
+      "declaration": "internal/metrics/collectors.go:848",
       "disposition": "IN_USE_TSDB_ONLY",
       "notes": "Auto-generate: no direct dashboard/alert/reader hit; flushed to TSDB metric_samples by internal/metrics/recorder.go. Operator: re-adjudicate to DORMANT_TO_REMOVE if a downstream review confirms no consumer value.",
       "type": "counter"
     },
     "guidance_conflicts_total": {
       "consumers": [],
-      "declaration": "internal/metrics/collectors.go:417",
+      "declaration": "internal/metrics/collectors.go:425",
       "disposition": "IN_USE_TSDB_ONLY",
       "notes": "Auto-generate: no direct dashboard/alert/reader hit; flushed to TSDB metric_samples by internal/metrics/recorder.go. Operator: re-adjudicate to DORMANT_TO_REMOVE if a downstream review confirms no consumer value.",
       "type": "counter"
     },
     "guidance_corpus_flush_failure_total": {
       "consumers": [],
-      "declaration": "internal/metrics/collectors.go:929",
+      "declaration": "internal/metrics/collectors.go:940",
       "disposition": "IN_USE_TSDB_ONLY",
       "notes": "Auto-generate: no direct dashboard/alert/reader hit; flushed to TSDB metric_samples by internal/metrics/recorder.go. Operator: re-adjudicate to DORMANT_TO_REMOVE if a downstream review confirms no consumer value.",
       "type": "counter"
     },
     "guidance_corpus_heuristic_label_fraction": {
       "consumers": [],
-      "declaration": "internal/metrics/collectors.go:932",
+      "declaration": "internal/metrics/collectors.go:943",
       "disposition": "IN_USE_TSDB_ONLY",
       "notes": "Auto-generate: no direct dashboard/alert/reader hit; flushed to TSDB metric_samples by internal/metrics/recorder.go. Operator: re-adjudicate to DORMANT_TO_REMOVE if a downstream review confirms no consumer value.",
       "type": "gauge"
     },
     "guidance_corpus_rows_dropped_total": {
       "consumers": [],
-      "declaration": "internal/metrics/collectors.go:926",
+      "declaration": "internal/metrics/collectors.go:937",
       "disposition": "IN_USE_TSDB_ONLY",
       "notes": "Auto-generate: no direct dashboard/alert/reader hit; flushed to TSDB metric_samples by internal/metrics/recorder.go. Operator: re-adjudicate to DORMANT_TO_REMOVE if a downstream review confirms no consumer value.",
       "type": "counter"
     },
     "guidance_corpus_rows_enqueued_total": {
       "consumers": [],
-      "declaration": "internal/metrics/collectors.go:923",
+      "declaration": "internal/metrics/collectors.go:934",
       "disposition": "IN_USE_TSDB_ONLY",
       "notes": "Auto-generate: no direct dashboard/alert/reader hit; flushed to TSDB metric_samples by internal/metrics/recorder.go. Operator: re-adjudicate to DORMANT_TO_REMOVE if a downstream review confirms no consumer value.",
       "type": "counter"
@@ -200,7 +200,7 @@
         "internal/alert/rules.go",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-overview.json"
       ],
-      "declaration": "internal/metrics/collectors.go:364",
+      "declaration": "internal/metrics/collectors.go:372",
       "disposition": "IN_USE",
       "notes": "",
       "type": "histogram"
@@ -217,7 +217,7 @@
         "internal/cli/grafana_templates/staged/dashboards/mdemg-overview.json",
         "internal/cli/grafana_templates/staged/provisioning/alerting/alerts.yml"
       ],
-      "declaration": "internal/metrics/collectors.go:357",
+      "declaration": "internal/metrics/collectors.go:365",
       "disposition": "IN_USE",
       "notes": "",
       "type": "counter"
@@ -229,7 +229,7 @@
         "internal/ape/live_collectors.go",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-j17.json"
       ],
-      "declaration": "internal/metrics/collectors.go:650",
+      "declaration": "internal/metrics/collectors.go:661",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
@@ -240,7 +240,7 @@
         "internal/ape/live_collectors.go",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-j17.json"
       ],
-      "declaration": "internal/metrics/collectors.go:654",
+      "declaration": "internal/metrics/collectors.go:665",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
@@ -253,7 +253,7 @@
         "internal/cli/grafana_templates/staged/dashboards/mdemg-j17.json",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-rsic.json"
       ],
-      "declaration": "internal/metrics/collectors.go:716",
+      "declaration": "internal/metrics/collectors.go:727",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
@@ -264,7 +264,7 @@
         "internal/ape/live_collectors.go",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-j17.json"
       ],
-      "declaration": "internal/metrics/collectors.go:666",
+      "declaration": "internal/metrics/collectors.go:677",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
@@ -276,7 +276,7 @@
         "internal/ape/live_collectors.go",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-j17.json"
       ],
-      "declaration": "internal/metrics/collectors.go:646",
+      "declaration": "internal/metrics/collectors.go:657",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
@@ -287,7 +287,7 @@
         "docs/tests/uobs/specs/jiminy_protocol_metrics.uobs.json",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-j17.json"
       ],
-      "declaration": "internal/metrics/collectors.go:670",
+      "declaration": "internal/metrics/collectors.go:681",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
@@ -299,7 +299,7 @@
         "internal/cli/grafana_templates/staged/dashboards/mdemg-j17.json",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-rsic.json"
       ],
-      "declaration": "internal/metrics/collectors.go:724",
+      "declaration": "internal/metrics/collectors.go:735",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
@@ -311,7 +311,7 @@
         "internal/cli/grafana_templates/staged/dashboards/mdemg-j17.json",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-rsic.json"
       ],
-      "declaration": "internal/metrics/collectors.go:720",
+      "declaration": "internal/metrics/collectors.go:731",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
@@ -321,14 +321,14 @@
         "deploy/docker/grafana/dashboards/mdemg-j17.json",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-j17.json"
       ],
-      "declaration": "internal/metrics/collectors.go:692",
+      "declaration": "internal/metrics/collectors.go:703",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
     },
     "j17_nli_fallback_total": {
       "consumers": [],
-      "declaration": "internal/metrics/collectors.go:696",
+      "declaration": "internal/metrics/collectors.go:707",
       "disposition": "IN_USE_TSDB_ONLY",
       "notes": "Auto-generate: no direct dashboard/alert/reader hit; flushed to TSDB metric_samples by internal/metrics/recorder.go. Operator: re-adjudicate to DORMANT_TO_REMOVE if a downstream review confirms no consumer value.",
       "type": "gauge"
@@ -339,7 +339,7 @@
         "internal/ape/live_collectors.go",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-j17.json"
       ],
-      "declaration": "internal/metrics/collectors.go:688",
+      "declaration": "internal/metrics/collectors.go:699",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
@@ -349,7 +349,7 @@
         "deploy/docker/grafana/dashboards/mdemg-j17.json",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-j17.json"
       ],
-      "declaration": "internal/metrics/collectors.go:760",
+      "declaration": "internal/metrics/collectors.go:771",
       "disposition": "IN_USE",
       "notes": "",
       "type": "counter"
@@ -360,7 +360,7 @@
         "internal/ape/live_collectors.go",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-j17.json"
       ],
-      "declaration": "internal/metrics/collectors.go:658",
+      "declaration": "internal/metrics/collectors.go:669",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
@@ -370,7 +370,7 @@
         "deploy/docker/grafana/dashboards/mdemg-j17.json",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-j17.json"
       ],
-      "declaration": "internal/metrics/collectors.go:746",
+      "declaration": "internal/metrics/collectors.go:757",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
@@ -380,7 +380,7 @@
         "deploy/docker/grafana/dashboards/mdemg-j17.json",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-j17.json"
       ],
-      "declaration": "internal/metrics/collectors.go:754",
+      "declaration": "internal/metrics/collectors.go:765",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
@@ -390,7 +390,7 @@
         "deploy/docker/grafana/dashboards/mdemg-j17.json",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-j17.json"
       ],
-      "declaration": "internal/metrics/collectors.go:738",
+      "declaration": "internal/metrics/collectors.go:749",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
@@ -400,7 +400,7 @@
         "deploy/docker/grafana/dashboards/mdemg-j17.json",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-j17.json"
       ],
-      "declaration": "internal/metrics/collectors.go:750",
+      "declaration": "internal/metrics/collectors.go:761",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
@@ -410,7 +410,7 @@
         "deploy/docker/grafana/dashboards/mdemg-j17.json",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-j17.json"
       ],
-      "declaration": "internal/metrics/collectors.go:734",
+      "declaration": "internal/metrics/collectors.go:745",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
@@ -420,7 +420,7 @@
         "deploy/docker/grafana/dashboards/mdemg-j17.json",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-j17.json"
       ],
-      "declaration": "internal/metrics/collectors.go:742",
+      "declaration": "internal/metrics/collectors.go:753",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
@@ -431,7 +431,7 @@
         "internal/ape/live_collectors.go",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-j17.json"
       ],
-      "declaration": "internal/metrics/collectors.go:662",
+      "declaration": "internal/metrics/collectors.go:673",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
@@ -441,7 +441,7 @@
         "deploy/docker/grafana/dashboards/mdemg-j17.json",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-j17.json"
       ],
-      "declaration": "internal/metrics/collectors.go:674",
+      "declaration": "internal/metrics/collectors.go:685",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
@@ -451,14 +451,14 @@
         "deploy/docker/grafana/dashboards/mdemg-j17.json",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-j17.json"
       ],
-      "declaration": "internal/metrics/collectors.go:634",
+      "declaration": "internal/metrics/collectors.go:645",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
     },
     "j17_tier_t1_outcome_count": {
       "consumers": [],
-      "declaration": "internal/metrics/collectors.go:702",
+      "declaration": "internal/metrics/collectors.go:713",
       "disposition": "IN_USE_TSDB_ONLY",
       "notes": "Auto-generate: no direct dashboard/alert/reader hit; flushed to TSDB metric_samples by internal/metrics/recorder.go. Operator: re-adjudicate to DORMANT_TO_REMOVE if a downstream review confirms no consumer value.",
       "type": "gauge"
@@ -468,7 +468,7 @@
         "deploy/docker/grafana/dashboards/mdemg-j17.json",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-j17.json"
       ],
-      "declaration": "internal/metrics/collectors.go:678",
+      "declaration": "internal/metrics/collectors.go:689",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
@@ -478,14 +478,14 @@
         "deploy/docker/grafana/dashboards/mdemg-j17.json",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-j17.json"
       ],
-      "declaration": "internal/metrics/collectors.go:638",
+      "declaration": "internal/metrics/collectors.go:649",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
     },
     "j17_tier_t2_outcome_count": {
       "consumers": [],
-      "declaration": "internal/metrics/collectors.go:706",
+      "declaration": "internal/metrics/collectors.go:717",
       "disposition": "IN_USE_TSDB_ONLY",
       "notes": "Auto-generate: no direct dashboard/alert/reader hit; flushed to TSDB metric_samples by internal/metrics/recorder.go. Operator: re-adjudicate to DORMANT_TO_REMOVE if a downstream review confirms no consumer value.",
       "type": "gauge"
@@ -495,7 +495,7 @@
         "deploy/docker/grafana/dashboards/mdemg-j17.json",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-j17.json"
       ],
-      "declaration": "internal/metrics/collectors.go:682",
+      "declaration": "internal/metrics/collectors.go:693",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
@@ -505,14 +505,14 @@
         "deploy/docker/grafana/dashboards/mdemg-j17.json",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-j17.json"
       ],
-      "declaration": "internal/metrics/collectors.go:642",
+      "declaration": "internal/metrics/collectors.go:653",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
     },
     "j17_tier_t3_outcome_count": {
       "consumers": [],
-      "declaration": "internal/metrics/collectors.go:710",
+      "declaration": "internal/metrics/collectors.go:721",
       "disposition": "IN_USE_TSDB_ONLY",
       "notes": "Auto-generate: no direct dashboard/alert/reader hit; flushed to TSDB metric_samples by internal/metrics/recorder.go. Operator: re-adjudicate to DORMANT_TO_REMOVE if a downstream review confirms no consumer value.",
       "type": "gauge"
@@ -522,14 +522,14 @@
         "deploy/docker/grafana/dashboards/mdemg-j17.json",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-j17.json"
       ],
-      "declaration": "internal/metrics/collectors.go:728",
+      "declaration": "internal/metrics/collectors.go:739",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
     },
     "jiminy_contradicted_total": {
       "consumers": [],
-      "declaration": "internal/metrics/collectors.go:806",
+      "declaration": "internal/metrics/collectors.go:817",
       "disposition": "IN_USE_TSDB_ONLY",
       "notes": "Auto-generate: no direct dashboard/alert/reader hit; flushed to TSDB metric_samples by internal/metrics/recorder.go. Operator: re-adjudicate to DORMANT_TO_REMOVE if a downstream review confirms no consumer value.",
       "type": "gauge"
@@ -538,7 +538,7 @@
       "consumers": [
         "internal/alert/rules.go"
       ],
-      "declaration": "internal/metrics/collectors.go:414",
+      "declaration": "internal/metrics/collectors.go:422",
       "disposition": "IN_USE_TSDB_ONLY",
       "notes": "Auto-generate: no direct dashboard/alert/reader hit; flushed to TSDB metric_samples by internal/metrics/recorder.go. Operator: re-adjudicate to DORMANT_TO_REMOVE if a downstream review confirms no consumer value.",
       "type": "counter"
@@ -552,21 +552,21 @@
         "internal/cli/grafana_templates/staged/dashboards/mdemg-jiminy.json",
         "internal/cli/grafana_templates/staged/provisioning/alerting/alerts.yml"
       ],
-      "declaration": "internal/metrics/collectors.go:772",
+      "declaration": "internal/metrics/collectors.go:783",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
     },
     "jiminy_followed_total": {
       "consumers": [],
-      "declaration": "internal/metrics/collectors.go:794",
+      "declaration": "internal/metrics/collectors.go:805",
       "disposition": "IN_USE_TSDB_ONLY",
       "notes": "Auto-generate: no direct dashboard/alert/reader hit; flushed to TSDB metric_samples by internal/metrics/recorder.go. Operator: re-adjudicate to DORMANT_TO_REMOVE if a downstream review confirms no consumer value.",
       "type": "gauge"
     },
     "jiminy_guidance_surfaced_total": {
       "consumers": [],
-      "declaration": "internal/metrics/collectors.go:411",
+      "declaration": "internal/metrics/collectors.go:419",
       "disposition": "IN_USE_TSDB_ONLY",
       "notes": "Auto-generate: no direct dashboard/alert/reader hit; flushed to TSDB metric_samples by internal/metrics/recorder.go. Operator: re-adjudicate to DORMANT_TO_REMOVE if a downstream review confirms no consumer value.",
       "type": "counter"
@@ -576,49 +576,49 @@
         "deploy/docker/grafana/dashboards/mdemg-jiminy.json",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-jiminy.json"
       ],
-      "declaration": "internal/metrics/collectors.go:790",
+      "declaration": "internal/metrics/collectors.go:801",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
     },
     "jiminy_guide_calls_total": {
       "consumers": [],
-      "declaration": "internal/metrics/collectors.go:816",
+      "declaration": "internal/metrics/collectors.go:827",
       "disposition": "IN_USE_TSDB_ONLY",
       "notes": "Auto-generate: no direct dashboard/alert/reader hit; flushed to TSDB metric_samples by internal/metrics/recorder.go. Operator: re-adjudicate to DORMANT_TO_REMOVE if a downstream review confirms no consumer value.",
       "type": "counter"
     },
     "jiminy_guide_empty_total": {
       "consumers": [],
-      "declaration": "internal/metrics/collectors.go:820",
+      "declaration": "internal/metrics/collectors.go:831",
       "disposition": "IN_USE_TSDB_ONLY",
       "notes": "Auto-generate: no direct dashboard/alert/reader hit; flushed to TSDB metric_samples by internal/metrics/recorder.go. Operator: re-adjudicate to DORMANT_TO_REMOVE if a downstream review confirms no consumer value.",
       "type": "counter"
     },
     "jiminy_ignored_total": {
       "consumers": [],
-      "declaration": "internal/metrics/collectors.go:802",
+      "declaration": "internal/metrics/collectors.go:813",
       "disposition": "IN_USE_TSDB_ONLY",
       "notes": "Auto-generate: no direct dashboard/alert/reader hit; flushed to TSDB metric_samples by internal/metrics/recorder.go. Operator: re-adjudicate to DORMANT_TO_REMOVE if a downstream review confirms no consumer value.",
       "type": "gauge"
     },
     "jiminy_latest_age_ms": {
       "consumers": [],
-      "declaration": "internal/metrics/collectors.go:844",
+      "declaration": "internal/metrics/collectors.go:855",
       "disposition": "IN_USE_TSDB_ONLY",
       "notes": "Auto-generate: no direct dashboard/alert/reader hit; flushed to TSDB metric_samples by internal/metrics/recorder.go. Operator: re-adjudicate to DORMANT_TO_REMOVE if a downstream review confirms no consumer value.",
       "type": "gauge"
     },
     "jiminy_latest_served_total": {
       "consumers": [],
-      "declaration": "internal/metrics/collectors.go:848",
+      "declaration": "internal/metrics/collectors.go:859",
       "disposition": "IN_USE_TSDB_ONLY",
       "notes": "Auto-generate: no direct dashboard/alert/reader hit; flushed to TSDB metric_samples by internal/metrics/recorder.go. Operator: re-adjudicate to DORMANT_TO_REMOVE if a downstream review confirms no consumer value.",
       "type": "counter"
     },
     "jiminy_partial_compliance_total": {
       "consumers": [],
-      "declaration": "internal/metrics/collectors.go:798",
+      "declaration": "internal/metrics/collectors.go:809",
       "disposition": "IN_USE_TSDB_ONLY",
       "notes": "Auto-generate: no direct dashboard/alert/reader hit; flushed to TSDB metric_samples by internal/metrics/recorder.go. Operator: re-adjudicate to DORMANT_TO_REMOVE if a downstream review confirms no consumer value.",
       "type": "gauge"
@@ -629,7 +629,7 @@
         "internal/ape/live_collectors.go",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-jiminy.json"
       ],
-      "declaration": "internal/metrics/collectors.go:786",
+      "declaration": "internal/metrics/collectors.go:797",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
@@ -639,7 +639,7 @@
         "deploy/docker/grafana/dashboards/mdemg-jiminy.json",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-jiminy.json"
       ],
-      "declaration": "internal/metrics/collectors.go:780",
+      "declaration": "internal/metrics/collectors.go:791",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
@@ -649,49 +649,49 @@
         "deploy/docker/grafana/dashboards/mdemg-jiminy.json",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-jiminy.json"
       ],
-      "declaration": "internal/metrics/collectors.go:776",
+      "declaration": "internal/metrics/collectors.go:787",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
     },
     "jiminy_warm_completed_total": {
       "consumers": [],
-      "declaration": "internal/metrics/collectors.go:825",
+      "declaration": "internal/metrics/collectors.go:836",
       "disposition": "IN_USE_TSDB_ONLY",
       "notes": "Auto-generate: no direct dashboard/alert/reader hit; flushed to TSDB metric_samples by internal/metrics/recorder.go. Operator: re-adjudicate to DORMANT_TO_REMOVE if a downstream review confirms no consumer value.",
       "type": "counter"
     },
     "jiminy_warm_debounced_total": {
       "consumers": [],
-      "declaration": "internal/metrics/collectors.go:833",
+      "declaration": "internal/metrics/collectors.go:844",
       "disposition": "IN_USE_TSDB_ONLY",
       "notes": "Auto-generate: no direct dashboard/alert/reader hit; flushed to TSDB metric_samples by internal/metrics/recorder.go. Operator: re-adjudicate to DORMANT_TO_REMOVE if a downstream review confirms no consumer value.",
       "type": "counter"
     },
     "jiminy_warm_errors_total": {
       "consumers": [],
-      "declaration": "internal/metrics/collectors.go:829",
+      "declaration": "internal/metrics/collectors.go:840",
       "disposition": "IN_USE_TSDB_ONLY",
       "notes": "Auto-generate: no direct dashboard/alert/reader hit; flushed to TSDB metric_samples by internal/metrics/recorder.go. Operator: re-adjudicate to DORMANT_TO_REMOVE if a downstream review confirms no consumer value.",
       "type": "counter"
     },
     "memory_heap_bytes": {
       "consumers": [],
-      "declaration": "internal/metrics/collectors.go:428",
+      "declaration": "internal/metrics/collectors.go:439",
       "disposition": "IN_USE_TSDB_ONLY",
       "notes": "Auto-generate: no direct dashboard/alert/reader hit; flushed to TSDB metric_samples by internal/metrics/recorder.go. Operator: re-adjudicate to DORMANT_TO_REMOVE if a downstream review confirms no consumer value.",
       "type": "gauge"
     },
     "memory_pressure_rejected_total": {
       "consumers": [],
-      "declaration": "internal/metrics/collectors.go:427",
+      "declaration": "internal/metrics/collectors.go:438",
       "disposition": "IN_USE_TSDB_ONLY",
       "notes": "Auto-generate: no direct dashboard/alert/reader hit; flushed to TSDB metric_samples by internal/metrics/recorder.go. Operator: re-adjudicate to DORMANT_TO_REMOVE if a downstream review confirms no consumer value.",
       "type": "gauge"
     },
     "mlx_fast_fail_total": {
       "consumers": [],
-      "declaration": "internal/metrics/collectors.go:863",
+      "declaration": "internal/metrics/collectors.go:874",
       "disposition": "IN_USE_TSDB_ONLY",
       "notes": "Auto-generate: no direct dashboard/alert/reader hit; flushed to TSDB metric_samples by internal/metrics/recorder.go. Operator: re-adjudicate to DORMANT_TO_REMOVE if a downstream review confirms no consumer value.",
       "type": "counter"
@@ -701,14 +701,14 @@
         "deploy/docker/grafana/dashboards/mdemg-ft-training.json",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-ft-training.json"
       ],
-      "declaration": "internal/metrics/collectors.go:858",
+      "declaration": "internal/metrics/collectors.go:869",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
     },
     "mlx_state_transitions_total": {
       "consumers": [],
-      "declaration": "internal/metrics/collectors.go:868",
+      "declaration": "internal/metrics/collectors.go:879",
       "disposition": "IN_USE_TSDB_ONLY",
       "notes": "Auto-generate: no direct dashboard/alert/reader hit; flushed to TSDB metric_samples by internal/metrics/recorder.go. Operator: re-adjudicate to DORMANT_TO_REMOVE if a downstream review confirms no consumer value.",
       "type": "counter"
@@ -724,7 +724,7 @@
         "internal/cli/grafana_templates/staged/dashboards/mdemg-neo4j.json",
         "internal/cli/grafana_templates/staged/provisioning/alerting/alerts.yml"
       ],
-      "declaration": "internal/metrics/collectors.go:474",
+      "declaration": "internal/metrics/collectors.go:485",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
@@ -735,7 +735,7 @@
         "docs/api/api-spec/uots/specs/prometheus_neo4j_container.uots.json",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-neo4j.json"
       ],
-      "declaration": "internal/metrics/collectors.go:476",
+      "declaration": "internal/metrics/collectors.go:487",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
@@ -747,7 +747,7 @@
         "internal/alert/rules.go",
         "internal/cli/grafana_templates/staged/provisioning/alerting/alerts.yml"
       ],
-      "declaration": "internal/metrics/collectors.go:477",
+      "declaration": "internal/metrics/collectors.go:488",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
@@ -759,7 +759,7 @@
         "docs/api/api-spec/uots/specs/prometheus_neo4j_container.uots.json",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-neo4j.json"
       ],
-      "declaration": "internal/metrics/collectors.go:475",
+      "declaration": "internal/metrics/collectors.go:486",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
@@ -770,14 +770,14 @@
         "internal/alert/rules.go",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-neo4j.json"
       ],
-      "declaration": "internal/metrics/collectors.go:459",
+      "declaration": "internal/metrics/collectors.go:470",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
     },
     "neo4j_graph_edges": {
       "consumers": [],
-      "declaration": "internal/metrics/collectors.go:447",
+      "declaration": "internal/metrics/collectors.go:458",
       "disposition": "IN_USE_TSDB_ONLY",
       "notes": "Auto-generate: no direct dashboard/alert/reader hit; flushed to TSDB metric_samples by internal/metrics/recorder.go. Operator: re-adjudicate to DORMANT_TO_REMOVE if a downstream review confirms no consumer value.",
       "type": "gauge"
@@ -789,14 +789,14 @@
         "internal/alert/rules.go",
         "internal/cli/grafana_templates/staged/provisioning/alerting/alerts.yml"
       ],
-      "declaration": "internal/metrics/collectors.go:462",
+      "declaration": "internal/metrics/collectors.go:473",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
     },
     "neo4j_graph_learning_edges": {
       "consumers": [],
-      "declaration": "internal/metrics/collectors.go:465",
+      "declaration": "internal/metrics/collectors.go:476",
       "disposition": "IN_USE_TSDB_ONLY",
       "notes": "Auto-generate: no direct dashboard/alert/reader hit; flushed to TSDB metric_samples by internal/metrics/recorder.go. Operator: re-adjudicate to DORMANT_TO_REMOVE if a downstream review confirms no consumer value.",
       "type": "gauge"
@@ -808,7 +808,7 @@
         "internal/alert/rules.go",
         "internal/cli/grafana_templates/staged/provisioning/alerting/alerts.yml"
       ],
-      "declaration": "internal/metrics/collectors.go:444",
+      "declaration": "internal/metrics/collectors.go:455",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
@@ -819,14 +819,14 @@
         "internal/alert/rules.go",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-neo4j.json"
       ],
-      "declaration": "internal/metrics/collectors.go:456",
+      "declaration": "internal/metrics/collectors.go:467",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
     },
     "neo4j_graph_observations": {
       "consumers": [],
-      "declaration": "internal/metrics/collectors.go:450",
+      "declaration": "internal/metrics/collectors.go:461",
       "disposition": "IN_USE_TSDB_ONLY",
       "notes": "Auto-generate: no direct dashboard/alert/reader hit; flushed to TSDB metric_samples by internal/metrics/recorder.go. Operator: re-adjudicate to DORMANT_TO_REMOVE if a downstream review confirms no consumer value.",
       "type": "gauge"
@@ -839,7 +839,7 @@
         "internal/ape/self_assess.go",
         "internal/cli/grafana_templates/staged/provisioning/alerting/alerts.yml"
       ],
-      "declaration": "internal/metrics/collectors.go:453",
+      "declaration": "internal/metrics/collectors.go:464",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
@@ -851,7 +851,7 @@
         "docs/api/api-spec/uots/specs/prometheus_neo4j_graph.uots.json",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-neo4j.json"
       ],
-      "declaration": "internal/metrics/collectors.go:470",
+      "declaration": "internal/metrics/collectors.go:481",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
@@ -863,7 +863,7 @@
         "docs/api/api-spec/uots/specs/prometheus_neo4j_graph.uots.json",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-neo4j.json"
       ],
-      "declaration": "internal/metrics/collectors.go:469",
+      "declaration": "internal/metrics/collectors.go:480",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
@@ -872,7 +872,7 @@
       "consumers": [
         "docs/api/api-spec/uots/specs/prometheus_neo4j_graph.uots.json"
       ],
-      "declaration": "internal/metrics/collectors.go:471",
+      "declaration": "internal/metrics/collectors.go:482",
       "disposition": "IN_USE",
       "notes": "METRICS-VERIFIER-UOBS-UOTS-001: promoted from IN_USE_TSDB_ONLY \u2014 the verifier's UOBS/UOTS spec-root pass found a runtime observability contract that asserts this metric MUST be present. Removing this declaration would break the spec's runner assertion.",
       "type": "gauge"
@@ -906,28 +906,28 @@
         "internal/cli/grafana_templates/staged/dashboards/mdemg-overview.json",
         "internal/cli/grafana_templates/staged/provisioning/alerting/alerts.yml"
       ],
-      "declaration": "internal/metrics/collectors.go:372",
+      "declaration": "internal/metrics/collectors.go:380",
       "disposition": "IN_USE",
       "notes": "",
       "type": "counter"
     },
     "retrieval_column_failed_total": {
       "consumers": [],
-      "declaration": "internal/metrics/collectors.go:885",
+      "declaration": "internal/metrics/collectors.go:896",
       "disposition": "IN_USE_TSDB_ONLY",
       "notes": "Auto-generate: no direct dashboard/alert/reader hit; flushed to TSDB metric_samples by internal/metrics/recorder.go. Operator: re-adjudicate to DORMANT_TO_REMOVE if a downstream review confirms no consumer value.",
       "type": "counter"
     },
     "retrieval_column_latency_seconds": {
       "consumers": [],
-      "declaration": "internal/metrics/collectors.go:880",
+      "declaration": "internal/metrics/collectors.go:891",
       "disposition": "IN_USE_TSDB_ONLY",
       "notes": "Auto-generate: no direct dashboard/alert/reader hit; flushed to TSDB metric_samples by internal/metrics/recorder.go. Operator: re-adjudicate to DORMANT_TO_REMOVE if a downstream review confirms no consumer value.",
       "type": "histogram"
     },
     "retrieval_consensus_strength": {
       "consumers": [],
-      "declaration": "internal/metrics/collectors.go:875",
+      "declaration": "internal/metrics/collectors.go:886",
       "disposition": "IN_USE_TSDB_ONLY",
       "notes": "Auto-generate: no direct dashboard/alert/reader hit; flushed to TSDB metric_samples by internal/metrics/recorder.go. Operator: re-adjudicate to DORMANT_TO_REMOVE if a downstream review confirms no consumer value.",
       "type": "histogram"
@@ -940,7 +940,7 @@
         "docs/tests/uobs/specs/prometheus_metrics.uobs.json",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-overview.json"
       ],
-      "declaration": "internal/metrics/collectors.go:369",
+      "declaration": "internal/metrics/collectors.go:377",
       "disposition": "IN_USE",
       "notes": "",
       "type": "histogram"
@@ -950,7 +950,7 @@
         "deploy/docker/grafana/dashboards/mdemg-rsic.json",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-rsic.json"
       ],
-      "declaration": "internal/metrics/collectors.go:501",
+      "declaration": "internal/metrics/collectors.go:512",
       "disposition": "IN_USE",
       "notes": "",
       "type": "histogram"
@@ -962,7 +962,7 @@
         "internal/cli/grafana_templates/staged/dashboards/mdemg-rsic.json",
         "internal/cli/grafana_templates/staged/provisioning/alerting/alerts.yml"
       ],
-      "declaration": "internal/metrics/collectors.go:497",
+      "declaration": "internal/metrics/collectors.go:508",
       "disposition": "IN_USE",
       "notes": "",
       "type": "counter"
@@ -974,7 +974,7 @@
         "internal/cli/grafana_templates/staged/dashboards/mdemg-rsic.json",
         "internal/cli/grafana_templates/staged/provisioning/alerting/alerts.yml"
       ],
-      "declaration": "internal/metrics/collectors.go:531",
+      "declaration": "internal/metrics/collectors.go:542",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
@@ -986,7 +986,7 @@
         "internal/cli/grafana_templates/staged/dashboards/mdemg-rsic.json",
         "internal/cli/grafana_templates/staged/provisioning/alerting/alerts.yml"
       ],
-      "declaration": "internal/metrics/collectors.go:485",
+      "declaration": "internal/metrics/collectors.go:496",
       "disposition": "IN_USE",
       "notes": "",
       "type": "histogram"
@@ -999,7 +999,7 @@
         "internal/cli/grafana_templates/staged/dashboards/mdemg-rsic.json",
         "internal/cli/grafana_templates/staged/provisioning/alerting/alerts.yml"
       ],
-      "declaration": "internal/metrics/collectors.go:481",
+      "declaration": "internal/metrics/collectors.go:492",
       "disposition": "IN_USE",
       "notes": "",
       "type": "counter"
@@ -1011,7 +1011,7 @@
         "internal/ape/live_collectors.go",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-rsic.json"
       ],
-      "declaration": "internal/metrics/collectors.go:580",
+      "declaration": "internal/metrics/collectors.go:591",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
@@ -1022,7 +1022,7 @@
         "internal/ape/live_collectors.go",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-rsic.json"
       ],
-      "declaration": "internal/metrics/collectors.go:560",
+      "declaration": "internal/metrics/collectors.go:571",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
@@ -1033,7 +1033,7 @@
         "internal/ape/live_collectors.go",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-rsic.json"
       ],
-      "declaration": "internal/metrics/collectors.go:594",
+      "declaration": "internal/metrics/collectors.go:605",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
@@ -1046,7 +1046,7 @@
         "internal/cli/grafana_templates/staged/dashboards/mdemg-jiminy.json",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-rsic.json"
       ],
-      "declaration": "internal/metrics/collectors.go:568",
+      "declaration": "internal/metrics/collectors.go:579",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
@@ -1057,7 +1057,7 @@
         "internal/ape/live_collectors.go",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-rsic.json"
       ],
-      "declaration": "internal/metrics/collectors.go:602",
+      "declaration": "internal/metrics/collectors.go:613",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
@@ -1068,7 +1068,7 @@
         "internal/ape/live_collectors.go",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-rsic.json"
       ],
-      "declaration": "internal/metrics/collectors.go:556",
+      "declaration": "internal/metrics/collectors.go:567",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
@@ -1079,7 +1079,7 @@
         "internal/ape/live_collectors.go",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-rsic.json"
       ],
-      "declaration": "internal/metrics/collectors.go:590",
+      "declaration": "internal/metrics/collectors.go:601",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
@@ -1095,7 +1095,7 @@
         "internal/cli/grafana_templates/staged/dashboards/mdemg-overview.json",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-rsic.json"
       ],
-      "declaration": "internal/metrics/collectors.go:543",
+      "declaration": "internal/metrics/collectors.go:554",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
@@ -1108,7 +1108,7 @@
         "internal/cli/grafana_templates/staged/dashboards/mdemg-j17.json",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-rsic.json"
       ],
-      "declaration": "internal/metrics/collectors.go:572",
+      "declaration": "internal/metrics/collectors.go:583",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
@@ -1119,7 +1119,7 @@
         "internal/ape/live_collectors.go",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-rsic.json"
       ],
-      "declaration": "internal/metrics/collectors.go:606",
+      "declaration": "internal/metrics/collectors.go:617",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
@@ -1130,7 +1130,7 @@
         "internal/ape/live_collectors.go",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-rsic.json"
       ],
-      "declaration": "internal/metrics/collectors.go:552",
+      "declaration": "internal/metrics/collectors.go:563",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
@@ -1141,7 +1141,7 @@
         "internal/ape/live_collectors.go",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-rsic.json"
       ],
-      "declaration": "internal/metrics/collectors.go:586",
+      "declaration": "internal/metrics/collectors.go:597",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
@@ -1152,7 +1152,7 @@
         "internal/ape/live_collectors.go",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-rsic.json"
       ],
-      "declaration": "internal/metrics/collectors.go:576",
+      "declaration": "internal/metrics/collectors.go:587",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
@@ -1163,7 +1163,7 @@
         "internal/ape/live_collectors.go",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-rsic.json"
       ],
-      "declaration": "internal/metrics/collectors.go:610",
+      "declaration": "internal/metrics/collectors.go:621",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
@@ -1174,7 +1174,7 @@
         "internal/ape/live_collectors.go",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-rsic.json"
       ],
-      "declaration": "internal/metrics/collectors.go:564",
+      "declaration": "internal/metrics/collectors.go:575",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
@@ -1185,14 +1185,14 @@
         "internal/ape/live_collectors.go",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-rsic.json"
       ],
-      "declaration": "internal/metrics/collectors.go:598",
+      "declaration": "internal/metrics/collectors.go:609",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
     },
     "rsic_llm_semaphore_blocked_total": {
       "consumers": [],
-      "declaration": "internal/metrics/collectors.go:515",
+      "declaration": "internal/metrics/collectors.go:526",
       "disposition": "IN_USE_TSDB_ONLY",
       "notes": "Auto-generate: no direct dashboard/alert/reader hit; flushed to TSDB metric_samples by internal/metrics/recorder.go. Operator: re-adjudicate to DORMANT_TO_REMOVE if a downstream review confirms no consumer value.",
       "type": "counter"
@@ -1201,7 +1201,7 @@
       "consumers": [
         "internal/alert/rules.go"
       ],
-      "declaration": "internal/metrics/collectors.go:547",
+      "declaration": "internal/metrics/collectors.go:558",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
@@ -1213,7 +1213,7 @@
         "internal/cli/grafana_templates/staged/dashboards/mdemg-rsic.json",
         "internal/cli/grafana_templates/staged/provisioning/alerting/alerts.yml"
       ],
-      "declaration": "internal/metrics/collectors.go:507",
+      "declaration": "internal/metrics/collectors.go:518",
       "disposition": "IN_USE",
       "notes": "",
       "type": "counter"
@@ -1223,7 +1223,7 @@
         "deploy/docker/grafana/dashboards/mdemg-rsic.json",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-rsic.json"
       ],
-      "declaration": "internal/metrics/collectors.go:537",
+      "declaration": "internal/metrics/collectors.go:548",
       "disposition": "IN_USE",
       "notes": "",
       "type": "counter"
@@ -1233,7 +1233,7 @@
         "deploy/docker/grafana/dashboards/mdemg-rsic.json",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-rsic.json"
       ],
-      "declaration": "internal/metrics/collectors.go:628",
+      "declaration": "internal/metrics/collectors.go:639",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
@@ -1243,7 +1243,7 @@
         "deploy/docker/grafana/dashboards/mdemg-rsic.json",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-rsic.json"
       ],
-      "declaration": "internal/metrics/collectors.go:616",
+      "declaration": "internal/metrics/collectors.go:627",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
@@ -1253,7 +1253,7 @@
         "deploy/docker/grafana/dashboards/mdemg-rsic.json",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-rsic.json"
       ],
-      "declaration": "internal/metrics/collectors.go:620",
+      "declaration": "internal/metrics/collectors.go:631",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
@@ -1263,7 +1263,7 @@
         "deploy/docker/grafana/dashboards/mdemg-rsic.json",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-rsic.json"
       ],
-      "declaration": "internal/metrics/collectors.go:624",
+      "declaration": "internal/metrics/collectors.go:635",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
@@ -1275,7 +1275,7 @@
         "internal/cli/grafana_templates/staged/dashboards/mdemg-rsic.json",
         "internal/cli/grafana_templates/staged/provisioning/alerting/alerts.yml"
       ],
-      "declaration": "internal/metrics/collectors.go:491",
+      "declaration": "internal/metrics/collectors.go:502",
       "disposition": "IN_USE",
       "notes": "",
       "type": "counter"
@@ -1287,7 +1287,7 @@
         "internal/cli/grafana_templates/staged/dashboards/mdemg-rsic.json",
         "internal/cli/grafana_templates/staged/provisioning/alerting/alerts.yml"
       ],
-      "declaration": "internal/metrics/collectors.go:520",
+      "declaration": "internal/metrics/collectors.go:531",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
@@ -1297,7 +1297,7 @@
         "deploy/docker/grafana/dashboards/mdemg-rsic.json",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-rsic.json"
       ],
-      "declaration": "internal/metrics/collectors.go:524",
+      "declaration": "internal/metrics/collectors.go:535",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
@@ -1309,28 +1309,28 @@
         "internal/cli/grafana_templates/staged/dashboards/mdemg-rsic.json",
         "internal/cli/grafana_templates/staged/provisioning/alerting/alerts.yml"
       ],
-      "declaration": "internal/metrics/collectors.go:527",
+      "declaration": "internal/metrics/collectors.go:538",
       "disposition": "IN_USE",
       "notes": "",
       "type": "counter"
     },
     "sparse_gate_active_count": {
       "consumers": [],
-      "declaration": "internal/metrics/collectors.go:898",
+      "declaration": "internal/metrics/collectors.go:909",
       "disposition": "IN_USE_TSDB_ONLY",
       "notes": "Auto-generate: no direct dashboard/alert/reader hit; flushed to TSDB metric_samples by internal/metrics/recorder.go. Operator: re-adjudicate to DORMANT_TO_REMOVE if a downstream review confirms no consumer value.",
       "type": "histogram"
     },
     "sparse_gate_dropped_fraction": {
       "consumers": [],
-      "declaration": "internal/metrics/collectors.go:902",
+      "declaration": "internal/metrics/collectors.go:913",
       "disposition": "IN_USE_TSDB_ONLY",
       "notes": "Auto-generate: no direct dashboard/alert/reader hit; flushed to TSDB metric_samples by internal/metrics/recorder.go. Operator: re-adjudicate to DORMANT_TO_REMOVE if a downstream review confirms no consumer value.",
       "type": "histogram"
     },
     "sparse_gate_threshold": {
       "consumers": [],
-      "declaration": "internal/metrics/collectors.go:906",
+      "declaration": "internal/metrics/collectors.go:917",
       "disposition": "IN_USE_TSDB_ONLY",
       "notes": "Auto-generate: no direct dashboard/alert/reader hit; flushed to TSDB metric_samples by internal/metrics/recorder.go. Operator: re-adjudicate to DORMANT_TO_REMOVE if a downstream review confirms no consumer value.",
       "type": "histogram"
@@ -1342,7 +1342,7 @@
         "docs/api/api-spec/uots/specs/prometheus_neo4j_pool.uots.json",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-neo4j.json"
       ],
-      "declaration": "internal/metrics/collectors.go:393",
+      "declaration": "internal/metrics/collectors.go:401",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
@@ -1351,7 +1351,7 @@
       "consumers": [
         "docs/api/api-spec/uots/specs/prometheus_neo4j_pool.uots.json"
       ],
-      "declaration": "internal/metrics/collectors.go:395",
+      "declaration": "internal/metrics/collectors.go:403",
       "disposition": "IN_USE",
       "notes": "METRICS-VERIFIER-UOBS-UOTS-001: promoted from IN_USE_TSDB_ONLY \u2014 the verifier's UOBS/UOTS spec-root pass found a runtime observability contract that asserts this metric MUST be present. Removing this declaration would break the spec's runner assertion.",
       "type": "gauge"
@@ -1363,7 +1363,7 @@
         "docs/api/api-spec/uots/specs/prometheus_neo4j_pool.uots.json",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-neo4j.json"
       ],
-      "declaration": "internal/metrics/collectors.go:392",
+      "declaration": "internal/metrics/collectors.go:400",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
@@ -1372,7 +1372,7 @@
       "consumers": [
         "docs/api/api-spec/uots/specs/prometheus_neo4j_pool.uots.json"
       ],
-      "declaration": "internal/metrics/collectors.go:394",
+      "declaration": "internal/metrics/collectors.go:402",
       "disposition": "IN_USE",
       "notes": "METRICS-VERIFIER-UOBS-UOTS-001: promoted from IN_USE_TSDB_ONLY \u2014 the verifier's UOBS/UOTS spec-root pass found a runtime observability contract that asserts this metric MUST be present. Removing this declaration would break the spec's runner assertion.",
       "type": "gauge"
@@ -1384,7 +1384,7 @@
         "docs/api/api-spec/uots/specs/prometheus_neo4j_pool.uots.json",
         "internal/cli/grafana_templates/staged/dashboards/mdemg-neo4j.json"
       ],
-      "declaration": "internal/metrics/collectors.go:391",
+      "declaration": "internal/metrics/collectors.go:399",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
@@ -1393,38 +1393,45 @@
       "consumers": [
         "internal/alert/rules.go"
       ],
-      "declaration": "internal/metrics/collectors.go:401",
+      "declaration": "internal/metrics/collectors.go:409",
       "disposition": "IN_USE",
       "notes": "",
       "type": "gauge"
     },
     "tsdb_writer_flush_success_total": {
       "consumers": [],
-      "declaration": "internal/metrics/collectors.go:398",
+      "declaration": "internal/metrics/collectors.go:406",
       "disposition": "IN_USE_TSDB_ONLY",
       "notes": "Auto-generate: no direct dashboard/alert/reader hit; flushed to TSDB metric_samples by internal/metrics/recorder.go. Operator: re-adjudicate to DORMANT_TO_REMOVE if a downstream review confirms no consumer value.",
       "type": "gauge"
     },
     "tsdb_writer_rows_dropped_total": {
       "consumers": [],
-      "declaration": "internal/metrics/collectors.go:407",
+      "declaration": "internal/metrics/collectors.go:415",
       "disposition": "IN_USE_TSDB_ONLY",
       "notes": "Auto-generate: no direct dashboard/alert/reader hit; flushed to TSDB metric_samples by internal/metrics/recorder.go. Operator: re-adjudicate to DORMANT_TO_REMOVE if a downstream review confirms no consumer value.",
       "type": "gauge"
     },
     "tsdb_writer_rows_flushed_total": {
       "consumers": [],
-      "declaration": "internal/metrics/collectors.go:404",
+      "declaration": "internal/metrics/collectors.go:412",
       "disposition": "IN_USE_TSDB_ONLY",
       "notes": "Auto-generate: no direct dashboard/alert/reader hit; flushed to TSDB metric_samples by internal/metrics/recorder.go. Operator: re-adjudicate to DORMANT_TO_REMOVE if a downstream review confirms no consumer value.",
       "type": "gauge"
     },
     "retrieval_rerank_length_mismatch_total": {
       "type": "counter",
-      "declaration": "internal/metrics/collectors.go:892",
+      "declaration": "internal/metrics/collectors.go:903",
       "consumers": [],
       "disposition": "IN_USE_TSDB_ONLY",
-      "notes": "RERANK-LENGTH-STRICT-001 (2026-08-13): fires when the rerank_cross LLM returns a JSON scores array whose length ≠ candidate count. Written via metric_samples; deliberately no Grafana panel or alert rule at ship (Fable HITL pass 2 found 14/40 rows in the pre-fix class; the counter's intent is trend-observability under the corrective-retry regime, and a panel is disclosed as a follow-up if the counter shows sustained non-zero). Labels: reason ∈ {short, long, retry_recovered}."
+      "notes": "RERANK-LENGTH-STRICT-001 (2026-08-13): fires when the rerank_cross LLM returns a JSON scores array whose length \u2260 candidate count. Written via metric_samples; deliberately no Grafana panel or alert rule at ship (Fable HITL pass 2 found 14/40 rows in the pre-fix class; the counter's intent is trend-observability under the corrective-retry regime, and a panel is disclosed as a follow-up if the counter shows sustained non-zero). Labels: reason \u2208 {short, long, retry_recovered}."
+    },
+    "constraint_detector_multi_emit_suppressed_total": {
+      "type": "counter",
+      "declaration": "internal/metrics/collectors.go:428",
+      "consumers": [],
+      "disposition": "IN_USE_TSDB_ONLY",
+      "notes": "Auto-generate: no direct dashboard/alert/reader hit; flushed to TSDB metric_samples by internal/metrics/recorder.go. Operator: re-adjudicate to DORMANT_TO_REMOVE if a downstream review confirms no consumer value."
     }
   }
 }

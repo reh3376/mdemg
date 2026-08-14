@@ -92,6 +92,7 @@ func NewServiceWithConfig(driver neo4j.DriverWithContext, embedder Embedder, vec
 		if cfg[0].ConstraintDetectionEnabled {
 			svc.constraintDetEnabled = true
 			svc.constraintDetector = NewConstraintDetector(cfg[0].ConstraintMinConfidence)
+			svc.constraintDetector.SetDedupEnabled(cfg[0].ConstraintDetectorDedupEnabled)
 		}
 	}
 
@@ -376,6 +377,14 @@ func (s *Service) Observe(ctx context.Context, req ObserveRequest) (*ObserveResp
 	var detectedConstraints []DetectedConstraint
 	if s.constraintDetEnabled && s.constraintDetector != nil {
 		detectedConstraints = s.constraintDetector.Detect(req.Content, obsType)
+		// JIMINY-CORPUS-CONSTRAINT-DETECTOR-DEDUP-001 (2026-08-14): report
+		// the N-1 suppressed emissions when the severity-precedence collapse
+		// fired. The winner's SkippedSuppressed carries the delta.
+		for _, dc := range detectedConstraints {
+			if dc.SkippedSuppressed > 0 {
+				metrics.Metrics().ConstraintDetectorMultiEmitSuppressed(req.SpaceID).Add(int64(dc.SkippedSuppressed))
+			}
+		}
 
 		// F6a: LLM classifier gate — confirm regex detection before tagging.
 		// If the gate is enabled and the classifier rejects (type == "none"), drop the

@@ -113,3 +113,27 @@ The operator flagged J17 avg trust at 25.4% + Jiminy actionable-compliance at ~1
 ⚠️ **Also pinned**: trust score is a receiver-side quality signal, NOT an observability-only gauge. Even when `J17_TIER_GATE_MODE=comprehension` (J17-TIER-GATE-001) bypasses trust for tier selection, a low trust EMA still means the substrate is producing untrustworthy guidance. Don't frame low trust as "harmless-by-design." The operator directive from 2026-08-01 stands: raise the trust signal, don't calibrate away the alarming number.
 
 See `docs/development/lever-c-tighten-001/`.
+
+## Follow-up — Mention-vs-Perform (JIMINY-CLASSIFIER-META-SCOPE-001, 2026-08-14)
+
+Phase 3.5 arc-adjacent to JIMINY-CEILING-BREAK-2. Extends the shipped CONTEXT-002 `mechanismScopeCreditClause` with a mention-vs-perform disambiguation clause: when the action-text contains the constraint's mechanism-verb ONLY as prose CONTENT (a doc edit, a sprint plan describing an approach, a CLAUDE.md pin quoting the rule) rather than as an EXECUTED mechanism (Bash invocation, runtime code call, executed migration), route to `not_applicable` UNCONDITIONALLY.
+
+**Motivation.** CONTEXT-002's mechanism-scope gate treats "action-text contains mechanism-verb" as "maybe the action performs it → proceed to determine follow/ignore." Operator observation post-Phase-3: the LLM systematically applies "contains verb → assume performing" → routes legitimate documentation edits to `ignored`. Adding a mention-vs-perform disambiguation should catch this class.
+
+**Live smoke result (2026-08-14 initial, 2 runs against local mdemg-llm-v1).** The clause SHIPS as DORMANT capability. `.env` flag `JIMINY_MENTION_VS_PERFORM_CREDIT_ENABLED` STAYS at code default `false`. Reasoning:
+- CONTEXT-002's shipped 3-credit baseline (non-violation + context-mismatch + mechanism-scope) already routes most fixtures to defensible verdicts — the mention-vs-perform clause showed no reliable marginal delta across two runs against the same 6-fixture set.
+- Two runs against identical inputs produced inconsistent LLM verdicts on the ambiguous doc-edit cases (F1-F3) — this is LLM variance on marginal cases, not a defect in the clause.
+- Counter-fixtures (F4 authored a mermaid diagram; F6 ran a real `git commit`) stayed stable in both runs — the safety envelope is intact. 0 regressions on either run.
+- Unambiguous mention-only cases (F1 pin quoting rule; F5 prose quoting rule) DO flip cleanly (`ignored`→`not_applicable`) when the LLM's variance lands on the mention interpretation.
+
+**Ship-dormant decision.** Rather than force a fixture-based lift that isn't there, the code + tests + docs + config knob ship as dormant capability. The 6 unit pin tests regression-lock the wiring at build time. The `.env` flag flip is deferred to a future measurement window — specifically, if the JIMINY-CEILING-BREAK-2 T+168h passive re-check on 2026-08-19 shows CONTEXT-002 alone underdelivers on the actionable-follow-rate target.
+
+**Byte-identical default-off.** The `resolveClassifySystemPrompt()` render is byte-identical to the CONTEXT-002 output when `MentionVsPerformCredit=false`. ULTS-CI-001 `system_prompt_hash` pin for the flag-off path is preserved; no ULTS hash bump required to ship dormant.
+
+**Composition.** With all four credit flags ON, the render order is exactly: base → non-violation → context-mismatch → mechanism-scope → mention-vs-perform (strongest-gate-last; recency-weighted LLM attention). Pin `TestResolveClassifySystemPrompt_AllFourCredits_Ordering` locks this.
+
+⚠️ **Architectural rule pinned**: a live-smoke that reveals "no measurable delta" is a legitimate ship-dormant outcome, not a failure. Mirror NEURAL-RERANK-QUALITY-AB-001's data-decided no-op verdict. Ship the code as regression-insured capability; leave the flag off until evidence justifies flipping it. Do not force a fixture set to produce a lift the LLM isn't organically providing.
+
+⚠️ **Also pinned**: LLM-fixture-based smokes on ambiguous prompt-tuning changes are HIGH-VARIANCE. Two runs against identical inputs can produce different verdicts. When a smoke gates a decision, either (a) accept 3+ runs of the same fixture and report the modal verdict, or (b) accept "informational smoke" mode where variance-dependent outcomes don't fail the build but regressions on counter-fixtures do (the shape used here — `regressions>0` fails, `flips` informational only).
+
+See `docs/development/jiminy-classifier-meta-scope-001/`.
