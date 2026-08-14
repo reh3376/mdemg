@@ -162,6 +162,64 @@ Before assigning ANY outcome (followed / partial_compliance / ignored / contradi
 This is the strongest gate — it precedes both non-violation credit and context-mismatch credit. When mechanism-scope fails, the outcome is settled without needing to invoke either of those.`
 
 
+// mentionVsPerformCreditClause is appended to the classifier system prompt
+// when OutcomeClassifierConfig.MentionVsPerformCredit is true
+// (JIMINY-CLASSIFIER-META-SCOPE-001, Phase 3.5 of JIMINY-CEILING-BREAK-2).
+//
+// Narrows the shipped mechanismScopeCreditClause: when the action-text
+// contains the constraint's mechanism-verb ONLY as prose content (a doc
+// edit, a sprint plan describing an approach, a CLAUDE.md pin quoting
+// the rule) rather than as an EXECUTED mechanism (a Bash invocation,
+// runtime code call, a migration script actually run), route to
+// not_applicable UNCONDITIONALLY.
+//
+// The over-triggering failure mode: CONTEXT-002's gate treats
+// "action-text contains mechanism-verb" as "maybe the action performs
+// it → proceed to determine follow/ignore". LLM systematically applies
+// "contains verb → assume performing" → routes legitimate documentation
+// edits to `ignored` when they should be `not_applicable`. This clause
+// disambiguates MENTIONED vs PERFORMED so the mechanism-scope gate
+// makes the correct pass/fail decision on doc-shaped actions.
+//
+// Ordering: strongest-gate-last. Appended AFTER mechanismScopeCredit
+// so the LLM's recency-weighted attention gives the mention-vs-perform
+// distinction the last word.
+//
+// Default OFF; operator flips JIMINY_MENTION_VS_PERFORM_CREDIT_ENABLED=true
+// in .env after live smoke. Byte-identical default-off render preserves
+// the ULTS-CI-001 system_prompt_hash pin (extension only splices when flag on).
+//
+//nolint:gosec // G101 false-positive: "CREDIT" in prose content is not a credential.
+const mentionVsPerformCreditClause = `
+
+MENTION-vs-PERFORM DISAMBIGUATION (refines the mechanism-scope gate above):
+When checking whether the action invoked the constraint's mechanism-verb, distinguish MENTIONING the verb from PERFORMING it.
+
+The verb is MENTIONED (not performed) when it appears as:
+- Text CONTENT the agent wrote or edited into a file — prose in a doc, markdown, README, sprint plan, CLAUDE.md, help text, comment; the string body of a code literal, JSON fixture, or test-data blob; a quoted rule the agent is discussing.
+- The OLD side of a "replaced 'OLD' with 'NEW'" edit summary — content REMOVED, not an action performed.
+- A description in the action summary of what the agent will discuss, plan, quote, or document — not what it is executing.
+
+The verb is PERFORMED when the action is:
+- A Bash / tool invocation that actually runs the verb (` + "`git commit`" + `, ` + "`git push`" + `, ` + "`psql -c \"ALTER TABLE ...\"`" + `, an ID-generation call, a schema-migration script executed).
+- A code change that invokes the mechanism at runtime (adding a call to a commit-triggering function, wiring an ID-mint into a code path that will run, an executable migration file).
+- The agent's own summary explicitly describes performing the mechanism ("committed on branch X", "ran the migration", "generated a new identifier for record Y").
+
+If the mechanism-verb appears ONLY as mentioned content — no execution, no runtime invocation, no performed action — treat the mechanism-scope gate as FAILING (verdict = "not_applicable" UNCONDITIONALLY, same as if the verb were absent). Editing a file that talks about commits is not committing. Writing a sprint plan that discusses "ALTER TABLE" is not altering a table. Quoting a rule about identifiers in CLAUDE.md is not generating an identifier.
+
+Only treat the mechanism-scope gate as PASSING (proceed to followed / ignored / partial / contradicted) when the action actually performs the verb.
+
+Examples:
+- Constraint "never commit directly to main" + action "Edited README.md: added text describing the commit workflow" → not_applicable (mentioned, not performed — the agent did not run git commit; adding docs about commits is not committing).
+- Constraint "never commit directly to main" + action "Ran ` + "`git commit -m 'x' && git push origin main`" + `" → contradicted (performed on main).
+- Constraint "use CUIDv2 for identifiers" + action "Edited docs/id-strategy.md: replaced 'uuid v4' with 'CUIDv2'" → not_applicable (mentioned; no identifier was generated during the action).
+- Constraint "use CUIDv2 for identifiers" + action "Added ` + "`id := cuid.NewV2()`" + ` to internal/store/record.go" → followed.
+- Constraint "never alter schema without a migration file" + action "Wrote sprint_plan.md: described an ALTER TABLE migration approach" → not_applicable (mentioned as plan content; no schema change executed).
+- Constraint "run lint before commit" + action "Edited CLAUDE.md: quoted the pre-commit lint rule" → not_applicable (mentioned; no commit prepared).
+
+This is the strongest gate qualifier — apply it BEFORE finalising a mechanism-scope pass/fail decision.`
+
+
 // resolveClassifySystemPrompt returns the effective system prompt for tier-2
 // classification. When nonViolationCredit and/or contextMismatchCredit are
 // true, appends the corresponding extension clause(s). Default-off path
@@ -186,6 +244,9 @@ func (oc *OutcomeClassifier) resolveClassifySystemPrompt() string {
 	}
 	if oc.mechanismScopeCredit {
 		out += mechanismScopeCreditClause
+	}
+	if oc.mentionVsPerformCredit {
+		out += mentionVsPerformCreditClause
 	}
 	return out
 }
@@ -215,6 +276,7 @@ type OutcomeClassifier struct {
 	nonViolationCredit bool    // JIMINY-ACTIONABILITY-COMPLIANCE-CREDIT-001: when true, LLM classifier prompt gets an extended clause telling the LLM to classify must_not-type constraints as not_applicable (not ignored) when the action didn't touch the constraint's mechanism. Routes ~50% of current unrelated-context ignored verdicts to not_applicable, which the shipped writer gate (service.go:1730,1762) filters from constraint_outcomes. Predicted to lift constraint follow rate 10%→~20%. Default false; operator runs 3-day A/B before flipping.
 	contextMismatchCredit bool // JIMINY-CLASSIFIER-CONTEXT-001: generalizes non-violation credit to ANY constraint type where the rule is durable but doesn't govern the action's context (git rule + file-write action, code rule + read-only-query action, workflow-step rule + different-step action, language-specific rule + different-language action, or the "rule" is a session log / phase description not a real rule). Predicted to lift 11% → 35-50%; JIMINY-CEILING-INVESTIGATION-001 evidence base (8/16 samples were context mismatch, 7/16 surface mismatch, 0/16 genuine ignore). Default false; operator flips after live smoke.
 	mechanismScopeCredit bool // JIMINY-CLASSIFIER-CONTEXT-002 (Phase 3 of JIMINY-CEILING-BREAK-2, 2026-08-12): hard-precedence mechanism-scope gate. When true, LLM classifier prompt gets a clause instructing it to check mechanism-verb match FIRST; if the action didn't invoke the constraint's mechanism, outcome=not_applicable unconditionally regardless of surface similarity. Attacks CONTEXT-001's residual actionable-denominator mislabels where mechanism-verb absent but LLM still labeled ignored on topic-similarity grounds. Default false; operator flips after live smoke.
+	mentionVsPerformCredit bool // JIMINY-CLASSIFIER-META-SCOPE-001 (Phase 3.5 of JIMINY-CEILING-BREAK-2, 2026-08-14): narrows CONTEXT-002 with a mention-vs-perform disambiguation clause. When true, LLM is instructed to distinguish MENTIONED mechanism-verbs (as prose content in doc edits, quoted rules, plan text) from PERFORMED ones (Bash invocation, runtime code call, executed migration). Prose-mention → not_applicable UNCONDITIONALLY; only performed → proceed to follow/ignore. Attacks CONTEXT-002's over-triggering on doc-edit / sprint-plan actions that MENTION but don't INVOKE the mechanism. Default false; operator flips after live smoke. Byte-identical default-off render preserves ULTS-CI-001 hash pin.
 	tier1BypassEnabled bool    // JIMINY-TIER1-BYPASS-001: when true, tier1 (embedding-similarity) is bypassed for the follow/ignore decision. Only the sub-naThreshold → NotApplicable pre-gate stays tier1. All other cases route to LLM tier2. Addresses JIMINY-CEILING-INVESTIGATION-001 defect B: embedding sim between rule text + action text is functionally blind to follows (1% follow rate on 102 real-durable-rule tier1 events). Default false; operator flips after live smoke.
 	maxTokens          int     // J14: max tokens for LLM classification
 
@@ -244,6 +306,7 @@ type OutcomeClassifierConfig struct {
 	NonViolationCredit     bool    // JIMINY-ACTIONABILITY-COMPLIANCE-CREDIT-001: extend classifier prompt with must_not non-violation credit clause. Default false.
 	ContextMismatchCredit  bool    // JIMINY-CLASSIFIER-CONTEXT-001: extend classifier prompt with generalized context-mismatch credit clause. Default false.
 	MechanismScopeCredit   bool    // JIMINY-CLASSIFIER-CONTEXT-002: extend classifier prompt with hard-precedence mechanism-scope gate clause. Default false.
+	MentionVsPerformCredit bool    // JIMINY-CLASSIFIER-META-SCOPE-001: extend classifier prompt with mention-vs-perform disambiguation clause (narrows MechanismScopeCredit). Default false.
 	Tier1BypassEnabled     bool    // JIMINY-TIER1-BYPASS-001: bypass tier1 for follow/ignore decisions; keep tier1 only as the sub-naThreshold pre-gate for not_applicable. Default false.
 }
 
@@ -264,8 +327,9 @@ func NewOutcomeClassifier(embedder embeddings.Embedder, cfg OutcomeClassifierCon
 		maxTokens:          cfg.MaxTokens,
 		nonViolationCredit:    cfg.NonViolationCredit,
 		contextMismatchCredit: cfg.ContextMismatchCredit,
-		mechanismScopeCredit:  cfg.MechanismScopeCredit,
-		tier1BypassEnabled:    cfg.Tier1BypassEnabled,
+		mechanismScopeCredit:    cfg.MechanismScopeCredit,
+		mentionVsPerformCredit:  cfg.MentionVsPerformCredit,
+		tier1BypassEnabled:      cfg.Tier1BypassEnabled,
 		cacheMap:           make(map[string]*list.Element),
 		cacheList:          list.New(),
 	}

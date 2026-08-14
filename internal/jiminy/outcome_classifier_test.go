@@ -572,3 +572,111 @@ func TestResolveClassifySystemPrompt_AllThreeCredits_Ordering(t *testing.T) {
 		t.Errorf("clause ordering must be non-violation < context-mismatch < mechanism-scope (recency-weighted strongest gate last); got nv=%d cm=%d ms=%d", nvIdx, cmIdx, msIdx)
 	}
 }
+
+// TestResolveClassifySystemPrompt_MentionVsPerform_DefaultOff_ByteIdentical
+// proves JIMINY-CLASSIFIER-META-SCOPE-001's flag default OFF preserves the
+// historical system-prompt render exactly, so the ULTS-CI-001 hash pin is
+// unaffected by this sprint (mirrors CONTEXT-002 shape).
+func TestResolveClassifySystemPrompt_MentionVsPerform_DefaultOff_ByteIdentical(t *testing.T) {
+	oc := &OutcomeClassifier{compressPrompts: false, mentionVsPerformCredit: false}
+	got := oc.resolveClassifySystemPrompt()
+	want := classifySystemPrompt
+	if got != want {
+		t.Errorf("default-off render differs from base classifySystemPrompt — ULTS pin would break. got len=%d want len=%d", len(got), len(want))
+	}
+}
+
+// TestResolveClassifySystemPrompt_MentionVsPerform_On_Extended proves
+// flipping the flag appends the clause exactly once.
+func TestResolveClassifySystemPrompt_MentionVsPerform_On_Extended(t *testing.T) {
+	oc := &OutcomeClassifier{compressPrompts: false, mentionVsPerformCredit: true}
+	got := oc.resolveClassifySystemPrompt()
+	want := classifySystemPrompt + mentionVsPerformCreditClause
+	if got != want {
+		t.Errorf("mention-vs-perform-on render doesn't match base + clause. got len=%d want len=%d", len(got), len(want))
+	}
+	if !strings.Contains(got, "MENTION-vs-PERFORM DISAMBIGUATION") {
+		t.Errorf("expected 'MENTION-vs-PERFORM DISAMBIGUATION' header in output; got prefix: %s...", got[:min(400, len(got))])
+	}
+}
+
+// TestNewOutcomeClassifier_MentionVsPerformCredit_Propagates verifies the
+// OutcomeClassifierConfig.MentionVsPerformCredit field flows through
+// NewOutcomeClassifier to the internal field.
+func TestNewOutcomeClassifier_MentionVsPerformCredit_Propagates(t *testing.T) {
+	off := NewOutcomeClassifier(nil, OutcomeClassifierConfig{MentionVsPerformCredit: false})
+	if off.mentionVsPerformCredit {
+		t.Error("MentionVsPerformCredit=false should not propagate to true")
+	}
+	on := NewOutcomeClassifier(nil, OutcomeClassifierConfig{MentionVsPerformCredit: true})
+	if !on.mentionVsPerformCredit {
+		t.Error("MentionVsPerformCredit=true should propagate")
+	}
+	if off.resolveClassifySystemPrompt() == on.resolveClassifySystemPrompt() {
+		t.Error("MentionVsPerformCredit flag on/off renders should differ")
+	}
+}
+
+// TestResolveClassifySystemPrompt_MentionVsPerform_AfterMechanismScope pins
+// that when both mechanism-scope and mention-vs-perform are ON, the
+// mention-vs-perform clause appears AFTER mechanism-scope (strongest-gate-last).
+// The mention-vs-perform disambiguation refines the mechanism-scope decision;
+// recency-weighted LLM attention gives the refinement the last word.
+func TestResolveClassifySystemPrompt_MentionVsPerform_AfterMechanismScope(t *testing.T) {
+	oc := &OutcomeClassifier{
+		compressPrompts:        false,
+		mechanismScopeCredit:   true,
+		mentionVsPerformCredit: true,
+	}
+	got := oc.resolveClassifySystemPrompt()
+	msIdx := strings.Index(got, "MECHANISM-SCOPE HARD-PRECEDENCE GATE")
+	mvpIdx := strings.Index(got, "MENTION-vs-PERFORM DISAMBIGUATION")
+	if msIdx < 0 || mvpIdx < 0 {
+		t.Fatalf("both clauses must be present; msIdx=%d mvpIdx=%d", msIdx, mvpIdx)
+	}
+	if mvpIdx <= msIdx {
+		t.Errorf("mention-vs-perform must appear AFTER mechanism-scope (strongest-gate-last); got msIdx=%d mvpIdx=%d", msIdx, mvpIdx)
+	}
+}
+
+// TestResolveClassifySystemPrompt_AllFourCredits_Ordering pins that when all
+// four credit flags are ON, the clauses splice in narrower→broader→strongest
+// order: non-violation → context-mismatch → mechanism-scope → mention-vs-perform.
+// Extends TestResolveClassifySystemPrompt_AllThreeCredits_Ordering to cover
+// META-SCOPE-001's addition.
+func TestResolveClassifySystemPrompt_AllFourCredits_Ordering(t *testing.T) {
+	oc := &OutcomeClassifier{
+		compressPrompts:        false,
+		nonViolationCredit:     true,
+		contextMismatchCredit:  true,
+		mechanismScopeCredit:   true,
+		mentionVsPerformCredit: true,
+	}
+	got := oc.resolveClassifySystemPrompt()
+	want := classifySystemPrompt + nonViolationCreditClause + contextMismatchCreditClause + mechanismScopeCreditClause + mentionVsPerformCreditClause
+	if got != want {
+		t.Errorf("all-four-flags render doesn't match base + all four clauses in expected order. got len=%d want len=%d", len(got), len(want))
+	}
+	nvIdx := strings.Index(got, "NON-VIOLATION CREDIT")
+	cmIdx := strings.Index(got, "CONTEXT-MISMATCH CREDIT")
+	msIdx := strings.Index(got, "MECHANISM-SCOPE HARD-PRECEDENCE GATE")
+	mvpIdx := strings.Index(got, "MENTION-vs-PERFORM DISAMBIGUATION")
+	if nvIdx < 0 || cmIdx < 0 || msIdx < 0 || mvpIdx < 0 {
+		t.Fatalf("all four clauses must be present; nvIdx=%d cmIdx=%d msIdx=%d mvpIdx=%d", nvIdx, cmIdx, msIdx, mvpIdx)
+	}
+	if !(nvIdx < cmIdx && cmIdx < msIdx && msIdx < mvpIdx) {
+		t.Errorf("clause ordering must be non-violation < context-mismatch < mechanism-scope < mention-vs-perform (strongest-gate-last); got nv=%d cm=%d ms=%d mvp=%d", nvIdx, cmIdx, msIdx, mvpIdx)
+	}
+}
+
+// TestResolveClassifySystemPrompt_MentionVsPerform_Compact_Compatible verifies
+// the clause splices onto the compact prompt path too (JIMINY compress-prompts
+// mode); mirrors the shipped compact-mode behaviour of the three sibling flags.
+func TestResolveClassifySystemPrompt_MentionVsPerform_Compact_Compatible(t *testing.T) {
+	oc := &OutcomeClassifier{compressPrompts: true, mentionVsPerformCredit: true}
+	got := oc.resolveClassifySystemPrompt()
+	want := classifySystemPromptCompact + mentionVsPerformCreditClause
+	if got != want {
+		t.Errorf("compact+mention-vs-perform render doesn't match. got len=%d want len=%d", len(got), len(want))
+	}
+}

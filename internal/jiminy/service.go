@@ -141,6 +141,7 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext, consultant Co
 			NonViolationCredit:     cfg.JiminyNonViolationCreditEnabled,
 			ContextMismatchCredit:  cfg.JiminyContextMismatchCreditEnabled,
 			MechanismScopeCredit:   cfg.JiminyMechanismScopeCreditEnabled,
+			MentionVsPerformCredit: cfg.JiminyMentionVsPerformCreditEnabled,
 			Tier1BypassEnabled:     cfg.JiminyTier1BypassEnabled,
 		})
 		slog.Info("jiminy: semantic outcome classifier enabled",
@@ -150,6 +151,7 @@ func NewService(cfg config.Config, driver neo4j.DriverWithContext, consultant Co
 			"nonviolation_credit", cfg.JiminyNonViolationCreditEnabled,
 			"context_mismatch_credit", cfg.JiminyContextMismatchCreditEnabled,
 			"mechanism_scope_credit", cfg.JiminyMechanismScopeCreditEnabled,
+			"mention_vs_perform_credit", cfg.JiminyMentionVsPerformCreditEnabled,
 			"tier1_bypass", cfg.JiminyTier1BypassEnabled)
 	}
 
