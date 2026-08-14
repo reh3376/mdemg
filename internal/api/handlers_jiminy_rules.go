@@ -12,6 +12,8 @@ import (
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"github.com/nrednav/cuid2"
+
+	"mdemg/internal/embeddings"
 )
 
 // JIMINY-RULES-UI-001 Epic 2 — READ-only endpoints for the /ui/rules tab.
@@ -466,12 +468,24 @@ func (s *Server) doRulesCreate(w http.ResponseWriter, r *http.Request) {
 
 	overrideDedup := strings.EqualFold(r.URL.Query().Get("override_dedup"), "true")
 
+	// EMBED-CALLSITE-002 (2026-08-14): attach embedding meta so the
+	// recorder tags rows with call_site + space_id (EMBED-CALLSITE-001
+	// zero-tolerance contract). Applies to BOTH the dedup embed below
+	// AND the persistent-node embed lower in this handler. Every code
+	// path that calls embedder.Embed on a recorder-wired embedder MUST
+	// attach meta or the RSIC self-reflect check #28 fires
+	// alert_embedding_regression.
+	embedCtx := embeddings.WithEmbeddingMeta(r.Context(), embeddings.EmbeddingMeta{
+		CallSite: "jiminy.rules.create",
+		SpaceID:  req.SpaceID,
+	})
+
 	// Dedup gate: cosine similarity ≥ JiminyRulesDedupSimThreshold on any
 	// live constraint/correction. Mirrors CREATE-CORRECTION-DEDUP-001 shape.
 	// Skipped when embedder unavailable OR threshold ≤ 0 OR override=true.
 	similar := []rulesSimilarRule{}
 	if s.embedder != nil && s.cfg.JiminyRulesDedupSimThreshold > 0 && !overrideDedup {
-		emb, embErr := s.embedder.Embed(r.Context(), req.Content)
+		emb, embErr := s.embedder.Embed(embedCtx, req.Content)
 		if embErr != nil {
 			// Non-fatal: log + proceed (better to mint a possible dup than
 			// block a legitimate create on a transient embed error).
@@ -515,7 +529,7 @@ func (s *Server) doRulesCreate(w http.ResponseWriter, r *http.Request) {
 	// path will fill it later.
 	var embedding []float32
 	if s.embedder != nil {
-		if e, err := s.embedder.Embed(r.Context(), req.Content); err == nil {
+		if e, err := s.embedder.Embed(embedCtx, req.Content); err == nil {
 			embedding = e
 		}
 	}
