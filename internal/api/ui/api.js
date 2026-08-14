@@ -211,5 +211,21 @@ export const rulesCreate = async (body, overrideDedup = false) => {
     }
     return payload;
 };
-export const rulesTombstone = (code, spaceID, reason) =>
-    post(`/v1/jiminy/rules/${encodeURIComponent(code)}/tombstone`, { space_id: spaceID, reason });
+// rulesTombstone uses direct fetch so it can surface the shipped 503 body
+// verbatim on flag-off (the shared post() helper only carries statusText).
+// Matches the rulesCreate throw-shape: err.status + err.payload set.
+export const rulesTombstone = async (code, spaceID, reason) => {
+    const res = await fetch(_baseURL + `/v1/jiminy/rules/${encodeURIComponent(code)}/tombstone`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ space_id: spaceID, reason }),
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) {
+        const err = new Error(payload.error || `${res.status} ${res.statusText}`);
+        err.status = res.status;
+        err.payload = payload;
+        throw err;
+    }
+    return payload;
+};

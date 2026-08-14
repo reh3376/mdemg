@@ -274,6 +274,11 @@ func (s *Server) fetchRuleByCode(ctx context.Context, spaceID, code string) (rul
 	session := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer session.Close(ctx)
 
+	// JIMINY-RULES-UI-001 Epic 4 UX-review fix (2026-08-13):
+	// After Edit = tombstone-and-recreate (Option A), two nodes with the
+	// same constraint_code exist transiently — the old one is_archived=true,
+	// the new one is_archived=false. Prefer the LIVE one; if only archived
+	// exists, return it. Also prefer the newest among ties.
 	cypher := `MATCH (n:MemoryNode)
 		WHERE n.space_id = $space_id
 		  AND n.constraint_code = $code
@@ -288,6 +293,7 @@ func (s *Server) fetchRuleByCode(ctx context.Context, spaceID, code string) (rul
 		       coalesce(n.is_archived, false) AS is_archived,
 		       coalesce(n.archive_reason, '') AS archive_reason,
 		       n.created_at AS created_at
+		ORDER BY coalesce(n.is_archived, false) ASC, n.created_at DESC
 		LIMIT 1`
 
 	result, err := session.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
