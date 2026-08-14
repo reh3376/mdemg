@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
@@ -230,4 +231,53 @@ func TestRulesTombstone_WrongMethodOnTombstonePath(t *testing.T) {
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("GET on /tombstone → %d, want 405 (%s)", rec.Code, rec.Body.String())
 	}
+}
+
+// TestRulesCreate_EmbedCallSitesAttached pins EMBED-CALLSITE-002 (2026-08-14):
+// doRulesCreate MUST wrap its embedder.Embed calls with
+// embeddings.WithEmbeddingMeta(ctx, EmbeddingMeta{CallSite:"jiminy.rules.create", SpaceID:...})
+// before invoking Embed. The recorder-wired embedder reads call_site + space_id
+// from the context meta; a metaless embed records an empty call_site, which
+// the RSIC self-reflect check #28 fires alert_embedding_regression on.
+// Live-caught in this session: 6 empty-call_site rows from the shipped Save
+// flow used by JIMINY-CORPUS-AUDIT-004's 7 content rewrites. Source-string
+// pin — this is the shape assertion the recorder integration can't unit-test
+// directly without a wired-up recorder + TSDB round-trip.
+func TestRulesCreate_EmbedCallSitesAttached(t *testing.T) {
+	b, err := readSourceFileAPI("handlers_jiminy_rules.go")
+	if err != nil {
+		t.Fatalf("read source: %v", err)
+	}
+	src := string(b)
+	start := strings.Index(src, "func (s *Server) doRulesCreate(")
+	if start < 0 {
+		t.Fatal("doRulesCreate not found in handlers_jiminy_rules.go")
+	}
+	// end of function — take a generous window; the two embed sites are near-top
+	end := start + 4000
+	if end > len(src) {
+		end = len(src)
+	}
+	body := src[start:end]
+
+	required := []string{
+		`embeddings.WithEmbeddingMeta`,
+		`CallSite: "jiminy.rules.create"`,
+		`SpaceID:  req.SpaceID`,
+	}
+	for _, r := range required {
+		if !strings.Contains(body, r) {
+			t.Errorf("doRulesCreate missing required embed-meta wiring %q — EMBED-CALLSITE-002 regression", r)
+		}
+	}
+
+	// Both Embed sites MUST use the meta-wrapped context, not r.Context() directly.
+	nBareEmbed := strings.Count(body, "s.embedder.Embed(r.Context()")
+	if nBareEmbed > 0 {
+		t.Errorf("doRulesCreate has %d bare s.embedder.Embed(r.Context(), ...) calls — EMBED-CALLSITE-002 requires embedCtx", nBareEmbed)
+	}
+}
+
+func readSourceFileAPI(name string) ([]byte, error) {
+	return os.ReadFile(name)
 }
