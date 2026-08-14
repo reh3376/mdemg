@@ -83,6 +83,14 @@ type StandardMetrics struct {
 	JiminyGuidanceSurfaced func(spaceID string) *Counter
 	JiminyFeedbackDropped  func(spaceID string) *Counter
 
+	// Constraint detector multi-emit suppression (JIMINY-CORPUS-CONSTRAINT-DETECTOR-DEDUP-001, 2026-08-14):
+	// counts N-1 suppressed emissions each time the detector collapses a multi-severity
+	// match to a single canonical DetectedConstraint via severity precedence. Increments
+	// when content triggers ≥2 severity buckets in one L0 observation. Steady state near
+	// zero for typical rule content; sustained non-zero indicates the corpus is producing
+	// mixed-severity rules that the operator may want to split into separate `observe` calls.
+	ConstraintDetectorMultiEmitSuppressed func(spaceID string) *Counter
+
 	// Emergence/consolidation cycle wall time (TSDB-CONSUME-001) — the
 	// observable the DBSCAN O(n²) deferral is conditioned on (>60s revisit
 	// threshold). Gauge of the LAST completed cycle, not a histogram: the
@@ -415,6 +423,9 @@ func NewStandardMetrics(r *Registry) *StandardMetrics {
 	}
 	m.GuidanceConflicts = func(spaceID string) *Counter {
 		return r.NewCounter("guidance_conflicts_total", "Conflicts detected by consulting.Suggest (idea 09 go/no-go signal)", map[string]string{"space_id": spaceID})
+	}
+	m.ConstraintDetectorMultiEmitSuppressed = func(spaceID string) *Counter {
+		return r.NewCounter("constraint_detector_multi_emit_suppressed_total", "N-1 suppressed emissions per collapse when the detector routes multi-severity matches on one L0 observation through the severity-precedence gate (JIMINY-CORPUS-CONSTRAINT-DETECTOR-DEDUP-001)", map[string]string{"space_id": spaceID})
 	}
 	m.EmergenceCycleDuration = func(spaceID, cycle string) *Gauge {
 		return r.NewGauge("emergence_cycle_duration_seconds", "Wall time of the last completed emergence/consolidation cycle (DBSCAN O(n²) deferral tripwire)", map[string]string{"space_id": spaceID, "cycle": cycle})

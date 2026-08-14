@@ -1,6 +1,7 @@
 package conversation
 
 import (
+	"log/slog"
 	"mdemg/internal/sanitize"
 	"regexp"
 	"strings"
@@ -18,15 +19,46 @@ type DetectedConstraint struct {
 	Name           string  `json:"name"`            // Short extracted label
 	Confidence     float64 `json:"confidence"`
 	MatchedPattern string  `json:"matched_pattern"`
+	// SkippedSuppressed is populated ONLY on the single canonical result when
+	// JIMINY-CORPUS-CONSTRAINT-DETECTOR-DEDUP-001's severity-precedence gate
+	// collapses a multi-severity match. It's the count of same-obs sibling
+	// severities that were suppressed (N-1 where N is the raw match count).
+	// Populated for downstream telemetry hooks; not persisted on the L1 node.
+	SkippedSuppressed int `json:"skipped_suppressed,omitempty"`
+}
+
+// severityPrecedence orders constraint types from strongest to weakest.
+// JIMINY-CORPUS-CONSTRAINT-DETECTOR-DEDUP-001 (2026-08-14): when one L0
+// observation triggers multiple severity buckets, this precedence picks the
+// single canonical DetectedConstraint. Rationale:
+//   - `must_not` outranks `must` because a prohibition is strictly more
+//     constraining than an obligation over the same substrate (the audit-004
+//     twin pair `z5xgcm`/`pwa2lm` proved this — the `must_not` twin was
+//     semantically correct, the `must` twin was a spurious match).
+//   - `should_not` > `should` for the same reason (prohibition over
+//     preference).
+//   - `deadline` is temporally-oriented, not severity-oriented; it lands
+//     last only as a tiebreak — content that is ONLY a deadline isn't
+//     collapsed at all (len(bestByType)==1).
+var severityPrecedence = map[string]int{
+	"must_not":   5,
+	"must":       4,
+	"should_not": 3,
+	"should":     2,
+	"deadline":   1,
 }
 
 // ConstraintDetector scans observation content for commitment/prohibition patterns.
 type ConstraintDetector struct {
 	patterns      map[string][]constraintPattern
 	minConfidence float64
+	dedupEnabled  bool
 }
 
 // NewConstraintDetector creates a detector with compiled patterns.
+// The severity-precedence collapse (JIMINY-CORPUS-CONSTRAINT-DETECTOR-DEDUP-001)
+// defaults ON; the conversation service overrides via SetDedupEnabled when
+// the operator sets CONSTRAINT_DETECTOR_DEDUP_ENABLED=false.
 func NewConstraintDetector(minConfidence float64) *ConstraintDetector {
 	if minConfidence <= 0 {
 		minConfidence = 0.6
@@ -34,9 +66,16 @@ func NewConstraintDetector(minConfidence float64) *ConstraintDetector {
 	d := &ConstraintDetector{
 		patterns:      make(map[string][]constraintPattern),
 		minConfidence: minConfidence,
+		dedupEnabled:  true, // safe default per JIMINY-CORPUS-CONSTRAINT-DETECTOR-DEDUP-001
 	}
 	d.initPatterns()
 	return d
+}
+
+// SetDedupEnabled toggles the severity-precedence collapse. Off returns to
+// pre-sprint behavior (byte-identical).
+func (d *ConstraintDetector) SetDedupEnabled(enabled bool) {
+	d.dedupEnabled = enabled
 }
 
 func (d *ConstraintDetector) initPatterns() {
@@ -170,6 +209,47 @@ func (d *ConstraintDetector) Detect(content string, obsType ObservationType) []D
 					}
 				}
 			}
+		}
+	}
+
+	// JIMINY-CORPUS-CONSTRAINT-DETECTOR-DEDUP-001 (2026-08-14): when the
+	// dedup gate is on AND multiple severity buckets matched on the same
+	// L0 observation, collapse to a single canonical DetectedConstraint via
+	// severity precedence (must_not > must > should_not > should > deadline).
+	// This closes the dual-severity dual-mint class where the L1 promoter
+	// (`CreateConstraintNodes`) minted one node per emitted type, all sharing
+	// the same constraint_code — the class Fable's JIMINY-CORPUS-AUDIT-004
+	// found live on mdemg-dev.
+	if d.dedupEnabled && len(bestByType) > 1 {
+		var chosenType string
+		var chosenPrec int
+		for cType, det := range bestByType {
+			prec := severityPrecedence[cType]
+			if prec == 0 {
+				continue // unknown type; skip from candidacy but still emit alone if it's the only one
+			}
+			if chosenType == "" || prec > chosenPrec ||
+				(prec == chosenPrec && det.Confidence > bestByType[chosenType].Confidence) {
+				chosenType = cType
+				chosenPrec = prec
+			}
+		}
+		if chosenType != "" {
+			suppressed := len(bestByType) - 1
+			winner := bestByType[chosenType]
+			winner.SkippedSuppressed = suppressed
+			results = []DetectedConstraint{winner}
+			// Collect suppressed-type names for the log line.
+			suppressedTypes := make([]string, 0, suppressed)
+			for t := range bestByType {
+				if t != chosenType {
+					suppressedTypes = append(suppressedTypes, t)
+				}
+			}
+			slog.Debug("constraint detector: multi-emit collapsed to canonical",
+				"chosen_type", chosenType,
+				"suppressed_types", suppressedTypes)
+			return results
 		}
 	}
 

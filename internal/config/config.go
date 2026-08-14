@@ -897,6 +897,7 @@ type Config struct {
 	ConstraintDetectionEnabled bool    // CONSTRAINT_DETECTION_ENABLED — enable constraint detection in observations (default: true)
 	ConstraintMinConfidence    float64 // CONSTRAINT_MIN_CONFIDENCE — minimum confidence to tag as constraint (default: 0.6)
 	ConstraintProtectFromDecay bool    // CONSTRAINT_PROTECT_FROM_DECAY — protect constraint-tagged obs from tombstoning (default: true)
+	ConstraintDetectorDedupEnabled bool // CONSTRAINT_DETECTOR_DEDUP_ENABLED — collapse multi-severity detections on a single L0 observation to ONE canonical DetectedConstraint via severity precedence (must_not > must > should_not > should > deadline). Fixes dual-severity dual-mint class where content triggering both must and must_not regexes minted 2 L1 constraint nodes sharing the same constraint_code. Default true (JIMINY-CORPUS-CONSTRAINT-DETECTOR-DEDUP-001, 2026-08-14).
 
 	// JIMINY-CORPUS-001 Epic 1: ConvObs→constraint promotion gate.
 	// Guards the ONLY site that mints role_type='constraint' nodes from
@@ -4366,6 +4367,7 @@ func FromEnv() (Config, error) {
 
 	// Constraint Module (Phase 45.5)
 	constraintDetectionEnabled := getBool("CONSTRAINT_DETECTION_ENABLED", true)
+	constraintDetectorDedupEnabled := getBool("CONSTRAINT_DETECTOR_DEDUP_ENABLED", true)
 	constraintMinConfidence, err := atof("CONSTRAINT_MIN_CONFIDENCE", 0.6)
 	if err != nil {
 		return Config{}, err
@@ -6454,6 +6456,7 @@ func FromEnv() (Config, error) {
 		CoolerGraduationThreshold:       coolerGradThresh,
 
 		ConstraintDetectionEnabled: constraintDetectionEnabled,
+		ConstraintDetectorDedupEnabled: constraintDetectorDedupEnabled,
 		ConstraintMinConfidence:    constraintMinConfidence,
 		ConstraintProtectFromDecay: constraintProtectFromDecay,
 
