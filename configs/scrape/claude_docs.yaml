@@ -1,0 +1,228 @@
+# CLAUDE-DOCS-TRAINING-001 Epic 1/2 — scrape configuration for Claude Code docs.
+# Produced 2026-08-14 during Epic 1 discovery.
+#
+# Robots.txt verdicts (fetched 2026-08-14):
+#   code.claude.com/robots.txt:
+#     User-agent: *
+#     Content-Signal: ai-train=yes, search=yes, ai-input=yes    # ← explicit AI-training permission
+#     Disallow: /cdn-cgi/
+#     Disallow: /_next/  (Allow: /_next/image)
+#     Sitemap: https://code.claude.com/docs/sitemap.xml
+#   platform.claude.com/robots.txt:
+#     User-agent: *
+#     Disallow: /api/                                            # ← Messages API reference BLOCKED
+#     Sitemap: https://platform.claude.com/sitemap.xml
+#
+# Source of truth: code.claude.com/docs/llms.txt (Anthropic's own curated
+# training-ready index of ~200 URLs, organized by section). Each URL has a
+# `.md` variant that serves the raw markdown — no HTML parsing needed.
+#
+# Included sections (150 URLs, ~60% of the 247 total):
+#   Core Documentation, Features & Extension, Configuration & Customization,
+#   Reference (CLI, commands, env-vars, hooks, settings, tools-reference),
+#   Multi-Agent & Orchestration, MCP & Extensions, Agent SDK,
+#   Output & Collaboration, Programmatic Access, Model & Performance,
+#   Platforms & Integrations (VS Code, JetBrains, Chrome, GitHub Actions, Slack)
+#
+# Excluded sections (~50 URLs — low ROI for CLI-user knowledge target):
+#   /whats-new/*                    — weekly changelogs, churn-heavy + redundant
+#   /claude-apps-gateway-*          — enterprise gateway deployment
+#   /self-hosted-environments-*     — enterprise self-hosting
+#   /amazon-bedrock, /google-vertex-ai, /microsoft-foundry  — cloud-provider hosting
+#   /llm-gateway-*                  — LLM gateway config
+#   /communications-kit, /champion-kit — rollout/adoption
+#
+# Rate limit: 1s between fetches (respects code.claude.com informal norm).
+# User-Agent: identifies as MDEMG training scraper — not spoofing a browser.
+
+domain: code.claude.com
+scheme: https
+rate_limit_seconds: 1.0
+timeout_seconds: 30
+user_agent: "MDEMG-Docs-Trainer/1.0 (CLAUDE-DOCS-TRAINING-001; mdemg contact via github.com/reh3376/mdemg/issues)"
+output_dir: training_data/claude-docs/raw
+manifest_path: training_data/claude-docs/scrape_manifest.json
+
+# URL paths (relative to https://code.claude.com). The scraper fetches each
+# path + ".md" — code.claude.com serves the underlying markdown source at that
+# URL, avoiding HTML parsing entirely.
+urls:
+  # Core Documentation (4)
+  - /docs/en/overview
+  - /docs/en/quickstart
+  - /docs/en/changelog
+  - /docs/en/how-claude-code-works
+
+  # Features & Extension (10)
+  - /docs/en/features-overview
+  - /docs/en/claude-directory
+  - /docs/en/context-window
+  - /docs/en/prompt-caching
+  - /docs/en/memory
+  - /docs/en/permission-modes
+  - /docs/en/sessions
+  - /docs/en/common-workflows
+  - /docs/en/prompt-library
+  - /docs/en/best-practices
+
+  # Configuration & Customization (5)
+  - /docs/en/settings
+  - /docs/en/permissions
+  - /docs/en/sandbox-environments
+  - /docs/en/sandboxing
+  - /docs/en/cloud-environments
+
+  # Model & Performance (4)
+  - /docs/en/model-config
+  - /docs/en/fast-mode
+  - /docs/en/advisor
+  - /docs/en/output-styles
+
+  # UI & Accessibility (6)
+  - /docs/en/terminal-config
+  - /docs/en/fullscreen
+  - /docs/en/accessibility
+  - /docs/en/voice-dictation
+  - /docs/en/statusline
+  - /docs/en/keybindings
+
+  # Reference — the operator's stated highest-priority target (10)
+  - /docs/en/cli-reference
+  - /docs/en/commands
+  - /docs/en/env-vars
+  - /docs/en/tools-reference
+  - /docs/en/interactive-mode
+  - /docs/en/checkpointing
+  - /docs/en/hooks
+  - /docs/en/plugins-reference
+  - /docs/en/channels-reference
+  - /docs/en/glossary
+
+  # Multi-Agent & Orchestration (7)
+  - /docs/en/agents
+  - /docs/en/sub-agents
+  - /docs/en/agent-view
+  - /docs/en/agent-teams
+  - /docs/en/cross-session-messaging
+  - /docs/en/workflows
+  - /docs/en/worktrees
+
+  # MCP & Extensions (5)
+  - /docs/en/mcp-quickstart
+  - /docs/en/mcp
+  - /docs/en/skills
+  - /docs/en/discover-plugins
+  - /docs/en/plugins
+
+  # Output & Collaboration (5)
+  - /docs/en/artifacts
+  - /docs/en/hooks-guide
+  - /docs/en/channels
+  - /docs/en/scheduled-tasks
+  - /docs/en/goal
+
+  # Programmatic Access (2)
+  - /docs/en/headless
+  - /docs/en/deep-links
+
+  # Platforms & Integrations (7)
+  - /docs/en/platforms
+  - /docs/en/remote-control
+  - /docs/en/web-quickstart
+  - /docs/en/claude-code-on-the-web
+  - /docs/en/mobile
+  - /docs/en/routines
+  - /docs/en/ultrareview
+
+  # Desktop & Mobile (6)
+  - /docs/en/desktop-quickstart
+  - /docs/en/desktop
+  - /docs/en/desktop-linux
+  - /docs/en/desktop-wsl
+  - /docs/en/desktop-scheduled-tasks
+  - /docs/en/desktop-ios-simulator
+
+  # Tool Integrations (4)
+  - /docs/en/chrome
+  - /docs/en/computer-use
+  - /docs/en/vs-code
+  - /docs/en/jetbrains
+
+  # Security & Code Quality (3)
+  - /docs/en/security-guidance
+  - /docs/en/claude-security
+  - /docs/en/code-review
+
+  # CI/CD & Automation (5)
+  - /docs/en/github-actions
+  - /docs/en/github-actions-cloud-providers
+  - /docs/en/github-enterprise-server
+  - /docs/en/gitlab-ci-cd
+  - /docs/en/slack
+
+  # Plugin Ecosystem (4)
+  - /docs/en/plugin-marketplaces
+  - /docs/en/plugin-dependencies
+  - /docs/en/plugin-hints
+  - /docs/en/plugin-relevance
+
+  # Troubleshooting (4)
+  - /docs/en/troubleshoot-install
+  - /docs/en/troubleshooting
+  - /docs/en/debug-your-config
+  - /docs/en/errors
+
+  # Admin & Organization Setup (5)
+  - /docs/en/admin-setup
+  - /docs/en/setup
+  - /docs/en/authentication
+  - /docs/en/server-managed-settings
+  - /docs/en/auto-mode-config
+
+  # Enterprise / Third-party (2)
+  - /docs/en/third-party-integrations
+  - /docs/en/managed-mcp
+
+  # Security & Data (3)
+  - /docs/en/security
+  - /docs/en/data-usage
+  - /docs/en/zero-data-retention
+
+  # Legal (1)
+  - /docs/en/legal-and-compliance
+
+  # Agent SDK — Overview & Core Concepts (4 + 4 = 8)
+  - /docs/en/agent-sdk/overview
+  - /docs/en/agent-sdk/quickstart
+  - /docs/en/agent-sdk/examples
+  - /docs/en/agent-sdk/troubleshooting
+  - /docs/en/agent-sdk/agent-loop
+  - /docs/en/agent-sdk/claude-code-features
+  - /docs/en/agent-sdk/sessions
+  - /docs/en/agent-sdk/session-storage
+
+  # Agent SDK — I/O + Tools (4 + 3 = 7)
+  - /docs/en/agent-sdk/streaming-vs-single-mode
+  - /docs/en/agent-sdk/user-input
+  - /docs/en/agent-sdk/streaming-output
+  - /docs/en/agent-sdk/structured-outputs
+  - /docs/en/agent-sdk/custom-tools
+  - /docs/en/agent-sdk/mcp
+  - /docs/en/agent-sdk/tool-search
+
+  # Agent SDK — Advanced (7 + 5 = 12)
+  - /docs/en/agent-sdk/subagents
+  - /docs/en/agent-sdk/modifying-system-prompts
+  - /docs/en/agent-sdk/slash-commands
+  - /docs/en/agent-sdk/skills
+  - /docs/en/agent-sdk/plugins
+  - /docs/en/agent-sdk/permissions
+  - /docs/en/agent-sdk/hooks
+  - /docs/en/agent-sdk/file-checkpointing
+  - /docs/en/agent-sdk/cost-tracking
+  - /docs/en/agent-sdk/observability
+  - /docs/en/agent-sdk/todo-tracking
+
+  # Agent SDK — API Reference (2)
+  - /docs/en/agent-sdk/typescript
+  - /docs/en/agent-sdk/python
