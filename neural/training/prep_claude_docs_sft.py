@@ -166,20 +166,20 @@ def main() -> int:
     manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
     print()
-    print(f"wrote:")
+    print("wrote:")
     print(f"  {train_path.relative_to(REPO_ROOT)}  ({train_path.stat().st_size / 1024:.1f} KB, sha={train_sha[:16]}...)")
     print(f"  {valid_path.relative_to(REPO_ROOT)}  ({valid_path.stat().st_size / 1024:.1f} KB, sha={valid_sha[:16]}...)")
     print(f"  {manifest_path.relative_to(REPO_ROOT)}")
     print()
-    print(f"ready to train:")
-    print(f"  python3 neural/training/train_ft.py \\")
-    print(f"    --tier 1 --mode sft \\")
+    print("ready to train:")
+    print("  python3 neural/training/train_ft.py \\")
+    print("    --tier 1 --mode sft \\")
     print(f"    --base-model {BASE_MODEL_NAME} \\")
     print(f"    --expected-sha256 {BASE_MODEL_SHA} \\")
     print(f"    --dataset {OUT_DIR.relative_to(REPO_ROOT)} \\")
-    print(f"    --adapter-path adapters/claude_docs_001/ \\")
-    print(f"    --n-epochs 1 --batch-size 4 \\")
-    print(f"    --dry-run   # verify config first")
+    print("    --adapter-path adapters/claude_docs_001/ \\")
+    print("    --n-epochs 1 --batch-size 4 \\")
+    print("    --dry-run   # verify config first")
 
     return 0
 

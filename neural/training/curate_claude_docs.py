@@ -366,7 +366,7 @@ def main() -> int:
     DISTRIBUTION_REPORT_PATH.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     print()
-    print(f"wrote:")
+    print("wrote:")
     print(f"  {QA_PATH.relative_to(REPO_ROOT)}  ({QA_PATH.stat().st_size / 1024:.1f} KB)")
     print(f"  {CURATE_MANIFEST_PATH.relative_to(REPO_ROOT)}")
     print(f"  {DISTRIBUTION_REPORT_PATH.relative_to(REPO_ROOT)}")

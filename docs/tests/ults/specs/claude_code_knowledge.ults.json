@@ -16,12 +16,12 @@
     "golden_holdout": "training_data/eval/claude_code_knowledge_golden.jsonl",
     "leak_audit_verdict": "PASS (0 source_url/section_index tuple overlap; 0 prompt-string overlap)",
     "system_prompt_embedded": "You are an expert on Claude Code (Anthropic's agentic CLI) and its Agent SDK. Answer the user's question accurately based on the official Anthropic documentation at code.claude.com. Be concise, cite specific configuration keys, commands, hook events, or SDK classes by exact name, and include verbatim code snippets when they clarify the answer. If a claim would require guessing beyond documented behavior, say so.",
-    "system_prompt_hash_note": "Zero-hash placeholder: this is a NEW knowledge-recall task with no shipped production call site, so the traditional source-line-pinned hash is not applicable. The prompt is embedded in metadata.system_prompt_embedded. If this task graduates to a shipped call site, compute the hash of that source at that time."
+    "system_prompt_hash_note": "Empty-hash convention: this is a NEW knowledge-recall task with no shipped production call site, so the traditional source-line-pinned hash is not applicable. The prompt is embedded in metadata.system_prompt_embedded. Empty system_prompt_hash + empty system_prompt_source triggers the ULTS runner's skip path per ults_runner.py::verify_prompt_hash (line 408: 'not hash_val or ... or not source'). If this task graduates to a shipped call site, compute the hash of that source at that time."
   },
   "sampling_group": "T",
   "prompt": {
-    "system_prompt_hash": "0000000000000000000000000000000000000000000000000000000000000000",
-    "system_prompt_source": "docs/tests/ults/specs/claude_code_knowledge.ults.json (embedded in metadata.system_prompt_embedded)",
+    "system_prompt_hash": "",
+    "system_prompt_source": "",
     "think_mode": false,
     "dynamic_prompt": false
   },

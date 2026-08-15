@@ -66,7 +66,6 @@ def rephrase_question(row: dict) -> str:
     """
     header = row["section_header"].strip().rstrip(".")
     doc = row["doc_title"]
-    header_lc = header.lower()
 
     if header.endswith("?"):
         # Already a question; add prefix.
@@ -173,7 +172,7 @@ def main() -> int:
         for k in list(overlap)[:5]:
             print(f"  {k}", file=sys.stderr)
         return 1
-    print(f"leak audit: 0 (source_url, section_index) overlap between train and golden ✓")
+    print("leak audit: 0 (source_url, section_index) overlap between train and golden ✓")
 
     # SECOND LEAK CHECK: verify golden Qs differ from any train Q
     train_prompts = {r["prompt"] for r in train_rows}
@@ -181,7 +180,7 @@ def main() -> int:
     if golden_q_overlap:
         print(f"error: LEAK DETECTED — {len(golden_q_overlap)} golden prompts appear in train prompts (rephrase failed to differentiate)", file=sys.stderr)
         return 1
-    print(f"leak audit: golden prompts all distinct from train prompts ✓")
+    print("leak audit: golden prompts all distinct from train prompts ✓")
 
     if args.dry_run:
         print("\n[dry-run] not writing outputs")
@@ -238,7 +237,7 @@ def main() -> int:
         print(f"  {n:3d} rows — {url}")
 
     print()
-    print(f"wrote:")
+    print("wrote:")
     print(f"  {TRAIN_PATH.relative_to(REPO_ROOT)}  ({TRAIN_PATH.stat().st_size / 1024:.1f} KB, sha256={train_sha[:16]}...)")
     print(f"  {GOLDEN_PATH.relative_to(REPO_ROOT)}  ({GOLDEN_PATH.stat().st_size / 1024:.1f} KB, sha256={golden_sha[:16]}...)")
     print(f"  {SPLIT_MANIFEST_PATH.relative_to(REPO_ROOT)}")
