@@ -1,0 +1,78 @@
+{
+  "ults_version": "1.0.0",
+  "task": {
+    "name": "claude.code_knowledge",
+    "description": "Claude Code CLI + Agent SDK knowledge recall — trained via CLAUDE-DOCS-TRAINING-001 LoRA on the 2141-row Claude Code documentation corpus. Measures the model's ability to answer questions about slash commands, settings.json keys, hook events, MCP tool contracts, Agent SDK classes, and other CLI-specific mechanisms.",
+    "version": "1.0.0"
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-08-14",
+    "priority": "high",
+    "notes": "Not a shipped LLM call site — this is a knowledge-recall task exercised via the benchmark harness only. The golden holdout is separate from valid_clean.jsonl (see golden_holdout section). Sprint: docs/development/claude-docs-training-001/. Training corpus at training_data/claude-docs/curated/train.jsonl (leak-safe split of qa.jsonl per split_manifest.json).",
+    "sprint": "CLAUDE-DOCS-TRAINING-001",
+    "training_corpus": "training_data/claude-docs/curated/train.jsonl",
+    "training_corpus_sha256_source": "training_data/claude-docs/curated/split_manifest.json",
+    "golden_holdout": "training_data/eval/claude_code_knowledge_golden.jsonl",
+    "leak_audit_verdict": "PASS (0 source_url/section_index tuple overlap; 0 prompt-string overlap)",
+    "system_prompt_embedded": "You are an expert on Claude Code (Anthropic's agentic CLI) and its Agent SDK. Answer the user's question accurately based on the official Anthropic documentation at code.claude.com. Be concise, cite specific configuration keys, commands, hook events, or SDK classes by exact name, and include verbatim code snippets when they clarify the answer. If a claim would require guessing beyond documented behavior, say so.",
+    "system_prompt_hash_note": "Zero-hash placeholder: this is a NEW knowledge-recall task with no shipped production call site, so the traditional source-line-pinned hash is not applicable. The prompt is embedded in metadata.system_prompt_embedded. If this task graduates to a shipped call site, compute the hash of that source at that time."
+  },
+  "sampling_group": "T",
+  "prompt": {
+    "system_prompt_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "system_prompt_source": "docs/tests/ults/specs/claude_code_knowledge.ults.json (embedded in metadata.system_prompt_embedded)",
+    "think_mode": false,
+    "dynamic_prompt": false
+  },
+  "performance": {
+    "latency_budget_ms": 30000,
+    "max_tokens": 4000
+  },
+  "output_schema": {
+    "type": "object",
+    "required": ["answer"],
+    "properties": {
+      "answer": {
+        "type": "string",
+        "description": "Free-form textual answer, may include code blocks (fenced markdown)."
+      },
+      "cited_concepts": {
+        "type": "array",
+        "items": {"type": "string"},
+        "description": "Optional: specific settings.json keys, slash commands, hook events, or SDK class names cited verbatim in the answer."
+      }
+    }
+  },
+  "quality_metrics": [
+    {
+      "name": "factuality",
+      "weight": 0.5,
+      "threshold": 0.7,
+      "description": "Answer is factually consistent with the source documentation for the golden Q&A pair (judge-scored by comparing to the pinned completion field)."
+    },
+    {
+      "name": "citation_precision",
+      "weight": 0.3,
+      "threshold": 0.6,
+      "description": "Names specific configuration keys, commands, hook events, or SDK classes verbatim (not paraphrased). Judge counts exact-match tokens against a reference token set extracted from the golden completion."
+    },
+    {
+      "name": "concision",
+      "weight": 0.2,
+      "threshold": 0.5,
+      "description": "Answer length is within 0.5x-2.0x of the golden completion word count. Rewards responses that neither over-elaborate nor under-answer."
+    }
+  ],
+  "reward_functions": [
+    "factuality_score",
+    "citation_precision",
+    "concision_ratio"
+  ],
+  "training_config": {
+    "rank": 32,
+    "min_examples": 500,
+    "quality_gate": 0.7,
+    "notes": "Rank 32 matches Phase 5 baseline. min_examples set to 500 (well below the 2141 training rows) as a floor gate. quality_gate 0.7 target on the aggregate weighted score across the 3 metrics above."
+  }
+}
