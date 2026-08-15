@@ -24,7 +24,7 @@ Last updated: 2026-07-21 (DOC-CURRENCY-002 — §2/§3/§5 refreshed to on-disk 
 | UVTS | Universal Validation Test Specification | Semantic retrieval quality benchmarks | active (live-gated) | 3 canonical, 1 draft |
 | UETS | Universal Emergence Test Specification | LLM emergence concept-naming quality | active | 8 |
 | UITS | Universal Iterative-Improvement Test Specification | T1 encoding comprehension validation | active | 11 |
-| ULTS | Universal LLM Task Specification | LLM task contracts: prompts, schemas, quality metrics, training config | active | 17 |
+| ULTS | Universal LLM Task Specification | LLM task contracts: prompts, schemas, quality metrics, training config | active | 18 |
 | UTDS | Universal Training Data Specification | Training data export manifest validation, privacy gates, archive integrity | active | 3 |
 | UAITS | Universal AI Training Specification | Training data curation governance: 4 paradigms (SFT, DPO, RAFT, curriculum), quality gates, format rules | active | 1 (4 datasets) |
 | UBENCH | Universal Benchmark Framework (LLM eval) | Aggregate LLM eval benchmark wrapping Phase 10 in the UxTS pattern | active | 1 (108 rows / 17 tasks) |
@@ -47,7 +47,7 @@ Last updated: 2026-07-21 (DOC-CURRENCY-002 — §2/§3/§5 refreshed to on-disk 
 | UVTS | `docs/tests/uvts/schema/uvts.schema.json` | Canonical: `docs/tests/uvts/specs/` (3); Drafts: `docs/tests/uvts/drafts/` (1) | `docs/tests/uvts/runners/uvts_runner.py` + `uvts_ab_compare.py` (fully functional since Phase 12; graded 120q corpus, V0016 TSDB persistence) | no CI step (stub-embedder CI grading deleted in UXTS-CI-001); live-gated via `make test-uvts-quick`/`-full` + the Note 02 A/B merge gate |
 | UETS | `docs/tests/uets/schema/uets.schema.json` | `docs/tests/uets/specs/` (8) | `docs/tests/uets/runners/uets_runner.py` | soft-fail CI step in `ci.yml` |
 | UITS | `docs/tests/uits/schema/uits.schema.json` | `docs/tests/uits/specs/` (11) | `docs/tests/uits/runners/uits_runner.py` | no CI gate (manual runner invocation only) |
-| ULTS | `docs/tests/ults/schema/ults.schema.json` | `docs/tests/ults/specs/` (17) | `docs/tests/ults/runners/ults_runner.py` | merge-blocking `--verify-hashes` in `ci.yml` (prompt-drift tripwire, UXTS-CI-001) |
+| ULTS | `docs/tests/ults/schema/ults.schema.json` | `docs/tests/ults/specs/` (18) | `docs/tests/ults/runners/ults_runner.py` | merge-blocking `--verify-hashes` in `ci.yml` (prompt-drift tripwire, UXTS-CI-001) |
 | UTDS | `docs/tests/utds/schema/utds.schema.json` | `docs/tests/utds/specs/` (3) | `docs/tests/utds/runners/utds_runner.py` | no CI gate |
 | UAITS | `docs/tests/uaits/schema/uaits.schema.json` | `docs/tests/uaits/specs/` (1: mdemg, 4 datasets) | `docs/tests/uaits/runners/uaits_runner.py` | no CI gate (drift checker covers spec counts) |
 | UBENCH | `docs/tests/ubench/schema/ubench.schema.json` | `docs/tests/ubench/specs/` (1: mdemg, 108 rows / 17 tasks) | `docs/tests/ubench/runners/` + `docs/tests/ubench/contracts/` (pytest) | merge-blocking `make test-ubench-lint` + dataset↔holdout contract in `ci.yml` |

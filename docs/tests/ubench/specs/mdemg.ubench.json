@@ -29,7 +29,7 @@
   },
   "ults": {
     "specs_dir": "docs/tests/ults/specs",
-    "expected_specs": 17,
+    "expected_specs": 18,
     "allowed_sampling_groups": [
       "T",
       "C",
@@ -38,9 +38,9 @@
   },
   "golden_holdout": {
     "path": "training_data/eval/valid_clean.jsonl",
-    "sha256": "f215a34a6ffbf7149444525a189e1c46c3259466431c66c5e41ef48024149e4e",
-    "expected_rows": 240,
-    "expected_tasks": 12,
+    "sha256": "3212cb3a7f73bae1acd29bf69c0f1e424c70a3d72b931406166714f98c9da6f0",
+    "expected_rows": 290,
+    "expected_tasks": 13,
     "min_rows_per_task": 3
   },
   "registry_parity": {
