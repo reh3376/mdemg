@@ -1,0 +1,56 @@
+# FOSS Base-Model Survey — 14B–40B Dense (or small-active MoE), Q3–Q4 2026
+
+**Scope**: research-only candidate enumeration for a potential `mdemg-llm-v2` base. No recommendation is made — operator picks.
+**Hard filters applied**: Apple-Silicon-local (M5 Max 128GB, llama-server GGUF / mlx_lm), 14B–40B dense or ≤A20B-active MoE, Apache-2.0/MIT-class license, ChatML/Qwen-style template, NOT tool-calling-primary, ≥32K context, released ≥2026-01-01.
+**Incumbent baseline**: `mdemg-llm-v1` = Qwen3-14B-4bit + LoRA r=32 α=64; 0.9188 honest aggregate; Q5_K_M = 10 GB; retrieval-path p95 11.1s.
+**Survey date**: 2026-08-16.
+
+## Comparison table (ranked by fit score, 7 dimensions × 0–2)
+
+| Rank | Model | Released | License | Size | Formats | Context | Trained-for / tool-calling bias | Benchmarks (published) | M5 Max footprint (est.) | Fit notes | Fit score /14 |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | **Qwen3.6-27B** (dense) | 2026-04-22 | Apache 2.0 | 27B dense | GGUF + MLX on HF Hub (official); Ollama community tag `batiai/qwen3.6-27b` | 262K | General + reasoning + "agentic coding" emphasis. ⚠️ Moderate tool-calling training (Qwen-Agent/MCP examples in card) — but same family as incumbent, which passes the 9-pattern no-tool-call audit today | Series card shows gains over 3.5 (visual charts, few published numbers yet); 84% MMLU cited by third-party trackers | Q5_K_M ≈ 19–20 GB; Q4_K_M ≈ 16.5 GB. Dense 27B ≈ ~½ the tok/s of 14B — retrieval p95 risk (~20s-class) needs live bake-off | Same Qwen chat template + tokenizer lineage as incumbent → lowest migration risk for the 16 call sites, ULTS prompt pins, and `mlx_lm.lora` SFT path | **13** |
+| 2 | **Qwen3.5-27B** (dense) | 2026-02-24 | Apache 2.0 | 27B dense | GGUF + MLX on HF Hub; llama.cpp/Ollama/LM Studio quantizations linked from model card | 262K native (ext. to 1M) | General/reasoning, thinking-mode default (`<think>` tags — must disable or strip for structured-output sites). Tool-calling *capable*, not primary | **MMLU-Pro 86.1, IFEval 95.0, LiveCodeBench v6 80.7** (model card) — strongest published instruction-following number in this table | Q5_K_M ≈ 19–20 GB; Q4_K_M ≈ 16.5 GB. Same ~½-speed caveat as 3.6-27B | Older sibling of #1 with better-documented benchmarks; hybrid Gated-DeltaNet attention layers — verify llama.cpp + `mlx_lm.lora` support maturity before committing | **13** |
+| 3 | **Gemma 4 31B** (dense) | 2026-04-02 | Apache 2.0 (license change from prior custom Gemma terms) | 31B dense | GGUF; MLX via `mlx-community/gemma-4-31B-it` collection + OptiQ 4-bit; Ollama `gemma4` | 256K | Reasoning/general/multimodal. ⚠️ **Native function-calling trained** across the family — spurious `tool_call` leakage on structured-output prompts must be grep-audited before adoption | #3 open model on Arena; AIME 2026 89.2%, LiveCodeBench v6 80%; MMLU-Pro/IFEval not yet published for 31B | Q5_K_M ≈ 22 GB; Q4_K_M ≈ 19 GB. Community reports **MLX still buggy for Gemma 4** (Ollama/llama.cpp stabler) — direct risk to the `mlx_lm.lora` training path | Strongest non-Qwen dense candidate; Gemma template ≠ ChatML (prompt-pin rework across all 16 ULTS specs); multimodal weights are dead cargo for MDEMG | **11** |
+| 4 | **Qwen3.5-35B-A3B** (MoE) | 2026-02-24 | Apache 2.0 | 35B total / 3B active | GGUF + MLX on HF Hub; Ollama | 262K | General/reasoning, thinking-mode; same moderate Qwen tool-calling posture as #2 | Series-level: near-27B quality at much higher tok/s (A3B active) | Q5_K_M ≈ 24–25 GB but **A3B active → faster than the incumbent 14B dense** — best latency profile in the table | ⚠️ **MoE LoRA training is architecturally blocked on M5 Max/macOS 26** (Metal 499K MTLResource ceiling — proven in-house 2026-04-22 against sibling Qwen3.6-35B-A3B; caused the MoE→dense pivot). Inference-only unless training moves off-box | **10** |
+| 5 | **Gemma 4 26B-A4B** (MoE) | 2026-04-02 | Apache 2.0 | 26B total / ~4B active | GGUF; MLX community quants; Ollama `gemma4:26b` | 256K (series) | Same family posture as #3: ⚠️ native function-calling trained | AIME 2026 ~89% cited for the MoE variant by third-party trackers | Q5_K_M ≈ 18–19 GB; A4B active → fast | Same two structural negatives stack: function-calling bias AND the in-house Metal MoE-LoRA ceiling (no local SFT path) | **9** |
+| 6 | **Mistral Small 4** (`mistral-small-2603`, MoE) | 2026-03-16 | Apache 2.0 | 119B total / 6B active (128 experts, 4 active) | GGUF on HF; Ollama; MLX ports thin at survey time | 260K (256K–262K per source) | Hybrid "chat + coding + **agentic** + reasoning" positioning — ⚠️ explicit agentic training; vision-capable | Artificial Analysis Intelligence Index 20; 155 tok/s (hosted); beats gpt-oss-120B on LiveCodeBench; IFEval not published | ⚠️ **Q4_K_M ≈ 65–70 GB, Q5_K_M ≈ 80–85 GB** — fits 128GB but consumes most of the box alongside Neo4j+TSDB+neural sidecar (~10+ GB working set) | Passes the ≤A20B-active letter of the filter but violates its spirit (total-weights memory); MoE-LoRA ceiling applies; weakest fit despite good raw quality | **7** |
+
+### Excluded / near-miss (verified, for the record)
+
+| Model | Why excluded |
+|---|---|
+| **Ministral 3 14B** (Mistral, 2025-12-04, Apache 2.0, 256K, AIME-25 85% reasoning variant) | Fails release-date filter by 4 weeks. Otherwise the closest drop-in size match to the incumbent — flag for operator if the date filter is soft |
+| **Nemotron 3 Nano 30B-A3B** (NVIDIA, Dec 2025/Jan 2026, 256K–1M ctx) | NVIDIA Open Model Agreement (permissive-commercial but NOT Apache/MIT — filter 3); explicitly built "for agentic AI systems" (filter 5); MoE (in-house LoRA ceiling) |
+| **MUSE-GLIMMER 30B** (Meta) | Previously researched: Apache 2.0, MLX+GGUF, 131K — but agentic-tool-loop trained; `{"tool_call":...}` leakage risk. Filed "promising but not drop-in" (unchanged) |
+| **gpt-oss-20B** (OpenAI) | Released Aug 2025 (filter 7); harmony format + tool-use-centric training (filter 5) |
+| **GLM-5.1 / 5.2** (Z.ai, MIT) | 754B-A40B — far outside size envelope; no 2026 "Air" variant exists |
+| **Ollama runtime** | Distribution only — Ollama runtime remains broken on M5 + macOS 26.3.x (in-house Phase 13.5 finding); all candidates would serve via llama-server or mlx_lm |
+| **Anthropic Claude models** (Opus 4.7, Sonnet, Haiku, Fable 5) | Closed-source, API-only — structurally ineligible for a local-first substrate; noted per task spec, not candidates |
+
+## Commentary (research notes, no recommendation)
+
+**The field collapsed onto Apache 2.0 in 2026.** Every ranked candidate is Apache 2.0, including Gemma 4 — Google's license change (April 2026) is the notable structural shift; Meta's Llama-style community licenses are absent from the viable set.
+
+**Two cross-cutting caveats dominate the table.** First, **every MoE candidate inherits the in-house Metal finding**: the 499K MTLResource ceiling that killed the Qwen3.6-35B-A3B pivot target applies to any non-trivial MoE LoRA backward pass on M5 Max/macOS 26. MoE rows (4–6) are therefore *inference-only* bases unless SFT moves off-box — which would break the recursive-retrain loop's on-box five-stage pipeline (FT-RECURSIVE-002). Second, **2026 training culture is agentic-heavy**: even Qwen 3.6's card leads with "agentic coding." Only the Qwen dense line has an in-house precedent (the incumbent) of passing the 9-pattern no-tool-call grep audit; Gemma 4's native function-calling and Mistral Small 4's agentic positioning need explicit leakage testing against `guardrail.evaluate` / `consulting.classify` prompts before shortlisting hardens.
+
+**Latency is the open empirical question.** Dense 27B/31B candidates run ~½ the tok/s of the 14B incumbent on the same box — against a retrieval-path p95 already at 11.1s and a `RerankMinBudgetMs` of 12s, that is a live NO-GO risk that only a bake-off (Phase 13.5-style: crash-count + p50/p95 + UVTS parity) can resolve. The A3B MoE rows invert this — faster than the incumbent — which is exactly the inference-vs-trainability tension the operator will have to price.
+
+**Benchmark gaps**: IFEval is published only for Qwen3.5-27B (95.0); StructuredJSON scores are published for none. MMLU-Pro/IFEval for Gemma 4 31B and Qwen3.6-27B were not yet on official cards at survey time — treat third-party tracker numbers as provisional.
+
+## Sources
+
+- [Qwen/Qwen3.5-27B — Hugging Face model card](https://huggingface.co/Qwen/Qwen3.5-27B) (benchmarks, license, context)
+- [QwenLM/Qwen3.6 — GitHub](https://github.com/QwenLM/Qwen3.6) (3.6 sizes, dates, GGUF/MLX availability)
+- [Qwen 3.5/3.6 open-weights guide — Codersera](https://codersera.com/blog/qwen-3-5-complete-guide-2026/); [Qwen — Wikipedia](https://en.wikipedia.org/wiki/Qwen) (release timeline)
+- [Gemma 4 model card — Google AI for Developers](https://ai.google.dev/gemma/docs/core/model_card_4); [google/gemma-4-31B — Hugging Face](https://huggingface.co/google/gemma-4-31B)
+- [Gemma 4 Apache 2.0 license change — Level Up Coding](https://levelup.gitconnected.com/google-just-released-gemma-4-and-the-license-change-is-the-real-story-29c7d940f57c); [Gemma 4 guide — Codersera](https://codersera.com/blog/gemma-4-complete-guide-2026/)
+- [mlx-community Gemma 4 collection — Hugging Face](https://huggingface.co/collections/mlx-community/gemma-4); [Gemma 4 on Apple Silicon — SudoAll](https://sudoall.com/gemma-4-31b-apple-silicon-local-guide/) (MLX-bug reports)
+- [Introducing Mistral Small 4 — Mistral AI](https://mistral.ai/news/mistral-small-4/); [Mistral Small 4 — Artificial Analysis](https://artificialanalysis.ai/models/mistral-small-4); [OpenRouter mistral-small-2603](https://openrouter.ai/mistralai/mistral-small-2603); [Mistral Small 4 local hardware reality — RunAIHome](https://runaihome.com/blog/mistral-small-4-local-ai-hardware-guide-2026/)
+- [Ministral 3 14B — llm-stats](https://llm-stats.com/models/ministral-14b-latest); [Ministral 3 — Artificial Analysis](https://artificialanalysis.ai/models/ministral-3-14b); [Introducing Mistral 3 — Mistral AI](https://mistral.ai/news/mistral-3/)
+- [Nemotron 3 Nano paper — arXiv 2512.20848](https://arxiv.org/html/2512.20848v1); [unsloth/Nemotron-3-Nano-30B-A3B-GGUF — Hugging Face](https://huggingface.co/unsloth/Nemotron-3-Nano-30B-A3B-GGUF); [OpenRouter Nemotron 3 Nano](https://openrouter.ai/nvidia/nemotron-3-nano-30b-a3b:free)
+- [GLM-5.1 review — BuildFastWithAI](https://www.buildfastwithai.com/blogs/glm-5-1-open-source-review-2026/); [GLM-5 guide — NxCode](https://www.nxcode.io/resources/news/glm-5-open-source-744b-model-complete-guide-2026)
+- Landscape cross-checks: [HF blog: open-source LLMs 2026](https://huggingface.co/blog/daya-shankar/open-source-llms); [Local LLM model updates 2026 — PromptQuorum](https://www.promptquorum.com/local-llms/local-llm-model-updates-2026); [fazm.ai 2026 running list](https://fazm.ai/t/latest-open-source-llm-releases-2026)
+- In-house evidence: `docs/development/ft-lora/00_README_v2.md` v5.6 (Metal 499K MTLResource MoE-LoRA ceiling, 2026-04-22 pivot); `docs/development/post-ft-lora/phase_13_5_bakeoff_results.md` (llama-server cutover, Ollama-runtime-broken finding)
+
+**Footprint estimation basis**: scaled from incumbent ground truth (14B → 10 GB Q5_K_M ≈ 0.71 GB/B; Q4_K_M ≈ 0.6 GB/B). Verify against actual GGUF file sizes before any bake-off.
