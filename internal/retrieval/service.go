@@ -1090,6 +1090,36 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 		}
 	}
 
+	// GROUNDED-BY-TRAVERSAL-001 (Phase A2): grounded L0 evidence for L≥1
+	// abstraction results. When IncludeGrounded is requested AND the killswitch
+	// is on AND at least one result is L≥1, walk the abstraction hierarchy
+	// backward to attach top-N grounded L0 content per result. Pure-L0 result
+	// sets skip this (their content is already on the result itself).
+	if req.IncludeGrounded && s.cfg.RetrieveGroundedEnabled && len(results) > 0 {
+		l1PlusIDs := make([]string, 0, len(results))
+		for _, r := range results {
+			if r.Layer >= 1 && r.NodeID != "" {
+				l1PlusIDs = append(l1PlusIDs, r.NodeID)
+			}
+		}
+		if len(l1PlusIDs) > 0 {
+			grounded, err := s.fetchGroundedContent(ctx, req.SpaceID, l1PlusIDs,
+				s.cfg.RetrieveGroundedMaxL0PerResult,
+				s.cfg.RetrieveGroundedMaxHops,
+				s.cfg.RetrieveGroundedContentMaxBytes)
+			if err != nil {
+				slog.Warn("retrieve: fetchGroundedContent failed",
+					"error", err, "n_l1plus", len(l1PlusIDs))
+			} else {
+				for i := range results {
+					if l0s, ok := grounded[results[i].NodeID]; ok && len(l0s) > 0 {
+						results[i].GroundedContent = l0s
+					}
+				}
+			}
+		}
+	}
+
 	// INGEST-TOPOLOGY-REPAIR-001: content projection into RetrieveResult.
 	// Injected here (post rerank/diversity/promoter/truncate) via ONE bulk
 	// Cypher over the final result node_ids — column-agnostic (works whether
@@ -1550,6 +1580,107 @@ RETURN n.node_id AS node_id, coalesce(n.content, obs_content, '') AS content`
 	// bites — but the current shape works for all claude-docs nodes which
 	// all have HAS_OBSERVATION edges from the ingest.
 	typed, _ := out.(map[string]string)
+	return typed, nil
+}
+
+// fetchGroundedContent — GROUNDED-BY-TRAVERSAL-001 (Phase A2): walk from
+// L≥1 result nodes back to L0 verbatim evidence via the abstraction
+// hierarchy. Uses UNDIRECTED variable-length path over
+// GROUNDED_BY|ABSTRACTS_TO|GENERALIZES so mixed edge directions on real
+// substrates (GENERALIZES L0→L1, ABSTRACTS_TO L1→L2+, GROUNDED_BY L5→L0)
+// all compose into a single walk that terminates at L0.
+//
+// Verified 2026-08-18 on mdemg-dev before shipping (per "verify before
+// build" operator directive): the undirected pattern returned 3 L0 evidence
+// nodes with real content (3495/3986/3976 bytes) from an L1 hidden-pattern
+// root in ~10ms. Pattern reused from hidden/service.go:5917.
+//
+// Returns map[rootNodeID][]GroundedNode. Nodes with layer=0 in `nodeIDs`
+// are skipped (their content is already on the result itself). Silently
+// returns empty on missing rows; caller decides whether to warn.
+func (s *Service) fetchGroundedContent(
+	ctx context.Context, spaceID string, nodeIDs []string,
+	maxL0PerResult, maxHops, maxContentBytes int,
+) (map[string][]models.GroundedNode, error) {
+	if len(nodeIDs) == 0 || maxL0PerResult <= 0 || maxHops <= 0 {
+		return nil, nil
+	}
+	if s.driver == nil {
+		return nil, errors.New("no driver configured")
+	}
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	// Undirected variable-length path handles all three edge types.
+	// Note: maxHops must be baked into the pattern (Cypher forbids
+	// $param in *1..N variable-length bounds). Format via fmt.Sprintf.
+	cypher := fmt.Sprintf(`
+UNWIND $nodeIds AS root_id
+MATCH (root:MemoryNode {space_id:$spaceId, node_id:root_id})
+WHERE root.layer >= 1 AND NOT coalesce(root.is_archived, false)
+CALL {
+  WITH root
+  MATCH path=(root)-[:GROUNDED_BY|ABSTRACTS_TO|GENERALIZES*1..%d]-(l0:MemoryNode {layer:0, space_id:$spaceId})
+  WHERE NOT coalesce(l0.is_archived, false)
+    AND l0.content IS NOT NULL AND l0.content <> ''
+  WITH l0, min(length(path)) AS hops
+  ORDER BY hops ASC, coalesce(l0.updated_at, datetime()) DESC
+  LIMIT $maxL0
+  RETURN collect({node_id:l0.node_id, path:coalesce(l0.path,''), name:coalesce(l0.name,''), content:l0.content, hops:hops}) AS l0s
+}
+RETURN root_id, l0s`, maxHops)
+
+	params := map[string]any{
+		"spaceId": spaceID,
+		"nodeIds": nodeIDs,
+		"maxL0":   maxL0PerResult,
+	}
+	out, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, cypher, params)
+		if err != nil {
+			return nil, err
+		}
+		result := make(map[string][]models.GroundedNode, len(nodeIDs))
+		for res.Next(ctx) {
+			rec := res.Record()
+			rid, _ := rec.Get("root_id")
+			l0sAny, _ := rec.Get("l0s")
+			rootID := fmt.Sprint(rid)
+			l0sList, _ := l0sAny.([]any)
+			if len(l0sList) == 0 {
+				continue
+			}
+			nodes := make([]models.GroundedNode, 0, len(l0sList))
+			for _, l0Any := range l0sList {
+				l0Map, ok := l0Any.(map[string]any)
+				if !ok {
+					continue
+				}
+				content := fmt.Sprint(l0Map["content"])
+				if maxContentBytes > 0 && len(content) > maxContentBytes {
+					content = content[:maxContentBytes]
+				}
+				hops := 0
+				if h, ok := l0Map["hops"].(int64); ok {
+					hops = int(h)
+				}
+				nodes = append(nodes, models.GroundedNode{
+					NodeID:         fmt.Sprint(l0Map["node_id"]),
+					Path:           fmt.Sprint(l0Map["path"]),
+					Name:           fmt.Sprint(l0Map["name"]),
+					Content:        content,
+					Layer:          0,
+					HopsFromResult: hops,
+				})
+			}
+			result[rootID] = nodes
+		}
+		return result, res.Err()
+	})
+	if err != nil {
+		return nil, err
+	}
+	typed, _ := out.(map[string][]models.GroundedNode)
 	return typed, nil
 }
 

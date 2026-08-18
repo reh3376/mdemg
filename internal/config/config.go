@@ -122,6 +122,22 @@ type Config struct {
 	// coalesce ordering.
 	RetrieveContentMaxBytes int
 
+	// GROUNDED-BY-TRAVERSAL-001 (Phase A2) knobs.
+	// RETRIEVE_GROUNDED_ENABLED — killswitch. When false, IncludeGrounded on
+	// the request is a no-op. Default true.
+	// RETRIEVE_GROUNDED_MAX_L0_PER_RESULT — how many L0 evidence rows to
+	// attach per L≥1 result. Default 3.
+	// RETRIEVE_GROUNDED_MAX_HOPS — variable-length path cap on the reverse
+	// traversal. Default 3 (L5 → L4 → L3 → L2 → L1 → L0 requires 5 hops via
+	// ABSTRACTS_TO but only 1 hop via GROUNDED_BY; 3 balances coverage vs
+	// perf on dense subgraphs).
+	// RETRIEVE_GROUNDED_CONTENT_MAX_BYTES — per-L0-evidence content cap.
+	// Default 2000 bytes; total budget ≈ topK × maxL0 × 2000 ≈ 30KB @ top5×3.
+	RetrieveGroundedEnabled         bool
+	RetrieveGroundedMaxL0PerResult  int
+	RetrieveGroundedMaxHops         int
+	RetrieveGroundedContentMaxBytes int
+
 	// Anomaly detection settings
 	AnomalyDetectionEnabled   bool    // Feature toggle (default: true)
 	AnomalyDuplicateThreshold float64 // Vector similarity threshold for duplicates (default: 0.95)
@@ -1959,6 +1975,29 @@ func FromEnv() (Config, error) {
 	}
 	if retrieveContentMaxBytes < 0 {
 		retrieveContentMaxBytes = 0
+	}
+	// GROUNDED-BY-TRAVERSAL-001 knobs
+	retrieveGroundedEnabled := getBool("RETRIEVE_GROUNDED_ENABLED", true)
+	retrieveGroundedMaxL0PerResult, err := atoi("RETRIEVE_GROUNDED_MAX_L0_PER_RESULT", 3)
+	if err != nil {
+		return Config{}, err
+	}
+	if retrieveGroundedMaxL0PerResult < 0 {
+		retrieveGroundedMaxL0PerResult = 0
+	}
+	retrieveGroundedMaxHops, err := atoi("RETRIEVE_GROUNDED_MAX_HOPS", 3)
+	if err != nil {
+		return Config{}, err
+	}
+	if retrieveGroundedMaxHops < 1 {
+		retrieveGroundedMaxHops = 1
+	}
+	retrieveGroundedContentMaxBytes, err := atoi("RETRIEVE_GROUNDED_CONTENT_MAX_BYTES", 2000)
+	if err != nil {
+		return Config{}, err
+	}
+	if retrieveGroundedContentMaxBytes < 0 {
+		retrieveGroundedContentMaxBytes = 0
 	}
 	retrieveTimeoutMs, err := atoi("RETRIEVE_TIMEOUT_MS", 20000)
 	if err != nil {
@@ -5879,6 +5918,10 @@ func FromEnv() (Config, error) {
 		HTTPWriteTimeout:               httpWriteTimeout,
 		RetrieveTimeoutMs:              retrieveTimeoutMs,
 		RetrieveContentMaxBytes:        retrieveContentMaxBytes,
+		RetrieveGroundedEnabled:        retrieveGroundedEnabled,
+		RetrieveGroundedMaxL0PerResult: retrieveGroundedMaxL0PerResult,
+		RetrieveGroundedMaxHops:        retrieveGroundedMaxHops,
+		RetrieveGroundedContentMaxBytes: retrieveGroundedContentMaxBytes,
 		AnomalyDetectionEnabled:        anomalyEnabled,
 		AnomalyDuplicateThreshold:      anomalyDupThreshold,
 		AnomalyOutlierStdDevs:          anomalyOutlierStdDevs,

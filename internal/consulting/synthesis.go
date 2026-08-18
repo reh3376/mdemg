@@ -249,6 +249,22 @@ func buildSynthesisPrompt(req SynthesisRequest, compress bool) string {
 			sb.WriteString(r.Content)
 			sb.WriteString("\n```\n")
 		}
+		// GROUNDED-BY-TRAVERSAL-001 (Phase A2): when this result is an L≥1
+		// abstraction and retrieval walked back to L0 evidence, render each
+		// grounded L0 with its own fenced block. Enables synthesis LLM to
+		// cite concrete underlying facts beneath an emergent concept rather
+		// than paraphrasing the abstraction summary.
+		if len(r.GroundedContent) > 0 {
+			sb.WriteString(fmt.Sprintf("- **Grounded L0 Evidence** (%d sources):\n", len(r.GroundedContent)))
+			for gi, gn := range r.GroundedContent {
+				sb.WriteString(fmt.Sprintf("  %d. [L0 %s, hops=%d, path=%s]\n",
+					gi+1, gn.NodeID, gn.HopsFromResult, gn.Path))
+				sb.WriteString("     ```\n     ")
+				// Indent content lines for the nested bullet's fenced block
+				sb.WriteString(strings.ReplaceAll(gn.Content, "\n", "\n     "))
+				sb.WriteString("\n     ```\n")
+			}
+		}
 		sb.WriteString("\n")
 	}
 

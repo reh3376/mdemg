@@ -264,6 +264,13 @@ func (s *Service) Consult(ctx context.Context, req models.ConsultRequest) (model
 		// server-side at RETRIEVE_CONTENT_MAX_BYTES per row. Non-synthesis
 		// consult (rationale-only) skips content to preserve wire size.
 		IncludeContent: req.LlmSynthesis,
+		// GROUNDED-BY-TRAVERSAL-001 (Phase A2): when synthesis is requested,
+		// also auto-opt-in to grounded L0 evidence so L≥1 abstraction results
+		// carry the concrete underlying facts. The synthesis LLM can then
+		// cite specific L0 evidence beneath an emergent concept rather than
+		// paraphrasing the abstraction summary. Skipped for pure-L0 result
+		// sets server-side. Cheap when killswitch off.
+		IncludeGrounded: req.LlmSynthesis,
 	}
 
 	retrieveResp, err := s.retriever.Retrieve(ctx, retrieveReq)

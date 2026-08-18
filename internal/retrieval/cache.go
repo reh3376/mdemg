@@ -97,6 +97,7 @@ func CacheKey(req models.RetrieveRequest, scorerVersion string) string {
 		ReverseRefOverride bool           `json:"rro,omitempty"` // RETRIEVAL-REVERSE-LOOKUP-001
 		ReverseRefEnabled  bool           `json:"rre,omitempty"` // RETRIEVAL-REVERSE-LOOKUP-001
 		IncludeContent     bool           `json:"ic,omitempty"`  // INGEST-TOPOLOGY-REPAIR-001
+		IncludeGrounded    bool           `json:"ig2,omitempty"` // GROUNDED-BY-TRAVERSAL-001 (ig already used above)
 		ScorerVersion      string         `json:"sv"`
 	}{
 		SpaceID:            req.SpaceID,
@@ -128,6 +129,7 @@ func CacheKey(req models.RetrieveRequest, scorerVersion string) string {
 		ReverseRefOverride: req.ReverseRefOverridePresent,
 		ReverseRefEnabled:  req.ReverseRefEnabled,
 		IncludeContent:     req.IncludeContent, // INGEST-TOPOLOGY-REPAIR-001
+		IncludeGrounded:    req.IncludeGrounded, // GROUNDED-BY-TRAVERSAL-001
 		ScorerVersion:      scorerVersion,
 	}
 
