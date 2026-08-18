@@ -157,6 +157,13 @@ Use "mdemg <command> --help" for more information about a command.`,
 	claudeDocsIngestCmd.GroupID = "memory"
 	rootCmd.AddCommand(claudeDocsIngestCmd)
 
+	// INGEST-TOPOLOGY-REPAIR-001 Epic 3: `mdemg backfill-node-content` — one-time
+	// repair lifting the latest linked Observation.content to MemoryNode.content
+	// for legacy-ingest nodes never re-ingested after the E1 ingest fix landed.
+	backfillNodeContentCmd := newBackfillNodeContentCmd()
+	backfillNodeContentCmd.GroupID = "memory"
+	rootCmd.AddCommand(backfillNodeContentCmd)
+
 	consolidateCmd := newConsolidateCmd()
 	consolidateCmd.GroupID = "memory"
 	rootCmd.AddCommand(consolidateCmd)

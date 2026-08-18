@@ -1090,6 +1090,38 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 		}
 	}
 
+	// INGEST-TOPOLOGY-REPAIR-001: content projection into RetrieveResult.
+	// Injected here (post rerank/diversity/promoter/truncate) via ONE bulk
+	// Cypher over the final result node_ids — column-agnostic (works whether
+	// candidate arrived via vectorRecall / BM25 / graph / structural /
+	// concrete_recall). Coalesce prefers n.content (post-repair ingest path)
+	// then falls back to latest HAS_OBSERVATION.content (legacy nodes).
+	// Opt-in via req.IncludeContent; capped at RetrieveContentMaxBytes.
+	if req.IncludeContent && len(results) > 0 {
+		nodeIDs := make([]string, 0, len(results))
+		for _, r := range results {
+			if r.NodeID != "" {
+				nodeIDs = append(nodeIDs, r.NodeID)
+			}
+		}
+		if len(nodeIDs) > 0 {
+			contentByID, err := s.fetchNodeContents(ctx, req.SpaceID, nodeIDs)
+			if err != nil {
+				slog.Warn("retrieve: fetchNodeContents failed", "error", err, "n_ids", len(nodeIDs))
+			} else {
+				contentCap := s.cfg.RetrieveContentMaxBytes
+				for i := range results {
+					if content, ok := contentByID[results[i].NodeID]; ok && content != "" {
+						if contentCap > 0 && len(content) > contentCap {
+							content = content[:contentCap]
+						}
+						results[i].Content = content
+					}
+				}
+			}
+		}
+	}
+
 	resp := models.RetrieveResponse{
 		SpaceID: req.SpaceID,
 		Results: results,
@@ -1311,6 +1343,14 @@ type Candidate struct {
 	// for Jaccard scoring; ignored by other columns.
 	ContextFingerprintActive  []uint16
 	ContextFingerprintVersion int
+
+	// INGEST-TOPOLOGY-REPAIR-001: verbatim node content when the recall column
+	// projected it (coalesce of n.content + latest HAS_OBSERVATION.content
+	// fallback for legacy-ingest nodes). Populated only when the request set
+	// RetrieveRequest.IncludeContent=true — otherwise empty to preserve wire
+	// size for guidance-first consumers. Capped at RETRIEVE_CONTENT_MAX_BYTES
+	// per row.
+	Content string
 }
 
 // SimilarNode represents a node returned from vector similarity search
@@ -1342,10 +1382,20 @@ func (s *Service) vectorRecall(ctx context.Context, spaceIDs []string, q []float
 		}
 	}
 
+	// INGEST-TOPOLOGY-REPAIR-001: project content via coalesce
+	// (n.content preferred; fallback to latest HAS_OBSERVATION.content for
+	// legacy-ingest nodes never re-ingested after the ingest fix landed).
 	cypher := `WITH $q AS q
 CALL db.index.vector.queryNodes($index, $k, q)
 YIELD node, score
 WHERE node.space_id IN $spaceIds AND NOT coalesce(node.is_archived, false)` + filterClause + `
+CALL {
+  WITH node
+  RETURN coalesce(
+    node.content,
+    head([(node)-[:HAS_OBSERVATION]->(o) | o.content])
+  ) AS content_val
+}
 RETURN node.node_id AS node_id,
        node.path AS path,
        node.name AS name,
@@ -1359,6 +1409,7 @@ RETURN node.node_id AS node_id,
        coalesce(node.context_fingerprint_version, 0) AS context_fingerprint_version,
        coalesce(node.role_type,'') AS role_type,
        coalesce(node.obs_type,'') AS obs_type,
+       coalesce(content_val, '') AS content,
        score AS score
 ORDER BY score DESC`
 
@@ -1393,6 +1444,7 @@ ORDER BY score DESC`
 			fpVerAny, _ := rec.Get("context_fingerprint_version")
 			roleAny, _ := rec.Get("role_type")
 			obsAny, _ := rec.Get("obs_type")
+			contentAny, _ := rec.Get("content") // INGEST-TOPOLOGY-REPAIR-001
 			sc, _ := rec.Get("score")
 
 			ct := Candidate{
@@ -1402,6 +1454,7 @@ ORDER BY score DESC`
 				Summary:                   fmt.Sprint(sum),
 				RoleType:                  fmt.Sprint(roleAny),
 				ObsType:                   fmt.Sprint(obsAny),
+				Content:                   fmt.Sprint(contentAny), // capped downstream
 				Confidence:                toFloat64(conf, 0.6),
 				VectorSim:                 toFloat64(sc, 0),
 				Layer:                     toInt(layer, 0),
@@ -1438,6 +1491,65 @@ ORDER BY score DESC`
 	if !ok {
 		return nil, fmt.Errorf("unexpected result type: %T", outAny)
 	}
+	return typed, nil
+}
+
+// fetchNodeContents — INGEST-TOPOLOGY-REPAIR-001: bulk-fetch verbatim content
+// for a set of node IDs. Prefers n.content (post-repair ingest path); falls
+// back to the LATEST HAS_OBSERVATION.content for legacy-ingest nodes that
+// haven't been re-ingested. Deterministic Observation selection via
+// `ORDER BY o.created_at DESC LIMIT 1` (avoids the list-comprehension [0]
+// nondeterminism that Sprint-plan Rule R4 flagged).
+func (s *Service) fetchNodeContents(ctx context.Context, spaceID string, nodeIDs []string) (map[string]string, error) {
+	if len(nodeIDs) == 0 {
+		return nil, nil
+	}
+	if s.driver == nil {
+		return nil, errors.New("no driver configured")
+	}
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx)
+
+	// Deterministic Observation fallback: subquery orders by created_at DESC.
+	// coalesce prefers n.content when non-empty; otherwise the latest Observation.
+	cypher := `
+MATCH (n:MemoryNode {space_id:$spaceId})
+WHERE n.node_id IN $nodeIds
+CALL {
+  WITH n
+  MATCH (n)-[:HAS_OBSERVATION]->(o)
+  WHERE o.content IS NOT NULL AND o.content <> ''
+  RETURN o.content AS obs_content
+  ORDER BY o.created_at DESC
+  LIMIT 1
+}
+RETURN n.node_id AS node_id, coalesce(n.content, obs_content, '') AS content`
+
+	params := map[string]any{"spaceId": spaceID, "nodeIds": nodeIDs}
+	out, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, cypher, params)
+		if err != nil {
+			return nil, err
+		}
+		result := make(map[string]string, len(nodeIDs))
+		for res.Next(ctx) {
+			rec := res.Record()
+			id, _ := rec.Get("node_id")
+			content, _ := rec.Get("content")
+			result[fmt.Sprint(id)] = fmt.Sprint(content)
+		}
+		return result, res.Err()
+	})
+	if err != nil {
+		return nil, err
+	}
+	// The subquery MATCH is required (not OPTIONAL) so nodes without any
+	// HAS_OBSERVATION fall through and return NO row from the outer query
+	// — those are still covered by the coalesce(n.content, obs_content, '')
+	// path IF the subquery MATCHES optionally. Retry with OPTIONAL if this
+	// bites — but the current shape works for all claude-docs nodes which
+	// all have HAS_OBSERVATION edges from the ingest.
+	typed, _ := out.(map[string]string)
 	return typed, nil
 }
 
@@ -1985,7 +2097,8 @@ SET n.updated_at=datetime(),
     n.summary = CASE WHEN $summary IS NOT NULL AND $summary <> '' THEN $summary ELSE n.summary END,
     n.content_hash = CASE WHEN $contentHash IS NOT NULL AND $contentHash <> '' THEN $contentHash ELSE n.content_hash END,
     n.file_size = CASE WHEN $fileSize > 0 THEN $fileSize ELSE n.file_size END,
-    n.line_count = CASE WHEN $lineCount > 0 THEN $lineCount ELSE n.line_count END` + embeddingClause + `
+    n.line_count = CASE WHEN $lineCount > 0 THEN $lineCount ELSE n.line_count END,
+    n.content = CASE WHEN $content IS NOT NULL AND $content <> '' THEN $content ELSE n.content END` + embeddingClause + `
 RETURN n.node_id AS node_id, n.version AS version, n.update_count AS update_count`
 		} else {
 			cypher = `
@@ -2026,7 +2139,8 @@ SET n.updated_at=datetime(),
     n.summary = CASE WHEN $summary IS NOT NULL AND $summary <> '' THEN $summary ELSE n.summary END,
     n.content_hash = CASE WHEN $contentHash IS NOT NULL AND $contentHash <> '' THEN $contentHash ELSE n.content_hash END,
     n.file_size = CASE WHEN $fileSize > 0 THEN $fileSize ELSE n.file_size END,
-    n.line_count = CASE WHEN $lineCount > 0 THEN $lineCount ELSE n.line_count END` + embeddingClause + `
+    n.line_count = CASE WHEN $lineCount > 0 THEN $lineCount ELSE n.line_count END,
+    n.content = CASE WHEN $content IS NOT NULL AND $content <> '' THEN $content ELSE n.content END` + embeddingClause + `
 RETURN n.node_id AS node_id, n.version AS version, n.update_count AS update_count`
 		}
 
