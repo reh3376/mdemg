@@ -38,6 +38,11 @@ var cacheKeyNeutralFields = map[string]string{
 	// results — changes the response payload; separate cache namespace to
 	// avoid content-leak across requests with different flag values. IN the key.
 	"IncludeContent": "",
+	// GROUNDED-BY-TRAVERSAL-001 (Phase A2): opt-in L≥1 → L0 grounded evidence
+	// attachment — changes the response payload; separate cache namespace to
+	// avoid grounded-content-leak across requests with different flag values.
+	// IN the key.
+	"IncludeGrounded": "",
 }
 
 func TestCacheKey_EveryRequestFieldClassified(t *testing.T) {

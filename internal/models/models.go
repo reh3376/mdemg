@@ -26,6 +26,17 @@ type RetrieveRequest struct {
 	// downstream synthesis needs to quote the source. Content is capped at
 	// RETRIEVE_CONTENT_MAX_BYTES to bound response size.
 	IncludeContent bool `json:"include_content,omitempty"`
+
+	// GROUNDED-BY-TRAVERSAL-001 (Phase A2): when set alongside a query that
+	// surfaces L≥1 abstraction nodes, retrieval walks GROUNDED_BY /
+	// ABSTRACTS_TO / GENERALIZES back to L0 verbatim evidence and attaches
+	// top-N grounded L0 nodes as RetrieveResult.GroundedContent. Enables
+	// synthesis on emergent concepts to quote concrete underlying facts.
+	// Skipped for pure-L0 result sets (no gain). Caps controlled by
+	// RETRIEVE_GROUNDED_MAX_L0_PER_RESULT + RETRIEVE_GROUNDED_MAX_HOPS +
+	// RETRIEVE_GROUNDED_CONTENT_MAX_BYTES. Killswitch:
+	// RETRIEVE_GROUNDED_ENABLED=false (server-side; no-op even if requested).
+	IncludeGrounded bool `json:"include_grounded,omitempty"`
 	CodeOnly          bool     `json:"code_only,omitempty"`          // Shorthand: exclude common non-code files (md, txt, json, yaml, etc.)
 
 	PolicyContext map[string]any `json:"policy_context,omitempty"`
@@ -131,6 +142,28 @@ type RetrieveResult struct {
 	// RETRIEVE_CONTENT_MAX_BYTES. Omitted (zero value) when not requested to
 	// preserve wire size for guidance-first consumers.
 	Content string `json:"content,omitempty"`
+
+	// GroundedContent — GROUNDED-BY-TRAVERSAL-001 (Phase A2): when the result
+	// is an L≥1 abstraction (hidden pattern, concept, emergent), traversal of
+	// GROUNDED_BY / ABSTRACTS_TO / GENERALIZES back to L0 attaches the top-N
+	// grounded L0 nodes as verbatim evidence. Enables synthesis LLM to cite
+	// the concrete facts underlying an emergent abstraction, not just the
+	// abstraction summary. Populated only when RetrieveRequest.IncludeGrounded
+	// is true AND Layer >= 1. Empty for L0 results (content already on the
+	// result itself).
+	GroundedContent []GroundedNode `json:"grounded_content,omitempty"`
+}
+
+// GroundedNode — GROUNDED-BY-TRAVERSAL-001: an L0 verbatim evidence node
+// reached by walking the abstraction hierarchy backward from an L≥1 result.
+// Content is capped server-side at RETRIEVE_GROUNDED_CONTENT_MAX_BYTES per row.
+type GroundedNode struct {
+	NodeID         string `json:"node_id"`
+	Path           string `json:"path,omitempty"`
+	Name           string `json:"name,omitempty"`
+	Content        string `json:"content"`
+	Layer          int    `json:"layer"`             // Always 0 for grounded evidence
+	HopsFromResult int    `json:"hops_from_result"`  // Shortest path length from parent result
 }
 
 // SymbolEvidence provides verifiable evidence linking a retrieval result to specific code.
