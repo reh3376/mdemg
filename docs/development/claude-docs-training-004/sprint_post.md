@@ -79,17 +79,32 @@ Combined: adapter_002 learned the SHAPE of Claude Code docs (verbose, many ident
 
 ⚠️ **Rule E — adapter LoRA that learns "shape" without "content" makes things WORSE, not neutral**: adapter_002 with factually-correct on 5/5 of the ONE row it was tested against (EffortLevel) but massive false-citation on 45 untested rows shows LoRA can teach a verbose-with-identifiers style even when the specific facts weren't learned. Combined with a bigram-F1 factuality metric that's near-zero for all configs (paraphrase-strict), the FALSE-CITATION penalty dominates. When adapter shows this pattern (high citation count, low citation accuracy), it's actively degrading — not just failing to help.
 
+⚠️ **Rule F (operator correction, 2026-08-17) — Fact-recall tasks are substrate-ingest problems in MDEMG's architecture, not model-weight-fine-tune problems**: MDEMG IS an improved RAG architecture (RRF over 4-5 columns: Embedding + BM25 + Graph + Structural + Context-fingerprint; cross-encoder rerank; 5-layer abstraction hierarchy; Hebbian reinforcement; consulting + jiminy synthesis). Choose LoRA when you want to shift model STYLE / REASONING / CALIBRATION. Choose substrate-ingest when you want to expose FACTS retrievable at inference. The CLAUDE-DOCS-TRAINING-001-through-004 arc was a category error: 4 sprints of LoRA training proved by exclusion that model-weight fine-tuning cannot force >2000-row fact recall into 14B parameters — but that failure was already predictable from MDEMG's architectural intent. The correct successor is CLAUDE-DOCS-INGEST-001 (ingest into substrate, let retrieval surface at inference), NOT "add RAG hybrid on top of LoRA".
+
 ## 5. Follow-up options
 
-1. **Accept LoRA path dead for Claude Code knowledge**. Move claude.code_knowledge to RAG or accept as a permanent gap.
-2. **Redesign the eval rubric**: bigram-F1 factuality is too strict when models paraphrase. Adding an LLM-judge factuality metric (per HITL-CURATION-002 pattern) could give real signal that this deterministic rubric misses.
-3. **Re-run MODEL-SWAP-QWEN27B-EVAL with rewards implemented** — the 27B FOSS verdict was based on silent-zero data.
-4. **Iterate LoRA architecture**: rank=32 α=64 on 7 target modules may be too much capacity, causing shape-overfit. Try rank=8 or fewer target modules.
-5. **RAG hybrid**: keep adapter for style + inject reference-doc chunks at inference time. Explicit-fact-grounding.
+⚠️ **Architectural correction (operator, 2026-08-17)**: MDEMG IS the retrieval architecture (RRF over 4-5 columns: Embedding + BM25 + Graph + Structural + Context-fingerprint; cross-encoder rerank; 5-layer abstraction hierarchy; Hebbian reinforcement; consulting + jiminy synthesis; **RSIC self-improvement loop**). The claim "add RAG hybrid" in an earlier draft of this section was confused — MDEMG is an improved RAG substrate at a level above vanilla RAG. The correct architectural separation is:
 
-**My recommendation**: options 3 + 5. Option 3 (re-run task #91) is cheap and clarifies whether base-model swap becomes viable now. Option 5 (RAG hybrid) is the highest-ROI path if we care about Claude Code knowledge specifically — LoRA cannot force factual recall of >2000 concrete docs into 14B parameters; retrieval is architecturally the right solution.
+- **Model weights (Phase-5 SFT `mdemg-llm-v1`)**: reasoning, style, general knowledge
+- **MDEMG substrate**: specific facts, retrievable at inference time via the 4-5-column retrieval pipeline
+- **Consulting/Jiminy layer**: synthesizes retrieved context into task-appropriate guidance
+- **RSIC (Recursive Self-Improving Cognition)**: continuously assesses substrate health across 7 dimensions (retrieval / memory / edge / task / guidance / protocol / synergy), reflects via LLM to produce insights, executes actions (graph repair, tombstone consolidation, drift detection, retrain triggers, etc.), and drives the substrate to improve autonomously. RSIC is what makes MDEMG an *improved* RAG — the substrate isn't static; it self-heals + self-optimizes based on measured retrieval quality + Hebbian reinforcement signals + consolidation cycles.
+
+Sprint 004's failure mode reframes cleanly under this lens: adapter_002 tried to bake 2141 concrete doc rows into 14B parameters via LoRA — architecturally the wrong tool. The right tool is **ingest into substrate + let the retrieval pipeline surface them at inference**.
+
+### Follow-up options (correct architectural framing)
+
+1. **CLAUDE-DOCS-INGEST-001 (recommended)** — ingest the 2141-row Claude Code corpus into the MDEMG substrate as memory nodes (role_type=`documentation`/`reference`, layer=0 with abstraction to layer≥1 via existing consolidation). At inference, when a query touches Claude Code CLI/SDK concepts, MDEMG's retrieval pipeline surfaces the relevant docs; Phase-5 `mdemg-llm-v1` grounds its answer on retrieved context. Zero LoRA needed. Zero model weights touched. Zero base-model composition risk. This IS how MDEMG is designed to acquire knowledge.
+2. **Accept LoRA path dead for Claude Code knowledge**. Model-weight fine-tuning is the wrong tool for large-corpus fact recall in this architecture.
+3. **Re-run MODEL-SWAP-QWEN27B-EVAL with rewards implemented** — the 27B FOSS verdict was based on silent-zero data; cheap to re-measure now.
+4. **Redesign the eval rubric**: bigram-F1 factuality is too strict when models paraphrase. Adding an LLM-judge factuality metric (per HITL-CURATION-002 pattern) could give real signal that this deterministic rubric misses. Necessary for both LoRA and substrate-ingest verdicts to be trustworthy.
+5. **LoRA architecture iteration** (only if we insist on the weight-baking approach after option 1 proves insufficient): rank=32 α=64 on 7 target modules may be too much capacity, causing shape-overfit. Try rank=8 or fewer target modules.
+
+**My recommendation**: option 1 (CLAUDE-DOCS-INGEST-001) as the architecturally-correct successor, option 3 as a cheap parallel task to clean up the invalidated data. Option 4 (LLM-judge eval) should be shared infrastructure that unblocks both.
 
 **Concrete DO NOT PROMOTE**: Do not flip `mdemg ft-loop promote` for adapter_002. Leave production `mdemg-llm-v1.Q5_K_M.gguf` on `:8102` as canonical.
+
+⚠️ **New arch rule from this correction (Rule F below)**: **Fact-recall tasks are substrate-ingest problems in MDEMG's architecture, not model-weight-fine-tune problems.** Choose LoRA when you want to shift model STYLE/REASONING/CALIBRATION; choose ingest when you want to expose FACTS. Sprint 001-004's LoRA arc was a category error — the 4 sprints of compute proved by exclusion that model-weight fine-tuning cannot force >2000-row fact recall into 14B parameters, but that was already predictable from MDEMG's architectural intent.
 
 ## 6. Verification
 

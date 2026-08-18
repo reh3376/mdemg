@@ -150,6 +150,13 @@ Use "mdemg <command> --help" for more information about a command.`,
 	ingestClaudeMDCmd.GroupID = "memory"
 	rootCmd.AddCommand(ingestClaudeMDCmd)
 
+	// CLAUDE-DOCS-INGEST-001: `mdemg claude-docs-ingest` — ingest Claude Code docs
+	// corpus as substrate memory nodes. Architecturally-correct successor to the
+	// CLAUDE-DOCS-TRAINING LoRA arc (see Sprint 004 Rule F).
+	claudeDocsIngestCmd := newClaudeDocsIngestCmd()
+	claudeDocsIngestCmd.GroupID = "memory"
+	rootCmd.AddCommand(claudeDocsIngestCmd)
+
 	consolidateCmd := newConsolidateCmd()
 	consolidateCmd.GroupID = "memory"
 	rootCmd.AddCommand(consolidateCmd)
