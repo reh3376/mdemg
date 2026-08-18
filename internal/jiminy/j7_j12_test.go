@@ -101,10 +101,24 @@ func TestLayerToPriority(t *testing.T) {
 type mockRetriever struct {
 	results []RetrievalResult
 	err     error
+	// ACTIVATION-DRIVEN-DISCOVERY-001: activation map returned by
+	// ExpandSeedsByActivation; if nil, method returns empty map + nil error.
+	activation    map[string]float64
+	activationErr error
 }
 
 func (m *mockRetriever) RetrieveForJiminy(_ context.Context, _, _ string, _, _ int, _ []float32) ([]RetrievalResult, error) {
 	return m.results, m.err
+}
+
+func (m *mockRetriever) ExpandSeedsByActivation(_ context.Context, _ string, _ []ActivationSeed, _ string) (map[string]float64, error) {
+	if m.activationErr != nil {
+		return nil, m.activationErr
+	}
+	if m.activation == nil {
+		return map[string]float64{}, nil
+	}
+	return m.activation, nil
 }
 
 func TestGuide_WithRetriever(t *testing.T) {

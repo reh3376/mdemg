@@ -210,9 +210,28 @@ type SignalLearnerProvider interface {
 
 // --- J7: RetrievalProvider interface ---
 
+// ActivationSeed is a lightweight seed for [RetrievalProvider.ExpandSeedsByActivation]
+// — carries just the node ID and initial activation score in [0,1]. Mirrors
+// retrieval.ActivationSeed (types are structurally identical; the adapter
+// converts between packages). Consumers pass the actionable candidates they
+// already care about; the provider expands via 1-hop edge fetch +
+// SpreadingActivationWithAttention.
+//
+// JIMINY-SUBSTRATE-NATIVE-001 Phase B1 (ACTIVATION-DRIVEN-DISCOVERY-001).
+type ActivationSeed struct {
+	NodeID string
+	Score  float64
+}
+
 // RetrievalProvider defines the interface for accessing the full retrieval pipeline.
 type RetrievalProvider interface {
 	RetrieveForJiminy(ctx context.Context, spaceID, queryText string, topK, hopDepth int, queryEmbedding []float32) ([]RetrievalResult, error)
+	// ExpandSeedsByActivation runs SpreadingActivationWithAttention over a
+	// caller-supplied seed set (typically Jiminy Lever C's role-filtered
+	// actionable nodes) and returns the post-spread activation map (seeds +
+	// newly-activated neighbors). Fail-open: any error returns nil map + err;
+	// caller should fall back to raw seed scores.
+	ExpandSeedsByActivation(ctx context.Context, spaceID string, seeds []ActivationSeed, queryText string) (map[string]float64, error)
 }
 
 // RetrievalResult is a simplified view of models.RetrieveResult for Jiminy use.

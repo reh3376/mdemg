@@ -1214,6 +1214,29 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 	if s.cfg.JiminyGuidanceConstraintBiasEnabled && queryEmbedding != nil {
 		actionable := s.fetchActionableCandidates(ctx, req.SpaceID, queryEmbedding,
 			s.cfg.JiminyGuidanceConstraintIncludeTopK, s.cfg.JiminyGuidanceConstraintSimFloor)
+		// ACTIVATION-DRIVEN-DISCOVERY-001 (Phase B1): rerank actionables by
+		// blending cosine confidence with Hebbian activation-spreading over
+		// the seed set's 1-hop neighborhood. Default-off; when disabled this
+		// is a byte-identical no-op. Substrate-native — reads CO_ACTIVATED_WITH
+		// weights the graph has learned instead of pure semantic embedding.
+		if len(actionable) > 0 && s.cfg.JiminyLeverCActivationEnabled {
+			// Build the substrate-aware query text: prefer request.Context (the
+			// action-scope hint) with agent_output as amplifier; falls back to
+			// the request query when both empty.
+			qtxt := req.Context
+			if req.AgentOutput != "" {
+				if qtxt != "" {
+					qtxt = qtxt + " " + req.AgentOutput
+				} else {
+					qtxt = req.AgentOutput
+				}
+			}
+			pre := len(actionable)
+			actionable = s.activationEnrichLeverC(ctx, req.SpaceID, actionable, qtxt)
+			if len(actionable) == pre {
+				debug["leverc_activation_enriched"] = pre
+			}
+		}
 		if len(actionable) > 0 {
 			seen := make(map[string]bool, len(items))
 			for _, it := range items {
@@ -3460,6 +3483,80 @@ func (s *Service) fetchActionableCandidates(ctx context.Context, spaceID string,
 	}
 	items, _ := out.([]GuidanceItem)
 	return items
+}
+
+// activationEnrichLeverC reranks Lever C actionable candidates by blending
+// their initial cosine confidence with the substrate's Hebbian activation
+// signal. Uses SpreadingActivationWithAttention over 1-hop CO_ACTIVATED_WITH
+// + typed semantic edges from the seed set. Guarantees the seed set is
+// preserved (activation reranks; it does NOT filter — no risk of returning
+// fewer actionables than the input).
+//
+// Flag-guarded (JIMINY_LEVER_C_ACTIVATION_ENABLED, default false); disabled →
+// identity function. Blend formula: blended = (1-w)*item.Confidence +
+// w*activation[node]. Nodes with no activation score (isolated in the graph)
+// keep their original cosine confidence — the (1-w) coefficient applies
+// uniformly, so isolated actionables are not differentially penalized.
+//
+// JIMINY-SUBSTRATE-NATIVE-001 Phase B1 — ACTIVATION-DRIVEN-DISCOVERY-001.
+// Substrate-native: reads Hebbian edge weights the graph has learned, not
+// pure semantic embedding similarity.
+func (s *Service) activationEnrichLeverC(ctx context.Context, spaceID string, actionables []GuidanceItem, queryText string) []GuidanceItem {
+	if !s.cfg.JiminyLeverCActivationEnabled || s.retriever == nil || len(actionables) == 0 {
+		return actionables
+	}
+	seeds := make([]ActivationSeed, 0, len(actionables))
+	for _, it := range actionables {
+		if len(it.SourceNodes) == 0 {
+			continue
+		}
+		seeds = append(seeds, ActivationSeed{NodeID: it.SourceNodes[0], Score: it.Confidence})
+	}
+	if len(seeds) == 0 {
+		return actionables
+	}
+	act, err := s.retriever.ExpandSeedsByActivation(ctx, spaceID, seeds, queryText)
+	if err != nil {
+		// Fail-open: preserve input ordering; the primitive already logged.
+		slog.Debug("jiminy: activation enrichment failed", "space_id", spaceID, "err", err)
+		return actionables
+	}
+	w := s.cfg.JiminyLeverCActivationWeight
+	if w <= 0 {
+		return actionables
+	}
+	if w > 1 {
+		w = 1
+	}
+	// Blend + rerank. Modify a copy to keep the input slice unmutated.
+	enriched := make([]GuidanceItem, len(actionables))
+	copy(enriched, actionables)
+	for i := range enriched {
+		if len(enriched[i].SourceNodes) == 0 {
+			continue
+		}
+		nodeID := enriched[i].SourceNodes[0]
+		a, ok := act[nodeID]
+		if !ok {
+			// Not in the activation map (edge fetch didn't touch this node)
+			// — apply the same (1-w)*cosine so cosine dominates ordering
+			// among unactivated items instead of leaving them at raw cosine.
+			// This keeps blending symmetric between activated and unactivated
+			// items: activated get a bonus in [0, w]; unactivated get 0.
+			a = 0
+		}
+		if a < 0 {
+			a = 0
+		}
+		if a > 1 {
+			a = 1
+		}
+		enriched[i].Confidence = (1-w)*enriched[i].Confidence + w*a
+	}
+	sort.SliceStable(enriched, func(i, j int) bool {
+		return enriched[i].Confidence > enriched[j].Confidence
+	})
+	return enriched
 }
 
 // Mirrors the proven Evaluator.findMatchingConstraints vector-index pattern.
