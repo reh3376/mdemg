@@ -400,6 +400,21 @@ func (a *jiminyRetrievalAdapter) RetrieveForJiminy(ctx context.Context, spaceID,
 	return mapRetrieveResultsToJiminyResults(resp.Results), nil
 }
 
+// ExpandSeedsByActivation adapts retrieval.Service.ExpandSeedsByActivation to
+// the jiminy.RetrievalProvider interface — converts the jiminy-shaped seeds
+// into retrieval-shaped seeds and returns the raw activation map unchanged.
+// ACTIVATION-DRIVEN-DISCOVERY-001 (JIMINY-SUBSTRATE-NATIVE-001 Phase B1).
+func (a *jiminyRetrievalAdapter) ExpandSeedsByActivation(ctx context.Context, spaceID string, seeds []jiminy.ActivationSeed, queryText string) (map[string]float64, error) {
+	if a.retriever == nil {
+		return nil, nil
+	}
+	rseeds := make([]retrieval.ActivationSeed, 0, len(seeds))
+	for _, s := range seeds {
+		rseeds = append(rseeds, retrieval.ActivationSeed{NodeID: s.NodeID, Score: s.Score})
+	}
+	return a.retriever.ExpandSeedsByActivation(ctx, spaceID, rseeds, queryText)
+}
+
 // mapRetrieveResultsToJiminyResults copies models.RetrieveResult rows to the
 // simpler jiminy.RetrievalResult shape. Extracted for testability — pins the
 // role_type / obs_type propagation that JIMINY-ROLETYPE-ADAPTER-001 restores.

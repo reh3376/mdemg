@@ -1200,6 +1200,17 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		)
 	}
 
+	// ACTIVATION-DRIVEN-DISCOVERY-001 (JIMINY-SUBSTRATE-NATIVE-001 Phase B1):
+	// substrate-native Lever C reranking via activation spreading.
+	if jiminySvc != nil {
+		slog.Info("jiminy: lever c activation",
+			"enabled", cfg.JiminyLeverCActivationEnabled,
+			"steps", cfg.JiminyLeverCActivationSteps,
+			"lambda", cfg.JiminyLeverCActivationLambda,
+			"weight", cfg.JiminyLeverCActivationWeight,
+		)
+	}
+
 	// HEBB-ETA-001: record precision-weighted η state at boot.
 	slog.Info("hebb: precision-weighted eta",
 		"enabled", cfg.PrecisionWeightedEtaEnabled,
