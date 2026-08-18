@@ -28,7 +28,16 @@ Applied `must-validate-all-claims-before-commit` throughout — every substrate 
 | Graph column pattern reusable | `Read` `column_graph.go:40-160` | ✅ confirmed |
 | `GUIDANCE_OUTCOME` sink populated (for B2) | live cypher: **0 rows** on mdemg-dev | ❌ **blocks B2** |
 
-⚠️ **Recon-discovered blocker for B2**: the shipped `GUIDANCE_OUTCOME` write path from JIMINY-OUTCOME-001 (2026-06-08) is silently no-op-ing despite being wired end-to-end. TSDB `constraint_outcomes` has rows; Neo4j `GUIDANCE_OUTCOME` edges have zero. Investigation is a prerequisite for Phase B2 (Hebbian effectiveness prior).
+⚠️ **B1 recon claim reversed post-ship (2026-08-18, GUIDANCE-OUTCOME-SINK-INVESTIGATE-001)**: the "0 rows on mdemg-dev" claim was a QUERY BUG in the recon, not a code defect. Live re-verify:
+
+- **8,517 GUIDANCE_OUTCOME edges** on mdemg-dev / 110 distinct target nodes
+- **809 edges in last 7d** / newest at 2026-08-18T18:25:29Z
+- Outcome distribution: 6680 ignored / 1510 followed / 313 partial / 14 contradicted
+- Write path from JIMINY-OUTCOME-001 (2026-06-08) is healthy and actively producing
+
+Root cause: `PersistGuidanceOutcome` (`persistence.go:78-86`) writes GUIDANCE_OUTCOME as **self-loops on the target node** (`CREATE (src)-[r]->(src)`) with `space_id` implicit from the node (never set as an edge property). My B1 recon used `MATCH ()-[r:GUIDANCE_OUTCOME]->() WHERE r.space_id='mdemg-dev'` which returned 0 because the edge property is never written. The correct pattern (used by `stats.go:42`) is `MATCH (n:MemoryNode {space_id: $sid})-[r:GUIDANCE_OUTCOME]-()`.
+
+**Phase B2 (Hebbian effectiveness prior) is UNBLOCKED — real data flows.**
 
 ## Live Tier-3 evidence
 
