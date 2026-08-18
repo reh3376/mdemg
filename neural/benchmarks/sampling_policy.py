@@ -60,6 +60,10 @@ def resolve_sampling(
         raise SamplingPolicyError(
             "J-group recipe missing presence_penalty — mandatory per ULTS contract"
         )
+    # repetition_penalty is optional; forward when present in recipe.
+    # Introduced by Sprint CLAUDE-DOCS-TRAINING-004 to A/B adapter_002 with rp=1.15.
+    if "repetition_penalty" in recipe:
+        kwargs["repetition_penalty"] = float(recipe["repetition_penalty"])
     return kwargs
 
 

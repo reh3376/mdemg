@@ -693,6 +693,129 @@ def latency_reward(
     return 1.0 / (1.0 + math.exp(5 * (ratio - 1.0)))
 
 
+# ── Documentation-recall rewards (Sprint CLAUDE-DOCS-TRAINING-004) ──
+
+
+def _tokenize_words(text: str) -> list[str]:
+    """Lowercase alphanumeric+underscore tokens; deterministic, no deps."""
+    import re
+    return re.findall(r"[A-Za-z0-9_]+", (text or "").lower())
+
+
+def _bigrams(tokens: list[str]) -> set[tuple[str, str]]:
+    return {(tokens[i], tokens[i + 1]) for i in range(len(tokens) - 1)}
+
+
+def _extract_identifiers(text: str) -> set[str]:
+    """Extract likely code identifiers from text.
+
+    Recognises (in order): (a) backtick-wrapped tokens, (b) function calls
+    `name(` where name has ≥2 chars, (c) PascalCase/CamelCase/mixed with any
+    uppercase mid-word (`ClaudeSDKClient`, `queryOptions`), (d) snake_case with
+    ≥1 underscore, (e) dotted access `foo.bar`. Strips wrapping punctuation.
+    Filters natural-language lowercase words (single lowercase word = not id).
+    """
+    import re
+    if not text:
+        return set()
+    ids: set[str] = set()
+    # (a) backtick-wrapped
+    for m in re.findall(r"`([^`\n]+)`", text):
+        ids.add(m.strip())
+    # (b) function-call form: word followed by ( — trim trailing (
+    for m in re.finditer(r"\b([A-Za-z_][A-Za-z0-9_]{1,})\s*\(", text):
+        ids.add(m.group(1))
+    # (c) uppercase-anywhere-mid-word: any word with ≥2 uppercase letters
+    #     or lowercase-first-then-uppercase (queryOptions, PascalCase, ALLCAPS)
+    for m in re.finditer(r"\b([A-Za-z_][A-Za-z0-9_]*)\b", text):
+        w = m.group(1)
+        if sum(1 for c in w if c.isupper()) >= 2:
+            ids.add(w)
+        elif len(w) >= 3 and w[0].islower() and any(c.isupper() for c in w[1:]):
+            ids.add(w)  # camelCase like queryOptions
+    # (d) snake_case with ≥1 underscore
+    for m in re.finditer(r"\b([A-Za-z_][A-Za-z0-9_]*_[A-Za-z0-9_]+)\b", text):
+        ids.add(m.group(1))
+    # (e) dotted access foo.bar (word.word, both len≥2)
+    for m in re.finditer(r"\b([A-Za-z_][A-Za-z0-9_]{1,}(?:\.[A-Za-z_][A-Za-z0-9_]+)+)\b", text):
+        ids.add(m.group(1))
+    # normalize (strip trailing/leading whitespace + wrapping punct)
+    normalized = {i.strip(" .,;:()[]{}\"'") for i in ids if i.strip()}
+    return {i for i in normalized if i and len(i) >= 2}
+
+
+def factuality_score(
+    response: str, expected: str | None = None, target: str | None = None,
+    **kwargs: Any,
+) -> float:
+    """Bigram-F1 overlap between response and reference (expected/target).
+
+    Deterministic, no LLM judge. Range [0.0, 1.0]. When reference is missing
+    returns 0.0 (contract: eval requires a golden target). This is a
+    lightweight lexical proxy for factual overlap — for the true rubric
+    (semantic factuality) an LLM-judge follow-up is disclosed as separate work.
+    """
+    ref = expected or target or ""
+    if not ref or not response:
+        return 0.0
+    r_bi = _bigrams(_tokenize_words(response))
+    e_bi = _bigrams(_tokenize_words(ref))
+    if not r_bi or not e_bi:
+        return 0.0
+    overlap = r_bi & e_bi
+    if not overlap:
+        return 0.0
+    precision = len(overlap) / len(r_bi)
+    recall = len(overlap) / len(e_bi)
+    return 2 * precision * recall / (precision + recall)
+
+
+def citation_precision(
+    response: str, expected: str | None = None, target: str | None = None,
+    **kwargs: Any,
+) -> float:
+    """Precision of code-identifier citations vs reference.
+
+    Extract identifier-shaped tokens (`Foo`, snake_case, dotted) from BOTH
+    response and reference. Precision = |R ∩ E| / |R|. Returns 0.0 when
+    response has no identifiers OR reference missing. Rewards models that
+    only cite identifiers that actually appear in the reference (i.e. no
+    hallucinated API names).
+    """
+    ref = expected or target or ""
+    if not ref or not response:
+        return 0.0
+    r_ids = _extract_identifiers(response)
+    e_ids = _extract_identifiers(ref)
+    if not r_ids:
+        return 0.0
+    if not e_ids:
+        return 0.0
+    overlap = r_ids & e_ids
+    return len(overlap) / len(r_ids)
+
+
+def concision_ratio(
+    response: str, expected: str | None = None, target: str | None = None,
+    **kwargs: Any,
+) -> float:
+    """Ratio min(1.0, ref_len / response_len). Rewards responses ≤ reference length.
+
+    Deterministic by character count. Floors at 0.1 so a truly empty response
+    doesn't score 1.0 by virtue of being shorter than the reference. Returns
+    0.0 when either side is empty (contract: eval requires both).
+    """
+    ref = expected or target or ""
+    if not ref or not response:
+        return 0.0
+    ref_len = len(ref)
+    resp_len = len(response)
+    if resp_len == 0:
+        return 0.0
+    ratio = ref_len / resp_len
+    return max(0.1, min(1.0, ratio))
+
+
 # ── Registry ──
 
 
@@ -726,6 +849,10 @@ REWARD_REGISTRY: dict[str, RewardFn] = {
     "false_positive_penalty": false_positive_penalty,
     # Performance
     "latency_reward": latency_reward,
+    # Documentation recall (Sprint CLAUDE-DOCS-TRAINING-004)
+    "factuality_score": factuality_score,
+    "citation_precision": citation_precision,
+    "concision_ratio": concision_ratio,
 }
 
 
