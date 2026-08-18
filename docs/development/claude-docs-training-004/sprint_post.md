@@ -83,11 +83,12 @@ Combined: adapter_002 learned the SHAPE of Claude Code docs (verbose, many ident
 
 ## 5. Follow-up options
 
-⚠️ **Architectural correction (operator, 2026-08-17)**: MDEMG IS the retrieval architecture (RRF over 4-5 columns: Embedding + BM25 + Graph + Structural + Context-fingerprint; cross-encoder rerank; 5-layer abstraction hierarchy; Hebbian reinforcement; consulting + jiminy synthesis). The claim "add RAG hybrid" in an earlier draft of this section was confused — MDEMG is an improved RAG substrate at a level above vanilla RAG. The correct architectural separation is:
+⚠️ **Architectural correction (operator, 2026-08-17)**: MDEMG IS the retrieval architecture (RRF over 4-5 columns: Embedding + BM25 + Graph + Structural + Context-fingerprint; cross-encoder rerank; 5-layer abstraction hierarchy; Hebbian reinforcement; consulting + jiminy synthesis; **RSIC self-improvement loop**). The claim "add RAG hybrid" in an earlier draft of this section was confused — MDEMG is an improved RAG substrate at a level above vanilla RAG. The correct architectural separation is:
 
 - **Model weights (Phase-5 SFT `mdemg-llm-v1`)**: reasoning, style, general knowledge
-- **MDEMG substrate**: specific facts, retrievable at inference time via the 4-5-column pipeline
+- **MDEMG substrate**: specific facts, retrievable at inference time via the 4-5-column retrieval pipeline
 - **Consulting/Jiminy layer**: synthesizes retrieved context into task-appropriate guidance
+- **RSIC (Recursive Self-Improving Cognition)**: continuously assesses substrate health across 7 dimensions (retrieval / memory / edge / task / guidance / protocol / synergy), reflects via LLM to produce insights, executes actions (graph repair, tombstone consolidation, drift detection, retrain triggers, etc.), and drives the substrate to improve autonomously. RSIC is what makes MDEMG an *improved* RAG — the substrate isn't static; it self-heals + self-optimizes based on measured retrieval quality + Hebbian reinforcement signals + consolidation cycles.
 
 Sprint 004's failure mode reframes cleanly under this lens: adapter_002 tried to bake 2141 concrete doc rows into 14B parameters via LoRA — architecturally the wrong tool. The right tool is **ingest into substrate + let the retrieval pipeline surface them at inference**.
 
