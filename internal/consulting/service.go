@@ -256,6 +256,14 @@ func (s *Service) Consult(ctx context.Context, req models.ConsultRequest) (model
 		QueryEmbedding: queryEmbedding,
 		TopK:           maxSuggestions * 3, // Get more candidates for filtering
 		HopDepth:       2,                  // Include related nodes
+
+		// INGEST-TOPOLOGY-REPAIR-001 E6: when the caller asked for LLM
+		// synthesis, always request full content pass-through so the
+		// synthesis prompt has verbatim reference material to ground on
+		// (not just node summaries + name signposts). Content is capped
+		// server-side at RETRIEVE_CONTENT_MAX_BYTES per row. Non-synthesis
+		// consult (rationale-only) skips content to preserve wire size.
+		IncludeContent: req.LlmSynthesis,
 	}
 
 	retrieveResp, err := s.retriever.Retrieve(ctx, retrieveReq)

@@ -236,6 +236,19 @@ func buildSynthesisPrompt(req SynthesisRequest, compress bool) string {
 		if summary != "" {
 			sb.WriteString(fmt.Sprintf("- **Summary**: %s\n", summary))
 		}
+		// INGEST-TOPOLOGY-REPAIR-001 E6: render full verbatim content when the
+		// retriever projected it (req.IncludeContent flowed through /v1/memory/
+		// retrieve → RetrieveResult.Content). Enables verbatim-fact-recall
+		// workflows (EffortLevel enum values, McpServerStatusConfig type def,
+		// etc.) that summary alone cannot support. Content is already capped
+		// server-side at RETRIEVE_CONTENT_MAX_BYTES. Rendered as fenced block
+		// so the synthesis LLM treats it as reference material rather than
+		// prose to paraphrase.
+		if r.Content != "" {
+			sb.WriteString("- **Content**:\n```\n")
+			sb.WriteString(r.Content)
+			sb.WriteString("\n```\n")
+		}
 		sb.WriteString("\n")
 	}
 

@@ -34,6 +34,10 @@ var cacheKeyNeutralFields = map[string]string{
 	// CONTEXT-LIVE-001: the catalog version drives the cross-version
 	// Jaccard guard — changes the result set. IN the key.
 	"QueryContextFingerprintVersion": "",
+	// INGEST-TOPOLOGY-REPAIR-001: opt-in verbatim content projection into
+	// results — changes the response payload; separate cache namespace to
+	// avoid content-leak across requests with different flag values. IN the key.
+	"IncludeContent": "",
 }
 
 func TestCacheKey_EveryRequestFieldClassified(t *testing.T) {
