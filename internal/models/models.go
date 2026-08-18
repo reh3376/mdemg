@@ -16,6 +16,16 @@ type RetrieveRequest struct {
 	// These filter results based on file path extensions.
 	IncludeExtensions []string `json:"include_extensions,omitempty"` // Only include files with these extensions (e.g., ["java", "go", "py"])
 	ExcludeExtensions []string `json:"exclude_extensions,omitempty"` // Exclude files with these extensions (e.g., ["md", "txt"])
+
+	// INGEST-TOPOLOGY-REPAIR-001: when set, retrieval projects each result's
+	// verbatim n.content (or the latest linked HAS_OBSERVATION content as
+	// fallback for legacy-ingest nodes never re-ingested). Default-off preserves
+	// existing wire size for the 15+ shipped consumers that only want the
+	// summary/name signposts. Required for verbatim-fact-recall workflows
+	// (documentation Q&A, exact-enum lookups, code snippets, etc.) where the
+	// downstream synthesis needs to quote the source. Content is capped at
+	// RETRIEVE_CONTENT_MAX_BYTES to bound response size.
+	IncludeContent bool `json:"include_content,omitempty"`
 	CodeOnly          bool     `json:"code_only,omitempty"`          // Shorthand: exclude common non-code files (md, txt, json, yaml, etc.)
 
 	PolicyContext map[string]any `json:"policy_context,omitempty"`
@@ -114,6 +124,13 @@ type RetrieveResult struct {
 	Activation float64            `json:"activation,omitempty"`
 	Jiminy     *JiminyExplanation `json:"jiminy,omitempty"`   // Explainable retrieval (when enabled)
 	Evidence   []SymbolEvidence   `json:"evidence,omitempty"` // Symbol evidence grounding the result
+
+	// Content — INGEST-TOPOLOGY-REPAIR-001: verbatim n.content when the request
+	// set include_content=true. Falls back to the latest linked
+	// HAS_OBSERVATION.content for legacy-ingest nodes. Capped at
+	// RETRIEVE_CONTENT_MAX_BYTES. Omitted (zero value) when not requested to
+	// preserve wire size for guidance-first consumers.
+	Content string `json:"content,omitempty"`
 }
 
 // SymbolEvidence provides verifiable evidence linking a retrieval result to specific code.

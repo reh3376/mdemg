@@ -112,6 +112,16 @@ type Config struct {
 	// empty-result cache guard) instead of hanging. 0 disables (default: 20000).
 	RetrieveTimeoutMs int
 
+	// RETRIEVE_CONTENT_MAX_BYTES — INGEST-TOPOLOGY-REPAIR-001: per-result cap
+	// on the projected verbatim content when RetrieveRequest.IncludeContent
+	// is true. Default 8000 bytes (~2000 tokens) keeps a top-5 include-content
+	// response under ~40 KB, well within downstream synthesis budgets. 0 =
+	// unbounded (not recommended — legacy Observation.content payloads can
+	// exceed 100KB). Applied client-side in retrieval.Service after RRF
+	// ranking; the Cypher projection itself is unbounded to preserve fallback
+	// coalesce ordering.
+	RetrieveContentMaxBytes int
+
 	// Anomaly detection settings
 	AnomalyDetectionEnabled   bool    // Feature toggle (default: true)
 	AnomalyDuplicateThreshold float64 // Vector similarity threshold for duplicates (default: 0.95)
@@ -1942,6 +1952,13 @@ func FromEnv() (Config, error) {
 	}
 	if httpWriteTimeout < 1 {
 		return Config{}, errors.New("HTTP_WRITE_TIMEOUT must be >= 1")
+	}
+	retrieveContentMaxBytes, err := atoi("RETRIEVE_CONTENT_MAX_BYTES", 8000)
+	if err != nil {
+		return Config{}, err
+	}
+	if retrieveContentMaxBytes < 0 {
+		retrieveContentMaxBytes = 0
 	}
 	retrieveTimeoutMs, err := atoi("RETRIEVE_TIMEOUT_MS", 20000)
 	if err != nil {
@@ -5861,6 +5878,7 @@ func FromEnv() (Config, error) {
 		HTTPReadTimeout:                httpReadTimeout,
 		HTTPWriteTimeout:               httpWriteTimeout,
 		RetrieveTimeoutMs:              retrieveTimeoutMs,
+		RetrieveContentMaxBytes:        retrieveContentMaxBytes,
 		AnomalyDetectionEnabled:        anomalyEnabled,
 		AnomalyDuplicateThreshold:      anomalyDupThreshold,
 		AnomalyOutlierStdDevs:          anomalyOutlierStdDevs,
