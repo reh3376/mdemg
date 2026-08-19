@@ -306,28 +306,43 @@ func runModelPull(ctx context.Context, cfg config.Config, adapter, dryRun bool) 
 
 	// SHA verify against the quant manifest (embedded or operator-override).
 	// Adapter pulls verify against mf.Adapter; fused quants against mf.Quants[quant].
+	//
+	// HOMEBREW-INSTALLER-QWEN-UPDATE-001 Phase B (2026-08-19): guard against
+	// false-mismatch when pulling a model version whose manifest hasn't shipped
+	// yet. The embedded manifest is ModelName-scoped (currently mdemg-llm-v1);
+	// pulling a different model via --name mdemg-llm-v2 would find v1's SHA at
+	// the same quant key and fire a mis-matched-SHA error against v2's real
+	// blob. When the manifest's ModelName does not match the request, skip
+	// SHA verify with an explicit log — expected during a model-version
+	// crossover (Phase B safety fix; Phase C wires the real v2 manifest).
 	mf, mfErr := LoadQuantManifest(cfg)
 	if mfErr == nil {
-		var rec QuantRecord
-		var ok bool
-		var verifyKey string
-		if adapter {
-			if mf.Adapter != nil {
-				rec = *mf.Adapter
-				ok = true
-			}
-			verifyKey = "adapter"
+		if !manifestAppliesToRequest(mf.ModelName, cfg.ModelName) {
+			fmt.Printf("SHA verify: skipped — loaded manifest is for %q, request is for %q "+
+				"(expected when pulling a new model version before its manifest ships)\n",
+				mf.ModelName, cfg.ModelName)
 		} else {
-			rec, ok = mf.Quants[quant]
-			verifyKey = quant
-		}
-		if ok && rec.SHA256 != "" {
-			if !strings.EqualFold(result.SHA256, rec.SHA256) {
-				return fmt.Errorf("SHA mismatch for %s: pulled blob has %s, quant manifest expects %s — do not trust this artifact", verifyKey, result.SHA256, rec.SHA256)
+			var rec QuantRecord
+			var ok bool
+			var verifyKey string
+			if adapter {
+				if mf.Adapter != nil {
+					rec = *mf.Adapter
+					ok = true
+				}
+				verifyKey = "adapter"
+			} else {
+				rec, ok = mf.Quants[quant]
+				verifyKey = quant
 			}
-			fmt.Printf("SHA verify: ok (%s)\n", rec.SHA256[:12]+"…")
-		} else {
-			fmt.Printf("SHA verify: skipped — quant manifest has no SHA recorded for %s yet\n", verifyKey)
+			if ok && rec.SHA256 != "" {
+				if !strings.EqualFold(result.SHA256, rec.SHA256) {
+					return fmt.Errorf("SHA mismatch for %s: pulled blob has %s, quant manifest expects %s — do not trust this artifact", verifyKey, result.SHA256, rec.SHA256)
+				}
+				fmt.Printf("SHA verify: ok (%s)\n", rec.SHA256[:12]+"…")
+			} else {
+				fmt.Printf("SHA verify: skipped — quant manifest has no SHA recorded for %s yet\n", verifyKey)
+			}
 		}
 	} else {
 		fmt.Printf("SHA verify: skipped — could not load quant manifest: %v\n", mfErr)

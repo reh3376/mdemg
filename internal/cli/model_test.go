@@ -502,3 +502,60 @@ func slicesEqual(a, b []string) bool {
 	}
 	return true
 }
+
+// TestManifestAppliesToRequest pins the HOMEBREW-INSTALLER-QWEN-UPDATE-001
+// Phase B safety fix: when the loaded quant manifest's ModelName does not
+// match the request's ModelName, the SHA verify path must be short-circuited
+// to prevent a false-mismatch error on the version-crossover case (e.g.
+// pulling mdemg-llm-v2 with the v1 manifest embedded).
+func TestManifestAppliesToRequest(t *testing.T) {
+	cases := []struct {
+		name          string
+		manifestModel string
+		requestModel  string
+		want          bool
+	}{
+		{"exact match — v1 pull with v1 manifest", "mdemg-llm-v1", "mdemg-llm-v1", true},
+		{"exact match — v2 pull with v2 manifest", "mdemg-llm-v2", "mdemg-llm-v2", true},
+		{"case-insensitive match", "MDEMG-LLM-V1", "mdemg-llm-v1", true},
+		{"MISMATCH — v2 pull with v1 manifest (the guard's raison d'être)", "mdemg-llm-v1", "mdemg-llm-v2", false},
+		{"MISMATCH — v1 pull with v2 manifest", "mdemg-llm-v2", "mdemg-llm-v1", false},
+		{"MISMATCH — custom fork name vs shipped v1", "mdemg-llm-v1", "acme-custom-llm", false},
+		{"empty manifest ModelName treated as unversioned (backward-compat)", "", "mdemg-llm-v1", true},
+		{"empty manifest ModelName vs v2 request (backward-compat)", "", "mdemg-llm-v2", true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := manifestAppliesToRequest(tc.manifestModel, tc.requestModel)
+			if got != tc.want {
+				t.Errorf("manifestAppliesToRequest(%q, %q) = %v, want %v",
+					tc.manifestModel, tc.requestModel, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestManifestAppliesToRequest_ShippedManifestVsV2Request pins the specific
+// live-behavior contract: with the SHIPPED embedded quant_manifest.json
+// (ModelName="mdemg-llm-v1") and a v2 request, the guard MUST return false
+// so the SHA verify block is skipped. If this test breaks, the safety fix
+// has regressed and a v2 pull will fire a false SHA-mismatch error.
+func TestManifestAppliesToRequest_ShippedManifestVsV2Request(t *testing.T) {
+	cfg := makeCfg()
+	mf, err := LoadQuantManifest(cfg)
+	if err != nil {
+		t.Fatalf("LoadQuantManifest failed: %v", err)
+	}
+	if mf.ModelName != "mdemg-llm-v1" {
+		t.Fatalf("shipped manifest ModelName sanity check: want %q, got %q",
+			"mdemg-llm-v1", mf.ModelName)
+	}
+	// Simulate a v2 pull: manifest says v1, request says v2 → guard MUST skip.
+	if manifestAppliesToRequest(mf.ModelName, "mdemg-llm-v2") {
+		t.Errorf("shipped manifest (v1) MUST NOT apply to v2 request; guard would fail to skip SHA verify")
+	}
+	// Simulate the default v1 pull: manifest says v1, request says v1 → guard MUST verify.
+	if !manifestAppliesToRequest(mf.ModelName, "mdemg-llm-v1") {
+		t.Errorf("shipped manifest (v1) MUST apply to v1 request; guard would incorrectly skip SHA verify (breaking v1's shipped contract)")
+	}
+}
