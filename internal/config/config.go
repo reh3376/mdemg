@@ -377,6 +377,17 @@ type Config struct {
 	JiminyLeverCActivationSteps   int     // JIMINY_LEVER_C_ACTIVATION_STEPS — propagation steps for SpreadingActivationWithAttention (default: 2)
 	JiminyLeverCActivationLambda  float64 // JIMINY_LEVER_C_ACTIVATION_LAMBDA — decay per step [0, 0.9] (default: 0.5)
 	JiminyLeverCActivationWeight  float64 // JIMINY_LEVER_C_ACTIVATION_WEIGHT — blend weight for activation vs cosine [0, 1]; blended = (1-w)*cosine + w*activation. Default 0.3 (cosine dominates 70/30 — conservative).
+	// EFFECTIVENESS-BLEND-001 (JIMINY-SUBSTRATE-NATIVE-001 Phase B2, 2026-08-18):
+	// Blend the shipped GUIDANCE_OUTCOME followed-rate (JIMINY-CORPUS-001 Lever B
+	// signal, per-node) into Lever C's rerank. With activation, produces a 3-way
+	// blend: (1-wa-we)*cosine + wa*activation + we*effectiveness. Fail-open: nodes
+	// with no effectiveness data → effectiveness term = 0 (uniform (1-we)*cosine
+	// fall-back, no differential penalty on data-sparse actionables). Composes
+	// multiplicatively with the shipped final-sort Lever B prior (they add signal
+	// at Lever-C selection AND at final sort — two application sites, one signal).
+	// When wa + we > 1, we is clamped to (1 - wa) so activation wins if the
+	// operator over-specifies.
+	JiminyLeverCEffectivenessWeight float64 // JIMINY_LEVER_C_EFFECTIVENESS_WEIGHT — blend weight for GUIDANCE_OUTCOME followed-rate in Lever C rerank [0, 1]. Default 0 (disabled — byte-identical to Phase B1). Enable in .env after live smoke.
 	// JIMINY-OUTCOME-001 — minimum vector-index cosine similarity for an embedding-based
 	// constraint-code match. Concept-abstracted guidance rarely shares 3+ literal words
 	// with raw constraint text, so keyword matching missed everything and the Neo4j
@@ -3004,6 +3015,17 @@ func FromEnv() (Config, error) {
 	}
 	if jiminyLeverCActivationWeight > 1 {
 		jiminyLeverCActivationWeight = 1
+	}
+	// EFFECTIVENESS-BLEND-001 (Phase B2)
+	jiminyLeverCEffectivenessWeight, err := atof("JIMINY_LEVER_C_EFFECTIVENESS_WEIGHT", 0.0)
+	if err != nil {
+		return Config{}, err
+	}
+	if jiminyLeverCEffectivenessWeight < 0 {
+		jiminyLeverCEffectivenessWeight = 0
+	}
+	if jiminyLeverCEffectivenessWeight > 1 {
+		jiminyLeverCEffectivenessWeight = 1
 	}
 	jiminyMinConfidence, err := atof("JIMINY_MIN_CONFIDENCE", 0.3)
 	if err != nil {
@@ -6145,6 +6167,7 @@ func FromEnv() (Config, error) {
 		JiminyLeverCActivationSteps:               jiminyLeverCActivationSteps,
 		JiminyLeverCActivationLambda:              jiminyLeverCActivationLambda,
 		JiminyLeverCActivationWeight:              jiminyLeverCActivationWeight,
+		JiminyLeverCEffectivenessWeight:           jiminyLeverCEffectivenessWeight,
 		JiminyMinConfidence:                       jiminyMinConfidence,
 		JiminySignalStrengthWeight:                jiminySignalStrengthWeight,
 		JiminyConstraintCodeSimThreshold:          jiminyConstraintCodeSimThreshold,

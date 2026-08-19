@@ -1,8 +1,11 @@
-# Jiminy Lever C — activation-driven reranking
+# Jiminy Lever C — substrate-native reranking (activation + effectiveness)
 
-**Sprint**: ACTIVATION-DRIVEN-DISCOVERY-001 (JIMINY-SUBSTRATE-NATIVE-001 Phase B1)
+**Sprints**:
+- ACTIVATION-DRIVEN-DISCOVERY-001 (JIMINY-SUBSTRATE-NATIVE-001 Phase B1) — activation signal
+- EFFECTIVENESS-BLEND-001 (JIMINY-SUBSTRATE-NATIVE-001 Phase B2) — effectiveness signal
+
 **Shipped**: 2026-08-18
-**Default**: OFF (opt-in via `.env`; per-request override via `?leverc_activation=true|false` planned)
+**Default**: OFF (both signals opt-in via `.env`; per-request override via `?leverc_activation=true|false` planned)
 
 ## Why
 
@@ -20,14 +23,27 @@ Operator locked (2026-08-18) direction:
 - **(a) drop-in flagged replacement** — keep the current role-filtered cosine seed set (guarantees actionable coverage); rerank the top-K via activation spreading; A/B measurable via URL override; default-off until data justifies flip.
 - **(b) full redesign** (start purely from query-embedding → vector-recall → activation) — deferred; risks surfacing zero actionables when the query neighborhood is sparse in constraints.
 
-### Blend formula
+### Blend formula (Phase B1 + B2)
 
 ```
-blended = (1 - w) * item.Confidence + w * activation[node_id]
+blended = (1 - wa - we) * item.Confidence
+        + wa * activation[node_id]           # Phase B1 — CO_ACTIVATED_WITH edge weights
+        + we * effectiveness_rate[node_id]   # Phase B2 — GUIDANCE_OUTCOME followed rate
 ```
 
-- `w = JIMINY_LEVER_C_ACTIVATION_WEIGHT` (default 0.3 — cosine dominates 70/30, conservative).
-- Nodes with no activation score (isolated in the graph) get `activation = 0`, so their blended score is `(1-w) * cosine` — same uniform coefficient across activated + unactivated items; no differential penalty on isolated actionables (**they don't leapfrog activated peers, but they don't get differentially punished either**).
+- `wa = JIMINY_LEVER_C_ACTIVATION_WEIGHT` (default 0.3 — cosine dominates 70/30 when only activation on).
+- `we = JIMINY_LEVER_C_EFFECTIVENESS_WEIGHT` (default 0 — Phase B2 off).
+- Nodes with no signal for a given term get 0 for that term; the `(1-wa-we)` coefficient applies uniformly, so data-sparse actionables are not differentially penalized (**they don't leapfrog nodes with rich substrate signal, but they don't get differentially punished either**).
+- Clamp: `we = min(we, 1 - wa)` — if the operator over-specifies `wa+we > 1`, activation wins.
+- **Fail-open** (B1 contract preserved): if a signal is requested but unusable (nil retriever / activation error / nil persistence / empty effectiveness cache), that signal's coefficient becomes 0 for this call and the blend degrades gracefully. If BOTH signals are unusable → identity function (no rerank).
+
+### Phase B2 — GUIDANCE_OUTCOME effectiveness signal
+
+The per-node `followed / surfaced` rate from the shipped `constraint_outcomes` (JIMINY-OUTCOME-001) — cached per-space via `Service.effectivenessPriorRates` (also feeds the shipped JIMINY-CORPUS-001 Lever B final-sort multiplier). Live-verified on mdemg-dev: 26 constraints with ≥5 samples, rates in `[0.0, 0.385]`.
+
+⚠️ **`JIMINY_LEVER_C_EFFECTIVENESS_WEIGHT` gates on `JIMINY_SURFACE_EFFECTIVENESS_PRIOR_WEIGHT`** (the shipped Lever B knob) at the source. The Lever B knob defaults to 0.3, so the cache is populated by default. But: if operators explicitly disable the shipped Lever B prior (`JIMINY_SURFACE_EFFECTIVENESS_PRIOR_WEIGHT=0`), the effectiveness cache stays empty and Phase B2 becomes a silent no-op. To use Phase B2, keep the shipped Lever B knob at its default (`>0`).
+
+**Composition with the shipped final-sort Lever B**: the effectiveness signal now applies at TWO sites — inside Lever-C rerank (B2, this sprint) AND in the final sort (shipped 2026-07-03). They compose multiplicatively via the sort key, so operators can tune both independently. The Lever B multiplier's default weight is 0.3; Phase B2's default is 0.0 — enable only after operator-directed live smoke.
 
 ### Reuse the shipped substrate primitive, don't invent a new one
 
@@ -67,18 +83,23 @@ Activation reranks; it does **not** filter. Zero risk of returning fewer actiona
 
 ```bash
 # in /Users/reh3376/mdemg/.env
-JIMINY_LEVER_C_ACTIVATION_ENABLED=true
 
-# optional tuning
+# --- Phase B1: activation signal ---
+JIMINY_LEVER_C_ACTIVATION_ENABLED=true
 JIMINY_LEVER_C_ACTIVATION_STEPS=2       # propagation steps (default 2)
 JIMINY_LEVER_C_ACTIVATION_LAMBDA=0.5    # decay per step [0, 0.9] (default 0.5)
 JIMINY_LEVER_C_ACTIVATION_WEIGHT=0.3    # blend weight for activation vs cosine [0, 1] (default 0.3)
+
+# --- Phase B2: effectiveness signal ---
+JIMINY_LEVER_C_EFFECTIVENESS_WEIGHT=0.3  # blend weight for followed-rate [0, 1] (default 0)
+# NOTE: Phase B2 requires JIMINY_SURFACE_EFFECTIVENESS_PRIOR_WEIGHT > 0 (default 0.3)
+# to keep the effectiveness cache populated. Silent no-op if that knob is disabled.
 ```
 
-Restart: `launchctl kickstart -k gui/501/com.mdemg.server`. Boot log confirms:
+Restart: `launchctl kickstart -k gui/501/com.mdemg.server`. Boot log confirms both:
 
 ```
-INFO msg="jiminy: lever c activation" enabled=true steps=2 lambda=0.5 weight=0.3
+INFO msg="jiminy: lever c activation" enabled=true steps=2 lambda=0.5 weight=0.3 eff_weight=0.3
 ```
 
 ### Observability
