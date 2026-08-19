@@ -3486,72 +3486,136 @@ func (s *Service) fetchActionableCandidates(ctx context.Context, spaceID string,
 }
 
 // activationEnrichLeverC reranks Lever C actionable candidates by blending
-// their initial cosine confidence with the substrate's Hebbian activation
-// signal. Uses SpreadingActivationWithAttention over 1-hop CO_ACTIVATED_WITH
-// + typed semantic edges from the seed set. Guarantees the seed set is
-// preserved (activation reranks; it does NOT filter — no risk of returning
-// fewer actionables than the input).
+// their initial cosine confidence with substrate signals — Hebbian activation
+// (Phase B1) and/or GUIDANCE_OUTCOME followed-rate (Phase B2). Guarantees
+// the seed set is preserved (reweights; does NOT filter — no risk of
+// returning fewer actionables than the input).
 //
-// Flag-guarded (JIMINY_LEVER_C_ACTIVATION_ENABLED, default false); disabled →
-// identity function. Blend formula: blended = (1-w)*item.Confidence +
-// w*activation[node]. Nodes with no activation score (isolated in the graph)
-// keep their original cosine confidence — the (1-w) coefficient applies
-// uniformly, so isolated actionables are not differentially penalized.
+// Two flag-guarded signals:
+//   - JIMINY_LEVER_C_ACTIVATION_ENABLED + _WEIGHT (wa): SpreadingActivationWith-
+//     Attention over 1-hop CO_ACTIVATED_WITH + typed semantic edges from the
+//     seed set.
+//   - JIMINY_LEVER_C_EFFECTIVENESS_WEIGHT (we): per-node followed/surfaced rate
+//     from GUIDANCE_OUTCOME edges (via the shipped JIMINY-CORPUS-001 Lever B
+//     cache). Composes multiplicatively with the shipped final-sort Lever B
+//     prior — two application sites for the same signal (Lever-C selection
+//     AND final sort).
 //
-// JIMINY-SUBSTRATE-NATIVE-001 Phase B1 — ACTIVATION-DRIVEN-DISCOVERY-001.
-// Substrate-native: reads Hebbian edge weights the graph has learned, not
-// pure semantic embedding similarity.
+// 3-way blend: blended = (1 - wa - we) * cosine + wa * activation + we * effRate.
+// When both signals are off (wa=0 AND we=0) → byte-identical identity function.
+// When wa + we > 1 → we is clamped to (1 - wa) so activation wins if the
+// operator over-specifies. Nodes with no signal (missing from either map) get
+// signal=0 for that term; the (1-wa-we) coefficient applies uniformly, so
+// data-sparse actionables are not differentially penalized.
+//
+// JIMINY-SUBSTRATE-NATIVE-001 Phase B1+B2 — ACTIVATION-DRIVEN-DISCOVERY-001,
+// EFFECTIVENESS-BLEND-001. Substrate-native: reads Hebbian edge weights and
+// outcome-reinforcement the graph has learned, not pure semantic embedding.
 func (s *Service) activationEnrichLeverC(ctx context.Context, spaceID string, actionables []GuidanceItem, queryText string) []GuidanceItem {
-	if !s.cfg.JiminyLeverCActivationEnabled || s.retriever == nil || len(actionables) == 0 {
+	wa := s.cfg.JiminyLeverCActivationWeight
+	if !s.cfg.JiminyLeverCActivationEnabled || wa <= 0 {
+		wa = 0
+	}
+	if wa > 1 {
+		wa = 1
+	}
+	we := s.cfg.JiminyLeverCEffectivenessWeight
+	if we < 0 {
+		we = 0
+	}
+	if we > 1 {
+		we = 1
+	}
+	// Clamp we so wa + we <= 1: activation wins if operator over-specifies.
+	if wa+we > 1 {
+		we = 1 - wa
+	}
+	if wa <= 0 && we <= 0 {
 		return actionables
 	}
-	seeds := make([]ActivationSeed, 0, len(actionables))
-	for _, it := range actionables {
-		if len(it.SourceNodes) == 0 {
-			continue
+	if len(actionables) == 0 {
+		return actionables
+	}
+
+	// Activation path (only fires when wa > 0 AND retriever present + successful).
+	// waEffective == 0 if the signal is requested but unusable (nil retriever /
+	// error / empty seeds); the blend then treats activation as absent instead
+	// of applying `(1-wa)*cosine` uniformly (that would be a stealth demotion
+	// vs raw input). B1 fail-open contract preserved: pure-activation setup
+	// with nil retriever / activation error returns raw input.
+	var act map[string]float64
+	waEffective := 0.0
+	if wa > 0 && s.retriever != nil {
+		seeds := make([]ActivationSeed, 0, len(actionables))
+		for _, it := range actionables {
+			if len(it.SourceNodes) == 0 {
+				continue
+			}
+			seeds = append(seeds, ActivationSeed{NodeID: it.SourceNodes[0], Score: it.Confidence})
 		}
-		seeds = append(seeds, ActivationSeed{NodeID: it.SourceNodes[0], Score: it.Confidence})
+		if len(seeds) > 0 {
+			var err error
+			act, err = s.retriever.ExpandSeedsByActivation(ctx, spaceID, seeds, queryText)
+			if err != nil {
+				slog.Debug("jiminy: activation enrichment failed", "space_id", spaceID, "err", err)
+				act = nil
+			} else {
+				waEffective = wa
+			}
+		}
 	}
-	if len(seeds) == 0 {
+
+	// Effectiveness path (only fires when we > 0 AND rate fetch returns data).
+	// weEffective == 0 if the signal is requested but unusable.
+	// ⚠ effectivenessPriorRates gates on JIMINY_SURFACE_EFFECTIVENESS_PRIOR_WEIGHT
+	// (the shipped Lever B knob) — that MUST be > 0 for effectiveness data to
+	// flow into this Lever-C blend. If operators enable Lever-C effectiveness
+	// but disable the shipped Lever B prior, effectiveness will be all-nil
+	// and this stage is a no-op (documented in the feature doc).
+	var effRates map[string]float64
+	weEffective := 0.0
+	if we > 0 {
+		effRates = s.effectivenessPriorRates(ctx, spaceID)
+		if len(effRates) > 0 {
+			weEffective = we
+		}
+	}
+
+	// If no signal is actually usable → identity (B1 contract preserved).
+	if waEffective <= 0 && weEffective <= 0 {
 		return actionables
 	}
-	act, err := s.retriever.ExpandSeedsByActivation(ctx, spaceID, seeds, queryText)
-	if err != nil {
-		// Fail-open: preserve input ordering; the primitive already logged.
-		slog.Debug("jiminy: activation enrichment failed", "space_id", spaceID, "err", err)
-		return actionables
-	}
-	w := s.cfg.JiminyLeverCActivationWeight
-	if w <= 0 {
-		return actionables
-	}
-	if w > 1 {
-		w = 1
-	}
+
 	// Blend + rerank. Modify a copy to keep the input slice unmutated.
 	enriched := make([]GuidanceItem, len(actionables))
 	copy(enriched, actionables)
+	cosineCoeff := 1 - waEffective - weEffective
 	for i := range enriched {
 		if len(enriched[i].SourceNodes) == 0 {
 			continue
 		}
 		nodeID := enriched[i].SourceNodes[0]
-		a, ok := act[nodeID]
-		if !ok {
-			// Not in the activation map (edge fetch didn't touch this node)
-			// — apply the same (1-w)*cosine so cosine dominates ordering
-			// among unactivated items instead of leaving them at raw cosine.
-			// This keeps blending symmetric between activated and unactivated
-			// items: activated get a bonus in [0, w]; unactivated get 0.
-			a = 0
+		a := 0.0
+		if v, ok := act[nodeID]; ok {
+			a = v
+			if a < 0 {
+				a = 0
+			}
+			if a > 1 {
+				a = 1
+			}
 		}
-		if a < 0 {
-			a = 0
+		e := 0.0
+		if v, ok := effRates[nodeID]; ok {
+			e = v
+			if e < 0 {
+				e = 0
+			}
+			if e > 1 {
+				e = 1
+			}
 		}
-		if a > 1 {
-			a = 1
-		}
-		enriched[i].Confidence = (1-w)*enriched[i].Confidence + w*a
+		enriched[i].Confidence = cosineCoeff*enriched[i].Confidence + waEffective*a + weEffective*e
 	}
 	sort.SliceStable(enriched, func(i, j int) bool {
 		return enriched[i].Confidence > enriched[j].Confidence

@@ -1200,14 +1200,15 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		)
 	}
 
-	// ACTIVATION-DRIVEN-DISCOVERY-001 (JIMINY-SUBSTRATE-NATIVE-001 Phase B1):
-	// substrate-native Lever C reranking via activation spreading.
+	// ACTIVATION-DRIVEN-DISCOVERY-001 (JIMINY-SUBSTRATE-NATIVE-001 Phase B1) +
+	// EFFECTIVENESS-BLEND-001 (Phase B2): substrate-native Lever C reranking.
 	if jiminySvc != nil {
 		slog.Info("jiminy: lever c activation",
 			"enabled", cfg.JiminyLeverCActivationEnabled,
 			"steps", cfg.JiminyLeverCActivationSteps,
 			"lambda", cfg.JiminyLeverCActivationLambda,
 			"weight", cfg.JiminyLeverCActivationWeight,
+			"eff_weight", cfg.JiminyLeverCEffectivenessWeight,
 		)
 	}
 
