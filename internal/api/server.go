@@ -1212,6 +1212,17 @@ func NewServer(cfg config.Config, driver neo4j.DriverWithContext, pluginMgr *plu
 		)
 	}
 
+	// LEVER-D-CONCEPT-BIAS-001 (JIMINY-SUBSTRATE-NATIVE-001 Phase C, 2026-08-18):
+	// Substrate-native L2+ concept surfacing.
+	if jiminySvc != nil {
+		slog.Info("jiminy: lever d concept bias",
+			"enabled", cfg.JiminyLeverDEnabled,
+			"topk", cfg.JiminyLeverDTopK,
+			"sim_floor", cfg.JiminyLeverDSimFloor,
+			"min_layer", cfg.JiminyLeverDMinLayer,
+		)
+	}
+
 	// HEBB-ETA-001: record precision-weighted η state at boot.
 	slog.Info("hebb: precision-weighted eta",
 		"enabled", cfg.PrecisionWeightedEtaEnabled,

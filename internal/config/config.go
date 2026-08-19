@@ -388,6 +388,17 @@ type Config struct {
 	// When wa + we > 1, we is clamped to (1 - wa) so activation wins if the
 	// operator over-specifies.
 	JiminyLeverCEffectivenessWeight float64 // JIMINY_LEVER_C_EFFECTIVENESS_WEIGHT — blend weight for GUIDANCE_OUTCOME followed-rate in Lever C rerank [0, 1]. Default 0 (disabled — byte-identical to Phase B1). Enable in .env after live smoke.
+	// LEVER-D-CONCEPT-BIAS-001 (JIMINY-SUBSTRATE-NATIVE-001 Phase C, 2026-08-18):
+	// Surface substrate-native L2+ concept / emergent_concept nodes directly as
+	// guidance items — MDEMG has ~9,732 such nodes on mdemg-dev that were
+	// otherwise invisible to Lever C (role-filtered to constraint/correction).
+	// Cypher: role_type IN ['concept','emergent_concept'] AND layer >= min_layer,
+	// gated by cosine sim_floor (RRF-SCALE-001-safe — stable [0,1]). Merged into
+	// guidance pool alongside Lever C actionables; dedup by node_id.
+	JiminyLeverDEnabled  bool    // JIMINY_LEVER_D_ENABLED — enable concept-bias fetch (default false — behavior-changing per HEBB-ETA-001 rule).
+	JiminyLeverDTopK     int     // JIMINY_LEVER_D_TOPK — how many L2+ concepts to merge (default 3).
+	JiminyLeverDSimFloor float64 // JIMINY_LEVER_D_SIM_FLOOR — cosine similarity floor [0,1], RRF-SCALE-001-safe (default 0.55 — start higher-recall than Lever C's 0.60 to observe the noise floor; tune via .env).
+	JiminyLeverDMinLayer int     // JIMINY_LEVER_D_MIN_LAYER — minimum node.layer for a concept to qualify (default 2 — L2+ per hierarchy design; set higher to gate on more-abstracted concepts).
 	// JIMINY-OUTCOME-001 — minimum vector-index cosine similarity for an embedding-based
 	// constraint-code match. Concept-abstracted guidance rarely shares 3+ literal words
 	// with raw constraint text, so keyword matching missed everything and the Neo4j
@@ -3026,6 +3037,32 @@ func FromEnv() (Config, error) {
 	}
 	if jiminyLeverCEffectivenessWeight > 1 {
 		jiminyLeverCEffectivenessWeight = 1
+	}
+	// LEVER-D-CONCEPT-BIAS-001 (Phase C)
+	jiminyLeverDEnabled := getBool("JIMINY_LEVER_D_ENABLED", false)
+	jiminyLeverDTopK, err := atoi("JIMINY_LEVER_D_TOPK", 3)
+	if err != nil {
+		return Config{}, err
+	}
+	if jiminyLeverDTopK < 0 {
+		jiminyLeverDTopK = 0
+	}
+	jiminyLeverDSimFloor, err := atof("JIMINY_LEVER_D_SIM_FLOOR", 0.55)
+	if err != nil {
+		return Config{}, err
+	}
+	if jiminyLeverDSimFloor < 0 {
+		jiminyLeverDSimFloor = 0
+	}
+	if jiminyLeverDSimFloor > 1 {
+		jiminyLeverDSimFloor = 1
+	}
+	jiminyLeverDMinLayer, err := atoi("JIMINY_LEVER_D_MIN_LAYER", 2)
+	if err != nil {
+		return Config{}, err
+	}
+	if jiminyLeverDMinLayer < 0 {
+		jiminyLeverDMinLayer = 0
 	}
 	jiminyMinConfidence, err := atof("JIMINY_MIN_CONFIDENCE", 0.3)
 	if err != nil {
@@ -6168,6 +6205,10 @@ func FromEnv() (Config, error) {
 		JiminyLeverCActivationLambda:              jiminyLeverCActivationLambda,
 		JiminyLeverCActivationWeight:              jiminyLeverCActivationWeight,
 		JiminyLeverCEffectivenessWeight:           jiminyLeverCEffectivenessWeight,
+		JiminyLeverDEnabled:                       jiminyLeverDEnabled,
+		JiminyLeverDTopK:                          jiminyLeverDTopK,
+		JiminyLeverDSimFloor:                      jiminyLeverDSimFloor,
+		JiminyLeverDMinLayer:                      jiminyLeverDMinLayer,
 		JiminyMinConfidence:                       jiminyMinConfidence,
 		JiminySignalStrengthWeight:                jiminySignalStrengthWeight,
 		JiminyConstraintCodeSimThreshold:          jiminyConstraintCodeSimThreshold,
