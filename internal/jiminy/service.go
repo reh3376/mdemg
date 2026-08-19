@@ -1256,6 +1256,33 @@ func (s *Service) Guide(ctx context.Context, req GuidanceRequest) (GuidanceRespo
 		}
 	}
 
+	// LEVER-D-CONCEPT-BIAS-001 (JIMINY-SUBSTRATE-NATIVE-001 Phase C, 2026-08-18):
+	// Surface substrate-native L2+ concepts as first-class guidance items. Mirror
+	// of Lever C's shape but scoped to role_type IN ['concept','emergent_concept']
+	// at layer >= min_layer. ~9,732 such nodes exist on mdemg-dev and were
+	// otherwise invisible to Lever C. Default OFF; dedup by node_id.
+	if s.cfg.JiminyLeverDEnabled && queryEmbedding != nil {
+		concepts := s.fetchConceptCandidates(ctx, req.SpaceID, queryEmbedding,
+			s.cfg.JiminyLeverDTopK, s.cfg.JiminyLeverDSimFloor, s.cfg.JiminyLeverDMinLayer)
+		if len(concepts) > 0 {
+			seen := make(map[string]bool, len(items))
+			for _, it := range items {
+				for _, n := range it.SourceNodes {
+					seen[n] = true
+				}
+			}
+			added := 0
+			for _, c := range concepts {
+				if len(c.SourceNodes) > 0 && seen[c.SourceNodes[0]] {
+					continue
+				}
+				items = append(items, c)
+				added++
+			}
+			debug["leverd_concept_merged"] = added
+		}
+	}
+
 	// LEVER-C-TIGHTEN-002 (JIMINY-CEILING-BREAK-2 Phase 2, 2026-08-12):
 	// scope-gate filter — suppress surfaced items whose derived action-scope
 	// families don't intersect the request-side scope. Addresses the ceiling
@@ -3479,6 +3506,102 @@ func (s *Service) fetchActionableCandidates(ctx context.Context, spaceID string,
 	})
 	if err != nil {
 		slog.Debug("jiminy: Lever C actionable fetch failed", "error", err)
+		return nil
+	}
+	items, _ := out.([]GuidanceItem)
+	return items
+}
+
+// fetchConceptCandidates is LEVER-D-CONCEPT-BIAS-001 (Phase C): a targeted
+// vector query returning the top-K L2+ concept / emergent_concept nodes by
+// embedding similarity to the query, so substrate-native abstractions enter
+// the guidance pool. Mirrors fetchActionableCandidates in shape and safety
+// contract (JIMINY-ARCHIVED-CODE-FILTER-001 archive gate; RRF-SCALE-001-safe
+// cosine [0,1] never the RRF Score).
+//
+// Live substrate on mdemg-dev: ~9,732 non-archived L2+ concept nodes were
+// otherwise invisible to Lever C (role-filtered to constraint/correction).
+// This function's returned items are typed GuidanceConcept with priority
+// "medium" (below Lever C actionables' "high") so they don't crowd the
+// actionables quota in Lever A composition.
+//
+// Fail-open: nil driver / empty embedding / topK ≤ 0 / query error → nil
+// (caller merges nothing; Guide() continues).
+func (s *Service) fetchConceptCandidates(ctx context.Context, spaceID string, embedding []float32, topK int, simFloor float64, minLayer int) []GuidanceItem {
+	if s.driver == nil || len(embedding) == 0 || topK <= 0 {
+		return nil
+	}
+	if minLayer < 0 {
+		minLayer = 0
+	}
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx) //nolint:errcheck
+
+	// Role filter + layer filter; cosine over the role-filtered partition
+	// (mirrors fetchActionableCandidates for the same reason — a global
+	// top-N vector-index scan then role-filter under-recalls).
+	cypher := `
+	MATCH (c:MemoryNode {space_id: $spaceId})
+	WHERE c.role_type IN ['concept', 'emergent_concept']
+	  AND c.layer >= $minLayer
+	  AND NOT coalesce(c.is_archived, false)
+	  AND c.embedding IS NOT NULL
+	WITH c, vector.similarity.cosine(c.embedding, $embedding) AS sim
+	WHERE sim >= $simFloor
+	RETURN c.node_id AS nodeId,
+	       coalesce(c.name, '')    AS name,
+	       coalesce(c.summary, '') AS summary,
+	       c.layer                  AS layer,
+	       sim
+	ORDER BY sim DESC LIMIT $topK`
+
+	out, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, txErr := tx.Run(ctx, cypher, map[string]any{
+			"embedding": embedding,
+			"spaceId":   spaceID,
+			"simFloor":  simFloor,
+			"topK":      topK,
+			"minLayer":  minLayer,
+		})
+		if txErr != nil {
+			return nil, txErr
+		}
+		var items []GuidanceItem
+		for res.Next(ctx) {
+			rec := res.Record()
+			getStr := func(k string) string { v, _ := rec.Get(k); return asStringVal(v) }
+			nodeID := getStr("nodeId")
+			name := getStr("name")
+			summary := getStr("summary")
+			simVal, _ := rec.Get("sim")
+			sim, _ := simVal.(float64)
+			content := name
+			if summary != "" {
+				if content != "" {
+					content += ": " + summary
+				} else {
+					content = summary
+				}
+			}
+			if content == "" || nodeID == "" {
+				continue
+			}
+			conf := sim
+			if conf > maxConfidence {
+				conf = maxConfidence
+			}
+			items = append(items, GuidanceItem{
+				Type:        GuidanceConcept,
+				Priority:    "medium", // below actionables' "high"
+				Content:     content,
+				Confidence:  conf,
+				SourceNodes: []string{nodeID},
+			})
+		}
+		return items, res.Err()
+	})
+	if err != nil {
+		slog.Debug("jiminy: Lever D concept fetch failed", "error", err)
 		return nil
 	}
 	items, _ := out.([]GuidanceItem)
