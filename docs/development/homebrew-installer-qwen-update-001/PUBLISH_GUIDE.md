@@ -6,52 +6,101 @@
 - Ollama account with push access to the `reh3376/` namespace (same account used for `mdemg-llm-v1`).
 - Local Ollama installed + logged in: `ollama --version` succeeds; `ollama whoami` shows `reh3376`.
 - `llama.cpp` build with `llama-quantize` binary available (same tool used in MODEL-DIST-001's pipeline).
-- Source model: Qwen3.8-27B base checkpoint (either MLX safetensors OR HF-safetensors). Winner of task #91 bake-off (0.9105 @ 180s on the 16-task UBENCH augmented eval; baseline v1 = 0.8047, +0.11 lift).
-- Disk headroom: ~80 GB for intermediate f16 GGUF + all 3 quant outputs.
+- Source model: Qwen3.8-27B base checkpoint — the winner of task #91 bake-off (0.9105 @ 180s on the 16-task UBENCH augmented eval; baseline v1 = 0.8047, +0.11 lift). Sourcing options are enumerated in Step 0.
+- Disk headroom: depends on Step 0 path (see per-path estimates).
 - Reliable upload bandwidth: 3 quants totalling ~63 GB will push to Ollama's CDN.
 
 ---
 
 ## Step 0 — Prepare the source
 
-If starting from **MLX safetensors** (typical if the base was fetched via `mlx_lm` for the bake-off):
+**Three sourcing options — pick one based on what you have + your bandwidth budget.**
+
+⚠️ **Verified availability (2026-08-19)**: Ollama Library carries `qwen3.8:27b` (200), `qwen3.8:27b-q8_0` (200), `qwen3.8:27b-q4_K_M` (200). **No fp16/f16/instruct variants exist** (all 404). Q8_0 is the highest precision available on Ollama for qwen3.8:27b.
+
+### Path 3a — Ollama-source (Q8_0 ceiling; RECOMMENDED for Ollama-native workflow)
+
+Use Ollama Library's `qwen3.8:27b-q8_0` as the highest-precision source available on that channel. Q8→Q5 and Q8→Q4 are quant-of-quant BUT with negligible practical loss (Q8 has enough dynamic range that lower-tier requantization stays close to native fidelity — much cleaner than the Q5→Q4 case with your existing local Q5_K_M).
 
 ```bash
-cd /Users/reh3376/mdemg/.local-models/qwen3.8-27b   # or wherever your MLX checkpoint lives
-# Dequant to bf16 HF safetensors (mirror mdemg-llm-v1's pipeline)
-mlx_lm.fuse --dequantize \
-  --model . \
-  --save-path /tmp/qwen3.8-27b-bf16
+# Pull the highest-precision Ollama-hosted variant
+ollama pull qwen3.8:27b-q8_0
+# → ~28 GB download from Ollama's CDN
+
+# Locate the model blob on disk. Ollama stores every tag as a manifest
+# under manifests/ pointing at a content-addressed GGUF blob in blobs/.
+OLLAMA_MODELS="${OLLAMA_MODELS:-$HOME/.ollama/models}"
+MANIFEST="$OLLAMA_MODELS/manifests/registry.ollama.ai/library/qwen3.8/27b-q8_0"
+ls -la "$MANIFEST"   # sanity: file exists
+
+# The layer with mediaType "application/vnd.ollama.image.model" is the GGUF
+DIGEST=$(cat "$MANIFEST" | jq -r '.layers[] | select(.mediaType == "application/vnd.ollama.image.model") | .digest' | sed 's/^sha256://')
+SRC="$OLLAMA_MODELS/blobs/sha256-$DIGEST"
+
+# Confirm it's a GGUF (magic bytes at offset 0)
+head -c 4 "$SRC"; echo   # → "GGUF"
+ls -lh "$SRC"            # → ~28 GB
 ```
 
-If starting from **HF safetensors** (e.g. downloaded via `huggingface-cli`), skip this step.
+Disk headroom for Path 3a: ~28 GB (source blob) + ~63 GB (3 output quants) = **~91 GB**. Skip Path 3a's "convert to f16" step — the pulled Ollama blob IS already GGUF; use it directly as `$SRC` for Step 1.
 
-Then convert to f16 GGUF (baseline for quantization):
+### Path 3b — MLX source (dequantize from your local `.local-models/qwen3.8-27b-mlx-4bit/`)
+
+⚠️ Your local MLX copy is **already 4-bit** (`config.json` shows `"quantization": {"bits": 4}`). Dequantizing to bf16 then requantizing to Q5/Q8 gives quant-of-quant — the Q8_0 output would be a high-bpw encoding of already-lossy 4-bit data, not true Q8 fidelity. Strictly worse than Path 3a. **Use only if Path 3a is unavailable.**
 
 ```bash
+cd /Users/reh3376/mdemg/.local-models/qwen3.8-27b-mlx-4bit
+mlx_lm.fuse --dequantize --model . --save-path /tmp/qwen3.8-27b-bf16
+# → ~55 GB bf16 safetensors
+
 python3 /path/to/llama.cpp/convert_hf_to_gguf.py \
   --outtype f16 \
   --outfile /tmp/qwen3.8-27b-f16.gguf \
   /tmp/qwen3.8-27b-bf16
 # → ~55 GB f16 GGUF
+
+SRC=/tmp/qwen3.8-27b-f16.gguf
 ```
+
+Disk headroom for Path 3b: ~55 GB (bf16 intermediate) + ~55 GB (f16 GGUF) + ~63 GB (3 quants) = **~173 GB**.
+
+### Path 3c — HF-safetensors source (native bf16 from Qwen's release — best absolute quality)
+
+If you have access to Qwen3.8-27B's native bf16/fp16 safetensors (from Qwen's official release or a compatible mirror — not necessarily HuggingFace, e.g. Modelscope or Qwen's own storage), this gives true full-fidelity Q4/Q5/Q8. Use the same `convert_hf_to_gguf.py --outtype f16` command as Path 3b's second block, pointing at the safetensors directory. Skip the `mlx_lm.fuse` dequant step (safetensors already at full precision).
+
+Disk headroom: ~55 GB (safetensors) + ~55 GB (f16 GGUF) + ~63 GB (3 quants) = **~173 GB**.
+
+**Not-recommended paths** (documented for completeness):
+- **Path 1** — publish your existing `.local-models/qwen3.8-27b-gguf/Qwen3.8-27B-Q5_K_M.gguf` as `reh3376/mdemg-llm-v2:Q5_K_M` only (skip Q4 + Q8). Q5_K_M is production canonical per shipped docs; single-tier v2 unblocks E4 promote. But: no Q4 tier for RAM-constrained operators; no Q8 tier for high-fidelity operators.
+- **Path 2** — dequantize your existing Q5_K_M GGUF then requantize. **Strictly dominated by Path 3a** (Q8→Q4/Q5 has less quality loss than Q5→Q4).
 
 ## Step 1 — Quantize to 3 tiers
 
-Reuses MODEL-DIST-001's shipped pipeline; run all 3 quantizations from the same f16 source:
+`$SRC` is set by your Step 0 path choice:
+- Path 3a: `$SRC` is the Ollama Q8_0 blob (~28 GB, already GGUF)
+- Path 3b/3c: `$SRC` is the f16 GGUF you produced (~55 GB)
+
+Run all 3 quantizations from the same `$SRC`:
 
 ```bash
 LLAMA_QUANTIZE=/path/to/llama.cpp/build/bin/llama-quantize
-SRC=/tmp/qwen3.8-27b-f16.gguf
 OUT=/tmp/qwen3.8-27b-quants
-
 mkdir -p $OUT
 
 $LLAMA_QUANTIZE $SRC $OUT/mdemg-llm-v2.Q4_K_M.gguf Q4_K_M
 $LLAMA_QUANTIZE $SRC $OUT/mdemg-llm-v2.Q5_K_M.gguf Q5_K_M
-$LLAMA_QUANTIZE $SRC $OUT/mdemg-llm-v2.Q8_0.gguf   Q8_0
 
-# Verify sizes (rough estimates — real values captured in Step 4)
+# ⚠ Path 3a only: Q8_0 output is a copy of the source Q8_0 blob (no requantization needed).
+#   For Paths 3b/3c the Q8_0 output is a real quantization from f16.
+if [ "$SRC" = "$OLLAMA_MODELS/blobs/sha256-$DIGEST" ]; then
+  # Path 3a — the source IS Q8_0; copy rather than requantize
+  cp $SRC $OUT/mdemg-llm-v2.Q8_0.gguf
+else
+  # Paths 3b/3c — quantize f16 → Q8_0
+  $LLAMA_QUANTIZE $SRC $OUT/mdemg-llm-v2.Q8_0.gguf Q8_0
+fi
+
+# Verify sizes (rough estimates — real values captured in Step 2)
 ls -lh $OUT
 # Expected order of magnitude:
 #   Q4_K_M: ~16 GB
@@ -156,22 +205,44 @@ Send the following to the Phase C sprint (or attach to task #134):
 
 Phase C sprint (`HOMEBREW-INSTALLER-QWEN-UPDATE-002`) creates `internal/cli/quant_manifest_v2.json` with these values, extends `LoadQuantManifest` to pick manifest by `cfg.ModelName`, updates the feature doc, and runs full end-to-end live smoke.
 
-## Common pitfalls
+## Common pitfalls (all paths)
 
 - **Ollama push size limits**: Ollama Library has soft per-blob size limits. If Q8_0 (~28 GB) rejects, consider dropping Q8_0 from v2 (Q5_K_M is production canonical anyway). Update Phase C's `quant_manifest_v2.json` to reflect only the published quants.
 - **Chat template drift**: If Qwen3.8 uses a different Jinja template than Qwen3.6/Qwen3-14B, the Modelfile's TEMPLATE block MUST reflect it. Symptom: `llama-server` responses are garbled or the model outputs raw template tokens. Test with a `curl POST /v1/chat/completions` immediately after Step 4 to catch this.
 - **Ollama account push permissions**: if `ollama push` fails with 401/403, run `ollama whoami` to confirm auth. May need `ollama signin` to refresh credentials.
 - **Local storage**: quant outputs live in `$OUT` (e.g. `/tmp/qwen3.8-27b-quants`) — total ~63 GB. Move to permanent storage if needed post-push, or delete after Phase C confirms the Ollama copies are reachable.
-- **f16 intermediate**: `/tmp/qwen3.8-27b-f16.gguf` (~55 GB) can be deleted after all quantizations complete. Keep it if you plan to re-quantize (e.g. add Q6_K).
+- **f16 intermediate (Paths 3b/3c only)**: `/tmp/qwen3.8-27b-f16.gguf` (~55 GB) can be deleted after all quantizations complete. Keep it if you plan to re-quantize (e.g. add Q6_K).
+- **Ollama blob source (Path 3a) MUST NOT be deleted while quantize runs**: `$SRC` points at Ollama's content-addressed blob (shared store). `rm` on it while `llama-quantize` reads it will corrupt the run + break other Ollama tags that share the blob.
 - **Task #91 verdict**: if you decide differently than the bake-off recommendation (Qwen3.8-27B), edit this guide's Step 0 source path + all downstream file/tag names to reflect Qwen3.6-27B (score 0.9010 vs 3.8's 0.9105).
+
+## Common pitfalls (Path 3a — Ollama source)
+
+- **`ollama pull` progress bar stalls / drops**: rerun `ollama pull qwen3.8:27b-q8_0` — Ollama resumes from the last successfully downloaded chunk.
+- **`jq` not installed for the DIGEST extraction**: install via `brew install jq` OR read the manifest JSON manually and grep for the model layer's `digest`.
+- **Manifest path drift**: if `$OLLAMA_MODELS/manifests/registry.ollama.ai/library/qwen3.8/27b-q8_0` doesn't exist after pull, check `ls $OLLAMA_MODELS/manifests/` — some ollama versions omit the `registry.ollama.ai` prefix; the manifest may live at `.../library/qwen3.8/27b-q8_0` directly.
+- **Blob is symlinked, not copied**: the `SRC` variable points at the shared blob store. `llama-quantize` will READ it (fine); don't `rm` it while quantize is running.
+- **Q8_0 published as a source-blob copy (Path 3a)**: this is a byte-for-byte copy of Ollama's `qwen3.8:27b-q8_0` blob under our namespace tag. Ollama's dedupe MAY notice this at push time and short-circuit — that's OK; the tag will still resolve for consumers.
 
 ## Estimated wall-clock
 
-- Step 0: 15-30 min (depending on source form)
-- Step 1: 30-60 min (3 llama-quantize runs, CPU-bound)
+**Path 3a (Ollama source, recommended)**:
+- Step 0: 15-60 min (ollama pull, ~28 GB, bandwidth-dependent)
+- Step 1: 20-40 min (2 `llama-quantize` runs — Q4_K_M + Q5_K_M; Q8_0 is a source-blob copy so ~free)
 - Step 2: 5 min (SHA capture)
 - Step 3: 10 min (Modelfile authoring; template verify)
-- Step 4: 30-120 min (upload bandwidth-dependent)
+- Step 4: 30-120 min (upload ~63 GB total to Ollama's CDN)
 - Step 5: 5 min (verify)
 - Step 6: 5 min (hand-off)
-- **Total: 2-4 hours** wall-clock; mostly `llama-quantize` + `ollama push` (both mostly-unattended after kickoff)
+- **Total: 1.5-4 hours** wall-clock; mostly download + upload (both unattended); `llama-quantize` runs a Q8→lower requantize which is faster than a full f16→quant.
+
+**Path 3b (MLX-4bit dequant, degraded quality)**:
+- Step 0: 45-90 min (mlx_lm.fuse dequant + convert_hf_to_gguf, disk-bound)
+- Step 1: 30-60 min (3 full `llama-quantize` runs from f16)
+- Steps 2-6: same as 3a
+- **Total: 2.5-5 hours** wall-clock. Q8_0 output is degraded (was 4-bit source).
+
+**Path 3c (HF-safetensors native bf16, best quality)**:
+- Step 0: 30-120 min (download ~55 GB safetensors + convert_hf_to_gguf)
+- Step 1: 30-60 min (3 full `llama-quantize` runs from f16)
+- Steps 2-6: same as 3a
+- **Total: 2-5 hours** wall-clock; only path where all 3 tiers are native full-fidelity quantizations.
