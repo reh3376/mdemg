@@ -96,6 +96,24 @@ type QuantRecord struct {
 //go:embed quant_manifest.json
 var embeddedQuantManifest []byte
 
+// manifestAppliesToRequest returns true when the loaded quant manifest's
+// ModelName matches the requested model — i.e. its SHAs are for the same
+// artifact class the operator is pulling. Returns false when they diverge
+// (e.g. pulling mdemg-llm-v2 with the v1 manifest embedded); callers should
+// skip SHA verify in that case rather than fire a false-mismatch error.
+//
+// Empty manifest.ModelName is treated as "manifest is unversioned" and
+// applies to any request — preserves backward-compat with legacy manifests
+// that predate the ModelName field.
+//
+// HOMEBREW-INSTALLER-QWEN-UPDATE-001 Phase B (2026-08-19).
+func manifestAppliesToRequest(manifestModelName, requestModelName string) bool {
+	if manifestModelName == "" {
+		return true
+	}
+	return strings.EqualFold(manifestModelName, requestModelName)
+}
+
 // LoadQuantManifest reads the runtime manifest. Order:
 //  1. cfg.ModelManifestPath (operator override; air-gapped deployments)
 //  2. embedded quant_manifest.json (canonical, sprint-built)
