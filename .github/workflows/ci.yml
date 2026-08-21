@@ -460,7 +460,14 @@ jobs:
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
-          version: latest
+          # Pin explicit version instead of `latest` (CI-GOLANGCI-PIN-001).
+          # `latest` grabs the newest release every run — upstream releases
+          # can silently introduce new staticcheck rules that fail PRs on
+          # unchanged code (surfaced on PR #643: v2.13.0 released 2026-08-19
+          # added a stricter SA1019 that flagged tls.PreferServerCipherSuites
+          # in code that had been shipped + green since the Cobra migration).
+          # Bump in dedicated PRs so the intent is visible + reviewable.
+          version: v2.13.1
           args: --timeout=5m
 
   security:
