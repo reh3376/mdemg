@@ -290,6 +290,147 @@ func TestLoadQuantManifest_OverrideMissingFile(t *testing.T) {
 	}
 }
 
+// ─── HOMEBREW-INSTALLER-QWEN-UPDATE-002 Phase C pins ─────────────────────
+
+// TestLoadQuantManifest_V2_DispatchesToV2Bytes asserts that setting
+// cfg.ModelName="mdemg-llm-v2" loads the v2 embedded manifest (not v1).
+// This is the primary Phase C contract.
+func TestLoadQuantManifest_V2_DispatchesToV2Bytes(t *testing.T) {
+	cfg := makeCfg()
+	cfg.ModelName = "mdemg-llm-v2"
+	mf, err := LoadQuantManifest(cfg)
+	if err != nil {
+		t.Fatalf("LoadQuantManifest: %v", err)
+	}
+	if mf.ModelName != "mdemg-llm-v2" {
+		t.Errorf("ModelName=%q, want mdemg-llm-v2 (should have dispatched to v2 embedded manifest)", mf.ModelName)
+	}
+	for _, q := range []string{"Q4_K_M", "Q5_K_M", "Q8_0"} {
+		rec, ok := mf.Quants[q]
+		if !ok {
+			t.Errorf("v2 manifest missing quant %s", q)
+			continue
+		}
+		if rec.SHA256 == "" || len(rec.SHA256) != 64 {
+			t.Errorf("v2 quant %s SHA256 invalid: %q", q, rec.SHA256)
+		}
+	}
+	// v2 ships raw base (no adapter per operator scope decision 2026-08-19)
+	if mf.Adapter != nil {
+		t.Errorf("v2 manifest has adapter field set — should be nil (raw-base-only per scope decision)")
+	}
+}
+
+// TestLoadQuantManifest_V2_SHAsMatchPhaseAPublishManifest is the drift
+// detector: the v2 embedded manifest's SHAs MUST match publish_manifest_v2.json
+// byte-for-byte. If either file is edited without the other, this fires.
+func TestLoadQuantManifest_V2_SHAsMatchPhaseAPublishManifest(t *testing.T) {
+	// Locate the publish manifest by walking up from the test file's package
+	// dir. Test working directory is internal/cli/ at test time.
+	repoRoot := filepath.Join("..", "..")
+	publishManifestPath := filepath.Join(repoRoot, "docs", "development",
+		"homebrew-installer-qwen-update-001", "publish_manifest_v2.json")
+	data, err := os.ReadFile(publishManifestPath)
+	if err != nil {
+		t.Fatalf("read publish manifest: %v (Phase A hand-off artifact — has it moved?)", err)
+	}
+	var publish struct {
+		Quants map[string]struct {
+			SHA256 string `json:"sha256"`
+		} `json:"quants"`
+	}
+	if err := json.Unmarshal(data, &publish); err != nil {
+		t.Fatalf("parse publish manifest: %v", err)
+	}
+
+	cfg := makeCfg()
+	cfg.ModelName = "mdemg-llm-v2"
+	mf, err := LoadQuantManifest(cfg)
+	if err != nil {
+		t.Fatalf("LoadQuantManifest: %v", err)
+	}
+	for _, q := range []string{"Q4_K_M", "Q5_K_M", "Q8_0"} {
+		wantSHA := publish.Quants[q].SHA256
+		gotSHA := mf.Quants[q].SHA256
+		if wantSHA == "" {
+			t.Errorf("publish manifest missing SHA for %s", q)
+			continue
+		}
+		if !strings.EqualFold(gotSHA, wantSHA) {
+			t.Errorf("v2 embedded manifest %s SHA drift:\n  embedded : %s\n  publish  : %s\nUpdate quant_manifest_v2.json to match Phase A publish_manifest_v2.json",
+				q, gotSHA, wantSHA)
+		}
+	}
+}
+
+// TestLoadQuantManifest_V1Explicit_DispatchesToV1 is a regression pin: an
+// explicit ModelName=mdemg-llm-v1 must still resolve to v1's shipped SHAs.
+func TestLoadQuantManifest_V1Explicit_DispatchesToV1(t *testing.T) {
+	cfg := makeCfg()
+	cfg.ModelName = "mdemg-llm-v1"
+	mf, err := LoadQuantManifest(cfg)
+	if err != nil {
+		t.Fatalf("LoadQuantManifest: %v", err)
+	}
+	if mf.ModelName != "mdemg-llm-v1" {
+		t.Errorf("ModelName=%q, want mdemg-llm-v1", mf.ModelName)
+	}
+	// v1 has adapter (Sprint MODEL-DIST-002)
+	if mf.Adapter == nil {
+		t.Errorf("v1 manifest lost adapter — MODEL-DIST-002 contract broken")
+	}
+}
+
+// TestLoadQuantManifest_EmptyModelName_DefaultsToV1 is a backward-compat pin:
+// pre-Phase-C the v1 manifest was the only embedded artifact. An empty
+// ModelName (unusual — FromEnv defaults it — but test hygiene) must not
+// break.
+func TestLoadQuantManifest_EmptyModelName_DefaultsToV1(t *testing.T) {
+	cfg := makeCfg()
+	cfg.ModelName = ""
+	mf, err := LoadQuantManifest(cfg)
+	if err != nil {
+		t.Fatalf("LoadQuantManifest: %v", err)
+	}
+	if mf.ModelName != "mdemg-llm-v1" {
+		t.Errorf("empty ModelName ModelName=%q, want mdemg-llm-v1 (v1 fallback)", mf.ModelName)
+	}
+}
+
+// TestLoadQuantManifest_UnknownModelName_FallsBackToV1 pins the safety net:
+// an operator running a custom ModelName does not silently receive v2 SHAs
+// (which would false-mismatch on their custom blob). Fall back to v1.
+func TestLoadQuantManifest_UnknownModelName_FallsBackToV1(t *testing.T) {
+	cfg := makeCfg()
+	cfg.ModelName = "mdemg-llm-v99-custom"
+	mf, err := LoadQuantManifest(cfg)
+	if err != nil {
+		t.Fatalf("LoadQuantManifest: %v", err)
+	}
+	if mf.ModelName != "mdemg-llm-v1" {
+		t.Errorf("unknown ModelName ModelName=%q, want mdemg-llm-v1 (fallback)", mf.ModelName)
+	}
+}
+
+// TestSelectEmbeddedManifest_CaseInsensitive pins the dispatch predicate:
+// case variations of v2 all reach the v2 bytes.
+func TestSelectEmbeddedManifest_CaseInsensitive(t *testing.T) {
+	cases := []string{"mdemg-llm-v2", "MDEMG-LLM-V2", "Mdemg-Llm-V2", "  mdemg-llm-v2  "}
+	for _, name := range cases {
+		t.Run("name="+name, func(t *testing.T) {
+			data := selectEmbeddedManifest(name)
+			// Cheapest check: parse the manifest and assert ModelName
+			var mf QuantManifest
+			if err := json.Unmarshal(data, &mf); err != nil {
+				t.Fatalf("parse: %v", err)
+			}
+			if mf.ModelName != "mdemg-llm-v2" {
+				t.Errorf("dispatch failed for %q: got ModelName=%q", name, mf.ModelName)
+			}
+		})
+	}
+}
+
 func TestOllamaFetcher_BuildTag_FusedVsAdapter(t *testing.T) {
 	cfg := makeCfg()
 	f := NewOllamaFetcher(cfg)

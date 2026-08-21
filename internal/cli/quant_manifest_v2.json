@@ -1,0 +1,36 @@
+{
+  "$comment": "Runtime quant manifest for mdemg-llm-v2 (Qwen3.8-27B). Published to Ollama Library 2026-08-20 via HOMEBREW-INSTALLER-QWEN-UPDATE-001 Phase A. SHAs sourced from docs/development/homebrew-installer-qwen-update-001/publish_manifest_v2.json — MUST stay byte-identical (TestLoadQuantManifest_V2_SHAsMatchPhaseAPublishManifest asserts this). Adapter omitted: v2 ships raw base only per operator scope decision 2026-08-19. Wired via LoadQuantManifest dispatch in HOMEBREW-INSTALLER-QWEN-UPDATE-002 Phase C.",
+  "version": "1.0.0",
+  "model_name": "mdemg-llm-v2",
+  "namespace_default": "reh3376",
+  "build_date": "2026-08-20",
+  "quants": {
+    "Q4_K_M": {
+      "size_bytes": 16810714464,
+      "size_human": "15.7 GB",
+      "bpw": 4.87,
+      "min_ram_gb": 20,
+      "recommended_ram_gb": 24,
+      "sha256": "4aa8e8390ad217479a833e0992d3f1d95eafab4d17b7714a2855103cdef9e917",
+      "ollama_manifest_digest": "sha256:b12fe2d4519862838afdaf07e83ba3f1fbfb8edac3f9d80b86acb9e8a01eb754"
+    },
+    "Q5_K_M": {
+      "size_bytes": 19535701344,
+      "size_human": "18.2 GB",
+      "bpw": 5.69,
+      "min_ram_gb": 24,
+      "recommended_ram_gb": 32,
+      "sha256": "b8456d5d96b56b4d3c0e09173866b58bc17078448a17786cc93781c02653c7e0",
+      "ollama_manifest_digest": "sha256:fe85d6c2b8ed3f97e3e57779c246cd5cda9670a5a76e32ed97f5502d6a9bed36"
+    },
+    "Q8_0": {
+      "size_bytes": 29047084384,
+      "size_human": "27.1 GB",
+      "bpw": 8.5,
+      "min_ram_gb": 36,
+      "recommended_ram_gb": 48,
+      "sha256": "2bb22714289826d7b9e0ba376c3ce47d08bce39abe598745857c44d88c09bdbf",
+      "ollama_manifest_digest": "sha256:8f5fb6b71ea00052cbe8545738c55ce61112c4e571cb60ca4dad00b131766039"
+    }
+  }
+}

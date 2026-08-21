@@ -2229,12 +2229,17 @@ func FromEnv() (Config, error) {
 	// Sprint MODEL-DIST-001 — model distribution config (Configurability Contract).
 	// Defaults match the v1 production reality so `mdemg model pull` with no flags
 	// Just Works for the common case; every value is overridable via env or flag.
+	// v2 (Qwen3.8-27B) has larger memory footprint — RAM tier default routes through
+	// defaultRamTiersForModel below.
 	homeDir, _ := os.UserHomeDir()
 	modelBackend := get("MDEMG_MODEL_BACKEND", "ollama")
 	modelNamespace := get("MDEMG_MODEL_NAMESPACE", "reh3376")
 	modelName := get("MDEMG_MODEL_NAME", "mdemg-llm-v1")
 	modelQuants := get("MDEMG_MODEL_QUANTS", "Q4_K_M,Q5_K_M,Q8_0")
-	modelRamTiers := get("MDEMG_MODEL_RAM_TIERS", `{"<16":"Q4_K_M","<24":"Q5_K_M","default":"Q8_0"}`)
+	// RAM tier default is model-aware — v1 (14B) and v2 (27B) have different memory footprints.
+	// Operator override via MDEMG_MODEL_RAM_TIERS still wins.
+	// HOMEBREW-INSTALLER-QWEN-UPDATE-002 Phase C (2026-08-20).
+	modelRamTiers := get("MDEMG_MODEL_RAM_TIERS", defaultRamTiersForModel(modelName))
 	modelQuant := get("MDEMG_MODEL_QUANT", "auto")
 	adapterBase := get("MDEMG_ADAPTER_BASE", "qwen3:14b")
 	modelDir := get("MDEMG_MODEL_DIR", filepath.Join(homeDir, ".mdemg", "models"))

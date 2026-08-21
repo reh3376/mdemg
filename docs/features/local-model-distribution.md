@@ -1,8 +1,31 @@
 # Local Model Distribution
 
-**Sprint**: MODEL-DIST-001 (2026-05-11), MODEL-DIST-002 adapter path (2026-05-25)
-**Status**: Default-on for Apple Silicon. Fused-GGUF + adapter-only paths both shipped.
+**Sprint**: MODEL-DIST-001 (2026-05-11), MODEL-DIST-002 adapter path (2026-05-25), HOMEBREW-INSTALLER-QWEN-UPDATE-002 v2 dispatch (2026-08-20)
+**Status**: Default-on for Apple Silicon. Fused-GGUF + adapter-only paths both shipped. v1 + v2 both distributed.
 **Feature surface**: `mdemg model pull [--adapter] | list | verify | remove | where`
+
+## Model versions
+
+| Model | Base | Published | Adapter? | Default? | Notes |
+|---|---|---|---|---|---|
+| `mdemg-llm-v1` | Qwen3-14B (Phase 5 dense SFT) | 2026-05-11 | ✅ 257 MB LoRA (MODEL-DIST-002) | ✅ default | Production canonical; aggregate 0.9188 on augmented eval |
+| `mdemg-llm-v2` | Qwen3.8-27B (raw base, no adapter yet) | 2026-08-20 | ❌ (raw base only) | opt-in via `MDEMG_MODEL_NAME=mdemg-llm-v2` | Task #91 bake-off winner (0.9105 @ 180s vs v1 0.8047, +0.11 lift). See `docs/development/homebrew-installer-qwen-update-001/publish_manifest_v2.json` for definitive SHAs. |
+
+**Switching versions**: set `MDEMG_MODEL_NAME=mdemg-llm-v2` in `.env`, then `mdemg model pull --quant <tier>`. The SHA verify contract enforces the correct manifest per model (`LoadQuantManifest` dispatch — see below). RAM tier defaults auto-adjust for the model's memory footprint (v1 = 14B math, v2 = 27B math). To switch back to v1: reset `MDEMG_MODEL_NAME` (or unset — default is v1).
+
+### v2 quant tiers (Qwen3.8-27B, 2026-08-20)
+
+| Quant | On-disk size | Min RAM | Recommended RAM | Ollama tag |
+|---|---|---|---|---|
+| Q4_K_M | 15.7 GB | 20 GB | 24 GB | `reh3376/mdemg-llm-v2:Q4_K_M` |
+| Q5_K_M | 18.2 GB | 24 GB | 32 GB | `reh3376/mdemg-llm-v2:Q5_K_M` |
+| Q8_0 | 27.1 GB | 36 GB | 48 GB | `reh3376/mdemg-llm-v2:Q8_0` |
+
+RAM tier defaults for v2: `{"<32":"Q4_K_M","<48":"Q5_K_M","default":"Q8_0"}` (vs v1's `{"<16":"Q4_K_M","<24":"Q5_K_M","default":"Q8_0"}`). Operator override via `MDEMG_MODEL_RAM_TIERS` env still wins.
+
+**All 3 v2 tiers include the Qwen3.8 CLIP vision projector** (~931 MB shared blob; content-addressed dedup on Ollama's side means the projector is fetched once per operator regardless of how many tiers they pull). Multi-modal use of v2 requires `llama-server` compiled with vision support; text-only use works out of the box.
+
+**v2 caveat: Q4/Q5 are Q8→lower requantize, not native f16→Q4/Q5.** Reason: `convert_hf_to_gguf.py` (llama.cpp b6600 era, Sep 2025) is BROKEN for the Qwen3.5 arch (`Qwen3_5ForConditionalGeneration`) — omits `blk.64.attn_norm.weight`, every downstream quant crashes on first inference. Fallback used Ollama Library's own working Q8_0 blob as the source for Q5/Q4 requantize. Quality delta vs native f16→Q4/Q5 is small in practice (Q8 has enough dynamic range that the loss is minor). See `docs/development/homebrew-installer-qwen-update-001/PUBLISH_GUIDE.md` §Path 3d for the full recovery story; a re-publish from a fixed converter is planned as optional Phase D.
 
 ## Why
 
