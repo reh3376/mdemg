@@ -3,9 +3,12 @@
 **Purpose**: publish Qwen3.8-27B GGUF quants to `reh3376/mdemg-llm-v2:*` on Ollama Library so `mdemg model pull --name mdemg-llm-v2` works for beta testers and downstream operators.
 
 **Prerequisites**:
-- Ollama account with push access to the `reh3376/` namespace (same account used for `mdemg-llm-v1`).
-- Local Ollama installed + logged in: `ollama --version` succeeds; `ollama whoami` shows `reh3376`.
-- `llama.cpp` build with `llama-quantize` binary available (same tool used in MODEL-DIST-001's pipeline).
+- **Ollama ≥ 0.32.14** — earlier versions 412 on `ollama pull qwen3.8:27b-*` (registry requires newer schema for qwen3.8). Check with `ollama --version`. If skew shows (client 0.32.14 / server 0.32.4), the DAEMON needs restart:
+  - `.app`-installed (typical macOS): quit via menu bar → relaunch `/Applications/Ollama.app` (or `pkill -x ollama && open /Applications/Ollama.app`); verify `ollama --version` reports 0.32.14 for BOTH client and server.
+  - `install.sh`-installed: `curl -fsSL https://ollama.com/install.sh | sh` to update binary + restart daemon.
+  - `brew install --cask ollama-app --force` upgrades in-place and adopts under brew management (future: `brew upgrade --cask ollama-app`).
+- Ollama account with push access to the `reh3376/` namespace (same account used for `mdemg-llm-v1`); `ollama whoami` shows `reh3376`.
+- **`llama-quantize` binary** — installed via `brew install llama.cpp` → `/opt/homebrew/bin/llama-quantize`. Compiled binaries only; the Python `convert_hf_to_gguf.py` is NOT included (see Path 3b/3c).
 - Source model: Qwen3.8-27B base checkpoint — the winner of task #91 bake-off (0.9105 @ 180s on the 16-task UBENCH augmented eval; baseline v1 = 0.8047, +0.11 lift). Sourcing options are enumerated in Step 0.
 - Disk headroom: depends on Step 0 path (see per-path estimates).
 - Reliable upload bandwidth: 3 quants totalling ~63 GB will push to Ollama's CDN.
@@ -46,29 +49,63 @@ Disk headroom for Path 3a: ~28 GB (source blob) + ~63 GB (3 output quants) = **~
 
 ### Path 3b — MLX source (dequantize from your local `.local-models/qwen3.8-27b-mlx-4bit/`)
 
-⚠️ Your local MLX copy is **already 4-bit** (`config.json` shows `"quantization": {"bits": 4}`). Dequantizing to bf16 then requantizing to Q5/Q8 gives quant-of-quant — the Q8_0 output would be a high-bpw encoding of already-lossy 4-bit data, not true Q8 fidelity. Strictly worse than Path 3a. **Use only if Path 3a is unavailable.**
+⚠️ **BROKEN ON QWEN3.8-27B AS OF 2026-08-20 (arch `Qwen3_5ForConditionalGeneration` / `qwen35`)**: `llama.cpp`'s `convert_hf_to_gguf.py` (b6600-era shipped via brew Sep 2025) produces a GGUF file **missing critical tensors** — specifically `blk.64.attn_norm.weight` for the last transformer block. Any downstream `llama-quantize` output loads but errors on inference with `tensor '<name>' not found`. Root cause: the `qwen35` arch definition in `convert_hf_to_gguf.py` doesn't yet emit all required tensors for the multi-modal variant. **This blocks Paths 3b and 3c entirely** until llama.cpp lands an updated Qwen3.5 arch handler. **Use Path 3a instead** — Ollama Library's own Q8_0 blob works correctly (their converter is ahead).
+
+⚠️ Your local MLX copy is **already 4-bit** (`config.json` shows `"quantization": {"bits": 4}`). Dequantizing to bf16 then requantizing to Q5/Q8 gives quant-of-quant — the Q8_0 output would be a high-bpw encoding of already-lossy 4-bit data, not true Q8 fidelity. Strictly worse than Path 3a. **Use only if Path 3a is unavailable AND llama.cpp's Qwen3.5 converter is fixed.**
+
+Prerequisite: **`convert_hf_to_gguf.py`** — NOT shipped by brew's `llama.cpp` (compiled binaries only). Shallow-clone the source repo once:
+
+```bash
+# One-time setup (~500 MB)
+cd /Users/reh3376   # or any persistent dir
+git clone --depth 1 https://github.com/ggml-org/llama.cpp.git llama.cpp-src
+
+# Install convert deps into your existing neural venv (mlx_lm already there)
+# The venv uses uv; use `uv pip` from the neural dir. If pip isn't available:
+cd /Users/reh3376/mdemg/neural
+uv pip install 'protobuf>=4.21.0,<5.0.0'
+# The other deps (numpy, sentencepiece, transformers, gguf, torch) are already
+# installed by mlx_lm. Only protobuf is typically missing.
+```
+
+Then dequant + convert:
 
 ```bash
 cd /Users/reh3376/mdemg/.local-models/qwen3.8-27b-mlx-4bit
-mlx_lm.fuse --dequantize --model . --save-path /tmp/qwen3.8-27b-bf16
-# → ~55 GB bf16 safetensors
 
-python3 /path/to/llama.cpp/convert_hf_to_gguf.py \
+# NOTE: use mlx_lm.convert (pure dequant tool), NOT mlx_lm.fuse (LoRA merger).
+# mlx_lm.fuse defaults to searching for ./adapters/ and errors "adapter path
+# does not exist" — that tool is for merging LoRA adapters, not pure dequant.
+/Users/reh3376/mdemg/neural/.venv/bin/mlx_lm.convert \
+  -d \
+  --hf-path . \
+  --mlx-path /tmp/qwen3.8-27b-bf16 \
+  --dtype bfloat16
+# → ~55 GB bf16 safetensors (11 shards)
+
+/Users/reh3376/mdemg/neural/.venv/bin/python \
+  /Users/reh3376/llama.cpp-src/convert_hf_to_gguf.py \
   --outtype f16 \
   --outfile /tmp/qwen3.8-27b-f16.gguf \
   /tmp/qwen3.8-27b-bf16
-# → ~55 GB f16 GGUF
+# → ~54 GB f16 GGUF (~1 min wall-clock on M5)
 
 SRC=/tmp/qwen3.8-27b-f16.gguf
 ```
 
-Disk headroom for Path 3b: ~55 GB (bf16 intermediate) + ~55 GB (f16 GGUF) + ~63 GB (3 quants) = **~173 GB**.
+Disk headroom for Path 3b: ~55 GB (bf16 intermediate) + ~54 GB (f16 GGUF) + ~63 GB (3 quants) = **~172 GB**.
 
 ### Path 3c — HF-safetensors source (native bf16 from Qwen's release — best absolute quality)
 
-If you have access to Qwen3.8-27B's native bf16/fp16 safetensors (from Qwen's official release or a compatible mirror — not necessarily HuggingFace, e.g. Modelscope or Qwen's own storage), this gives true full-fidelity Q4/Q5/Q8. Use the same `convert_hf_to_gguf.py --outtype f16` command as Path 3b's second block, pointing at the safetensors directory. Skip the `mlx_lm.fuse` dequant step (safetensors already at full precision).
+⚠️ **BROKEN by the same `convert_hf_to_gguf.py` Qwen3.5 arch bug documented in Path 3b.** Even a pristine bf16 safetensors input produces a tensor-missing GGUF. Use Path 3a until llama.cpp fixes the qwen35 arch handler.
 
-Disk headroom: ~55 GB (safetensors) + ~55 GB (f16 GGUF) + ~63 GB (3 quants) = **~173 GB**.
+If you have access to Qwen3.8-27B's native bf16/fp16 safetensors (from Qwen's official release or a compatible mirror — not necessarily HuggingFace, e.g. Modelscope or Qwen's own storage), this gives true full-fidelity Q4/Q5/Q8 **once the converter is fixed**. Use the same `convert_hf_to_gguf.py --outtype f16` command as Path 3b's second block (including the one-time clone+deps setup), pointing at the safetensors directory. Skip the `mlx_lm.convert` dequant step (safetensors already at full precision).
+
+Disk headroom: ~55 GB (safetensors) + ~54 GB (f16 GGUF) + ~63 GB (3 quants) = **~172 GB**.
+
+### Path 3d — Recovery from broken convert pipeline (2026-08-20)
+
+If you attempted Path 3b or 3c and got a broken GGUF (symptom: `llama-server` boots successfully but every inference returns `tensor '<name>' not found`), the recovery is to fall through to Path 3a: pull `qwen3.8:27b-q8_0` from Ollama Library and use it as the source for Q4/Q5 requantization + `ollama cp` for Q8_0. This is what shipped for the 2026-08-20 v2 publish. See `publish_manifest_v2.json` for the SHAs captured at that publish.
 
 **Not-recommended paths** (documented for completeness):
 - **Path 1** — publish your existing `.local-models/qwen3.8-27b-gguf/Qwen3.8-27B-Q5_K_M.gguf` as `reh3376/mdemg-llm-v2:Q5_K_M` only (skip Q4 + Q8). Q5_K_M is production canonical per shipped docs; single-tier v2 unblocks E4 promote. But: no Q4 tier for RAM-constrained operators; no Q8 tier for high-fidelity operators.
@@ -78,26 +115,25 @@ Disk headroom: ~55 GB (safetensors) + ~55 GB (f16 GGUF) + ~63 GB (3 quants) = **
 
 `$SRC` is set by your Step 0 path choice:
 - Path 3a: `$SRC` is the Ollama Q8_0 blob (~28 GB, already GGUF)
-- Path 3b/3c: `$SRC` is the f16 GGUF you produced (~55 GB)
+- Path 3b/3c: `$SRC` is the f16 GGUF you produced (~54 GB)
 
-Run all 3 quantizations from the same `$SRC`:
+Brew's `llama.cpp` installs `llama-quantize` to `/opt/homebrew/bin/llama-quantize` — no `$LLAMA_QUANTIZE=` env var needed; `llama-quantize` resolves via PATH. Run all 3 quantizations from the same `$SRC`:
 
 ```bash
-LLAMA_QUANTIZE=/path/to/llama.cpp/build/bin/llama-quantize
 OUT=/tmp/qwen3.8-27b-quants
 mkdir -p $OUT
 
-$LLAMA_QUANTIZE $SRC $OUT/mdemg-llm-v2.Q4_K_M.gguf Q4_K_M
-$LLAMA_QUANTIZE $SRC $OUT/mdemg-llm-v2.Q5_K_M.gguf Q5_K_M
+llama-quantize $SRC $OUT/mdemg-llm-v2.Q4_K_M.gguf Q4_K_M   # ~10-15 min on M5, ~17 GB output
+llama-quantize $SRC $OUT/mdemg-llm-v2.Q5_K_M.gguf Q5_K_M   # ~10-15 min on M5, ~20 GB output
 
 # ⚠ Path 3a only: Q8_0 output is a copy of the source Q8_0 blob (no requantization needed).
 #   For Paths 3b/3c the Q8_0 output is a real quantization from f16.
-if [ "$SRC" = "$OLLAMA_MODELS/blobs/sha256-$DIGEST" ]; then
+if [ -n "$DIGEST" ] && [ "$SRC" = "$OLLAMA_MODELS/blobs/sha256-$DIGEST" ]; then
   # Path 3a — the source IS Q8_0; copy rather than requantize
   cp $SRC $OUT/mdemg-llm-v2.Q8_0.gguf
 else
-  # Paths 3b/3c — quantize f16 → Q8_0
-  $LLAMA_QUANTIZE $SRC $OUT/mdemg-llm-v2.Q8_0.gguf Q8_0
+  # Paths 3b/3c — quantize f16 → Q8_0 (~10-15 min on M5, ~28 GB output)
+  llama-quantize $SRC $OUT/mdemg-llm-v2.Q8_0.gguf Q8_0
 fi
 
 # Verify sizes (rough estimates — real values captured in Step 2)
@@ -121,47 +157,86 @@ Save `/tmp/mdemg-llm-v2-shas.txt` — Phase C sprint reads these to populate `qu
 
 ## Step 3 — Author the Modelfiles
 
-One Modelfile per quant. Template (adapt if the Qwen3.8 chat template differs from Qwen3-14B's — check the source model's `tokenizer_config.json` for the canonical Jinja template):
+**Path 3a (recommended) shortcut**: extract the reference Modelfile from the upstream Q8 tag and rewrite `FROM` per quant — this preserves Ollama's built-in Qwen3.8 renderer + Qwen3.5 parser + the CLIP vision projector (multi-modal). Do NOT hand-author a `<|im_start|>...` TEMPLATE block for qwen35 — Ollama's `RENDERER qwen3.8` handles the Jinja chat template natively and is required for correct tool-use + thinking-block handling.
 
-```dockerfile
-# Modelfile.Q5_K_M
-FROM ./mdemg-llm-v2.Q5_K_M.gguf
+```bash
+# Grab the working reference (must have already run `ollama pull qwen3.8:27b-q8_0` in Step 0)
+ollama show --modelfile qwen3.8:27b-q8_0 > /tmp/qwen3.8-ref.modelfile
 
-# Same template as mdemg-llm-v1 (Qwen3 chat template) — verify against the
-# source model's tokenizer_config.json chat_template field. If Qwen3.8 uses
-# a different template shape, replace this block.
-TEMPLATE """{{ if .System }}<|im_start|>system
-{{ .System }}<|im_end|>
-{{ end }}{{ if .Prompt }}<|im_start|>user
-{{ .Prompt }}<|im_end|>
-{{ end }}<|im_start|>assistant
-{{ .Response }}<|im_end|>
-"""
-
-PARAMETER stop "<|im_start|>"
-PARAMETER stop "<|im_end|>"
-PARAMETER num_ctx 32768
-
-# Optional metadata:
-LICENSE "Qwen — check upstream for exact terms"
+# Extract projector blob path (mediaType application/vnd.ollama.image.projector)
+# ollama show prints two FROM lines: the LLM blob + the projector blob (~931 MB CLIP)
+PROJECTOR=$(grep '^FROM ' /tmp/qwen3.8-ref.modelfile | sed -n '2p' | sed 's/^FROM //')
+echo "projector: $PROJECTOR"   # → /Users/<you>/.ollama/models/blobs/sha256-ac3714bfdd...
 ```
 
-Repeat for `Modelfile.Q4_K_M` (change FROM line to `./mdemg-llm-v2.Q4_K_M.gguf`) and `Modelfile.Q8_0`.
+Then create per-quant Modelfiles that reuse the shared projector blob (Q4/Q5 keep vision capability):
+
+```bash
+OUT=/tmp/qwen3.8-27b-quants   # from Step 1
+for q in Q4_K_M Q5_K_M; do
+  cat > $OUT/Modelfile.$q <<MODEOF
+FROM ./mdemg-llm-v2.$q.gguf
+FROM $PROJECTOR
+TEMPLATE {{ .Prompt }}
+RENDERER qwen3.8
+PARSER qwen3.5
+PARAMETER top_k 20
+PARAMETER top_p 0.95
+PARAMETER min_p 0
+PARAMETER presence_penalty 0
+PARAMETER repeat_penalty 1
+PARAMETER temperature 1
+MODEOF
+done
+```
+
+**Q8_0 shortcut**: if source blob IS Ollama's Q8_0 (Path 3a), skip `ollama create -f Modelfile.Q8_0` entirely and use `ollama cp` — content-addressed dedup makes this instant and byte-preserving:
+
+```bash
+ollama cp qwen3.8:27b-q8_0 reh3376/mdemg-llm-v2:Q8_0
+```
+
+For Paths 3b/3c (when the converter is fixed), also write `Modelfile.Q8_0` with the same shape, `FROM ./mdemg-llm-v2.Q8_0.gguf`.
+
+⚠️ **`RENDERER qwen3.8` + `PARSER qwen3.5` require Ollama ≥ 0.32.14** (registry+client contract for qwen3.8 arch). Older versions will fall back to a stub renderer and emit raw template tokens — sanity-check with `ollama run reh3376/mdemg-llm-v2:<Q> "reply with only ok"` before pushing (see Step 4a).
 
 ## Step 4 — Create + push each quant to Ollama Library
 
 ```bash
 cd $OUT
 
-for q in Q4_K_M Q5_K_M Q8_0; do
-  # Create the local Ollama model
+# Path 3a: create Q4/Q5 from local Modelfiles; Q8_0 via ollama cp (see Step 3)
+for q in Q4_K_M Q5_K_M; do
   ollama create reh3376/mdemg-llm-v2:$q -f Modelfile.$q
+done
+# ollama cp qwen3.8:27b-q8_0 reh3376/mdemg-llm-v2:Q8_0    # if not already done in Step 3
+```
 
-  # Push to Ollama Library (public)
+### Step 4a — MANDATORY local sanity check BEFORE push
+
+Every quant MUST pass a real inference before push — a tensor-missing GGUF (Path 3b/3c broken-convert class) will `ollama create` cleanly but crash on first token. **Push a broken tag and every consumer breaks + the tag has to be republished.** Fail-fast locally:
+
+```bash
+for q in Q4_K_M Q5_K_M Q8_0; do
+  echo "=== sanity $q ==="
+  ollama run reh3376/mdemg-llm-v2:$q "reply with only the word ok, nothing else"
+  # Expected: "ok" (possibly preceded by a <think>...</think> block — that's normal)
+  # FAIL SIGNATURES: "tensor '...' not found", model process exits, garbled template tokens
+done
+```
+
+If ANY quant fails, do NOT push it. Debug: check `ollama show <tag>` for FROM lines pointing at the right blob; regenerate the Modelfile per Step 3; if the underlying GGUF is broken (Path 3b/3c class), fall through to Path 3d recovery.
+
+### Step 4b — Push each quant
+
+```bash
+for q in Q4_K_M Q5_K_M Q8_0; do
   ollama push reh3376/mdemg-llm-v2:$q
   # → captures the Ollama manifest digest in the push output; save it
 done
 ```
+
+Push size × 3 tiers = ~63 GB total upload. Parallel pushes are supported but throttle by the daemon; sequential is usually simpler.
 
 **During push, capture the Ollama manifest digest** — the CLI prints something like:
 

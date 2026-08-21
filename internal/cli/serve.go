@@ -711,10 +711,12 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 
 	// Configure TLS if enabled
 	if cfg.TLSEnabled {
+		// PreferServerCipherSuites removed — deprecated + ignored since Go 1.18
+		// (the TLS 1.3 cipher suite selection is not configurable and TLS 1.2 uses
+		// the client's preference order by default).
 		tlsCfg := &tls.Config{
-			MinVersion:               tls.VersionTLS12,
-			CurvePreferences:         []tls.CurveID{tls.CurveP256, tls.X25519},
-			PreferServerCipherSuites: true,
+			MinVersion:       tls.VersionTLS12,
+			CurvePreferences: []tls.CurveID{tls.CurveP256, tls.X25519},
 			CipherSuites: []uint16{
 				tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
 				tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,

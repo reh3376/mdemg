@@ -1,0 +1,38 @@
+{
+  "version": "1.0",
+  "model_name": "mdemg-llm-v2",
+  "namespace_default": "reh3376",
+  "build_date": "2026-08-20",
+  "base_model_upstream": "qwen3.8:27b (Ollama Library)",
+  "publish_pipeline": "Option 2 (fallback): pulled upstream Q8_0, requantized to Q5/Q4 via llama-quantize, ollama cp of Q8_0",
+  "convert_pipeline_broken": "convert_hf_to_gguf.py from llama.cpp b6600-era produced broken GGUF for Qwen3_5 arch (missing blk.64.attn_norm.weight) \u2014 see PUBLISH_GUIDE.md Path 3d for recovery",
+  "quants": {
+    "Q4_K_M": {
+      "sha256": "4aa8e8390ad217479a833e0992d3f1d95eafab4d17b7714a2855103cdef9e917",
+      "size_bytes": 16810714464,
+      "size_human": "15.7 GB",
+      "ollama_model_layer_digest": "sha256:4aa8e8390ad217479a833e0992d3f1d95eafab4d17b7714a2855103cdef9e917",
+      "ollama_projector_layer_digest": "sha256:ac3714bfdddeca31351f2752bf1a63f266f4df87c0b68c895e44945ca704448e",
+      "ollama_manifest_digest": "sha256:b12fe2d4519862838afdaf07e83ba3f1fbfb8edac3f9d80b86acb9e8a01eb754",
+      "public_url": "https://ollama.com/reh3376/mdemg-llm-v2:Q4_K_M"
+    },
+    "Q5_K_M": {
+      "sha256": "b8456d5d96b56b4d3c0e09173866b58bc17078448a17786cc93781c02653c7e0",
+      "size_bytes": 19535701344,
+      "size_human": "18.2 GB",
+      "ollama_model_layer_digest": "sha256:b8456d5d96b56b4d3c0e09173866b58bc17078448a17786cc93781c02653c7e0",
+      "ollama_projector_layer_digest": "sha256:ac3714bfdddeca31351f2752bf1a63f266f4df87c0b68c895e44945ca704448e",
+      "ollama_manifest_digest": "sha256:fe85d6c2b8ed3f97e3e57779c246cd5cda9670a5a76e32ed97f5502d6a9bed36",
+      "public_url": "https://ollama.com/reh3376/mdemg-llm-v2:Q5_K_M"
+    },
+    "Q8_0": {
+      "sha256": "2bb22714289826d7b9e0ba376c3ce47d08bce39abe598745857c44d88c09bdbf",
+      "size_bytes": 29047084384,
+      "size_human": "27.1 GB",
+      "ollama_model_layer_digest": "sha256:2bb22714289826d7b9e0ba376c3ce47d08bce39abe598745857c44d88c09bdbf",
+      "ollama_projector_layer_digest": "sha256:ac3714bfdddeca31351f2752bf1a63f266f4df87c0b68c895e44945ca704448e",
+      "ollama_manifest_digest": "sha256:8f5fb6b71ea00052cbe8545738c55ce61112c4e571cb60ca4dad00b131766039",
+      "public_url": "https://ollama.com/reh3376/mdemg-llm-v2:Q8_0"
+    }
+  }
+}
