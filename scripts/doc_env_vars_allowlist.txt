@@ -87,3 +87,6 @@ REFERENCES_SYMBOL        # RQA-001 disclosed follow-up: hypothesized graph edge 
 # CONVERSATION-EMBEDDER-OPTIONAL-001: anti-pattern placeholders in prose ("if X != nil { CONSTRUCT_ALL } else { LOG_DISABLED }")
 CONSTRUCT_ALL
 LOG_DISABLED
+
+# HOMEBREW-INSTALLER-QWEN-UPDATE-002 Phase C: PUBLISH_GUIDE is the filename of the operator-runbook doc (PUBLISH_GUIDE.md), NOT an env var
+PUBLISH_GUIDE

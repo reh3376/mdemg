@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"sort"
 	"strconv"
@@ -96,6 +97,31 @@ type QuantRecord struct {
 //go:embed quant_manifest.json
 var embeddedQuantManifest []byte
 
+//go:embed quant_manifest_v2.json
+var embeddedQuantManifestV2 []byte
+
+// selectEmbeddedManifest returns the embedded manifest bytes for the given
+// model name. Unknown names fall back to v1 with a WARN log — preserves
+// pre-Phase-C behavior for operators running a custom ModelName without
+// silently dispatching v2 SHAs at them.
+//
+// Empty ModelName ("") is treated as v1 (backward-compat: pre-Phase-C the
+// v1 manifest was the only embedded artifact).
+//
+// HOMEBREW-INSTALLER-QWEN-UPDATE-002 Phase C (2026-08-20).
+func selectEmbeddedManifest(modelName string) []byte {
+	switch strings.ToLower(strings.TrimSpace(modelName)) {
+	case "mdemg-llm-v2":
+		return embeddedQuantManifestV2
+	case "", "mdemg-llm-v1":
+		return embeddedQuantManifest
+	default:
+		slog.Warn("LoadQuantManifest: unknown ModelName, using v1 manifest as fallback",
+			"model_name", modelName)
+		return embeddedQuantManifest
+	}
+}
+
 // manifestAppliesToRequest returns true when the loaded quant manifest's
 // ModelName matches the requested model — i.e. its SHAs are for the same
 // artifact class the operator is pulling. Returns false when they diverge
@@ -116,7 +142,9 @@ func manifestAppliesToRequest(manifestModelName, requestModelName string) bool {
 
 // LoadQuantManifest reads the runtime manifest. Order:
 //  1. cfg.ModelManifestPath (operator override; air-gapped deployments)
-//  2. embedded quant_manifest.json (canonical, sprint-built)
+//  2. embedded manifest dispatched on cfg.ModelName (mdemg-llm-v1 default;
+//     mdemg-llm-v2 via HOMEBREW-INSTALLER-QWEN-UPDATE-002 Phase C).
+//     Unknown names fall back to v1 with a WARN log — see selectEmbeddedManifest.
 func LoadQuantManifest(cfg config.Config) (*QuantManifest, error) {
 	var data []byte
 	if p := strings.TrimSpace(cfg.ModelManifestPath); p != "" {
@@ -126,7 +154,7 @@ func LoadQuantManifest(cfg config.Config) (*QuantManifest, error) {
 		}
 		data = b
 	} else {
-		data = embeddedQuantManifest
+		data = selectEmbeddedManifest(cfg.ModelName)
 	}
 	var m QuantManifest
 	if err := json.Unmarshal(data, &m); err != nil {
