@@ -13,7 +13,7 @@
 - **Version**: 1.0
 - **Author**: Claude (opus 4.7) + operator `reh3376`
 - **Date**: 2026-08-21
-- **Est. duration**: 1 focused session for planning + corpus assembly + kickoff (~1h); then multi-hour training in background (~2-6h wall-clock on M5 Max); then benchmark + verdict (~30-45 min).
+- **Est. duration**: 1 focused session for planning + corpus assembly + kickoff (~1h); then multi-hour training in background (~10-15h wall-clock on M5 Max at REDUCED scope — see §5 Epic 3 addendum 2026-08-21); then benchmark + verdict (~30-45 min).
 - **Category**: dev / model training + benchmark
 
 ## 2. Problem Statement
@@ -113,7 +113,22 @@ Run `mlx_lm.lora --config configs/sft_phase_e3_v1_base_v3.yaml` in background wi
 
 **Deliverable**: `adapters/phase_e3_v1_base_v3/` (LoRA safetensors + optimizer state + adapter_config.json).
 
-**Gate**: training terminates cleanly (either full 3,378 iters OR early-stopped); adapter safetensors exists + parses.
+**Gate**: training terminates cleanly (either full 3,376 iters OR early-stopped); adapter safetensors exists + parses.
+
+**Addendum 2026-08-21 — scope reduction after first-run extrapolation**:
+
+Original config (2 epochs × batch=4 × max_seq=8192 = 3,378 iters) was ratified based on a dry-run 2-iter measurement of 8s/iter. The first live training run showed real steady-state throughput of **0.011 It/sec = ~90s/iter** — 11× slower than the dry-run reading. Extrapolation: ~85 hours (3.5 days) wall-clock. Operator decision (2026-08-21 ~19:50): kill + reduce scope. New config:
+
+- `batch_size` 4 → **2** (halves activation memory + per-iter time)
+- `max_seq_length` 8192 → **4096** (halves KV cache + per-iter time; ⚠️ truncates rerank_cross prompts observed up to 5,899 tokens in Phase 11.5d — some (input, teacher) alignment lost on that task family)
+- `iters` 3,378 → **3,376** (1 epoch instead of 2 at the halved batch size = same forward-pass count per row)
+- 3-epoch hard cap (per FT-OAI-001) still enforced: 10,128 iters is the ceiling
+
+New est. wall-clock: **~10-15h** (~10-20s per iter based on halved memory pressure).
+
+The aborted first-run log is preserved at `train.aborted-8192-batch4.log` for forensic + lessons-learned reference. Verdict rubric in §Epic 5 already handles a possible aggregate dip from the max_seq truncation as a KNOWN trade-off — a small regression on rerank_cross specifically should be interpreted against the corpus-reduction hypothesis, not blamed on the retrain.
+
+**Learning pinned**: `mlx_lm.lora` dry-run reports on very-low iter counts (2 iters) measure warmup, not steady-state. For future compute-heavy sprints, either (a) run dry-run to ≥25 iters to see the reported `It/sec` stabilize, or (b) compute wall-clock from `Tokens/sec` × avg tokens/iter rather than trusting the low-iter It/sec.
 
 ### Epic 4 — Benchmark
 
