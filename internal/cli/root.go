@@ -157,6 +157,14 @@ Use "mdemg <command> --help" for more information about a command.`,
 	claudeDocsIngestCmd.GroupID = "memory"
 	rootCmd.AddCommand(claudeDocsIngestCmd)
 
+	// MDEMG-DOCS-INGEST-001: `mdemg mdemg-docs-ingest` — ingest MDEMG's own
+	// documentation (docs/features, docs/user, docs/api, CLAUDE.md, CLI help)
+	// into the mdemg-dev substrate. Direct execution of operator directive
+	// 2026-08-24 (substrate carries facts; adapter carries HOW-TO-USE-MDEMG).
+	mdemgDocsIngestCmd := newMdemgDocsIngestCmd()
+	mdemgDocsIngestCmd.GroupID = "memory"
+	rootCmd.AddCommand(mdemgDocsIngestCmd)
+
 	// INGEST-TOPOLOGY-REPAIR-001 Epic 3: `mdemg backfill-node-content` — one-time
 	// repair lifting the latest linked Observation.content to MemoryNode.content
 	// for legacy-ingest nodes never re-ingested after the E1 ingest fix landed.
