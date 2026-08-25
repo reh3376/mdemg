@@ -1,0 +1,92 @@
+# MDEMG-USAGE-LORA-001 — LoRA retrain on v1 base with 6-family corpus
+#
+# Sprint: docs/development/mdemg-usage-lora-001/sprint_plan.md
+# Corpus: training_data/sft/mdemg_usage_lora_001/  (7,702 train + 878 valid)
+#         (extends E3's 5-family corpus with mdemg_usage_v1 as the 6th family)
+# Base: mlx-community/Qwen3-14B-4bit (v1 base) — apples-to-apples with
+#       0.9188 v1 aggregate baseline (APE-REFLECT-EVAL-REFRESH-001, 2026-07-21).
+#
+# FT-OAI-001 rules honored:
+#   - Explicit iters (no auto): 7,702 = 2 epochs × (7,702 train / batch 2) = 3,851 × 2 = 7,702
+#   - 3-epoch hard cap: 11,553 iters — enforced via config not exceeded
+#   - Early-stop armed at val_loss > best × 1.05 for 2 consecutive evals
+#
+# PHASE-E3 arch rules honored:
+#   - Rule 1: wall-clock computed from Tokens/sec × tokens/iter, NOT dry-run It/sec
+#     E3 reported ~90 s/iter steady-state at these settings → conservative estimate
+#     7702 iters × 90 s/iter = 193h. Early-stop typically fires mid-run.
+#   - Rule 4: peak GPU memory ~30 GB at batch=2 × max_seq=4096 × 7-module rank=32
+#             (well under M5 Max 128 GB unified memory ceiling)
+#
+# CONFIG DIFFS vs sft_phase_e3_v1_base_v3.yaml:
+#   - `data:` → mdemg_usage_lora_001 (was e3_v1_base_v3)
+#   - `iters:` → 7702 (was 3376) — 2 epochs on larger corpus vs 1 epoch on smaller
+#   - `adapter_path:` → adapters/mdemg_usage_lora_001
+#   - Everything else IDENTICAL to E3
+#
+# ⚠️ TRADE-OFF (inherited from E3, NOT re-introduced by this sprint):
+#   max_seq 4096 truncates rerank_cross prompts observed up to 5,899 tokens in
+#   Phase 11.5d. Some (input, teacher-response) pairs in family_reasoning_think
+#   will lose alignment, potentially dragging aggregate on those tasks. If E4
+#   verdict is ❌ specifically on rerank_cross, iterate config with max_seq=8192
+#   (would need batch=1 → ~180 s/iter → 15 days wall-clock; NOT this sprint).
+
+# Base model — v1 base unchanged for apples-to-apples with 0.9188 baseline.
+model: ".local-models/qwen3-14b-4bit-base"
+
+train: true
+
+# Assembled 6-family corpus (Epic 1)
+data: "training_data/sft/mdemg_usage_lora_001"
+
+# LoRA params — match Phase 5 / Run 7 / FT-CLASSIFY-002 / E3 (7-module Option C)
+fine_tune_type: lora
+num_layers: 40
+lora_parameters:
+  rank: 32
+  scale: 2.0
+  dropout: 0.05
+  keys:
+    - "self_attn.q_proj"
+    - "self_attn.k_proj"
+    - "self_attn.v_proj"
+    - "self_attn.o_proj"
+    - "mlp.gate_proj"
+    - "mlp.up_proj"
+    - "mlp.down_proj"
+
+# Training schedule — REDUCED SCOPE inherited from E3 (batch=2, max_seq=4096)
+#   iters: 2 epochs × 3851 = 7702  (was E3: 1 epoch × 3376 = 3376)
+#   Wall-clock estimate:
+#     - At E3 early-run pace (~27 s/iter): 7702 × 27s ≈ 58h (~2.4 days)
+#     - At E3 steady-state pace (~90 s/iter): 7702 × 90s ≈ 193h (~8 days)
+#     - FT-OAI-001 early-stop typically fires 30-60% through run → 25-60h wall
+#   3-epoch hard cap (per FT-OAI-001): 11,553 iters — DO NOT exceed via CLI
+#
+#   Operator override options (via `mlx_lm.lora --iters N` CLI flag):
+#     - 1 epoch fast:  --iters 3851  (~15-30h wall-clock)
+#     - 2 epochs default: 7702       (~30-90h wall-clock)
+#     - 3 epochs deep: --iters 11553 (~45-135h wall-clock, near hard cap)
+batch_size: 2
+iters: 7702
+learning_rate: 1.0e-5
+max_seq_length: 4096
+seed: 0
+grad_checkpoint: true
+
+# Eval + checkpoint cadence
+# 19 eval points across 2 epochs (steps_per_eval 400 × 19 ≈ 7702). Doubled
+# from E3's 200 because doubling iters would 2x eval count for no additional
+# signal.
+steps_per_eval: 400
+val_batches: 20      # 20 × batch=2 = 40 valid rows per eval
+save_every: 400
+
+# Adapter output dir (E4 handoff artifact)
+adapter_path: "adapters/mdemg_usage_lora_001"
+
+# Reporting
+steps_per_report: 25
+
+# Optimizer
+optimizer: adamw
