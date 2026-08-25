@@ -1,0 +1,41 @@
+MDEMG-USAGE-CORPUS-CURATE-001 — Distribution Report
+Generated: 2026-08-25T00:33:18.151407+00:00
+Family: mdemg_usage_v1
+
+Total rows: 1198
+train.jsonl SHA-256: d271a825d384390dfe1d7bb6cacdca89d5b7dfb3bdc8f9e931b2404c89e2ff26
+
+Per-surface distribution:
+  features       830  ( 69.3%)
+  user_api       362  ( 30.2%)
+  cli-help         3  (  0.3%)
+  CLAUDE.md        3  (  0.3%)
+
+Top 20 path prefixes:
+  docs/api/api-spec                               160
+  mdemg-docs/user/api-reference                    51
+  mdemg-docs/user/cli-reference                    28
+  mdemg-docs/features/unified-cli                  24
+  mdemg-docs/features/j17-ai2ai-protocol           19
+  mdemg-docs/api/readme                            18
+  mdemg-docs/features/beta-share                   14
+  mdemg-docs/user/ingestion-guide                  13
+  mdemg-docs/features/teardown                     13
+  mdemg-docs/features/jiminy-actionability         13
+  mdemg-docs/features/jiminy-inner-voice           13
+  mdemg-docs/user/quickstart-docker                12
+  mdemg-docs/user/module-developer-tutorial        12
+  mdemg-docs/features/service-resilience           12
+  mdemg-docs/features/observability-dashboards     12
+  mdemg-docs/features/synergy-optimization         12
+  mdemg-docs/features/browser-ui                   11
+  mdemg-docs/features/context-fingerprinting       10
+  mdemg-docs/user/cms-rsic-guide                   10
+  mdemg-docs/features/j17-feedback-loop-closure    10
+
+Word-count histogram (per-row answer length):
+  0-49         169
+  50-99        348
+  100-249      297
+  250-499      232
+  500+         152
