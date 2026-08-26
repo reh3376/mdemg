@@ -256,6 +256,14 @@ Use "mdemg <command> --help" for more information about a command.`,
 	modelCmd.GroupID = "config"
 	rootCmd.AddCommand(modelCmd)
 
+	// ADAPTER-SWAP-STANDARDIZE-001: `mdemg adapter` — LoRA A/B benchmark helper
+	// (bench-serve + freeze + atomic benchmark). Orthogonal to `mdemg model swap`
+	// (production FUSED-GGUF llama-server); this operates on BENCH mlx_lm.server
+	// on an alt port (default 8103) so shipped llama-server on 8102 is untouched.
+	adapterCmd := newAdapterCmd()
+	adapterCmd.GroupID = "config"
+	rootCmd.AddCommand(adapterCmd)
+
 	menubarCmd := newMenubarCmd()
 	menubarCmd.GroupID = "config"
 	rootCmd.AddCommand(menubarCmd)
