@@ -102,8 +102,22 @@ func (s *Service) scorerVersion() string {
 			s.cfg.EdgeAttentionInfluences, s.cfg.EdgeAttentionDefinesSymbol,
 			s.cfg.EdgeAttentionThemeOf)
 	}
+	// RETRIEVAL-META-DOC-SUPPRESSION-001 (task #143): suppress config joins
+	// the namespace so flipping RETRIEVAL_SUPPRESS_PATHS or _FACTOR flushes
+	// stale scores for the affected paths.
+	suppress := "off"
+	if len(s.cfg.RetrievalSuppressPaths) > 0 {
+		sortedPaths := append([]string(nil), s.cfg.RetrievalSuppressPaths...)
+		sort.Strings(sortedPaths)
+		h := sha256.New()
+		for _, p := range sortedPaths {
+			h.Write([]byte(p))
+			h.Write([]byte{0}) // separator
+		}
+		suppress = fmt.Sprintf("on|f=%.3f|h=%x", s.cfg.RetrievalSuppressFactor, h.Sum(nil)[:6])
+	}
 	return fmt.Sprintf(
-		"v2-rrf5|e=%.3f|b=%.3f|g=%.3f|s=%.3f|c=%.3f|hops=%d|emb=%t|bm=%t|gr=%t|st=%t|ctx=%t|strict=%.3f|catmaps=%s|tge=%s",
+		"v2-rrf5|e=%.3f|b=%.3f|g=%.3f|s=%.3f|c=%.3f|hops=%d|emb=%t|bm=%t|gr=%t|st=%t|ctx=%t|strict=%.3f|catmaps=%s|tge=%s|sup=%s",
 		s.cfg.RetrievalColumnWeightEmbedding,
 		s.cfg.RetrievalColumnWeightBM25,
 		s.cfg.RetrievalColumnWeightGraph,
@@ -118,6 +132,7 @@ func (s *Service) scorerVersion() string {
 		s.cfg.RetrievalContextStrictThreshold,
 		s.categoryMapsHash(),
 		typedEdges,
+		suppress,
 	)
 }
 
@@ -663,6 +678,17 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 			"before", preFilterCount, "after", len(cands), "constraint", hints.TemporalIntent.Constraint.Description)
 	}
 
+	// RETRIEVAL-META-DOC-SUPPRESSION-001 (task #143): downweight fused scores
+	// for operator-specified meta-doc paths (e.g. CHANGELOG.md, CLAUDE.md,
+	// .goreleaser.yaml) that lexically match nearly every MDEMG-usage query
+	// via BM25 + short-content + repeated "MDEMG" term. Applied post-fusion
+	// pre-seed-extraction so suppressed candidates slide down the seed list.
+	// Default OFF (empty RetrievalSuppressPaths). Non-destructive; reversible
+	// via env unset.
+	if len(s.cfg.RetrievalSuppressPaths) > 0 {
+		cands = SuppressCandidatesByPath(cands, s.cfg.RetrievalSuppressPaths, s.cfg.RetrievalSuppressFactor)
+	}
+
 	if len(cands) == 0 {
 		return models.RetrieveResponse{SpaceID: req.SpaceID, Results: []models.RetrieveResult{}}, nil
 	}
@@ -1046,6 +1072,18 @@ func (s *Service) Retrieve(ctx context.Context, req models.RetrieveRequest) (mod
 		Enabled:  reverseRefPromoterEnabled,
 		MinSlots: s.cfg.RetrievalReverseRefQuotaMinSlots,
 	})
+
+	// RETRIEVAL-META-DOC-SUPPRESSION-001 (task #143): apply path suppression
+	// POST-RERANK so it actually affects the final response. Previous hook
+	// positions (pre-fusion + post-scoring) were no-ops because column-voting
+	// re-computes RRFScore and the LLM rerank rewrites Score wholesale. This
+	// hook runs after rerank, concrete-quota, reverse-ref quota — the last
+	// point where Score is authoritative — and before diversity filter +
+	// truncation, so suppressed nodes drop out of topK naturally. Non-
+	// destructive; reversible via env unset.
+	if len(s.cfg.RetrievalSuppressPaths) > 0 {
+		results = SuppressResultsByPath(results, s.cfg.RetrievalSuppressPaths, s.cfg.RetrievalSuppressFactor)
+	}
 
 	// RETRIEVAL-DIVERSITY-001: post-rerank near-duplicate suppression.
 	// Runs BEFORE the topK truncation so the filter can pick from a larger

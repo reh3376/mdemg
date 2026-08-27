@@ -788,6 +788,15 @@ type Config struct {
 	RetrievalConcreteRecallRoleTypes string  // RETRIEVAL_CONCRETE_RECALL_ROLE_TYPES — comma-separated role_types accepted as "concrete" (default: "leaf,constraint,correction,conversation_observation"; empty = any role_type under LAYER_MAX)
 	RetrievalConcreteQuotaEnabled    bool    // RETRIEVAL_CONCRETE_QUOTA_ENABLED — post-rerank layer-diversity quota (RETRIEVAL-LAYER-BALANCE-001 Epic 2, added after live smoke revealed the E1 pool-inclusion alone doesn't surface concrete candidates — RRF fusion + rerank push them below top-K). Reorders so the first N slots contain L0/L1 concretes when they exist. Composes with the diversity filter. Default false; operator flips after live smoke.
 	RetrievalConcreteQuotaMinSlots   int     // RETRIEVAL_CONCRETE_QUOTA_MIN_SLOTS — guaranteed number of L0/L1 slots in top-K (default: 1)
+	// RETRIEVAL-META-DOC-SUPPRESSION-001 (task #143) — narrow opt-in intervention
+	// downweighting fusion scores for operator-specified exact-match paths. Addresses
+	// MDEMG-DOCS-INGEST-001 ⚠️ verdict where 3 heavy-hub meta-doc nodes systematically
+	// over-scored on MDEMG-usage queries via BM25 + short-content + "MDEMG" term repetition.
+	// Applied post-fusion pre-seed-extraction in Service.Retrieve. Default OFF (empty).
+	// Reversible via env unset. Non-destructive to substrate — no graph mutation.
+	RetrievalSuppressPaths  []string // RETRIEVAL_SUPPRESS_PATHS — comma-sep exact-match node paths to downweight (default: empty)
+	RetrievalSuppressFactor float64  // RETRIEVAL_SUPPRESS_FACTOR — score multiplier for matched paths (default: 0.3; 0=drop score to 0 but keep in pool)
+
 	RetrievalReverseRefEnabled       bool    // RETRIEVAL_REVERSE_REF_ENABLED — filesystem-grep for reverse-lookup queries ("what consumes X?") (RETRIEVAL-REVERSE-LOOKUP-001). Extracts candidate symbols from queryText, greps the workspace, injects matching MemoryNodes into the RRF pool via the concrete-quota mechanism. Addresses RQA-001 cluster A. Default false; operator flips after live smoke.
 	RetrievalReverseRefWorkspaceRoot string  // RETRIEVAL_REVERSE_REF_WORKSPACE_ROOT — filesystem root to grep (default: MDEMG_WORKSPACE env, else current working directory). Empty disables reverse-ref.
 	RetrievalReverseRefTopK          int     // RETRIEVAL_REVERSE_REF_TOPK — max grep-matched files injected into the RRF pool (default: 15 — needs runway because many top hits are typically the WRITER/DEFINER files already in the primary pool; the actual CONSUMER files are ranked lower by hit-count)
@@ -3870,6 +3879,20 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	// RETRIEVAL-META-DOC-SUPPRESSION-001 (task #143): targeted per-path score suppression.
+	retrievalSuppressPathsRaw := get("RETRIEVAL_SUPPRESS_PATHS", "")
+	var retrievalSuppressPaths []string
+	for _, p := range strings.Split(retrievalSuppressPathsRaw, ",") {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			retrievalSuppressPaths = append(retrievalSuppressPaths, p)
+		}
+	}
+	retrievalSuppressFactor, err := atof("RETRIEVAL_SUPPRESS_FACTOR", 0.3)
+	if err != nil {
+		return Config{}, err
+	}
+
 	// RETRIEVAL-REVERSE-LOOKUP-001: filesystem-grep for reverse-lookup queries.
 	retrievalReverseRefEnabled := getBool("RETRIEVAL_REVERSE_REF_ENABLED", false)
 	retrievalReverseRefWorkspaceRoot := get("RETRIEVAL_REVERSE_REF_WORKSPACE_ROOT",
@@ -6494,6 +6517,9 @@ func FromEnv() (Config, error) {
 		RetrievalConcreteRecallRoleTypes: retrievalConcreteRecallRoleTypes,
 		RetrievalConcreteQuotaEnabled:    retrievalConcreteQuotaEnabled,
 		RetrievalConcreteQuotaMinSlots:   retrievalConcreteQuotaMinSlots,
+		RetrievalSuppressPaths:  retrievalSuppressPaths,
+		RetrievalSuppressFactor: retrievalSuppressFactor,
+
 		RetrievalReverseRefEnabled:       retrievalReverseRefEnabled,
 		RetrievalReverseRefWorkspaceRoot: retrievalReverseRefWorkspaceRoot,
 		RetrievalReverseRefTopK:          retrievalReverseRefTopK,

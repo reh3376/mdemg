@@ -1,0 +1,92 @@
+# PHASE-E3-RETRAIN-BENCHMARK-001 — LoRA retrain on v3-stripped corpus
+#
+# Sprint: docs/development/phase-e3-retrain-benchmark-001/sprint_plan.md
+# Corpus: training_data/sft/e3_v1_base_v3/  (6,753 train + 750 valid, leak-clean)
+# Base: mlx-community/Qwen3-14B-4bit (v1 base; unchanged from Phase 5) —
+#       benchmark result is apples-to-apples with 0.9188 v1 aggregate baseline
+#       (APE-REFLECT-EVAL-REFRESH-001, 2026-07-21).
+#
+# FT-OAI-001 rules honored:
+#   - Explicit iters (no auto): 3,378 = 2 epochs × (6,753 / batch 4) = 1,688.25 → 3,378
+#   - 3-epoch hard cap: 5,067 iters — enforced via config not exceeded
+#   - Early-stop armed at val_loss > best × 1.05 for 2 consecutive evals (mlx_lm.lora's
+#     shipped early-stop path, if enabled — else manual watcher; see sprint plan Epic 3)
+#
+# Config shape matches shipped Phase 5 / Run 7 / FT-CLASSIFY-002:
+#   - LoRA rank 32, scale 2.0, dropout 0.05
+#   - 7 modules: attn q/k/v/o + mlp gate/up/down
+#   - batch=4, LR=1e-5, seed=0, grad_checkpoint (avoids the mlx.checkpoint closure footgun)
+#   - max_seq_length 8192 (rerank_cross prompts observed up to 5,899 tokens per Phase 11.5d)
+#
+# MEMORY constraints honored:
+#   - No hardcoded values — every knob CLI-overridable
+#   - CUIDv2 for adapter IDs (mlx_lm.lora emits its own adapter_config.json)
+#   - No max_completion_tokens (this is training, not inference)
+
+# Base model — v1 base unchanged for apples-to-apples with 0.9188 baseline.
+# Points at the local copy (verified 2026-08-21) to skip an ~8 GB HF pull;
+# the local path IS mlx-community/Qwen3-14B-4bit (same digest).
+model: ".local-models/qwen3-14b-4bit-base"
+
+train: true
+
+# Assembled corpus (Epic 1)
+data: "training_data/sft/e3_v1_base_v3"
+
+# LoRA params — match Phase 5 / Run 7 / FT-CLASSIFY-002 (7-module Option C)
+fine_tune_type: lora
+num_layers: 40
+lora_parameters:
+  rank: 32
+  scale: 2.0
+  dropout: 0.05
+  keys:
+    - "self_attn.q_proj"
+    - "self_attn.k_proj"
+    - "self_attn.v_proj"
+    - "self_attn.o_proj"
+    - "mlp.gate_proj"
+    - "mlp.up_proj"
+    - "mlp.down_proj"
+
+# Training schedule — REDUCED SCOPE (retuned 2026-08-21 after first-run
+# extrapolation showed 85h wall-clock at 2-epoch × batch=4 × max_seq=8192).
+# Real steady-state at those settings: 0.011 It/sec = ~90s/iter, tokens/sec
+# ~130 stable. Dry-run's reported 8s/iter was warmup measurement, not
+# steady-state.
+#
+# Reduced scope (operator decision):
+#   - batch_size 4 → 2 (halves activation memory + halves per-iter time)
+#   - max_seq_length 8192 → 4096 (halves KV cache + halves per-iter time)
+#   - iters: 1 epoch = 6753 / batch=2 = 3376 (was 3378 at batch=4 × 2 epochs)
+# Est. wall-clock: ~10-15h at ~10-20s per iter (down from ~85h).
+# 3-epoch hard cap (per FT-OAI-001): 10,128 iters (never exceed via CLI override).
+#
+# ⚠️ TRADE-OFF: max_seq 4096 truncates rerank_cross prompts that were observed
+# up to 5,899 tokens in Phase 11.5d. Some (input, teacher-response) pairs in
+# family_reasoning_think + retrieval-adjacent rows will lose alignment,
+# potentially dragging the aggregate on those tasks. Documented so the
+# verdict rubric can interpret a partial regression correctly.
+batch_size: 2
+iters: 3376
+learning_rate: 1.0e-5
+max_seq_length: 4096
+seed: 0
+grad_checkpoint: true
+
+# Eval + checkpoint cadence
+# 17 eval points across the run (steps_per_eval 200 × 17 ≈ 3376). Retuned
+# alongside the compute-scope reduction. Eval overhead at max_seq=4096 +
+# batch=2 should be ~1-2 min per checkpoint (down from 3-4 min at 8192).
+steps_per_eval: 200
+val_batches: 20      # 20 × batch=2 = 40 valid rows per eval
+save_every: 400
+
+# Adapter output dir (E4 handoff artifact)
+adapter_path: "adapters/phase_e3_v1_base_v3"
+
+# Reporting
+steps_per_report: 25
+
+# Optimizer
+optimizer: adamw

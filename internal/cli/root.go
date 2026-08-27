@@ -157,6 +157,14 @@ Use "mdemg <command> --help" for more information about a command.`,
 	claudeDocsIngestCmd.GroupID = "memory"
 	rootCmd.AddCommand(claudeDocsIngestCmd)
 
+	// MDEMG-DOCS-INGEST-001: `mdemg mdemg-docs-ingest` — ingest MDEMG's own
+	// documentation (docs/features, docs/user, docs/api, CLAUDE.md, CLI help)
+	// into the mdemg-dev substrate. Direct execution of operator directive
+	// 2026-08-24 (substrate carries facts; adapter carries HOW-TO-USE-MDEMG).
+	mdemgDocsIngestCmd := newMdemgDocsIngestCmd()
+	mdemgDocsIngestCmd.GroupID = "memory"
+	rootCmd.AddCommand(mdemgDocsIngestCmd)
+
 	// INGEST-TOPOLOGY-REPAIR-001 Epic 3: `mdemg backfill-node-content` — one-time
 	// repair lifting the latest linked Observation.content to MemoryNode.content
 	// for legacy-ingest nodes never re-ingested after the E1 ingest fix landed.
@@ -247,6 +255,14 @@ Use "mdemg <command> --help" for more information about a command.`,
 	modelCmd := newModelCmd()
 	modelCmd.GroupID = "config"
 	rootCmd.AddCommand(modelCmd)
+
+	// ADAPTER-SWAP-STANDARDIZE-001: `mdemg adapter` — LoRA A/B benchmark helper
+	// (bench-serve + freeze + atomic benchmark). Orthogonal to `mdemg model swap`
+	// (production FUSED-GGUF llama-server); this operates on BENCH mlx_lm.server
+	// on an alt port (default 8103) so shipped llama-server on 8102 is untouched.
+	adapterCmd := newAdapterCmd()
+	adapterCmd.GroupID = "config"
+	rootCmd.AddCommand(adapterCmd)
 
 	menubarCmd := newMenubarCmd()
 	menubarCmd.GroupID = "config"

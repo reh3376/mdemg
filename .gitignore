@@ -45,9 +45,18 @@ training_data/sft/*
 !training_data/sft/family_reasoning_think/
 !training_data/sft/family_classify_notink/
 !training_data/sft/family_structured_notink/
+!training_data/sft/mdemg_usage_v1/
+!training_data/sft/mdemg_usage_lora_001/
 !training_data/sft/**/train.jsonl
 !training_data/sft/**/valid.jsonl
 !training_data/sft/**/manifest.json
+# Sprint MDEMG-USAGE-CORPUS-CURATE-001 — additional canonical artifacts
+!training_data/sft/mdemg_usage_v1/distribution_report.txt
+!training_data/sft/mdemg_usage_v1/leak_audit.json
+# Sprint MDEMG-USAGE-LORA-001 — split files for train/valid/benchmark holdout
+!training_data/sft/mdemg_usage_v1/train_split.jsonl
+!training_data/sft/mdemg_usage_v1/valid_split.jsonl
+!training_data/sft/mdemg_usage_v1/benchmark_holdout.jsonl
 !training_data/curated/
 training_data/curated/*
 !training_data/curated/sft_synth_v1/

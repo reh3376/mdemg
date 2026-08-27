@@ -1,0 +1,89 @@
+{
+  "sprint": "PHASE-E3-RETRAIN-BENCHMARK-001",
+  "epic": "1 (corpus assembly)",
+  "family_name": "e3_v1_base_v3",
+  "base_dataset_ver": "e3_v1_base_v3",
+  "meta_placement": "embedded",
+  "row_counts": {
+    "train": 6753,
+    "valid": 750
+  },
+  "per_family_train_counts": {
+    "tier1": 3150,
+    "family_reasoning_think": 1530,
+    "family_classify_notink": 1080,
+    "family_structured_notink": 540,
+    "claude_code_knowledge_v3_stripped": 453
+  },
+  "per_family_valid_counts": {
+    "tier1": 350,
+    "family_reasoning_think": 170,
+    "family_classify_notink": 120,
+    "family_structured_notink": 60,
+    "claude_code_knowledge_v3_stripped": 50
+  },
+  "file_sha256": {
+    "train.jsonl": "e9b114a2ab89c340b303e609e4ce8ece926b4227873f2bbe9923328c52ae1d13",
+    "valid.jsonl": "6775e5c6d8d3e7c11e0fa0e447d3c128822e50d8e0b547266039d2ed203a9e5a"
+  },
+  "sources": [
+    {
+      "family": "tier1",
+      "train_sha256": "d739a69c54da9f5de1a83d11181f84740b4817e044bd94ae0f60a87afb628aa6",
+      "train_rows": 3150,
+      "valid_sha256": "031d1c08b95d8efb2fb29d72de4dcf4954f86d5d4bec905f1895e3a28da003f6",
+      "valid_rows": 350,
+      "train_source": "training_data/sft/tier1/train.jsonl",
+      "valid_source": "training_data/sft/tier1/valid.jsonl"
+    },
+    {
+      "family": "family_reasoning_think",
+      "train_sha256": "c170fcd0f3b24f07771a9b9e99b939d9297f8be82041764e0e78e124165fefde",
+      "train_rows": 1530,
+      "valid_sha256": "f70748246b5d4d87831ac5a2cb3699c987aa72c3df485bb65281722c43a86f68",
+      "valid_rows": 170,
+      "train_source": "training_data/sft/family_reasoning_think/train.jsonl",
+      "valid_source": "training_data/sft/family_reasoning_think/valid.jsonl"
+    },
+    {
+      "family": "family_classify_notink",
+      "train_sha256": "8d0fa1fefbba2e35c1f78e31d636e63851d6361aff78e2b6d73b8d50a8475c5c",
+      "train_rows": 1080,
+      "valid_sha256": "9e2a02449ee340d6f2fec975f0052ebca9ff52e0b2c6cfdf6d374565c3041f3a",
+      "valid_rows": 120,
+      "train_source": "training_data/sft/family_classify_notink/train.jsonl",
+      "valid_source": "training_data/sft/family_classify_notink/valid.jsonl"
+    },
+    {
+      "family": "family_structured_notink",
+      "train_sha256": "5933678b92309c030646d0bdad33a022096b5e6c151ae598eb9277ef9972937e",
+      "train_rows": 540,
+      "valid_sha256": "a5a0534b1fdb9220e1439357ab92e6857b8d5f15d029e68c9dd7e28031b0f804",
+      "valid_rows": 60,
+      "train_source": "training_data/sft/family_structured_notink/train.jsonl",
+      "valid_source": "training_data/sft/family_structured_notink/valid.jsonl"
+    },
+    {
+      "family": "claude_code_knowledge_v3_stripped",
+      "source_sha256": "c4412be7a4cc4301c89ec91a73983a8c45cb792a66a65586f83c260dd8031527",
+      "source_rows": 503,
+      "split_holdout": 50,
+      "assembled_train_rows": 453,
+      "assembled_valid_rows": 50,
+      "source_path": "training_data/sft/claude_code_knowledge_v3_stripped/train.jsonl",
+      "note": "no valid.jsonl in source; last N rows of train held out deterministically"
+    }
+  ],
+  "assembly_ordering": [
+    "tier1",
+    "family_reasoning_think",
+    "family_classify_notink",
+    "family_structured_notink",
+    "claude_code_knowledge_v3_stripped"
+  ],
+  "v3_holdout": 50,
+  "byte_verbatim": true,
+  "base_model_name": "mlx-community/Qwen3-14B-4bit",
+  "leak_audit_required": "run scripts/audit_eval_leakage.py --eval training_data/eval/valid_clean.jsonl --against ./train.jsonl",
+  "generated_at_utc": "2026-08-21T22:23:56.156003+00:00"
+}

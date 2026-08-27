@@ -1,0 +1,99 @@
+{
+  "sprint": "MDEMG-USAGE-LORA-001",
+  "epic": "1b (6-family corpus assembly)",
+  "family_name": "mdemg_usage_lora_001",
+  "families_included": [
+    "tier1",
+    "family_reasoning_think",
+    "family_classify_notink",
+    "family_structured_notink",
+    "claude_code_knowledge_v3_stripped",
+    "mdemg_usage_v1"
+  ],
+  "row_counts": {
+    "train": 7702,
+    "valid": 878,
+    "total": 8580
+  },
+  "file_sha256": {
+    "train.jsonl": "8e4d4d761cf5b652e51d581b91e05594ab43c54596747d34f128e9563152fae9",
+    "valid.jsonl": "b8381f4ea7d6b0d6f22c391dc62294b0e8cde6bc504dbab08a33a100d3e4de25"
+  },
+  "per_family_train_counts": {
+    "tier1": 3150,
+    "family_reasoning_think": 1530,
+    "family_classify_notink": 1080,
+    "family_structured_notink": 540,
+    "claude_code_knowledge_v3_stripped": 453,
+    "mdemg_usage_v1": 949
+  },
+  "per_family_valid_counts": {
+    "tier1": 350,
+    "family_reasoning_think": 170,
+    "family_classify_notink": 120,
+    "family_structured_notink": 60,
+    "claude_code_knowledge_v3_stripped": 50,
+    "mdemg_usage_v1": 128
+  },
+  "source_records": [
+    {
+      "family": "tier1",
+      "train_sha256": "d739a69c54da9f5de1a83d11181f84740b4817e044bd94ae0f60a87afb628aa6",
+      "train_rows": 3150,
+      "valid_sha256": "031d1c08b95d8efb2fb29d72de4dcf4954f86d5d4bec905f1895e3a28da003f6",
+      "valid_rows": 350,
+      "train_source": "training_data/sft/tier1/train.jsonl",
+      "valid_source": "training_data/sft/tier1/valid.jsonl"
+    },
+    {
+      "family": "family_reasoning_think",
+      "train_sha256": "c170fcd0f3b24f07771a9b9e99b939d9297f8be82041764e0e78e124165fefde",
+      "train_rows": 1530,
+      "valid_sha256": "f70748246b5d4d87831ac5a2cb3699c987aa72c3df485bb65281722c43a86f68",
+      "valid_rows": 170,
+      "train_source": "training_data/sft/family_reasoning_think/train.jsonl",
+      "valid_source": "training_data/sft/family_reasoning_think/valid.jsonl"
+    },
+    {
+      "family": "family_classify_notink",
+      "train_sha256": "8d0fa1fefbba2e35c1f78e31d636e63851d6361aff78e2b6d73b8d50a8475c5c",
+      "train_rows": 1080,
+      "valid_sha256": "9e2a02449ee340d6f2fec975f0052ebca9ff52e0b2c6cfdf6d374565c3041f3a",
+      "valid_rows": 120,
+      "train_source": "training_data/sft/family_classify_notink/train.jsonl",
+      "valid_source": "training_data/sft/family_classify_notink/valid.jsonl"
+    },
+    {
+      "family": "family_structured_notink",
+      "train_sha256": "5933678b92309c030646d0bdad33a022096b5e6c151ae598eb9277ef9972937e",
+      "train_rows": 540,
+      "valid_sha256": "a5a0534b1fdb9220e1439357ab92e6857b8d5f15d029e68c9dd7e28031b0f804",
+      "valid_rows": 60,
+      "train_source": "training_data/sft/family_structured_notink/train.jsonl",
+      "valid_source": "training_data/sft/family_structured_notink/valid.jsonl"
+    },
+    {
+      "family": "claude_code_knowledge_v3_stripped",
+      "source_sha256": "c4412be7a4cc4301c89ec91a73983a8c45cb792a66a65586f83c260dd8031527",
+      "source_rows": 503,
+      "split_holdout": 50,
+      "assembled_train_rows": 453,
+      "assembled_valid_rows": 50,
+      "source_path": "training_data/sft/claude_code_knowledge_v3_stripped/train.jsonl",
+      "note": "no valid.jsonl in source; last N rows held out"
+    },
+    {
+      "family": "mdemg_usage_v1",
+      "train_sha256": "12cd738c836cda9f79f9dde8b6c890606b073e22e9c4c3c675a1e7d8e4ce4c46",
+      "train_rows": 949,
+      "valid_sha256": "10dd147cc6e6238f8f8f75b487f201350cd032eb8fea2a6e0eb3ed55c8a2b2b0",
+      "valid_rows": 128,
+      "train_source": "training_data/sft/mdemg_usage_v1/train_split.jsonl",
+      "valid_source": "training_data/sft/mdemg_usage_v1/valid_split.jsonl",
+      "note": "sprint=MDEMG-USAGE-CORPUS-CURATE-001 (task #144); split via split_mdemg_usage_v1.py (SHA(row_id) mod 10)"
+    }
+  ],
+  "base_model_name": "mlx-community/Qwen3-14B-4bit",
+  "trained_against_model_sha": null,
+  "generated_at_utc": "2026-08-25T00:55:13.253384+00:00"
+}

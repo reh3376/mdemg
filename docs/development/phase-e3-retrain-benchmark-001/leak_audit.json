@@ -1,0 +1,114 @@
+{
+  "eval_path": "training_data/eval/valid_clean.jsonl",
+  "sources": [
+    "training_data/sft/e3_v1_base_v3/train.jsonl"
+  ],
+  "tasks": {
+    "ape.reflect": {
+      "eval_count": 20,
+      "overlap_any": 0,
+      "per_source_overlap": {
+        "training_data/sft/e3_v1_base_v3/train.jsonl": 0
+      },
+      "overlap_examples": []
+    },
+    "claude.code_knowledge": {
+      "eval_count": 50,
+      "overlap_any": 0,
+      "per_source_overlap": {
+        "training_data/sft/e3_v1_base_v3/train.jsonl": 0
+      },
+      "overlap_examples": []
+    },
+    "consulting.classify": {
+      "eval_count": 20,
+      "overlap_any": 0,
+      "per_source_overlap": {
+        "training_data/sft/e3_v1_base_v3/train.jsonl": 0
+      },
+      "overlap_examples": []
+    },
+    "hidden.name_emergence": {
+      "eval_count": 20,
+      "overlap_any": 0,
+      "per_source_overlap": {
+        "training_data/sft/e3_v1_base_v3/train.jsonl": 0
+      },
+      "overlap_examples": []
+    },
+    "hidden.reclassify": {
+      "eval_count": 20,
+      "overlap_any": 0,
+      "per_source_overlap": {
+        "training_data/sft/e3_v1_base_v3/train.jsonl": 0
+      },
+      "overlap_examples": []
+    },
+    "hidden.summarize": {
+      "eval_count": 20,
+      "overlap_any": 0,
+      "per_source_overlap": {
+        "training_data/sft/e3_v1_base_v3/train.jsonl": 0
+      },
+      "overlap_examples": []
+    },
+    "jiminy.codegen": {
+      "eval_count": 20,
+      "overlap_any": 0,
+      "per_source_overlap": {
+        "training_data/sft/e3_v1_base_v3/train.jsonl": 0
+      },
+      "overlap_examples": []
+    },
+    "jiminy.evaluate": {
+      "eval_count": 20,
+      "overlap_any": 0,
+      "per_source_overlap": {
+        "training_data/sft/e3_v1_base_v3/train.jsonl": 0
+      },
+      "overlap_examples": []
+    },
+    "jiminy.evaluate_llm": {
+      "eval_count": 20,
+      "overlap_any": 0,
+      "per_source_overlap": {
+        "training_data/sft/e3_v1_base_v3/train.jsonl": 0
+      },
+      "overlap_examples": []
+    },
+    "jiminy.synthesize": {
+      "eval_count": 20,
+      "overlap_any": 0,
+      "per_source_overlap": {
+        "training_data/sft/e3_v1_base_v3/train.jsonl": 0
+      },
+      "overlap_examples": []
+    },
+    "retrieval.intent_translate": {
+      "eval_count": 20,
+      "overlap_any": 0,
+      "per_source_overlap": {
+        "training_data/sft/e3_v1_base_v3/train.jsonl": 0
+      },
+      "overlap_examples": []
+    },
+    "retrieval.query_classify": {
+      "eval_count": 20,
+      "overlap_any": 0,
+      "per_source_overlap": {
+        "training_data/sft/e3_v1_base_v3/train.jsonl": 0
+      },
+      "overlap_examples": []
+    },
+    "retrieval.rerank_cross": {
+      "eval_count": 20,
+      "overlap_any": 0,
+      "per_source_overlap": {
+        "training_data/sft/e3_v1_base_v3/train.jsonl": 0
+      },
+      "overlap_examples": []
+    }
+  },
+  "overlap_total": 0,
+  "eval_total": 290
+}
