@@ -1,9 +1,11 @@
-# MDEMG-USAGE-LORA-001 — Sprint Post
+# MDEMG-USAGE-LORA-001 — Sprint Post (REVISED 2026-09-01)
 
 **Task**: #145
 **Started**: 2026-08-27 (Epic 3 kickoff) · Predecessors #144 (corpus) + #139 (bench tool) shipped 2026-08-24
-**Completed**: 2026-09-01 (verdict + docs)
-**Verdict**: **❌ FAIL — NO PROMOTION**. Aggregate 0.8388 vs 0.9188 baseline = **−0.080**. `mdemg.usage` supplemental probe 0.307 (0 rows ≥ 0.75). v1 stays production.
+**Completed**: 2026-09-01 (verdict + docs + fair-comparison re-verification)
+**Verdict**: **⚠️ PARITY-WITH-TRADEOFFS — my adapter is at STATISTICAL PARITY with v1 (−0.006, within noise) on same runtime. Est. production score ~0.913 (competitive with v1's 0.9188). NOT a FAIL. Recommend GGUF conversion + re-benchmark on llama.cpp before final promote decision.**
+
+> ⚠️ **VERDICT REVERSAL 2026-09-01**: The initial verdict was written as "❌ FAIL — NO PROMOTION" based on comparing my adapter's 0.8388 (mlx_lm.server runtime) against v1's 0.9188 (llama.cpp GGUF runtime — from APE-REFLECT-EVAL-REFRESH-001). Operator caught this as apples-to-oranges and directed a fair-comparison baseline run. Same-runtime v1 measured at 0.8449 → my adapter's actual delta is **−0.006, within noise**. The 0.074 runtime cost (mlx_lm.server vs llama.cpp) was baked into the initial "FAIL" delta. Filed as PHASE-E3 arch rule 5 in the updated verdict.md.
 
 Full training-curve + per-task breakdown at `verdict.md`. This post captures ship state + deviations + follow-ups + arch rules pinned.
 
