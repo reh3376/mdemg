@@ -1,0 +1,22 @@
+{
+  "sprint": "MDEMG-USAGE-LORA-001",
+  "epic": "3 (LoRA training)",
+  "pid": 85448,
+  "started_at_utc": "2026-08-27T23:21:11Z",
+  "config": "configs/sft_mdemg_usage_lora_001.yaml",
+  "corpus_train_sha": "8e4d4d761cf5b652e51d581b91e05594ab43c54596747d34f128e9563152fae9",
+  "corpus_valid_sha": "b8381f4ea7d6b0d6f22c391dc62294b0e8cde6bc504dbab08a33a100d3e4de25",
+  "base_model": ".local-models/qwen3-14b-4bit-base",
+  "iters": 7702,
+  "batch_size": 2,
+  "max_seq_length": 4096,
+  "wall_clock_estimate": "30-90h if early-stop fires; 90-193h steady state",
+  "llama_server_quiesced": true,
+  "adapter_output_dir": "adapters/mdemg_usage_lora_001",
+  "operator_instructions": {
+    "monitor": "tail -f logs/mdemg_usage_lora_001_training.log",
+    "checkpoint_progress": "ls -la adapters/mdemg_usage_lora_001/*.safetensors",
+    "kill_if_needed": "kill 85448",
+    "restore_llama_server_after": "launchctl bootstrap gui/501 ~/Library/LaunchAgents/com.mdemg.llama-server.plist && launchctl kickstart -k gui/501/com.mdemg.llama-server"
+  }
+}
