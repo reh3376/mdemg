@@ -1,0 +1,1 @@
+1df8f48d5ad3b52c4b25a350d4fed38e0e544c9ef6442a59fc8b4c36e50d95ea  .local-models/qwen3-14b-mdemg-usage-fused.Q8_0.gguf
