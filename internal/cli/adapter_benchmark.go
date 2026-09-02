@@ -8,9 +8,12 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -21,6 +24,33 @@ const (
 	defaultBenchTimeoutSec = 3600
 	defaultBenchmarkConfig = "configs/benchmark_phase10.yaml"
 )
+
+// signalCleanupBenchmark receives a SIGTERM/SIGINT (or a channel-close
+// on normal shutdown), stops the bench-serve if it started, then closes
+// `done` and re-raises the signal so the process exits with the expected
+// signal-terminated status. If the channel closes (normal shutdown), the
+// goroutine exits silently. Extracted for testability
+// (ADAPTER-SWAP-STANDARDIZE-002 arch decision: signal delivery testing
+// in Go is fragile; test the cleanup function directly).
+func signalCleanupBenchmark(sigCh <-chan os.Signal, done chan<- struct{}, benchStarted *atomic.Bool, pidfilePath string, port int) {
+	sig, ok := <-sigCh
+	if !ok {
+		// Normal shutdown — defer closed the channel
+		close(done)
+		return
+	}
+	fmt.Fprintf(os.Stderr, "\n== received %s: stopping bench-serve (port=%d) before re-raising\n", sig, port)
+	if benchStarted.Load() {
+		_ = stopBenchServe(pidfilePath, port)
+	}
+	close(done)
+	// Re-raise the signal with default handler so the process exits
+	// with a signal-terminated status (equivalent to shell's 128+N).
+	if syscallSig, ok := sig.(syscall.Signal); ok {
+		signal.Reset(syscallSig)
+		_ = syscall.Kill(os.Getpid(), syscallSig)
+	}
+}
 
 func newAdapterBenchmarkCmd() *cobra.Command {
 	var (
@@ -102,12 +132,38 @@ Example:
 				}
 			}
 
+			// SIGTERM/SIGINT handler — Go's defer does NOT run on
+			// signal-based termination. Without this, wrapper kill
+			// (Bash tool 10-min ceiling, operator ^C, etc.) leaves a
+			// stale pidfile at ~/.mdemg/bench-serve-<port>.json that
+			// blocks the next `bench-serve` invocation until manually
+			// removed. Live-caught in MDEMG-USAGE-LORA-001 Epic 4
+			// (#145); fixed in ADAPTER-SWAP-STANDARDIZE-002 (#146).
+			//
+			// Contract: idempotent (stopBenchServe handles missing
+			// pidfile gracefully); benchStarted guard prevents cleanup
+			// firing before startBenchServe succeeds; signal is
+			// re-raised with default handler after cleanup so the
+			// process exits with the expected signal-terminated status.
+			sigCh := make(chan os.Signal, 1)
+			signal.Notify(sigCh, syscall.SIGTERM, syscall.SIGINT)
+			var benchStarted atomic.Bool
+			signalDone := make(chan struct{})
+			go signalCleanupBenchmark(sigCh, signalDone, &benchStarted, pidfilePath, port)
+			defer func() {
+				signal.Stop(sigCh)
+				close(sigCh)
+				<-signalDone
+			}()
+
 			fmt.Printf("== bench-serve start (port=%d, adapter=%s)\n", port, absAdapter)
 			if err := startBenchServe(pidfilePath, absAdapter, base, port, defaultBenchServeMaxTok, startupSec); err != nil {
 				return fmt.Errorf("bench-serve: %w", err)
 			}
+			benchStarted.Store(true)
 
-			// defer-cleanup: always stop bench-serve
+			// defer-cleanup: always stop bench-serve on normal return
+			// (signal-based termination is handled by the goroutine above)
 			defer func() {
 				fmt.Printf("== bench-serve stop (port=%d)\n", port)
 				_ = stopBenchServe(pidfilePath, port)

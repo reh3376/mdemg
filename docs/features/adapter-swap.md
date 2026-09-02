@@ -140,6 +140,7 @@ mdemg adapter benchmark \
 - `bench-serve --stop` is idempotent (no-op if pidfile absent)
 - `freeze --yes` captures pre-image backup before overwrite (reversible)
 - `benchmark` defer-cleanup ensures bench-serve always stops even on subprocess failure
+- **`benchmark` SIGTERM/SIGINT handler ensures bench-serve is stopped + pidfile removed even when the wrapper is signal-killed** — installed via `signal.Notify` at RunE entry; goroutine calls the same `stopBenchServe` path as `defer`, then re-raises the signal so the process exits with the expected signal-terminated status. Fixed in ADAPTER-SWAP-STANDARDIZE-002 (task #146) after MDEMG-USAGE-LORA-001 (#145) live-hit the "Bash tool 10-min ceiling → orphan pidfile" gap. Idempotent (stopBenchServe handles missing pidfile); guarded by `benchStarted` atomic bool so early SIGTERM before bench-serve starts is a clean no-op. Live-verified via real E3 adapter kick + SIGTERM at ~30s — port freed, pidfile removed, no orphans, prod 8102 untouched.
 - Port collision on bench-serve start → early fail (checks port free before spawn)
 - Pidfile collision on bench-serve start → early fail with fix hint (`--stop` first)
 
