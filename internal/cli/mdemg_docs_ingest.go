@@ -91,7 +91,14 @@ Architectural framing (operator directive 2026-08-24): the adapter's job is
 HOW-TO-USE-MDEMG; the substrate's job is FACT-CARRYING. This CLI makes MDEMG's
 own doc surface retrievable so shipped call sites (jiminy.synthesize,
 consulting.classify, etc.) can ground MDEMG-usage questions in the actual
-doc content instead of the LLM's cached general knowledge.`,
+doc content instead of the LLM's cached general knowledge.
+
+Directory exclusions (MDEMG-DOCS-INGEST-002, task #147): both the markdown
+walker and the CLI Go walker skip subtrees named .venv, __pycache__,
+node_modules, *.dist-info, *.egg-info — the operational classes that pollute
+the substrate if accidentally nested. Extend the deny set via env
+MDEMG_DOCS_INGEST_EXCLUDE_DIRS=name1,name2,... or disable the built-in list
+entirely with MDEMG_DOCS_INGEST_EXCLUDE_DIRS=-.`,
 		RunE: c.run,
 	}
 	cmd.Flags().StringVar(&c.opts.rootPath, "root", ".",
@@ -335,18 +342,87 @@ func splitMdemgDocsH2(body string) []struct{ Header, Body string } {
 	return out
 }
 
+// mdemgDocsDefaultExcludeDirs is the built-in deny-set of directory names
+// the doc-ingest walkers skip WHOLESALE (via fs.SkipDir on the subtree).
+// Sprint MDEMG-DOCS-INGEST-002 (task #147) added these so an accidentally-
+// nested Python virtualenv, bytecode cache, npm module tree, or Python
+// packaging metadata never lands as a MemoryNode in the substrate.
+//
+// Extend via `MDEMG_DOCS_INGEST_EXCLUDE_DIRS` (comma-separated). Set to
+// `-` to disable the built-in list entirely (advanced users only).
+var mdemgDocsDefaultExcludeDirs = []string{
+	".venv",
+	"__pycache__",
+	"node_modules",
+	"dist-info",
+	"egg-info",
+}
+
+// mdemgDocsExcludeDirSet resolves the effective exclusion set from the
+// built-in defaults + optional env override. Matches on the directory's
+// base name; suffix-match applies to `dist-info` / `egg-info` because
+// Python packaging emits `foo-1.2.3.dist-info` / `foo.egg-info` shapes.
+func mdemgDocsExcludeDirSet() map[string]struct{} {
+	set := make(map[string]struct{}, len(mdemgDocsDefaultExcludeDirs)+4)
+	seed := mdemgDocsDefaultExcludeDirs
+	if v := strings.TrimSpace(os.Getenv("MDEMG_DOCS_INGEST_EXCLUDE_DIRS")); v != "" {
+		if v == "-" {
+			seed = nil
+		} else {
+			seed = append(seed, strings.Split(v, ",")...)
+		}
+	}
+	for _, name := range seed {
+		if n := strings.TrimSpace(name); n != "" {
+			set[n] = struct{}{}
+		}
+	}
+	return set
+}
+
+// mdemgDocsShouldExcludeDir reports whether a directory name matches the
+// exclusion set (exact match) or ends in `dist-info` / `egg-info` (Python
+// packaging metadata dir suffix — `foo-1.2.3.dist-info`, `foo.egg-info`).
+func mdemgDocsShouldExcludeDir(name string, set map[string]struct{}) bool {
+	if _, hit := set[name]; hit {
+		return true
+	}
+	// Suffix match for the two Python-packaging patterns; only fires if the
+	// suffix is in the active set (so `MDEMG_DOCS_INGEST_EXCLUDE_DIRS=-`
+	// truly disables it).
+	if _, hit := set["dist-info"]; hit && strings.HasSuffix(name, ".dist-info") {
+		return true
+	}
+	if _, hit := set["egg-info"]; hit && strings.HasSuffix(name, ".egg-info") {
+		return true
+	}
+	return false
+}
+
 // collectMarkdownChunks walks a directory and produces one chunk per H2
 // section in each *.md file (with preamble captured if any).
+//
+// Skips subtrees whose directory name matches mdemgDocsExcludeDirSet
+// (built-in + MDEMG_DOCS_INGEST_EXCLUDE_DIRS env). Prevents accidental
+// ingest of nested venvs / bytecode caches / npm trees / Python packaging
+// metadata into the substrate — sprint MDEMG-DOCS-INGEST-002 (task #147).
 func collectMarkdownChunks(surface, dir, root string) ([]mdemgDocsChunk, error) {
 	var out []mdemgDocsChunk
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		return nil, nil // silently skip if a surface dir doesn't exist
 	}
+	excludes := mdemgDocsExcludeDirSet()
 	err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
 		}
 		if d.IsDir() {
+			// Never skip the root walker dir itself, even if its name
+			// somehow matches — an operator pointing --root or a surface
+			// dir directly at an excluded name still gets scanned.
+			if path != dir && mdemgDocsShouldExcludeDir(d.Name(), excludes) {
+				return fs.SkipDir
+			}
 			return nil
 		}
 		if !strings.HasSuffix(strings.ToLower(d.Name()), ".md") {
@@ -409,14 +485,22 @@ func collectClaudeMdChunks(path, root string) ([]mdemgDocsChunk, error) {
 
 // collectCliLongChunks extracts cobra command Long: strings from Go source
 // via AST. One chunk per (file, Long value) pair. Skips empty Longs.
+//
+// Honors mdemgDocsExcludeDirSet for symmetry with the markdown walker —
+// same defensive envelope against accidental nested venv/vendor/etc trees
+// (task #147).
 func collectCliLongChunks(cliDir, root string) ([]mdemgDocsChunk, error) {
 	var out []mdemgDocsChunk
 	fset := token.NewFileSet()
+	excludes := mdemgDocsExcludeDirSet()
 	err := filepath.WalkDir(cliDir, func(path string, d fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
 		}
 		if d.IsDir() {
+			if path != cliDir && mdemgDocsShouldExcludeDir(d.Name(), excludes) {
+				return fs.SkipDir
+			}
 			return nil
 		}
 		name := d.Name()

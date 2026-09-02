@@ -260,7 +260,182 @@ func TestPathSlug_MdemgDocs(t *testing.T) {
 	}
 }
 
+// Sprint MDEMG-DOCS-INGEST-002 (task #147) — exclusion tests for the
+// filesystem walkers. Ensures the built-in deny-set + env override
+// keep venv / bytecode-cache / node_modules / Python-packaging trees
+// out of the substrate.
+
+func TestMdemgDocsShouldExcludeDir_BuiltinSet(t *testing.T) {
+	set := map[string]struct{}{
+		".venv":        {},
+		"__pycache__":  {},
+		"node_modules": {},
+		"dist-info":    {},
+		"egg-info":     {},
+	}
+	// Exact matches
+	for _, name := range []string{".venv", "__pycache__", "node_modules"} {
+		if !mdemgDocsShouldExcludeDir(name, set) {
+			t.Errorf("expected %q excluded", name)
+		}
+	}
+	// Suffix matches (Python packaging shapes)
+	for _, name := range []string{"mdemg-1.2.3.dist-info", "cuid2.egg-info"} {
+		if !mdemgDocsShouldExcludeDir(name, set) {
+			t.Errorf("expected %q excluded via suffix rule", name)
+		}
+	}
+	// Non-matches
+	for _, name := range []string{"docs", "features", "internal", "cli", ".git", "node_modules_backup"} {
+		if mdemgDocsShouldExcludeDir(name, set) {
+			t.Errorf("expected %q NOT excluded", name)
+		}
+	}
+}
+
+func TestMdemgDocsShouldExcludeDir_EmptySetDisables(t *testing.T) {
+	empty := map[string]struct{}{}
+	for _, name := range []string{".venv", "__pycache__", "node_modules", "mdemg-1.2.3.dist-info"} {
+		if mdemgDocsShouldExcludeDir(name, empty) {
+			t.Errorf("expected %q NOT excluded when set is empty (disables suffix rules too)", name)
+		}
+	}
+}
+
+func TestMdemgDocsExcludeDirSet_EnvOverride(t *testing.T) {
+	// Extend built-in with custom entries
+	t.Setenv("MDEMG_DOCS_INGEST_EXCLUDE_DIRS", "vendor,tmp")
+	set := mdemgDocsExcludeDirSet()
+	for _, want := range []string{".venv", "__pycache__", "node_modules", "dist-info", "egg-info", "vendor", "tmp"} {
+		if _, ok := set[want]; !ok {
+			t.Errorf("expected exclusion set to contain %q, got keys: %v", want, keysOf(set))
+		}
+	}
+}
+
+func TestMdemgDocsExcludeDirSet_EnvDashDisablesBuiltin(t *testing.T) {
+	t.Setenv("MDEMG_DOCS_INGEST_EXCLUDE_DIRS", "-")
+	set := mdemgDocsExcludeDirSet()
+	if len(set) != 0 {
+		t.Errorf("expected empty set on '-', got %v", keysOf(set))
+	}
+}
+
+// TestCollectMarkdownChunks_SkipsExcludedSubtree writes a synthetic doc
+// tree that includes a .venv subtree carrying a real README.md, and
+// verifies the walker never returns any chunk sourced from that subtree.
+func TestCollectMarkdownChunks_SkipsExcludedSubtree(t *testing.T) {
+	root := t.TempDir()
+	docsDir := filepath.Join(root, "docs", "features")
+	if err := os.MkdirAll(docsDir, 0o755); err != nil {
+		t.Fatalf("mkdir docs: %v", err)
+	}
+
+	// Legit doc
+	legit := filepath.Join(docsDir, "real-feature.md")
+	if err := os.WriteFile(legit, []byte("# Real Feature\n\nBody.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Junk under nested .venv — must be skipped
+	venvDocs := filepath.Join(docsDir, "some-project", ".venv", "lib", "site-packages", "somepkg")
+	if err := os.MkdirAll(venvDocs, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	junk := filepath.Join(venvDocs, "README.md")
+	if err := os.WriteFile(junk, []byte("# Junk from venv\n\nBody.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Also drop a __pycache__ tree and a node_modules tree — same expectation
+	pyc := filepath.Join(docsDir, "__pycache__")
+	if err := os.MkdirAll(pyc, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	_ = os.WriteFile(filepath.Join(pyc, "cached.md"), []byte("# Junk from pycache\n"), 0o644)
+
+	nm := filepath.Join(docsDir, "app", "node_modules", "left-pad")
+	if err := os.MkdirAll(nm, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	_ = os.WriteFile(filepath.Join(nm, "README.md"), []byte("# Junk from npm\n"), 0o644)
+
+	// dist-info / egg-info suffix cases
+	dinfo := filepath.Join(docsDir, "app", "mdemg-1.0.0.dist-info")
+	_ = os.MkdirAll(dinfo, 0o755)
+	_ = os.WriteFile(filepath.Join(dinfo, "METADATA.md"), []byte("# Junk from dist-info\n"), 0o644)
+
+	einfo := filepath.Join(docsDir, "app", "cuid2.egg-info")
+	_ = os.MkdirAll(einfo, 0o755)
+	_ = os.WriteFile(filepath.Join(einfo, "PKG-INFO.md"), []byte("# Junk from egg-info\n"), 0o644)
+
+	chunks, err := collectMarkdownChunks("features", docsDir, root)
+	if err != nil {
+		t.Fatalf("collect: %v", err)
+	}
+
+	// Must have exactly the legit chunk (+ preamble split not applicable to single-H1 body → 1 whole-file chunk)
+	if len(chunks) == 0 {
+		t.Fatalf("expected at least the legit chunk, got 0")
+	}
+	for _, ch := range chunks {
+		lower := strings.ToLower(ch.SourceFile)
+		for _, banned := range []string{".venv", "__pycache__", "node_modules", ".dist-info", ".egg-info"} {
+			if strings.Contains(lower, banned) {
+				t.Errorf("chunk from excluded subtree leaked: source=%s header=%s", ch.SourceFile, ch.SectionHeader)
+			}
+		}
+	}
+	// At least one chunk must come from the real file
+	sawLegit := false
+	for _, ch := range chunks {
+		if strings.HasSuffix(ch.SourceFile, "real-feature.md") {
+			sawLegit = true
+		}
+	}
+	if !sawLegit {
+		t.Errorf("legit real-feature.md chunk missing from %d chunks", len(chunks))
+	}
+}
+
+// TestCollectMarkdownChunks_EnvOverrideDisablesBuiltin verifies that
+// setting MDEMG_DOCS_INGEST_EXCLUDE_DIRS=- fully disables the exclusion
+// (so junk under .venv WOULD be ingested — the operator-directed escape
+// hatch for advanced use).
+func TestCollectMarkdownChunks_EnvOverrideDisablesBuiltin(t *testing.T) {
+	t.Setenv("MDEMG_DOCS_INGEST_EXCLUDE_DIRS", "-")
+	root := t.TempDir()
+	docsDir := filepath.Join(root, "docs", "features")
+	venvDocs := filepath.Join(docsDir, ".venv", "lib")
+	if err := os.MkdirAll(venvDocs, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	_ = os.WriteFile(filepath.Join(venvDocs, "leak.md"), []byte("# Leaked\n\nBody.\n"), 0o644)
+
+	chunks, err := collectMarkdownChunks("features", docsDir, root)
+	if err != nil {
+		t.Fatalf("collect: %v", err)
+	}
+	sawLeak := false
+	for _, ch := range chunks {
+		if strings.Contains(ch.SourceFile, ".venv") {
+			sawLeak = true
+		}
+	}
+	if !sawLeak {
+		t.Errorf("with MDEMG_DOCS_INGEST_EXCLUDE_DIRS=-, expected .venv leak; got %d chunks", len(chunks))
+	}
+}
+
 // helpers
+
+func keysOf(m map[string]struct{}) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	return out
+}
 
 func headersOf(chunks []mdemgDocsChunk) []string {
 	out := make([]string, len(chunks))
