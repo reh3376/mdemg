@@ -1,0 +1,8 @@
+fffaf280929ab533468d332cbe71d4eeb5769df504c8d71ad447dca65a39e237  .local-models/qwen3-14b-mdemg-usage-fused/model-00001-of-00006.safetensors
+8802502349400c3262f405dfdbbc0b7d71305765ee0b1daf5b042e6ab6699ee9  .local-models/qwen3-14b-mdemg-usage-fused/model-00002-of-00006.safetensors
+af9a975e01db6b9472652968134b7dace40c17ced0f4577c6f85b7e09063f37e  .local-models/qwen3-14b-mdemg-usage-fused/model-00003-of-00006.safetensors
+237af6f936c4435182fbf53a1a6b5be9a9a76a7719c5acaf25dc53315036a8ff  .local-models/qwen3-14b-mdemg-usage-fused/model-00004-of-00006.safetensors
+b11ec9a612205cb206fa00723ed5d8f07bea79ecd2e76ea821aa3f4bbf9f5616  .local-models/qwen3-14b-mdemg-usage-fused/model-00005-of-00006.safetensors
+6620cf9060142cd4446ffa764ff00e51bccfd692d538c66bea8df327bf977f3a  .local-models/qwen3-14b-mdemg-usage-fused/model-00006-of-00006.safetensors
+06023757c4b84a9fef8d46b846f67d098f84cadea8dbe4d82b7f4701b60735d0  .local-models/qwen3-14b-mdemg-usage-fused.f16.gguf
+77d0d0aa2b74ab104a00b9e3b8cdba8fa7abec0a7974d8b0ae2c8fc4502b12b7  .local-models/qwen3-14b-mdemg-usage-fused.Q5_K_M.gguf
