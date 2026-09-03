@@ -48,9 +48,25 @@ NAV_HEADER_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Sprint MDEMG-USAGE-CORPUS-CURATE-002 (task #148) — required prefix.
+# The upstream exporter (`mdemg_usage_export_docs.py`) enforces the same
+# prefix in its query WHERE clause; this curator-side gate is defense-in-
+# depth against a hand-edited raw JSONL or a future exporter regression.
+MDEMG_DOCS_PATH_PREFIX = "mdemg-docs/"
+
 JUNK_PATH_PATTERNS = [
     re.compile(r"mdemg-docs/features/template/", re.IGNORECASE),
 ]
+
+
+def is_valid_mdemg_docs_path(path: str) -> bool:
+    """Reject any path that doesn't start with the mdemg-docs prefix.
+
+    Task #148 — enforces prefix even when the raw JSONL has been hand-edited
+    or produced by a pre-#148 exporter. Empty path → False; wrong prefix
+    (e.g. `claude-docs/...`, `/docs/features/...`, `.venv/**/*.py`) → False.
+    """
+    return bool(path) and path.startswith(MDEMG_DOCS_PATH_PREFIX)
 
 # Question template variants — picked deterministically by row_index % N so
 # distribution is even without RNG-driven nondeterminism.
@@ -122,6 +138,11 @@ def build_qa_row(node_row: dict, template_idx: int) -> dict | None:
 
     if not header or not content or not node_id:
         return None
+    if not is_valid_mdemg_docs_path(path):
+        # Task #148 — reject rows whose path doesn't have the mdemg-docs/
+        # prefix. Defense-in-depth against a pre-fix raw JSONL or a future
+        # exporter regression.
+        return None
     if is_nav_header(header):
         return None
     if is_junk_path(path):
@@ -191,6 +212,9 @@ def curate(
                     skip_reasons["no_header"] = skip_reasons.get("no_header", 0) + 1
                 elif not content:
                     skip_reasons["no_content"] = skip_reasons.get("no_content", 0) + 1
+                elif not is_valid_mdemg_docs_path(path):
+                    # Task #148 — track prefix-gate rejects for reporting.
+                    skip_reasons["wrong_prefix"] = skip_reasons.get("wrong_prefix", 0) + 1
                 elif is_nav_header(header):
                     skip_reasons["nav_header"] = skip_reasons.get("nav_header", 0) + 1
                 elif is_junk_path(path):

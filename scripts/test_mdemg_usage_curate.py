@@ -14,12 +14,17 @@ from pathlib import Path
 # Add scripts/ to sys.path so we can import the pipeline modules
 sys.path.insert(0, str(Path(__file__).parent))
 
-from mdemg_usage_export_docs import classify_surface, sha256_str  # noqa: E402
+from mdemg_usage_export_docs import (  # noqa: E402
+    classify_surface,
+    sha256_str,
+    build_query,
+)
 from mdemg_usage_curate import (  # noqa: E402
     build_qa_row,
     derive_feature_name,
     is_junk_path,
     is_nav_header,
+    is_valid_mdemg_docs_path,
     word_count,
 )
 from mdemg_usage_leak_audit import overlap, tri_grams  # noqa: E402
@@ -39,13 +44,24 @@ def check(name: str, ok: bool, detail: str = "") -> None:
 
 
 def test_classify_surface() -> None:
+    """Task #148: classify_surface anchors to mdemg-docs/ prefix."""
     print("test_classify_surface:")
-    check("features prefix", classify_surface("/docs/features/foo") == "features")
-    check("user prefix", classify_surface("/docs/user/foo") == "user_api")
-    check("api prefix", classify_surface("/docs/api/foo") == "user_api")
-    check("cli-reference", classify_surface("claude-docs/cli-reference/foo") == "cli-help")
-    check("CLAUDE.md", classify_surface("/CLAUDE.md") == "CLAUDE.md")
-    check("unmatched", classify_surface("/random/path") is None)
+    # Positive: mdemg-docs/-anchored paths for each sub-surface
+    check("mdemg-docs features", classify_surface("mdemg-docs/features/beta-share/000__whole-file") == "features")
+    check("mdemg-docs user", classify_surface("mdemg-docs/user/multi-instance/000__whole-file") == "user_api")
+    check("mdemg-docs api", classify_surface("mdemg-docs/api/inventory/000__whole-file") == "user_api")
+    check("mdemg-docs cli-help", classify_surface("mdemg-docs/cli-help/adapter/000__cli-adapter") == "cli-help")
+    check("mdemg-docs claude", classify_surface("mdemg-docs/claude/architecture-notes/000__whole-file") == "CLAUDE.md")
+
+    # Task #148 negative: no-prefix, wrong-prefix, and leak-class paths must all reject
+    check("legacy /docs/features rejected", classify_surface("/docs/features/foo") is None)
+    check("legacy /docs/user rejected", classify_surface("/docs/user/foo") is None)
+    check("legacy /docs/api rejected", classify_surface("/docs/api/foo") is None)
+    check("legacy /CLAUDE.md rejected", classify_surface("/CLAUDE.md") is None)
+    check("legacy claude-docs/ rejected", classify_surface("claude-docs/cli-reference/foo") is None)
+    check("venv symbol leak rejected", classify_surface("/docs/api/api-spec/uats/.venv/lib/python3.12/site-packages/urllib3/exceptions.py#EmptyPoolError") is None)
+    check("empty path", classify_surface("") is None)
+    check("random path", classify_surface("/random/path") is None)
 
 
 def test_derive_feature_name() -> None:
@@ -107,6 +123,53 @@ def test_build_qa_row() -> None:
     check("empty content → None", build_qa_row({**node, "content": ""}, 0) is None)
     check("junk path → None", build_qa_row({**node, "path": "mdemg-docs/features/template/skeleton"}, 0) is None)
     check("nav header → None", build_qa_row({**node, "section_header": "See also"}, 0) is None)
+    # Task #148 — path prefix rejection
+    check(
+        "claude-docs/ path rejected",
+        build_qa_row({**node, "path": "claude-docs/cli-reference/settings/000__whole-file"}, 0) is None,
+    )
+    check(
+        "/docs/api absolute-slash path rejected",
+        build_qa_row({**node, "path": "/docs/api/inventory/foo"}, 0) is None,
+    )
+    check(
+        "venv leak path rejected",
+        build_qa_row({**node, "path": "/docs/api/api-spec/uats/.venv/lib/python3.12/site-packages/urllib3/exceptions.py#EmptyPoolError"}, 0) is None,
+    )
+    check(
+        "empty path rejected",
+        build_qa_row({**node, "path": ""}, 0) is None,
+    )
+
+
+def test_is_valid_mdemg_docs_path() -> None:
+    """Task #148: prefix predicate itself."""
+    print("test_is_valid_mdemg_docs_path:")
+    check("prefix positive features", is_valid_mdemg_docs_path("mdemg-docs/features/foo/000__bar"))
+    check("prefix positive user", is_valid_mdemg_docs_path("mdemg-docs/user/foo/000__bar"))
+    check("prefix positive api", is_valid_mdemg_docs_path("mdemg-docs/api/foo/000__bar"))
+    check("prefix positive claude", is_valid_mdemg_docs_path("mdemg-docs/claude/foo/000__bar"))
+    check("prefix positive cli-help", is_valid_mdemg_docs_path("mdemg-docs/cli-help/foo/000__bar"))
+    check("wrong prefix claude-docs", not is_valid_mdemg_docs_path("claude-docs/cli-reference/foo"))
+    check("wrong prefix /docs", not is_valid_mdemg_docs_path("/docs/features/foo"))
+    check("wrong prefix venv-symbol", not is_valid_mdemg_docs_path("/docs/api/api-spec/uats/.venv/lib/foo.py#Bar"))
+    check("empty path", not is_valid_mdemg_docs_path(""))
+    check("mdemg-docs without slash", not is_valid_mdemg_docs_path("mdemg-docs"))
+    # Edge: mdemg-docsX substring should NOT match (exact prefix rule)
+    check("mdemg-docs-fake NOT matched (exact prefix)", not is_valid_mdemg_docs_path("mdemg-docs-fake/features/foo"))
+
+
+def test_build_query_starts_with_prefix() -> None:
+    """Task #148: exporter query anchors WHERE clause to mdemg-docs/ prefix."""
+    print("test_build_query_starts_with_prefix:")
+    q = build_query()
+    check("query contains STARTS WITH", "STARTS WITH" in q, detail=q)
+    check("query contains mdemg-docs/", "mdemg-docs/" in q, detail=q)
+    # Regression guard: the pre-#148 loose predicate must be gone
+    check("query does NOT use loose CONTAINS 'docs/features'", "CONTAINS 'docs/features'" not in q)
+    check("query does NOT use CONTAINS 'docs/api'", "CONTAINS 'docs/api'" not in q)
+    check("query still excludes archived", "is_archived, false" in q)
+    check("query still requires non-empty content", "n.content <> ''" in q)
 
 
 def test_leak_audit_overlap() -> None:
@@ -133,6 +196,8 @@ def main() -> int:
     test_is_junk_path()
     test_word_count_and_sha()
     test_build_qa_row()
+    test_is_valid_mdemg_docs_path()
+    test_build_query_starts_with_prefix()
     test_leak_audit_overlap()
 
     print(f"\n{len(PASSES)} passed, {len(FAILS)} failed")
