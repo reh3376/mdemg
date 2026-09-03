@@ -2,14 +2,20 @@
 """MDEMG-USAGE-CORPUS-CURATE-001 Epic 1 — export ingested MDEMG doc nodes.
 
 Reads MemoryNode rows from the `mdemg-dev` Neo4j space and emits one JSONL row
-per ingested doc surface: docs/features/*, docs/user/*, docs/api/*, CLAUDE.md,
-claude-docs/cli-reference/* (the 5 surfaces ingested by MDEMG-DOCS-INGEST-001).
+per ingested doc section under `mdemg-docs/{features,user,api,claude,cli-help}/`
+(the 5 surfaces ingested by MDEMG-DOCS-INGEST-001).
+
+⚠️ Sprint MDEMG-USAGE-CORPUS-CURATE-002 (task #148) tightened the query WHERE
+clause + `classify_surface` to REQUIRE the `mdemg-docs/` prefix. Prior loose
+`CONTAINS 'docs/features'` predicate leaked 504 vendored Python-symbol rows +
+13 claude-docs rows into the raw export. The prefix is anchored to what
+`mdemg mdemg-docs-ingest` actually writes; nothing else survives.
 
 Output row shape (see docs/development/mdemg-usage-corpus-curate-001/sprint_plan.md §5 Epic 1):
 
     {
       "node_id": "<CUIDv2>",
-      "path": "/docs/features/...",
+      "path": "mdemg-docs/features/...",
       "surface": "features|user_api|cli-help|CLAUDE.md",
       "section_header": "How it works",  // optional; may be None
       "content": "...",
@@ -36,24 +42,49 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
+# Sprint MDEMG-USAGE-CORPUS-CURATE-002 (task #148) — prefix-anchored surface
+# classification. The shipped `mdemg mdemg-docs-ingest` CLI writes paths of the
+# shape `mdemg-docs/{surface}/{file_slug}/{NNN}__{header_slug}` where
+# {surface} ∈ {features, user, api, claude, cli-help}. Requiring this exact
+# prefix at BOTH the query WHERE clause (root cause) and the classify_surface
+# function (defense-in-depth) prevents pollution from:
+#   - vendored Python symbols like `/docs/api/api-spec/uats/.venv/**/*.py#Symbol`
+#     (504 rows in the 2026-08-24 snapshot)
+#   - claude-docs corpus rows (13 rows in the same snapshot; ingested by
+#     claude-docs-ingest with the `claude-docs/` prefix — a different corpus)
+#   - stray `CLAUDE.md` symbol nodes from the code-symbol ingester
+# The old broad `CONTAINS 'docs/features'` predicate matched any of those.
+MDEMG_DOCS_PATH_PREFIX = "mdemg-docs/"
+
+
 @dataclass(frozen=True)
 class SurfaceRule:
     name: str
-    contains: str
+    # Prefix relative to MDEMG_DOCS_PATH_PREFIX (i.e. the sub-surface segment).
+    subprefix: str
 
 
 SURFACES: tuple[SurfaceRule, ...] = (
-    SurfaceRule("features", "docs/features"),
-    SurfaceRule("user_api", "docs/user"),
-    SurfaceRule("user_api", "docs/api"),
-    SurfaceRule("cli-help", "cli-reference"),
-    SurfaceRule("CLAUDE.md", "CLAUDE.md"),
+    SurfaceRule("features", "features/"),
+    SurfaceRule("user_api", "user/"),
+    SurfaceRule("user_api", "api/"),
+    SurfaceRule("cli-help", "cli-help/"),
+    SurfaceRule("CLAUDE.md", "claude/"),
 )
 
 
 def classify_surface(path: str) -> str | None:
+    """Classify a path into one of the 5 mdemg-docs surfaces.
+
+    Requires the `mdemg-docs/` prefix (task #148). Returns None for any path
+    that doesn't carry the prefix OR whose sub-surface doesn't match any
+    known rule.
+    """
+    if not path or not path.startswith(MDEMG_DOCS_PATH_PREFIX):
+        return None
+    tail = path[len(MDEMG_DOCS_PATH_PREFIX):]
     for rule in SURFACES:
-        if rule.contains in path:
+        if tail.startswith(rule.subprefix):
             return rule.name
     return None
 
@@ -63,20 +94,22 @@ def sha256_str(s: str) -> str:
 
 
 def build_query() -> str:
-    # Union across the 5 surface predicates. WHERE clause matches
-    # SURFACES's `contains` strings exactly.
-    predicates = " OR ".join(
-        [
-            "n.path CONTAINS 'docs/features'",
-            "n.path CONTAINS 'docs/user'",
-            "n.path CONTAINS 'docs/api'",
-            "n.path CONTAINS 'cli-reference'",
-            "n.path CONTAINS 'CLAUDE.md'",
-        ]
-    )
+    # Sprint MDEMG-USAGE-CORPUS-CURATE-002 (task #148) — root-cause fix.
+    # The pre-#148 predicate was 5× `n.path CONTAINS '<sub>'` which matched
+    # ANY node whose path had those substrings ANYWHERE. On the 2026-08-24
+    # snapshot this pulled 504 non-mdemg-docs rows into the raw export
+    # (vendored Python symbol nodes like `/docs/api/api-spec/uats/.venv/lib/
+    # python3.12/site-packages/urllib3/exceptions.py#EmptyPoolError`) plus
+    # 13 claude-docs rows from a DIFFERENT ingest pipeline.
+    #
+    # Fix: `STARTS WITH 'mdemg-docs/'` anchors the predicate to the exact
+    # prefix `mdemg mdemg-docs-ingest` writes; nothing else can match.
+    # Defense-in-depth mirror: `classify_surface()` also gates on the
+    # prefix + subprefix — both layers together prevent regression.
     return (
         "MATCH (n:MemoryNode {space_id: $space_id}) "
-        f"WHERE n.path IS NOT NULL AND ({predicates}) "
+        "WHERE n.path IS NOT NULL "
+        f"AND n.path STARTS WITH '{MDEMG_DOCS_PATH_PREFIX}' "
         "AND coalesce(n.is_archived, false) = false "
         "AND n.content IS NOT NULL AND n.content <> '' "
         "RETURN n.node_id AS node_id, n.path AS path, n.name AS section_header, n.content AS content "
