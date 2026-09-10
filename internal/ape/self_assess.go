@@ -844,6 +844,13 @@ func (a *Assessor) applyHonestFollowRate(ctx context.Context, spaceID string, st
 	if rate, n, err := a.datasetProvider.GuidanceEffectiveness(ctx, spaceID, window); err == nil && n > 0 {
 		stats.FollowRate = rate
 	}
+	// JIMINY-METRIC-PARTITION-001 (task #158): populate per-class follow-rate
+	// fields on the stats result. Empty map (dormant classes, no data in
+	// window) → all four class rates read as 0/0 samples, which the emitter
+	// publishes as 0 gauge value (safe idle-state).
+	if byClass, err := a.datasetProvider.GuidanceEffectivenessByClass(ctx, spaceID, window); err == nil {
+		stats.FollowRateByClass = byClass
+	}
 }
 
 // publishGuidanceMetrics publishes Jiminy guidance telemetry to Prometheus gauges.
@@ -851,6 +858,22 @@ func (a *Assessor) publishGuidanceMetrics(spaceID string, stats JiminyStatsResul
 	m := metrics.Metrics()
 
 	m.JiminyFollowRate(spaceID).Set(stats.FollowRate)
+	// JIMINY-METRIC-PARTITION-001 (task #158): per-class honest follow rate.
+	// Empty map (dormant classes, no data) → all 4 gauges publish 0 — the
+	// safe idle state (per TSDB-CONSUME-001 idle-safe contract).
+	for _, class := range []string{"classifier", "process", "hybrid", "human"} {
+		rate := stats.FollowRateByClass[class].Rate
+		switch class {
+		case "classifier":
+			m.JiminyFollowRateClassifierVerifiable(spaceID).Set(rate)
+		case "process":
+			m.JiminyFollowRateProcessVerifiable(spaceID).Set(rate)
+		case "hybrid":
+			m.JiminyFollowRateHybrid(spaceID).Set(rate)
+		case "human":
+			m.JiminyFollowRateHuman(spaceID).Set(rate)
+		}
+	}
 	// jiminy_constraint_effectiveness retired METRICS-DEPRECATE-JIMINY-CONSTRAINT-EFF-001 (2026-08-10).
 	m.JiminySourceDiversity(spaceID).Set(stats.SourceDiversity)
 	m.JiminyTotalIssued(spaceID).Set(float64(stats.TotalGuidanceIssued))

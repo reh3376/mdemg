@@ -468,6 +468,14 @@ type JiminyStatsResult struct {
 	ConstraintEffRate      float64 `json:"constraint_effectiveness_rate"`
 	ConstraintDataAvail    bool    `json:"constraint_data_available"`
 	SourceDiversity        float64 `json:"source_diversity"`
+
+	// FollowRateByClass is the per-verifiability-class follow rate windowed
+	// over the RSICGuidanceEffectivenessWindowHours. Keys: 'classifier' |
+	// 'process' | 'hybrid' | 'human'. Nil map ↔ dataset provider unavailable
+	// or window empty; empty entries per class ↔ zero samples in window for
+	// that class. Emitted as 4 per-class gauges by publishGuidanceMetrics.
+	// JIMINY-METRIC-PARTITION-001 (task #158).
+	FollowRateByClass map[string]tsdb.GuidanceClassRate `json:"follow_rate_by_class,omitempty"`
 }
 
 // ProtocolStatsProvider exposes J17 protocol metrics for RSIC assessment.

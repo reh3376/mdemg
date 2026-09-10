@@ -25,6 +25,12 @@ type ConstraintOutcomeRow struct {
 	// ClassifierSource: tier1|llm|heuristic|explicit (JIMINY-OUTCOME-002) —
 	// distinguishes real verdicts from the heuristic-fallback artifact class.
 	ClassifierSource string
+	// VerifiabilityClass: classifier|process|hybrid|human (JIMINY-METRIC-
+	// PARTITION-001, task #158). Tags rows by the verifiability class of
+	// the source rule so per-class metric gauges can partition follow-rate
+	// honestly. Empty defaults to 'classifier' at the TSDB layer (V0035
+	// default value).
+	VerifiabilityClass string
 }
 
 // ConstraintOutcomesWriter buffers constraint outcome events and flushes them
@@ -72,18 +78,22 @@ func (w *ConstraintOutcomesWriter) flushLoop() {
 
 // RecordOutcome implements jiminy.OutcomeWriter by converting and buffering the record.
 // This avoids an import cycle between jiminy and tsdb packages.
-func (w *ConstraintOutcomesWriter) RecordOutcome(spaceID, constraintID, constraintCode, guidanceID, sessionID, outcomeType, guidanceType, instanceID, classifierSource string, similarity float64) {
+//
+// verifiabilityClass tags the row per JIMINY-METRIC-PARTITION-001; empty
+// defaults to 'classifier' at the TSDB layer (V0035 default).
+func (w *ConstraintOutcomesWriter) RecordOutcome(spaceID, constraintID, constraintCode, guidanceID, sessionID, outcomeType, guidanceType, instanceID, classifierSource, verifiabilityClass string, similarity float64) {
 	w.Record(ConstraintOutcomeRow{
-		SpaceID:          spaceID,
-		ConstraintID:     constraintID,
-		ConstraintCode:   constraintCode,
-		GuidanceID:       guidanceID,
-		SessionID:        sessionID,
-		OutcomeType:      outcomeType,
-		Similarity:       similarity,
-		GuidanceType:     guidanceType,
-		InstanceID:       instanceID,
-		ClassifierSource: classifierSource,
+		SpaceID:            spaceID,
+		ConstraintID:       constraintID,
+		ConstraintCode:     constraintCode,
+		GuidanceID:         guidanceID,
+		SessionID:          sessionID,
+		OutcomeType:        outcomeType,
+		Similarity:         similarity,
+		GuidanceType:       guidanceType,
+		InstanceID:         instanceID,
+		ClassifierSource:   classifierSource,
+		VerifiabilityClass: verifiabilityClass,
 	})
 }
 
@@ -110,11 +120,19 @@ func (w *ConstraintOutcomesWriter) Flush(ctx context.Context) error {
 
 	rows := make([][]any, len(batch))
 	for i, r := range batch {
+		// JIMINY-METRIC-PARTITION-001: empty VerifiabilityClass defaults to
+		// 'classifier' — matches the V0035 column DEFAULT. Kept explicit here
+		// so a future CopyFrom column reorder can't silently swap defaults.
+		vc := r.VerifiabilityClass
+		if vc == "" {
+			vc = "classifier"
+		}
 		rows[i] = []any{
 			r.Time, r.SpaceID, r.ConstraintID, r.ConstraintCode,
 			r.GuidanceID, r.SessionID, r.OutcomeType,
 			r.Similarity, r.GuidanceType, r.InstanceID,
 			r.ClassifierSource,
+			vc,
 		}
 	}
 
@@ -125,6 +143,7 @@ func (w *ConstraintOutcomesWriter) Flush(ctx context.Context) error {
 			"guidance_id", "session_id", "outcome_type",
 			"similarity", "guidance_type", "instance_id",
 			"classifier_source",
+			"verifiability_class",
 		},
 		pgx.CopyFromRows(rows),
 	)

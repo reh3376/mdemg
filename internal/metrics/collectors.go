@@ -258,6 +258,14 @@ type StandardMetrics struct {
 
 	// Jiminy guidance metrics (published after each assessment)
 	JiminyFollowRate func(spaceID string) *Gauge
+	// JIMINY-METRIC-PARTITION-001 (task #158, 2026-09-10) — per-verifiability-class
+	// follow-rate gauges. Aggregate FollowRate above is now dishonest because
+	// rules of different verifiability classes are mixed; the per-class gauges
+	// below give the honest scoreboard. See docs/features/jiminy-metric-partition.md.
+	JiminyFollowRateClassifierVerifiable func(spaceID string) *Gauge
+	JiminyFollowRateProcessVerifiable    func(spaceID string) *Gauge
+	JiminyFollowRateHybrid               func(spaceID string) *Gauge
+	JiminyFollowRateHuman                func(spaceID string) *Gauge
 	// JiminyConstraintEffectiveness RETIRED 2026-08-10
 	// (METRICS-DEPRECATE-JIMINY-CONSTRAINT-EFF-001). Was a lifetime-cumulative
 	// multi-credit gauge (DASHBOARD-TRUTH-001 flagged the honesty issue,
@@ -780,7 +788,30 @@ func NewStandardMetrics(r *Registry) *StandardMetrics {
 
 	// Jiminy guidance metrics
 	m.JiminyFollowRate = func(spaceID string) *Gauge {
-		return r.NewGauge("jiminy_follow_rate", "Guidance follow rate (0-1)",
+		return r.NewGauge("jiminy_follow_rate", "Guidance follow rate (0-1) — aggregate over mixed verifiability classes (dishonest; see per-class gauges below)",
+			map[string]string{"space_id": spaceID})
+	}
+	// JIMINY-METRIC-PARTITION-001 — per-class honest follow-rate gauges.
+	// Populated by the ape.live_collectors path via windowed queries on
+	// constraint_outcomes with GROUP BY verifiability_class (V0035 column).
+	m.JiminyFollowRateClassifierVerifiable = func(spaceID string) *Gauge {
+		return r.NewGauge("jiminy_follow_rate_classifier_verifiable",
+			"Guidance follow rate (0-1) over rules whose class is verifiable from action-text — the metric a retrain CAN improve. JIMINY-METRIC-PARTITION-001",
+			map[string]string{"space_id": spaceID})
+	}
+	m.JiminyFollowRateProcessVerifiable = func(spaceID string) *Gauge {
+		return r.NewGauge("jiminy_follow_rate_process_verifiable",
+			"Guidance follow rate (0-1) over rules requiring process-observation evidence (lint-run, retrieval-call ordering, etc.). Dormant until Path 2 observers ship (JIMINY-PROCESS-OBSERVER-{01..06}).",
+			map[string]string{"space_id": spaceID})
+	}
+	m.JiminyFollowRateHybrid = func(spaceID string) *Gauge {
+		return r.NewGauge("jiminy_follow_rate_hybrid",
+			"Guidance follow rate (0-1) over rules where classifier grades SHAPE + process grades ACT. JIMINY-METRIC-PARTITION-001.",
+			map[string]string{"space_id": spaceID})
+	}
+	m.JiminyFollowRateHuman = func(spaceID string) *Gauge {
+		return r.NewGauge("jiminy_follow_rate_human",
+			"Guidance follow rate (0-1) over rules requiring HITL grading. Dormant until JIMINY-HITL-HUMAN-CLASS-INTEGRATION-001 routes human-class outcomes to the HITL grader.",
 			map[string]string{"space_id": spaceID})
 	}
 	m.JiminySurfacedActionableFraction = func(spaceID string) *Gauge {

@@ -301,8 +301,14 @@ type JiminyStats struct {
 
 // OutcomeWriter records constraint guidance outcomes to TSDB for dynamic
 // Grafana queries (user-selected time range effectiveness calculation).
+//
+// Sprint JIMINY-METRIC-PARTITION-001 (task #158, 2026-09-10) added the
+// verifiabilityClass parameter — allows aggregators to partition follow-rate
+// gauges by rule class (classifier|process|hybrid|human). Callers unaware of
+// class SHOULD pass "classifier" (the safe default matching the shipped
+// TSDB column default).
 type OutcomeWriter interface {
-	RecordOutcome(spaceID, constraintID, constraintCode, guidanceID, sessionID, outcomeType, guidanceType, instanceID, classifierSource string, similarity float64)
+	RecordOutcome(spaceID, constraintID, constraintCode, guidanceID, sessionID, outcomeType, guidanceType, instanceID, classifierSource, verifiabilityClass string, similarity float64)
 }
 
 // ContradictedDraftWriter is the tsdb bridge for
@@ -410,4 +416,70 @@ type EscalationSnapshot struct {
 	SessionID string                     `json:"session_id"`
 	States    map[string]EscalationEntry `json:"states"`
 	UpdatedAt time.Time                  `json:"updated_at"`
+}
+
+// VerifiabilityClass tags a constraint/correction rule by the class of
+// evidence a grader needs to verify follow. Sprint JIMINY-METRIC-PARTITION-001
+// (task #158) — implements Path 3 from JIMINY-METRIC-DENOMINATOR-DESIGN-001.
+//
+// The class determines which grading pipeline records the outcome and which
+// per-class metric gauge it feeds. Aggregate follow rate over mixed classes
+// is dishonest because the ceiling is bounded by the class mix, not the
+// classifier's quality on any one class (JIMINY-CEILING-INVESTIGATION-002).
+type VerifiabilityClass string
+
+const (
+	// VerifiabilityClassifier — evidence is in the action-text (code diff,
+	// bash command, file path). Graded by the shipped LLM classifier.
+	// This is the DEFAULT for backward-compat: any rule created before
+	// #158 lands, or without an explicit class set, is treated as classifier.
+	VerifiabilityClassifier VerifiabilityClass = "classifier"
+
+	// VerifiabilityProcess — evidence is in process-observation events
+	// (lint-run happened, retrieval-call preceded glob). Graded by a
+	// per-rule matcher over `process_events` (shipped by JIMINY-PROCESS-
+	// OBSERVER-{01..06}). Until Path 2 ships, outcomes on process rules
+	// do NOT persist to constraint_outcomes — logged + dropped.
+	VerifiabilityProcess VerifiabilityClass = "process"
+
+	// VerifiabilityHybrid — classifier grades the SHAPE (does the sprint plan
+	// list 3 test tiers?); process grades the ACT (did the 3 tiers actually
+	// run?). Both signals recorded for future arc analysis.
+	VerifiabilityHybrid VerifiabilityClass = "hybrid"
+
+	// VerifiabilityHuman — no automated grade possible; requires HITL
+	// (JIMINY-HITL-VELOCITY-001 platform). Outcomes on human rules do NOT
+	// persist to constraint_outcomes — routed to HITL grader by a future
+	// sprint. Until then, logged + dropped.
+	VerifiabilityHuman VerifiabilityClass = "human"
+)
+
+// IsValidVerifiabilityClass reports whether s is one of the 4 enum values.
+// Empty string is NOT valid — callers must default to VerifiabilityClassifier
+// explicitly (safer than silently accepting missing input).
+func IsValidVerifiabilityClass(s string) bool {
+	switch VerifiabilityClass(s) {
+	case VerifiabilityClassifier, VerifiabilityProcess, VerifiabilityHybrid, VerifiabilityHuman:
+		return true
+	}
+	return false
+}
+
+// AllVerifiabilityClasses returns the four class values in canonical order
+// (used by CLI validation + gauge emitter iteration).
+func AllVerifiabilityClasses() []VerifiabilityClass {
+	return []VerifiabilityClass{
+		VerifiabilityClassifier,
+		VerifiabilityProcess,
+		VerifiabilityHybrid,
+		VerifiabilityHuman,
+	}
+}
+
+// ClassPersistsToConstraintOutcomes reports whether outcomes on rules of the
+// given class should be recorded to the shipped constraint_outcomes writer.
+// Currently classifier + hybrid persist; process + human do NOT (routed to
+// their own grader pipelines by future sprints).
+func ClassPersistsToConstraintOutcomes(c VerifiabilityClass) bool {
+	return c == VerifiabilityClassifier || c == VerifiabilityHybrid
 }
