@@ -99,6 +99,34 @@ CREATE INDEX IF NOT EXISTS idx_process_outcomes_matcher_time
     ON process_outcomes (space_id, matcher_name, time DESC);
 
 -- ── retention + compression (TSDB-CONSUME-001 telemetry family default) ──
+-- Enable columnstore (guarded, idempotent) before add_compression_policy —
+-- mirrors V0025's pattern. add_compression_policy errors with "columnstore
+-- not enabled on hypertable" when the underlying ALTER hasn't fired.
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM timescaledb_information.hypertables
+        WHERE hypertable_name = 'process_events' AND compression_enabled
+    ) THEN
+        ALTER TABLE process_events SET (
+            timescaledb.compress,
+            timescaledb.compress_segmentby = 'space_id, event_type',
+            timescaledb.compress_orderby = 'time DESC'
+        );
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM timescaledb_information.hypertables
+        WHERE hypertable_name = 'process_outcomes' AND compression_enabled
+    ) THEN
+        ALTER TABLE process_outcomes SET (
+            timescaledb.compress,
+            timescaledb.compress_segmentby = 'space_id, matcher_name',
+            timescaledb.compress_orderby = 'time DESC'
+        );
+    END IF;
+END $$;
+
 SELECT add_retention_policy('process_events',   INTERVAL '90 days', if_not_exists => TRUE);
 SELECT add_retention_policy('process_outcomes', INTERVAL '90 days', if_not_exists => TRUE);
 SELECT add_compression_policy('process_events',   INTERVAL '7 days', if_not_exists => TRUE);
