@@ -19,6 +19,7 @@ import (
 
 const (
 	defaultBenchServePort    = 8103
+	defaultBenchServePortEnv = "MDEMG_BENCH_SERVE_PORT"
 	defaultBenchServeBaseEnv = "MDEMG_BENCH_SERVE_BASE"
 	defaultBenchServeBase    = ".local-models/qwen3-14b-4bit-base"
 	benchServeStartupEnv     = "MDEMG_BENCH_SERVE_STARTUP_TIMEOUT_SEC"
@@ -58,6 +59,13 @@ Stop mode reads the pidfile at ~/.mdemg/bench-serve-<port>.json, sends SIGTERM
 to the recorded PID, and removes the pidfile. Idempotent — no-op if pidfile absent.
 `,
 		RunE: func(_ *cobra.Command, _ []string) error {
+			if port <= 0 {
+				if v := os.Getenv(defaultBenchServePortEnv); v != "" {
+					if n, err := strconv.Atoi(v); err == nil && n > 0 {
+						port = n
+					}
+				}
+			}
 			if port <= 0 {
 				port = defaultBenchServePort
 			}
@@ -99,7 +107,7 @@ to the recorded PID, and removes the pidfile. Idempotent — no-op if pidfile ab
 	}
 	cmd.Flags().StringVar(&adapter, "adapter", "", "adapter directory (required in start mode)")
 	cmd.Flags().StringVar(&base, "base", "", "base model path (default: MDEMG_BENCH_SERVE_BASE env or .local-models/qwen3-14b-4bit-base)")
-	cmd.Flags().IntVar(&port, "port", defaultBenchServePort, "port to bind bench-serve on")
+	cmd.Flags().IntVar(&port, "port", 0, "port to bind bench-serve on (env MDEMG_BENCH_SERVE_PORT; default 8103)")
 	cmd.Flags().IntVar(&maxTokens, "max-tokens", defaultBenchServeMaxTok, "--max-tokens flag passed to mlx_lm.server")
 	cmd.Flags().BoolVar(&stop, "stop", false, "stop the bench-serve on --port (or default 8103)")
 	cmd.Flags().IntVar(&startupSec, "startup-timeout-sec", 0, "seconds to poll for readiness before giving up (env MDEMG_BENCH_SERVE_STARTUP_TIMEOUT_SEC)")
