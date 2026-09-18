@@ -313,25 +313,52 @@ func (b *DatasetBuilder) GuidanceEffectiveness(ctx context.Context, spaceID stri
 }
 
 // GuidanceEffectivenessByClass returns the same math as GuidanceEffectiveness
-// partitioned by the V0035 verifiability_class column. Rows with no explicit
-// class (pre-#158) read as 'classifier' via the column DEFAULT. Missing keys
-// in the returned map ↔ zero samples in the window for that class.
+// partitioned by the V0035 verifiability_class column, PLUS a UNION over
+// V0036 process_outcomes rows (which always land as verifiability_class=
+// 'process' with their own outcome_type enum). Rows with no explicit
+// class in constraint_outcomes (pre-#158) read as 'classifier' via the
+// column DEFAULT. Missing keys in the returned map ↔ zero samples in the
+// window for that class.
 //
-// JIMINY-METRIC-PARTITION-001 (task #158).
+// process_outcomes outcome_type semantics (JIMINY-PROCESS-OBSERVER-01):
+//   - process_followed    → 1.0 credit
+//   - process_incomplete  → 0.5 credit (lint ran but failed — like partial_compliance)
+//   - process_missed      → 0.0 credit
+//
+// JIMINY-METRIC-PARTITION-001 (task #158) — classifier/hybrid/human path.
+// JIMINY-PROCESS-OBSERVER-01 (task #160) — process path via UNION.
 func (b *DatasetBuilder) GuidanceEffectivenessByClass(ctx context.Context, spaceID string, window time.Duration) (map[string]GuidanceClassRate, error) {
 	cutoff := time.Now().Add(-window)
+	// UNION ALL over the two outcome tables. Each side emits (class, credit)
+	// tuples the outer aggregate averages. LEFT JOIN would drop-vs-UNION the
+	// zero-row case; UNION lets both tables independently contribute rows.
+	// Wrapped in a subquery so GROUP BY + COALESCE apply uniformly.
 	const query = `
+		WITH combined AS (
+			SELECT
+				verifiability_class AS class,
+				CASE WHEN outcome_type = 'followed'            THEN 1.0
+				     WHEN outcome_type = 'partial_compliance'  THEN 0.5
+				     ELSE 0.0 END AS credit
+			FROM constraint_outcomes
+			WHERE space_id = $1 AND time >= $2
+
+			UNION ALL
+
+			SELECT
+				'process' AS class,
+				CASE WHEN outcome_type = 'process_followed'    THEN 1.0
+				     WHEN outcome_type = 'process_incomplete'  THEN 0.5
+				     ELSE 0.0 END AS credit
+			FROM process_outcomes
+			WHERE space_id = $1 AND time >= $2
+		)
 		SELECT
-			verifiability_class,
+			class,
 			COUNT(*)::int AS n,
-			COALESCE(
-				SUM(CASE WHEN outcome_type = 'followed' THEN 1.0
-				         WHEN outcome_type = 'partial_compliance' THEN 0.5
-				         ELSE 0.0 END) / NULLIF(COUNT(*), 0),
-				0)::float8 AS rate
-		FROM constraint_outcomes
-		WHERE space_id = $1 AND time >= $2
-		GROUP BY verifiability_class`
+			COALESCE(SUM(credit) / NULLIF(COUNT(*), 0), 0)::float8 AS rate
+		FROM combined
+		GROUP BY class`
 	rows, err := b.pool.Query(ctx, query, spaceID, cutoff)
 	if err != nil {
 		return nil, fmt.Errorf("dataset_builder: guidance_effectiveness_by_class: %w", err)
@@ -347,6 +374,20 @@ func (b *DatasetBuilder) GuidanceEffectivenessByClass(ctx context.Context, space
 		}
 		if class == "" {
 			class = "classifier"
+		}
+		// Merge if two branches both emitted rows for the same class
+		// (shouldn't happen at the SQL level — 'process' comes only from
+		// process_outcomes, others only from constraint_outcomes — but the
+		// defensive sum-with-weights keeps future extension safe).
+		if existing, ok := out[class]; ok {
+			total := existing.Samples + n
+			if total > 0 {
+				out[class] = GuidanceClassRate{
+					Rate:    (existing.Rate*float64(existing.Samples) + rate*float64(n)) / float64(total),
+					Samples: total,
+				}
+			}
+			continue
 		}
 		out[class] = GuidanceClassRate{Rate: rate, Samples: n}
 	}
