@@ -1426,6 +1426,9 @@ type Config struct {
 	ProcessMatcherSequentialEpicsEnabled    bool // PROCESS_MATCHER_SEQUENTIAL_EPICS_ENABLED — enable the sequential-epics matcher (JIMINY-PROCESS-OBSERVER-02, default: false)
 	ProcessMatcherQueryCmsFirstEnabled      bool // PROCESS_MATCHER_QUERY_CMS_FIRST_ENABLED — enable the query-cms-first matcher (JIMINY-PROCESS-OBSERVER-03, default: false)
 	ProcessMatcherQueryCmsWindowSec         int  // PROCESS_MATCHER_QUERY_CMS_WINDOW_SEC — lookback window for prior retrieval before a filesystem_search (default: 300, floor: 30)
+	ProcessMatcherUiedEnabled               bool   // PROCESS_MATCHER_UIED_ENABLED — enable the unit-integration-e2e-docs matcher (JIMINY-PROCESS-OBSERVER-04, default: false)
+	SprintDocsRoot                          string // SPRINT_DOCS_ROOT — filesystem root for sprint plans (default: "docs/development" relative to CWD; used by the uied matcher)
+	ProcessMatcherUiedMaxFileBytes          int    // PROCESS_MATCHER_UIED_MAX_FILE_BYTES — safety cap on sprint_plan.md read (default: 200000; over-cap → skip)
 
 	// Live Metrics (collect-on-request)
 	LiveMetricsEnabled     bool // LIVE_METRICS_ENABLED — enable live metric collection on metrics snapshot (default: true)
@@ -4311,6 +4314,18 @@ func FromEnv() (Config, error) {
 	if processMatcherQueryCmsWindowSec < 30 {
 		processMatcherQueryCmsWindowSec = 30
 	}
+	processMatcherUiedEnabled := getBool("PROCESS_MATCHER_UIED_ENABLED", false)
+	sprintDocsRoot := strings.TrimSpace(os.Getenv("SPRINT_DOCS_ROOT"))
+	if sprintDocsRoot == "" {
+		sprintDocsRoot = "docs/development"
+	}
+	processMatcherUiedMaxFileBytes, err := atoi("PROCESS_MATCHER_UIED_MAX_FILE_BYTES", 200000)
+	if err != nil {
+		return Config{}, err
+	}
+	if processMatcherUiedMaxFileBytes < 4096 {
+		processMatcherUiedMaxFileBytes = 4096
+	}
 
 	// Phase 14 Epic 1 → Phase 14.1.1 — Note 06 sparse activation gate
 	// defaults. Phase 14 Epic 0 forensic set p95 + within-call clamp shape.
@@ -6655,6 +6670,9 @@ func FromEnv() (Config, error) {
 		ProcessMatcherSequentialEpicsEnabled:    processMatcherSequentialEpicsEnabled,
 		ProcessMatcherQueryCmsFirstEnabled:      processMatcherQueryCmsFirstEnabled,
 		ProcessMatcherQueryCmsWindowSec:         processMatcherQueryCmsWindowSec,
+		ProcessMatcherUiedEnabled:               processMatcherUiedEnabled,
+		SprintDocsRoot:                          sprintDocsRoot,
+		ProcessMatcherUiedMaxFileBytes:          processMatcherUiedMaxFileBytes,
 
 		// Phase 14 Epic 1 — Note 06 sparse activation gate
 		SparseRetrievalEnabled:     sparseRetrievalEnabled,
