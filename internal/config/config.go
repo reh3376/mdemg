@@ -1423,6 +1423,7 @@ type Config struct {
 	ProcessGraderEnabled                    bool // PROCESS_GRADER_ENABLED — enable the periodic matcher loop that writes process_outcomes (default: false)
 	ProcessGraderIntervalSec                int  // PROCESS_GRADER_INTERVAL_SEC — matcher loop cadence in seconds (default: 60, floor: 15)
 	ProcessMatcherLintBeforeCommitEnabled   bool // PROCESS_MATCHER_LINT_BEFORE_COMMIT_ENABLED — enable the lint-before-commit matcher (default: false)
+	ProcessMatcherSequentialEpicsEnabled    bool // PROCESS_MATCHER_SEQUENTIAL_EPICS_ENABLED — enable the sequential-epics matcher (JIMINY-PROCESS-OBSERVER-02, default: false)
 
 	// Live Metrics (collect-on-request)
 	LiveMetricsEnabled     bool // LIVE_METRICS_ENABLED — enable live metric collection on metrics snapshot (default: true)
@@ -4299,6 +4300,7 @@ func FromEnv() (Config, error) {
 		processGraderIntervalSec = 15
 	}
 	processMatcherLintBeforeCommitEnabled := getBool("PROCESS_MATCHER_LINT_BEFORE_COMMIT_ENABLED", false)
+	processMatcherSequentialEpicsEnabled := getBool("PROCESS_MATCHER_SEQUENTIAL_EPICS_ENABLED", false)
 
 	// Phase 14 Epic 1 → Phase 14.1.1 — Note 06 sparse activation gate
 	// defaults. Phase 14 Epic 0 forensic set p95 + within-call clamp shape.
@@ -6640,6 +6642,7 @@ func FromEnv() (Config, error) {
 		ProcessGraderEnabled:                    processGraderEnabled,
 		ProcessGraderIntervalSec:                processGraderIntervalSec,
 		ProcessMatcherLintBeforeCommitEnabled:   processMatcherLintBeforeCommitEnabled,
+		ProcessMatcherSequentialEpicsEnabled:    processMatcherSequentialEpicsEnabled,
 
 		// Phase 14 Epic 1 — Note 06 sparse activation gate
 		SparseRetrievalEnabled:     sparseRetrievalEnabled,

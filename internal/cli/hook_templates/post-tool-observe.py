@@ -526,7 +526,23 @@ def _process_events_for_tool(tool_name: str, tool_input: dict, tool_output_str: 
             ev["event_type"] = "git_commit"
             ev["event_subtype"] = "git-commit"
             ev["outcome"] = "success"
-            ev["metadata"] = {"command_preview": command[:200]}
+            meta = {"command_preview": command[:200]}
+            # JIMINY-PROCESS-OBSERVER-02: capture the actual commit message
+            # via `git log -1 --format=%B` so downstream matchers (e.g.
+            # sequential-epics parsing `Epic N` markers) don't have to parse
+            # the -m flag out of the raw command. Fail-open: any failure
+            # (git missing, non-repo cwd, timeout) drops the field silently.
+            try:
+                msg = subprocess.check_output(
+                    ["git", "log", "-1", "--format=%B"],
+                    stderr=subprocess.DEVNULL,
+                    timeout=2,
+                ).decode("utf-8", errors="replace").strip()
+                if msg:
+                    meta["commit_message"] = msg[:500]
+            except Exception:
+                pass
+            ev["metadata"] = meta
             events.append(ev)
 
     elif tool_name in ("Write", "Edit"):
