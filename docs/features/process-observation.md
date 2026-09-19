@@ -65,6 +65,22 @@ Semantics per design spec §B4:
 6. Else → `process_missed` (0.0 credit).
 7. If no prior `file_write` → fail-open skip (docs-only commit; not a violation).
 
+### `unit-integration-e2e-docs` (UIED) matcher (fourth observer — JIMINY-PROCESS-OBSERVER-04)
+
+Grades the shipped `unit-integration-e2e-docs` Jiminy rule ("All development plans MUST include three testing tiers: unit tests, integration tests, e2e tests, plus documentation updates"). Hybrid class — the classifier grades doc-shape presence in general prose; this observer grades the specific sprint plan for the sprint code named in the commit message.
+
+⚠️ **New capability class: filesystem read**. Prior matchers only queried `process_events`. UIED reads a single file (`<SprintDocsRoot>/<kebab-code>/sprint_plan.md`) with a `MaxFileBytes` safety cap and fail-open on any error.
+
+Semantics:
+1. Terminal event: `git_commit` on session S with `metadata.commit_message` populated (via OBSERVER-02 hook capture)
+2. Extract sprint code via `\b([A-Z][A-Z0-9]+(?:-[A-Z0-9]+)+-\d+)\b` — requires word-boundary + at least one hyphen
+3. If no marker → fail-open skip (chore/merge/non-sprint commit)
+4. Kebab-lower the code, look up the sprint plan file
+5. File absent → `process_missed` (sprint referenced without a plan)
+6. File present, all 3 tier keywords found (case-fold `unit` + `integration` + [`e2e` OR `end-to-end`]) → `process_followed`
+7. Missing ≥1 tier → `process_incomplete` (reason names the missing tier)
+8. File over cap → fail-open skip (safety)
+
 ### `query-cms-first` matcher (third observer — JIMINY-PROCESS-OBSERVER-03)
 
 Grades the `query-mdemg-cms-file-paths` Jiminy rule ("When discovering unfamiliar code structure, query MDEMG CMS retrieval FIRST; glob/grep only for exact-token or CMS-miss fallback"). Introduces two new event types:
@@ -103,6 +119,7 @@ PROCESS_GRADER_ENABLED=true
 PROCESS_MATCHER_LINT_BEFORE_COMMIT_ENABLED=true
 PROCESS_MATCHER_SEQUENTIAL_EPICS_ENABLED=true    # JIMINY-PROCESS-OBSERVER-02
 PROCESS_MATCHER_QUERY_CMS_FIRST_ENABLED=true     # JIMINY-PROCESS-OBSERVER-03
+PROCESS_MATCHER_UIED_ENABLED=true                # JIMINY-PROCESS-OBSERVER-04
 ```
 
 Then `mdemg service restart` (or `docker compose up -d`).
@@ -146,6 +163,9 @@ Flip any of the 3 env vars to `false` and restart. The V0036 tables persist (dat
 | `PROCESS_MATCHER_SEQUENTIAL_EPICS_ENABLED` | `false` | Enable the sequential-epics matcher (JIMINY-PROCESS-OBSERVER-02) |
 | `PROCESS_MATCHER_QUERY_CMS_FIRST_ENABLED` | `false` | Enable the query-cms-first matcher (JIMINY-PROCESS-OBSERVER-03) |
 | `PROCESS_MATCHER_QUERY_CMS_WINDOW_SEC` | `300` | Lookback window (sec) for prior retrieval_call before a filesystem_search; floor 30 |
+| `PROCESS_MATCHER_UIED_ENABLED` | `false` | Enable the unit-integration-e2e-docs matcher (JIMINY-PROCESS-OBSERVER-04) |
+| `SPRINT_DOCS_ROOT` | `docs/development` | Filesystem root the UIED matcher joins the kebab-lower sprint code under (relative to cwd) |
+| `PROCESS_MATCHER_UIED_MAX_FILE_BYTES` | `200000` | Safety cap on sprint_plan.md read size; over-cap → skip; floor 4096 |
 
 ## Adding a new observer (sibling sprints)
 
