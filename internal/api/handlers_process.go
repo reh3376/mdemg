@@ -51,6 +51,7 @@ var (
 		"test_run":         {},
 		"plan_mode_entry":  {},
 		"file_write":       {},
+		"filesystem_search": {}, // JIMINY-PROCESS-OBSERVER-03
 	}
 	allowedProcessEventOutcomes = map[string]struct{}{
 		"":        {}, // treated as "unknown" by writer

@@ -7,9 +7,15 @@ Fires-and-forgets a CMS observe call for noteworthy events.
 
 import json
 import os
+import re
 import subprocess
 import sys
 import time
+
+# JIMINY-PROCESS-OBSERVER-03: word-boundary-anchored search-binary regex.
+# Matches: rg / ripgrep / ag / `grep -r*` / `find <path>`. Excludes
+# `pygrep`, `mygrep`, function names, etc.
+_BASH_SEARCH_RE = re.compile(r"\b(rg|ripgrep|ag)\b|\bgrep\s+-\w*r|\bfind\s")
 
 
 def _resolve_mdemg_url() -> str:
@@ -545,6 +551,26 @@ def _process_events_for_tool(tool_name: str, tool_input: dict, tool_output_str: 
             ev["metadata"] = meta
             events.append(ev)
 
+        # JIMINY-PROCESS-OBSERVER-03: Bash-side detections for the
+        # query-cms-first matcher's terminal + anchor events.
+        # (a) retrieval_call — agent-side curl to /v1/memory/retrieve
+        if "/v1/memory/retrieve" in command:
+            ev = dict(common)
+            ev["event_type"] = "retrieval_call"
+            ev["event_subtype"] = "bash-curl"
+            ev["outcome"] = "failure" if looks_error else "success"
+            ev["metadata"] = {"command_preview": command[:200]}
+            events.append(ev)
+        # (b) filesystem_search — search binaries (rg / ripgrep / grep -r /
+        # find / ag). Word-boundary-anchored via module-level regex.
+        if _BASH_SEARCH_RE.search(cmd_lower):
+            ev = dict(common)
+            ev["event_type"] = "filesystem_search"
+            ev["event_subtype"] = "bash-search"
+            ev["outcome"] = "failure" if looks_error else "success"
+            ev["metadata"] = {"command_preview": command[:200]}
+            events.append(ev)
+
     elif tool_name in ("Write", "Edit"):
         file_path = tool_input.get("file_path") or ""
         if not file_path:
@@ -554,6 +580,41 @@ def _process_events_for_tool(tool_name: str, tool_input: dict, tool_output_str: 
         ev["event_subtype"] = tool_name.lower()
         ev["outcome"] = "success"
         ev["metadata"] = {"file_path": file_path}
+        events.append(ev)
+
+    # JIMINY-PROCESS-OBSERVER-03: filesystem_search events (Glob / Grep tool)
+    # for the query-cms-first matcher's terminal event.
+    if tool_name == "Glob":
+        pattern = tool_input.get("pattern") or ""
+        ev = dict(common)
+        ev["event_type"] = "filesystem_search"
+        ev["event_subtype"] = "glob"
+        ev["outcome"] = "success"
+        ev["metadata"] = {"pattern": pattern[:200]}
+        events.append(ev)
+    elif tool_name == "Grep":
+        pattern = tool_input.get("pattern") or ""
+        path = tool_input.get("path") or ""
+        ev = dict(common)
+        ev["event_type"] = "filesystem_search"
+        ev["event_subtype"] = "grep"
+        ev["outcome"] = "success"
+        ev["metadata"] = {"pattern": pattern[:200], "path": path[:200]}
+        events.append(ev)
+
+    # JIMINY-PROCESS-OBSERVER-03: retrieval_call events on MCP retrieve calls.
+    # PostToolUse fires with tool_name like `mcp__mdemg__memory_recall`;
+    # we match on the substring so any MCP server's retrieve-shape tool is
+    # captured. Bash-side (curl /v1/memory/retrieve) is handled in the Bash
+    # branch above via cmd_lower check (added below).
+    if tool_name and tool_name.startswith("mcp__") and (
+        "memory_recall" in tool_name or "memory_retrieve" in tool_name or tool_name.endswith("__recall")
+    ):
+        ev = dict(common)
+        ev["event_type"] = "retrieval_call"
+        ev["event_subtype"] = tool_name
+        ev["outcome"] = "success"
+        ev["metadata"] = {"tool_name": tool_name}
         events.append(ev)
 
     return events
