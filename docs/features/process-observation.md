@@ -65,6 +65,17 @@ Semantics per design spec §B4:
 6. Else → `process_missed` (0.0 credit).
 7. If no prior `file_write` → fail-open skip (docs-only commit; not a violation).
 
+### `uxts-frameworks` matcher (fifth observer — JIMINY-PROCESS-OBSERVER-05)
+
+Grades the shipped `must-use-uxts-frameworks-consistently` Jiminy rule (hybrid class): "When creating a JSON schema, contract, or test spec that will be used repeatedly, use the UxTS framework family." Design classifier side is "new JSON schema files outside `docs/tests/u*ts/`"; this observer ships the process side. **No cross-table query, no filesystem read** — purely a metadata regex check on `file_write` events.
+
+Semantics:
+1. Terminal event: `file_write` (Write or Edit tool) with `metadata.file_path`
+2. Filename regex `\.u[a-z]+\.json$` — matches all 11 shipped UxTS families (uaits, uams, ubench, ubts, uets, uits, ults, uobs, usts, utds, uvts) + any future u-prefix framework
+3. No match → fail-open skip (not a UxTS-shape JSON file)
+4. Path contains `docs/tests/u` → `process_followed`
+5. Path doesn't contain → `process_incomplete` (reason names the violating path)
+
 ### `unit-integration-e2e-docs` (UIED) matcher (fourth observer — JIMINY-PROCESS-OBSERVER-04)
 
 Grades the shipped `unit-integration-e2e-docs` Jiminy rule ("All development plans MUST include three testing tiers: unit tests, integration tests, e2e tests, plus documentation updates"). Hybrid class — the classifier grades doc-shape presence in general prose; this observer grades the specific sprint plan for the sprint code named in the commit message.
@@ -120,6 +131,7 @@ PROCESS_MATCHER_LINT_BEFORE_COMMIT_ENABLED=true
 PROCESS_MATCHER_SEQUENTIAL_EPICS_ENABLED=true    # JIMINY-PROCESS-OBSERVER-02
 PROCESS_MATCHER_QUERY_CMS_FIRST_ENABLED=true     # JIMINY-PROCESS-OBSERVER-03
 PROCESS_MATCHER_UIED_ENABLED=true                # JIMINY-PROCESS-OBSERVER-04
+PROCESS_MATCHER_UXTS_FRAMEWORKS_ENABLED=true     # JIMINY-PROCESS-OBSERVER-05
 ```
 
 Then `mdemg service restart` (or `docker compose up -d`).
@@ -166,6 +178,7 @@ Flip any of the 3 env vars to `false` and restart. The V0036 tables persist (dat
 | `PROCESS_MATCHER_UIED_ENABLED` | `false` | Enable the unit-integration-e2e-docs matcher (JIMINY-PROCESS-OBSERVER-04) |
 | `SPRINT_DOCS_ROOT` | `docs/development` | Filesystem root the UIED matcher joins the kebab-lower sprint code under (relative to cwd) |
 | `PROCESS_MATCHER_UIED_MAX_FILE_BYTES` | `200000` | Safety cap on sprint_plan.md read size; over-cap → skip; floor 4096 |
+| `PROCESS_MATCHER_UXTS_FRAMEWORKS_ENABLED` | `false` | Enable the uxts-frameworks matcher (JIMINY-PROCESS-OBSERVER-05) |
 
 ## Adding a new observer (sibling sprints)
 
