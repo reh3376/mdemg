@@ -1429,6 +1429,7 @@ type Config struct {
 	ProcessMatcherUiedEnabled               bool   // PROCESS_MATCHER_UIED_ENABLED — enable the unit-integration-e2e-docs matcher (JIMINY-PROCESS-OBSERVER-04, default: false)
 	SprintDocsRoot                          string // SPRINT_DOCS_ROOT — filesystem root for sprint plans (default: "docs/development" relative to CWD; used by the uied matcher)
 	ProcessMatcherUiedMaxFileBytes          int    // PROCESS_MATCHER_UIED_MAX_FILE_BYTES — safety cap on sprint_plan.md read (default: 200000; over-cap → skip)
+	ProcessMatcherUxtsFrameworksEnabled     bool   // PROCESS_MATCHER_UXTS_FRAMEWORKS_ENABLED — enable the uxts-frameworks matcher (JIMINY-PROCESS-OBSERVER-05, default: false)
 
 	// Live Metrics (collect-on-request)
 	LiveMetricsEnabled     bool // LIVE_METRICS_ENABLED — enable live metric collection on metrics snapshot (default: true)
@@ -4326,6 +4327,7 @@ func FromEnv() (Config, error) {
 	if processMatcherUiedMaxFileBytes < 4096 {
 		processMatcherUiedMaxFileBytes = 4096
 	}
+	processMatcherUxtsFrameworksEnabled := getBool("PROCESS_MATCHER_UXTS_FRAMEWORKS_ENABLED", false)
 
 	// Phase 14 Epic 1 → Phase 14.1.1 — Note 06 sparse activation gate
 	// defaults. Phase 14 Epic 0 forensic set p95 + within-call clamp shape.
@@ -6673,6 +6675,7 @@ func FromEnv() (Config, error) {
 		ProcessMatcherUiedEnabled:               processMatcherUiedEnabled,
 		SprintDocsRoot:                          sprintDocsRoot,
 		ProcessMatcherUiedMaxFileBytes:          processMatcherUiedMaxFileBytes,
+		ProcessMatcherUxtsFrameworksEnabled:     processMatcherUxtsFrameworksEnabled,
 
 		// Phase 14 Epic 1 — Note 06 sparse activation gate
 		SparseRetrievalEnabled:     sparseRetrievalEnabled,
