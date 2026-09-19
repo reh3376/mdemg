@@ -65,6 +65,33 @@ Semantics per design spec §B4:
 6. Else → `process_missed` (0.0 credit).
 7. If no prior `file_write` → fail-open skip (docs-only commit; not a violation).
 
+### `query-cms-first` matcher (third observer — JIMINY-PROCESS-OBSERVER-03)
+
+Grades the `query-mdemg-cms-file-paths` Jiminy rule ("When discovering unfamiliar code structure, query MDEMG CMS retrieval FIRST; glob/grep only for exact-token or CMS-miss fallback"). Introduces two new event types:
+- `retrieval_call` — emitted by the hook when the agent invokes an MCP retrieve tool (`mcp__*memory_recall*` / `memory_retrieve` / `__recall`) OR runs a Bash `curl` to `/v1/memory/retrieve`
+- `filesystem_search` — emitted on `Glob` / `Grep` tool completion, OR Bash containing `rg` / `ripgrep` / `ag` / `grep -r*` / `find <path>` (word-boundary-anchored)
+
+Semantics:
+1. Terminal event: `filesystem_search` on session S at time T
+2. Query same-session prior `retrieval_call` events within `PROCESS_MATCHER_QUERY_CMS_WINDOW_SEC` (default 300s / 5min) before T
+3. ≥1 prior retrieval → `process_followed` (evidence = the most recent retrieval event_id)
+4. 0 prior retrievals → `process_missed`
+5. Empty session_id → fail-open skip (can't correlate)
+
+⚠️ **MVP limitation**: the "exact-token / CMS-miss fallback" exception (a narrow specific-string search is a legitimate case even without prior retrieval) is NOT distinguished — all filesystem_search events without a prior retrieval are graded `process_missed`. Ship default-OFF; operator flip after passive observation. If FP rate is unacceptable, a follow-up sprint can add a search-shape heuristic (path scope + single-quoted literal).
+
+### `sequential-epics` matcher (second observer — JIMINY-PROCESS-OBSERVER-02)
+
+Grades the `sequential-epics` Jiminy rule ("Execute sprint epics SEQUENTIALLY — Epic N MUST complete fully before Epic N+1 begins"). The hook captures the actual commit message via `git log -1 --format=%B` (bounded 500 chars, fail-open on error) into `metadata.commit_message`; the matcher parses it.
+
+Semantics:
+1. Given a `git_commit` event on session S at time T with a commit message,
+2. Extract the `Epic N` marker via `(?i)\bepic\s+(\d+)\b` (word-boundary),
+3. If no marker → fail-open skip (chore/docs/refactor commits are NOT graded),
+4. Query same-session prior `git_commit` events; find max prior Epic N,
+5. If max prior ≤ current → `process_followed` (monotonic sequence maintained; equal N is fine — same epic, multiple commits),
+6. If max prior > current → `process_incomplete` (out-of-order — exactly what the rule prohibits).
+
 ## How to use
 
 ### Enable end-to-end (default-off in code, opt-in via `.env`)
@@ -74,6 +101,8 @@ Semantics per design spec §B4:
 PROCESS_EVENTS_ENABLED=true
 PROCESS_GRADER_ENABLED=true
 PROCESS_MATCHER_LINT_BEFORE_COMMIT_ENABLED=true
+PROCESS_MATCHER_SEQUENTIAL_EPICS_ENABLED=true    # JIMINY-PROCESS-OBSERVER-02
+PROCESS_MATCHER_QUERY_CMS_FIRST_ENABLED=true     # JIMINY-PROCESS-OBSERVER-03
 ```
 
 Then `mdemg service restart` (or `docker compose up -d`).
@@ -114,6 +143,9 @@ Flip any of the 3 env vars to `false` and restart. The V0036 tables persist (dat
 | `PROCESS_GRADER_ENABLED` | `false` | Enable the periodic matcher loop |
 | `PROCESS_GRADER_INTERVAL_SEC` | `60` | Grader loop cadence (floor 15) |
 | `PROCESS_MATCHER_LINT_BEFORE_COMMIT_ENABLED` | `false` | Enable the lint-before-commit matcher |
+| `PROCESS_MATCHER_SEQUENTIAL_EPICS_ENABLED` | `false` | Enable the sequential-epics matcher (JIMINY-PROCESS-OBSERVER-02) |
+| `PROCESS_MATCHER_QUERY_CMS_FIRST_ENABLED` | `false` | Enable the query-cms-first matcher (JIMINY-PROCESS-OBSERVER-03) |
+| `PROCESS_MATCHER_QUERY_CMS_WINDOW_SEC` | `300` | Lookback window (sec) for prior retrieval_call before a filesystem_search; floor 30 |
 
 ## Adding a new observer (sibling sprints)
 

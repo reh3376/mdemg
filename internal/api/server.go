@@ -2476,6 +2476,12 @@ func (s *Server) StartSupervisedBackground() {
 		if s.cfg.ProcessMatcherLintBeforeCommitEnabled {
 			g.Register(procmatchers.NewLintBeforeCommit())
 		}
+		if s.cfg.ProcessMatcherSequentialEpicsEnabled {
+			g.Register(procmatchers.NewSequentialEpics())
+		}
+		if s.cfg.ProcessMatcherQueryCmsFirstEnabled {
+			g.Register(procmatchers.NewQueryCmsFirst(s.cfg.ProcessMatcherQueryCmsWindowSec))
+		}
 		if g.MatcherCount() > 0 {
 			s.goSupervised("process-grader", g.Run)
 			slog.Info("process grader: wired",
