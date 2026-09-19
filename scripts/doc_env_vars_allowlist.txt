@@ -90,3 +90,17 @@ LOG_DISABLED
 
 # HOMEBREW-INSTALLER-QWEN-UPDATE-002 Phase C: PUBLISH_GUIDE is the filename of the operator-runbook doc (PUBLISH_GUIDE.md), NOT an env var
 PUBLISH_GUIDE
+
+# ── PR 657 lint fix (2026-09-18) ──
+# CLAUDE.md prose (pins record patterns/placeholders/labels, not env vars)
+CLI_NAME              # MDEMG-DOCS-INGEST-002 pin: pattern placeholder `<CLI_NAME>_EXCLUDE_DIRS` for the deny-set shape
+DS_ENVVAR             # ARC-TRAJECTORY-PANEL-001 pin: Grafana template-variable form `${DS_ENVVAR}` (works only in grafana.com imports)
+DS_TIMESCALEDB        # ARC-TRAJECTORY-PANEL-001 pin: same class — grafana template-variable form, not an env var
+EXPORT_ID_RE          # SEC-TRANCHE-3 pin: JavaScript regex const name from internal/api/ui/tabs/training_data.js
+KEEP_ACTIONABLE       # JIMINY-CORRECTION-CORPUS-001 pin: audit-verdict classification label
+KEEP_REAL             # JIMINY-CORRECTION-CORPUS-001 pin: audit-verdict classification label
+MARK_INFORMATIONAL    # JIMINY-CORRECTION-CORPUS-001 pin: audit-verdict classification label
+README_BETA           # BETA-DOCS-MODEL-VERSIONING-001 pin + docs/features/beta-share.md: filename `README_BETA.md`
+# Non-CLAUDE.md prose
+ISSUE_TEMPLATE        # docs/user/cli-reference.md: filesystem path `.github/ISSUE_TEMPLATE/beta-bug-report.yml`
+MTIME_UTC             # docs/features/adapter-swap.md: column header in a tabular CLI-output example

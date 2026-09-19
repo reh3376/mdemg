@@ -1335,7 +1335,7 @@ type Config struct {
 	TSDBFlushIntervalSec      int    // TSDB_FLUSH_INTERVAL_SEC — metric writer flush interval in seconds (default: 60)
 	TSDBRawRetentionDays      int    // TSDB_RAW_RETENTION_DAYS — raw sample retention in days (default: 90)
 	TSDBHourlyRetentionDays   int    // TSDB_HOURLY_RETENTION_DAYS — hourly aggregate retention in days (default: 365)
-	TSDBRequiredSchemaVersion int    // TSDB_REQUIRED_SCHEMA_VERSION — minimum required TSDB schema version (default: 34 post-REVIEW-GRADE-NOTES-FIELD-001 V0034 ALTER TABLE review_grades ADD COLUMN notes)
+	TSDBRequiredSchemaVersion int    // TSDB_REQUIRED_SCHEMA_VERSION — minimum required TSDB schema version (default: 36 post-JIMINY-PROCESS-OBSERVER-01 V0036 process_events + process_outcomes hypertables)
 	TSDBOptional              bool   // TSDB_OPTIONAL — if true, TSDB failure is non-fatal on startup (default: true)
 	InstanceID                string // MDEMG_INSTANCE_ID — identifies this node for multi-instance coordination (default: "{hostname}-{space_id}")
 	LLMInteractionLogging     bool   // LLM_INTERACTION_LOGGING — log all LLM calls to llm_interactions table (default: true)
@@ -1415,6 +1415,14 @@ type Config struct {
 	EventGraphMaxEventsPerQuery              int  // EVENTGRAPH_MAX_EVENTS_PER_QUERY — federation API ceiling on returned events (default: 500)
 	EventGraphFederationDefaultHops          int  // EVENTGRAPH_FEDERATION_DEFAULT_HOPS — federation API default hops when request omits the field (default: 2)
 	EventGraphFederationDefaultLookbackHours int  // EVENTGRAPH_FEDERATION_DEFAULT_LOOKBACK_HOURS — federation API default lookback window in hours (default: 24)
+
+	// JIMINY-PROCESS-OBSERVER-01 — Path 2 process-observation platform (task #160)
+	ProcessEventsEnabled                    bool // PROCESS_EVENTS_ENABLED — enable POST /v1/process/event ingestion + buffered writer (default: false)
+	ProcessEventWriterFlushIntervalSec      int  // PROCESS_EVENT_WRITER_FLUSH_INTERVAL_SEC — buffered writer flush cadence in seconds (default: 30, floor: 5)
+	ProcessEventWriterBufferSize            int  // PROCESS_EVENT_WRITER_BUFFER_SIZE — max rows held before FIFO eviction (default: 500)
+	ProcessGraderEnabled                    bool // PROCESS_GRADER_ENABLED — enable the periodic matcher loop that writes process_outcomes (default: false)
+	ProcessGraderIntervalSec                int  // PROCESS_GRADER_INTERVAL_SEC — matcher loop cadence in seconds (default: 60, floor: 15)
+	ProcessMatcherLintBeforeCommitEnabled   bool // PROCESS_MATCHER_LINT_BEFORE_COMMIT_ENABLED — enable the lint-before-commit matcher (default: false)
 
 	// Live Metrics (collect-on-request)
 	LiveMetricsEnabled     bool // LIVE_METRICS_ENABLED — enable live metric collection on metrics snapshot (default: true)
@@ -4264,6 +4272,34 @@ func FromEnv() (Config, error) {
 		return Config{}, err
 	}
 
+	// JIMINY-PROCESS-OBSERVER-01 — Path 2 process-observation platform (task #160).
+	// Defaults OFF per HEBB-ETA-001 rule: behavior-changing flags ship off in
+	// both code AND `.env`; operators opt in explicitly.
+	processEventsEnabled := getBool("PROCESS_EVENTS_ENABLED", false)
+	processEventWriterFlushIntervalSec, err := atoi("PROCESS_EVENT_WRITER_FLUSH_INTERVAL_SEC", 30)
+	if err != nil {
+		return Config{}, err
+	}
+	if processEventWriterFlushIntervalSec < 5 {
+		processEventWriterFlushIntervalSec = 5
+	}
+	processEventWriterBufferSize, err := atoi("PROCESS_EVENT_WRITER_BUFFER_SIZE", 500)
+	if err != nil {
+		return Config{}, err
+	}
+	if processEventWriterBufferSize < 1 {
+		processEventWriterBufferSize = 1
+	}
+	processGraderEnabled := getBool("PROCESS_GRADER_ENABLED", false)
+	processGraderIntervalSec, err := atoi("PROCESS_GRADER_INTERVAL_SEC", 60)
+	if err != nil {
+		return Config{}, err
+	}
+	if processGraderIntervalSec < 15 {
+		processGraderIntervalSec = 15
+	}
+	processMatcherLintBeforeCommitEnabled := getBool("PROCESS_MATCHER_LINT_BEFORE_COMMIT_ENABLED", false)
+
 	// Phase 14 Epic 1 → Phase 14.1.1 — Note 06 sparse activation gate
 	// defaults. Phase 14 Epic 0 forensic set p95 + within-call clamp shape.
 	// Phase 14.1.1 hybrid 120q PASSED (mean +0.003, 0 regressions, 10
@@ -5495,7 +5531,7 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	tsdbRequiredSchemaVersion, err := atoi("TSDB_REQUIRED_SCHEMA_VERSION", 34)
+	tsdbRequiredSchemaVersion, err := atoi("TSDB_REQUIRED_SCHEMA_VERSION", 36)
 	if err != nil {
 		return Config{}, err
 	}
@@ -6596,6 +6632,14 @@ func FromEnv() (Config, error) {
 		EventGraphMaxEventsPerQuery:              eventGraphMaxEventsPerQuery,
 		EventGraphFederationDefaultHops:          eventGraphFederationDefaultHops,
 		EventGraphFederationDefaultLookbackHours: eventGraphFederationDefaultLookbackHours,
+
+		// JIMINY-PROCESS-OBSERVER-01 (task #160) — Path 2 platform.
+		ProcessEventsEnabled:                    processEventsEnabled,
+		ProcessEventWriterFlushIntervalSec:      processEventWriterFlushIntervalSec,
+		ProcessEventWriterBufferSize:            processEventWriterBufferSize,
+		ProcessGraderEnabled:                    processGraderEnabled,
+		ProcessGraderIntervalSec:                processGraderIntervalSec,
+		ProcessMatcherLintBeforeCommitEnabled:   processMatcherLintBeforeCommitEnabled,
 
 		// Phase 14 Epic 1 — Note 06 sparse activation gate
 		SparseRetrievalEnabled:     sparseRetrievalEnabled,

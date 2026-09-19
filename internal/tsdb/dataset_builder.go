@@ -30,6 +30,12 @@ type DatasetProvider interface {
 	// so the gauge, the panels, and RSIC GuidanceHealth all agree. samples=0
 	// signals no data in the window (caller falls back).
 	GuidanceEffectiveness(ctx context.Context, spaceID string, window time.Duration) (rate float64, samples int, err error)
+	// GuidanceEffectivenessByClass returns the same math as GuidanceEffectiveness
+	// but partitioned by the verifiability_class column (V0035, sprint
+	// JIMINY-METRIC-PARTITION-001). Keys: 'classifier' | 'process' | 'hybrid'
+	// | 'human'; missing keys signal 0-sample windows (safe: caller emits 0
+	// or skips). Feeds the per-class gauges + honest scoreboard.
+	GuidanceEffectivenessByClass(ctx context.Context, spaceID string, window time.Duration) (map[string]GuidanceClassRate, error)
 	// EnforcementOutcomes returns per-constraint-code counts of the three
 	// enforcement-decision outcome types (JIMINY-ENFORCE-004/005):
 	//   blocked_true_positive   — classifier denied, deny survived override
@@ -47,6 +53,13 @@ type DatasetProvider interface {
 	// has this constraint been overridden?" Empty slice + nil error signals
 	// no events in the window.
 	OverrideHistory(ctx context.Context, spaceID string, window time.Duration) ([]OverrideEvent, error)
+}
+
+// GuidanceClassRate is the per-verifiability-class row returned by
+// GuidanceEffectivenessByClass. JIMINY-METRIC-PARTITION-001 (task #158).
+type GuidanceClassRate struct {
+	Rate    float64 `json:"rate"`
+	Samples int     `json:"samples"`
 }
 
 // OverrideEvent is a single row from constraint_overrides — one operator
@@ -297,6 +310,88 @@ func (b *DatasetBuilder) GuidanceEffectiveness(ctx context.Context, spaceID stri
 		return 0, 0, fmt.Errorf("dataset_builder: guidance_effectiveness: %w", err)
 	}
 	return rate, n, nil
+}
+
+// GuidanceEffectivenessByClass returns the same math as GuidanceEffectiveness
+// partitioned by the V0035 verifiability_class column, PLUS a UNION over
+// V0036 process_outcomes rows (which always land as verifiability_class=
+// 'process' with their own outcome_type enum). Rows with no explicit
+// class in constraint_outcomes (pre-#158) read as 'classifier' via the
+// column DEFAULT. Missing keys in the returned map ↔ zero samples in the
+// window for that class.
+//
+// process_outcomes outcome_type semantics (JIMINY-PROCESS-OBSERVER-01):
+//   - process_followed    → 1.0 credit
+//   - process_incomplete  → 0.5 credit (lint ran but failed — like partial_compliance)
+//   - process_missed      → 0.0 credit
+//
+// JIMINY-METRIC-PARTITION-001 (task #158) — classifier/hybrid/human path.
+// JIMINY-PROCESS-OBSERVER-01 (task #160) — process path via UNION.
+func (b *DatasetBuilder) GuidanceEffectivenessByClass(ctx context.Context, spaceID string, window time.Duration) (map[string]GuidanceClassRate, error) {
+	cutoff := time.Now().Add(-window)
+	// UNION ALL over the two outcome tables. Each side emits (class, credit)
+	// tuples the outer aggregate averages. LEFT JOIN would drop-vs-UNION the
+	// zero-row case; UNION lets both tables independently contribute rows.
+	// Wrapped in a subquery so GROUP BY + COALESCE apply uniformly.
+	const query = `
+		WITH combined AS (
+			SELECT
+				verifiability_class AS class,
+				CASE WHEN outcome_type = 'followed'            THEN 1.0
+				     WHEN outcome_type = 'partial_compliance'  THEN 0.5
+				     ELSE 0.0 END AS credit
+			FROM constraint_outcomes
+			WHERE space_id = $1 AND time >= $2
+
+			UNION ALL
+
+			SELECT
+				'process' AS class,
+				CASE WHEN outcome_type = 'process_followed'    THEN 1.0
+				     WHEN outcome_type = 'process_incomplete'  THEN 0.5
+				     ELSE 0.0 END AS credit
+			FROM process_outcomes
+			WHERE space_id = $1 AND time >= $2
+		)
+		SELECT
+			class,
+			COUNT(*)::int AS n,
+			COALESCE(SUM(credit) / NULLIF(COUNT(*), 0), 0)::float8 AS rate
+		FROM combined
+		GROUP BY class`
+	rows, err := b.pool.Query(ctx, query, spaceID, cutoff)
+	if err != nil {
+		return nil, fmt.Errorf("dataset_builder: guidance_effectiveness_by_class: %w", err)
+	}
+	defer rows.Close()
+	out := make(map[string]GuidanceClassRate)
+	for rows.Next() {
+		var class string
+		var n int
+		var rate float64
+		if err := rows.Scan(&class, &n, &rate); err != nil {
+			return nil, fmt.Errorf("dataset_builder: guidance_effectiveness_by_class scan: %w", err)
+		}
+		if class == "" {
+			class = "classifier"
+		}
+		// Merge if two branches both emitted rows for the same class
+		// (shouldn't happen at the SQL level — 'process' comes only from
+		// process_outcomes, others only from constraint_outcomes — but the
+		// defensive sum-with-weights keeps future extension safe).
+		if existing, ok := out[class]; ok {
+			total := existing.Samples + n
+			if total > 0 {
+				out[class] = GuidanceClassRate{
+					Rate:    (existing.Rate*float64(existing.Samples) + rate*float64(n)) / float64(total),
+					Samples: total,
+				}
+			}
+			continue
+		}
+		out[class] = GuidanceClassRate{Rate: rate, Samples: n}
+	}
+	return out, rows.Err()
 }
 
 // EnforcementOutcomes returns per-constraint counts of enforcement-decision

@@ -85,6 +85,13 @@ Example:
 `,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			if port <= 0 {
+				if v := os.Getenv(defaultBenchServePortEnv); v != "" {
+					if n, err := strconv.Atoi(v); err == nil && n > 0 {
+						port = n
+					}
+				}
+			}
+			if port <= 0 {
 				port = defaultBenchServePort
 			}
 			if configPath == "" {
@@ -229,7 +236,7 @@ Example:
 	cmd.Flags().StringVar(&configPath, "config", defaultBenchmarkConfig, "benchmark config yaml")
 	cmd.Flags().StringVar(&out, "out", "", "output benchmark JSON path (required)")
 	cmd.Flags().StringVar(&base, "base", "", "base model path (default: MDEMG_BENCH_SERVE_BASE env or .local-models/qwen3-14b-4bit-base)")
-	cmd.Flags().IntVar(&port, "port", defaultBenchServePort, "bench-serve port")
+	cmd.Flags().IntVar(&port, "port", 0, "bench-serve port (env MDEMG_BENCH_SERVE_PORT; default 8103)")
 	cmd.Flags().BoolVar(&applyTSDB, "apply-tsdb", false, "pass --apply-tsdb to run_benchmark")
 	cmd.Flags().StringVar(&modelName, "mlx-model-name", "", "override --mlx-model-name for run_benchmark (defaults to --base)")
 	cmd.Flags().IntVar(&timeoutSec, "timeout-sec", 0, "max seconds for the run_benchmark subprocess (env MDEMG_BENCH_TIMEOUT_SEC, default 3600)")

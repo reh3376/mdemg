@@ -48,6 +48,12 @@ func (m *mockDatasetProvider) GuidanceEffectiveness(_ context.Context, _ string,
 	return 0, 0, nil // JIMINY-SIGNAL-001: mock returns no data → caller uses Neo4j fallback
 }
 
+// JIMINY-METRIC-PARTITION-001: mock returns empty map (all classes dormant),
+// matching the "no data in window" contract of the real DatasetBuilder.
+func (m *mockDatasetProvider) GuidanceEffectivenessByClass(_ context.Context, _ string, _ time.Duration) (map[string]tsdb.GuidanceClassRate, error) {
+	return nil, nil
+}
+
 // ENFORCE-004-FOLLOWUP: mock returns empty map by default; per-test EnforcementOutcomes
 // override lives in the test that consumes the reflect pattern.
 func (m *mockDatasetProvider) EnforcementOutcomes(_ context.Context, _ string, _ time.Duration) (map[string]tsdb.EnforcementOutcomeCounts, error) {

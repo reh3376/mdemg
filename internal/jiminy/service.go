@@ -811,12 +811,16 @@ func (s *Service) DetectMissedViolation(ctx context.Context, spaceID, sessionID 
 	if code == "" {
 		return ""
 	}
+	// JIMINY-METRIC-PARTITION-001: this is a retrospective correction-observed
+	// missed-violation write against a constraint node. Class defaults to
+	// classifier — the actual node's class is looked up at aggregation time
+	// via the shipped V0035 column (backward-compat for pre-#158 rows).
 	s.outcomeWriter.RecordOutcome(
 		spaceID, "" /* constraint_id — not needed; RSIC keys on code */, code,
 		"" /* guidance_id — the correction IS the retrospective judgment */,
 		sessionID,
 		string(OutcomeMissedViolation), string(GuidanceConstraint),
-		s.cfg.InstanceID, "correction_observed", 1.0,
+		s.cfg.InstanceID, "correction_observed", string(VerifiabilityClassifier), 1.0,
 	)
 	slog.Info("jiminy: missed_violation detected",
 		"space_id", spaceID, "session_id", sessionID, "constraint_code", code)
@@ -891,11 +895,13 @@ func (s *Service) writeEnforcementOutcomes(req ClassifyRequest, resp ClassifyRes
 			if code == "" {
 				continue
 			}
+			// JIMINY-METRIC-PARTITION-001: enforcement decisions default to
+			// classifier class (the classify path IS the LLM classifier).
 			s.outcomeWriter.RecordOutcome(
 				req.SpaceID, "" /* constraint_id — unknown at classify time */, code,
 				"" /* guidance_id — classify is a standalone decision */, req.SessionID,
 				string(OutcomeBlockedTruePositive), string(GuidanceConstraint),
-				s.cfg.InstanceID, "strict_classifier", resp.Confidence,
+				s.cfg.InstanceID, "strict_classifier", string(VerifiabilityClassifier), resp.Confidence,
 			)
 		}
 	}
@@ -908,7 +914,7 @@ func (s *Service) writeEnforcementOutcomes(req ClassifyRequest, resp ClassifyRes
 				req.SpaceID, "", code,
 				"", req.SessionID,
 				string(OutcomeBlockedFalsePositive), string(GuidanceConstraint),
-				s.cfg.InstanceID, "operator_override", 1.0,
+				s.cfg.InstanceID, "operator_override", string(VerifiabilityClassifier), 1.0,
 			)
 		}
 	}
@@ -1937,6 +1943,14 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 	}
 	informationalSet := s.loadInformationalNodeSet(ctx, informationalIDs)
 
+	// JIMINY-METRIC-PARTITION-001 (task #158): batch-lookup verifiability_class
+	// for the same source node set. Used inside the loop to (a) route outcomes
+	// on process/human class rules AWAY from constraint_outcomes (they're
+	// graded by Path 2 / HITL respectively), and (b) TAG classifier/hybrid
+	// class rows with the class label so per-class gauges can partition
+	// follow-rate honestly. Reuses informationalIDs — same source-node id set.
+	verifiabilityClassMap := s.loadVerifiabilityClassMap(ctx, informationalIDs)
+
 	for _, item := range items {
 		var cr ClassificationResult
 
@@ -2086,12 +2100,30 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 				(item.Type == GuidanceConstraint || item.Type == GuidanceCorrection) {
 				constraintCode = s.persistence.FindConstraintCodeForNode(ctx, req.SpaceID, constraintID)
 			}
-			s.outcomeWriter.RecordOutcome(
-				req.SpaceID, constraintID, constraintCode,
-				req.GuidanceID, feedbackSessionID,
-				string(outcome), string(item.Type), s.cfg.InstanceID,
-				cr.Source, cr.Confidence,
-			)
+			// JIMINY-METRIC-PARTITION-001: pick the source node's verifiability
+			// class. Rules classed as process/human do NOT persist to
+			// constraint_outcomes — Path 2 grader (process) or HITL platform
+			// (human) will grade them via their own sinks. Log INFO with the
+			// reason so operators can audit the routing decision.
+			vc := s.primaryVerifiabilityClass(item.SourceNodes, verifiabilityClassMap)
+			if !ClassPersistsToConstraintOutcomes(vc) {
+				slog.Info("jiminy: outcome not persisted — non-classifier verifiability class",
+					"space_id", req.SpaceID,
+					"constraint_code", constraintCode,
+					"constraint_id", constraintID,
+					"guidance_type", item.Type,
+					"verifiability_class", string(vc),
+					"outcome", string(outcome),
+					"note", "Path 2 (process) or HITL (human) grader will persist this outcome via its own sink",
+				)
+			} else {
+				s.outcomeWriter.RecordOutcome(
+					req.SpaceID, constraintID, constraintCode,
+					req.GuidanceID, feedbackSessionID,
+					string(outcome), string(item.Type), s.cfg.InstanceID,
+					cr.Source, string(vc), cr.Confidence,
+				)
+			}
 		}
 
 		// JIMINY-CONTRADICTED-BRIDGE-001: on a contradicted verdict, mint a
@@ -3332,6 +3364,87 @@ func (s *Service) loadInformationalNodeSet(ctx context.Context, nodeIDs []string
 		return m
 	}
 	return out
+}
+
+// loadVerifiabilityClassMap returns node_id → VerifiabilityClass for the given
+// candidate ids, defaulting to VerifiabilityClassifier for nodes missing the
+// property (safe default per V0035 column DEFAULT).
+//
+// Sprint JIMINY-METRIC-PARTITION-001 (task #158): used by RecordOutcome to
+// partition follow-rate accounting by verifiability class. Mirrors the shape
+// of loadInformationalNodeSet — batched, one Cypher round-trip, fail-open on
+// driver-nil or query error (returns empty map, callers must treat missing
+// keys as classifier default).
+func (s *Service) loadVerifiabilityClassMap(ctx context.Context, nodeIDs []string) map[string]VerifiabilityClass {
+	out := make(map[string]VerifiabilityClass)
+	if s.driver == nil || len(nodeIDs) == 0 {
+		return out
+	}
+	uniq := make(map[string]bool, len(nodeIDs))
+	for _, id := range nodeIDs {
+		if id != "" {
+			uniq[id] = true
+		}
+	}
+	if len(uniq) == 0 {
+		return out
+	}
+	ids := make([]string, 0, len(uniq))
+	for id := range uniq {
+		ids = append(ids, id)
+	}
+
+	sess := s.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	defer sess.Close(ctx) //nolint:errcheck
+
+	result, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, `
+			MATCH (n:MemoryNode)
+			WHERE n.node_id IN $ids
+			  AND n.verifiability_class IS NOT NULL
+			RETURN n.node_id AS id, n.verifiability_class AS class
+		`, map[string]any{"ids": ids})
+		if err != nil {
+			return nil, err
+		}
+		m := make(map[string]VerifiabilityClass)
+		for res.Next(ctx) {
+			rec := res.Record()
+			idV, _ := rec.Get("id")
+			classV, _ := rec.Get("class")
+			id, _ := idV.(string)
+			class, _ := classV.(string)
+			if id != "" && IsValidVerifiabilityClass(class) {
+				m[id] = VerifiabilityClass(class)
+			}
+		}
+		return m, res.Err()
+	})
+	if err != nil {
+		slog.Warn("jiminy: loadVerifiabilityClassMap failed (defaulting to classifier)", "error", err)
+		return out
+	}
+	if m, ok := result.(map[string]VerifiabilityClass); ok {
+		return m
+	}
+	return out
+}
+
+// primaryVerifiabilityClass picks the verifiability class for a guidance item
+// from its source nodes. Uses the FIRST source node's class (matches the
+// SetOutcome writer's constraintID = SourceNodes[0] convention). Missing key
+// or empty source → VerifiabilityClassifier (safe default).
+func (s *Service) primaryVerifiabilityClass(sourceNodes []string, classMap map[string]VerifiabilityClass) VerifiabilityClass {
+	for _, id := range sourceNodes {
+		if id == "" {
+			continue
+		}
+		if c, ok := classMap[id]; ok {
+			return c
+		}
+		return VerifiabilityClassifier
+	}
+	return VerifiabilityClassifier
 }
 
 // loadSpaceConstraintCodes loads all constraint codes for a space from Neo4j

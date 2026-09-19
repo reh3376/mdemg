@@ -444,6 +444,105 @@ def send_guardrail_producer(tool_name: str, tool_input: dict):
         pass
 
 
+def send_process_events(events: list[dict]):
+    """Fire-and-forget batch POST to /v1/process/event.
+
+    JIMINY-PROCESS-OBSERVER-01 (task #160). Emits process-event
+    observations for the Path 2 grader (lint-before-commit + future
+    matchers). Server returns 202 immediately; 503 when
+    PROCESS_EVENTS_ENABLED=false (silently dropped here — server-side flag
+    is the single source of truth). Fail-open on network error.
+    """
+    if not events:
+        return
+    payload = json.dumps({"events": events})
+    try:
+        subprocess.Popen(
+            [
+                "curl", "-sf", "-X", "POST",
+                f"{MDEMG_URL}/v1/process/event",
+                "-H", "Content-Type: application/json",
+                "-d", payload,
+                "--connect-timeout", "1",
+                "--max-time", "3",
+                "-o", "/dev/null",
+            ],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except Exception:
+        pass
+
+
+def _process_events_for_tool(tool_name: str, tool_input: dict, tool_output_str: str, session_id: str, space_id: str) -> list[dict]:
+    """Derive process events from a single PostToolUse invocation.
+
+    Emits fire-and-forget events for JIMINY-PROCESS-OBSERVER-01 (Path 2):
+      - Bash + lint command → event_type=lint_run
+      - Bash + git commit (no error indicators) → event_type=git_commit
+      - Write / Edit → event_type=file_write
+    Returns a list (may be empty). Never raises.
+    """
+    events: list[dict] = []
+    now_ms = int(time.time() * 1000)
+    common = {
+        "space_id": space_id,
+        "session_id": session_id,
+        "time_millis": now_ms,
+        "source_hook": "post-tool-observe.py",
+    }
+    error_indicators = ("error:", "Error:", "FATAL", "fatal:", "panic:", "FAILED", "command not found")
+
+    if tool_name == "Bash":
+        command = (tool_input.get("command") or "").strip()
+        if not command:
+            return events
+        cmd_lower = command.lower()
+        looks_error = any(ind in tool_output_str for ind in error_indicators)
+
+        is_lint = (
+            "golangci-lint" in cmd_lower
+            or "ruff check" in cmd_lower
+            or cmd_lower.startswith("ruff ")
+        )
+        if is_lint:
+            ev = dict(common)
+            ev["event_type"] = "lint_run"
+            if "golangci-lint" in cmd_lower:
+                ev["event_subtype"] = "golangci-lint"
+            elif "ruff" in cmd_lower:
+                ev["event_subtype"] = "ruff"
+            ev["outcome"] = "failure" if looks_error else "success"
+            ev["metadata"] = {"command_preview": command[:200]}
+            events.append(ev)
+
+        if (
+            "git commit" in cmd_lower
+            and "--amend" not in cmd_lower
+            and "--dry-run" not in cmd_lower
+            and not looks_error
+        ):
+            ev = dict(common)
+            ev["event_type"] = "git_commit"
+            ev["event_subtype"] = "git-commit"
+            ev["outcome"] = "success"
+            ev["metadata"] = {"command_preview": command[:200]}
+            events.append(ev)
+
+    elif tool_name in ("Write", "Edit"):
+        file_path = tool_input.get("file_path") or ""
+        if not file_path:
+            return events
+        ev = dict(common)
+        ev["event_type"] = "file_write"
+        ev["event_subtype"] = tool_name.lower()
+        ev["outcome"] = "success"
+        ev["metadata"] = {"file_path": file_path}
+        events.append(ev)
+
+    return events
+
+
 def observe(content: str, obs_type: str, tags: list[str] | None = None):
     """Fire-and-forget observation to CMS."""
     payload = {
@@ -854,6 +953,18 @@ def main():
     # GUARDRAIL-PRODUCER-001: async guardrail evaluation of real edits
     if tool_name in ("Write", "Edit"):
         send_guardrail_producer(tool_name, tool_input)
+
+    # JIMINY-PROCESS-OBSERVER-01 (task #160): emit process events for the
+    # Path 2 grader (lint-before-commit + future observers). Fire-and-forget.
+    if tool_name in ("Write", "Edit", "Bash"):
+        try:
+            proc_events = _process_events_for_tool(
+                tool_name, tool_input, output_str, SESSION_ID, SPACE_ID
+            )
+            if proc_events:
+                send_process_events(proc_events)
+        except Exception:
+            pass
 
     sys.exit(0)
 

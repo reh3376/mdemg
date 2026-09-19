@@ -29,6 +29,8 @@ import (
 	"mdemg/internal/dockerbin"
 	"mdemg/internal/embeddings"
 	"mdemg/internal/eventgraph"
+	procgrader "mdemg/internal/grader/process"
+	procmatchers "mdemg/internal/grader/process/matchers"
 	"mdemg/internal/filewatcher"
 	"mdemg/internal/ftloop"
 	"mdemg/internal/gaps"
@@ -175,6 +177,11 @@ type Server struct {
 	retrievalAuditWriter     *tsdb.RetrievalAuditWriter
 	sparseGateWriter         *tsdb.SparseGateMetricsWriter
 	reinforcementWriter      *tsdb.ReinforcementEventsWriter
+	// JIMINY-PROCESS-OBSERVER-01 (task #160) — Path 2 process-observation platform.
+	// Constructed only when PROCESS_EVENTS_ENABLED=true. nil otherwise; handler
+	// short-circuits with 503 when nil so operators know to flip the flag.
+	processEventsWriter      *tsdb.ProcessEventsWriter
+	processOutcomesWriter    *tsdb.ProcessOutcomesWriter
 	eventgraphService        *eventgraph.Service
 	constraintOutcomesWriter *tsdb.ConstraintOutcomesWriter
 	guidanceTrainingWriter   *tsdb.GuidanceTrainingRowsWriter
@@ -1672,6 +1679,28 @@ func (s *Server) SetTSDBClient(client *tsdb.Client) {
 			slog.Info("tsdb: reinforcement_events writer disabled (EVENTGRAPH_ENABLED=false)")
 		}
 
+		// JIMINY-PROCESS-OBSERVER-01 (task #160) Epic 3 — V0036 process_events
+		// + process_outcomes writers. Gated by PROCESS_EVENTS_ENABLED
+		// (default false); when disabled both writers stay nil and the
+		// POST /v1/process/event handler + grader loop short-circuit cleanly.
+		if s.cfg.ProcessEventsEnabled {
+			s.processEventsWriter = tsdb.NewProcessEventsWriter(
+				client.Pool(),
+				time.Duration(s.cfg.ProcessEventWriterFlushIntervalSec)*time.Second,
+				s.cfg.ProcessEventWriterBufferSize,
+			)
+			s.processOutcomesWriter = tsdb.NewProcessOutcomesWriter(
+				client.Pool(),
+				time.Duration(s.cfg.ProcessEventWriterFlushIntervalSec)*time.Second,
+				s.cfg.ProcessEventWriterBufferSize,
+			)
+			slog.Info("tsdb: process_events + process_outcomes writers attached",
+				"flush_interval_sec", s.cfg.ProcessEventWriterFlushIntervalSec,
+				"buffer_size", s.cfg.ProcessEventWriterBufferSize)
+		} else {
+			slog.Info("tsdb: process_events + process_outcomes writers disabled (PROCESS_EVENTS_ENABLED=false)")
+		}
+
 		// Phase 13.5 — LLM endpoint health events writer (V0018 hypertable).
 		// Watchdog state-transition + fast-fail-burst events land here for
 		// historical Grafana panels that survive mdemg restarts. Wire into
@@ -1965,6 +1994,12 @@ func (s *Server) Shutdown() {
 	}
 	if s.reinforcementWriter != nil {
 		s.reinforcementWriter.Close()
+	}
+	if s.processEventsWriter != nil {
+		s.processEventsWriter.Close()
+	}
+	if s.processOutcomesWriter != nil {
+		s.processOutcomesWriter.Close()
 	}
 	if s.constraintOutcomesWriter != nil {
 		s.constraintOutcomesWriter.Close()
@@ -2421,6 +2456,37 @@ func (s *Server) StartSupervisedBackground() {
 			})
 			s.goSupervised("scheduled-autograde", asch.Run)
 		}
+	}
+
+	// JIMINY-PROCESS-OBSERVER-01 (task #160) Epic 4 — process-grader loop.
+	// Gated by PROCESS_GRADER_ENABLED (default false). The writers must be
+	// present (Epic 3 wiring, gated by PROCESS_EVENTS_ENABLED); if either is
+	// missing the grader stays dormant.
+	if s.cfg.ProcessGraderEnabled && s.processOutcomesWriter != nil && s.tsdbClient != nil {
+		graderSpaceID := s.cfg.RSICWatchdogSpaceID
+		if graderSpaceID == "" {
+			graderSpaceID = "mdemg-dev"
+		}
+		g := procgrader.NewGrader(
+			procgrader.PoolAdapter{Pool: s.tsdbClient.Pool()},
+			s.processOutcomesWriter,
+			graderSpaceID,
+			time.Duration(s.cfg.ProcessGraderIntervalSec)*time.Second,
+		)
+		if s.cfg.ProcessMatcherLintBeforeCommitEnabled {
+			g.Register(procmatchers.NewLintBeforeCommit())
+		}
+		if g.MatcherCount() > 0 {
+			s.goSupervised("process-grader", g.Run)
+			slog.Info("process grader: wired",
+				"interval_sec", s.cfg.ProcessGraderIntervalSec,
+				"space_id", graderSpaceID,
+				"matcher_count", g.MatcherCount())
+		} else {
+			slog.Info("process grader: no matchers enabled — loop not started")
+		}
+	} else if s.cfg.ProcessGraderEnabled {
+		slog.Info("process grader: enabled but process_outcomes writer or TSDB client missing — dormant")
 	}
 }
 
@@ -3073,6 +3139,8 @@ func (s *Server) Routes() http.Handler {
 	mux.Handle("/v1/review/autograde-preview", scopedHandler(auth.ScopeAdminSpaces, s.handleReviewAutogradePreview)) // HITL-AUTOGRADE-PREVIEW-001
 	mux.HandleFunc("/v1/eventgraph/reinforcement-neighborhood", s.handleEventgraphReinforcementNeighborhood)
 	mux.HandleFunc("/v1/eventgraph/guidance-outcome-neighborhood", s.handleEventgraphGuidanceOutcomeNeighborhood)
+	// JIMINY-PROCESS-OBSERVER-01 (task #160) — Path 2 process-event ingest.
+	mux.HandleFunc("/v1/process/event", s.handleProcessEvent)
 	mux.Handle("/ui/", http.StripPrefix("/ui/", uiHandler()))
 
 	// Synergy: Claude Code ↔ MDEMG token optimization

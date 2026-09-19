@@ -43,6 +43,11 @@ per-action directives.`,
 	}
 	cmd.AddCommand(newJiminyConstraintMarkCmd())
 	cmd.AddCommand(newJiminyConstraintListInformationalCmd())
+	// Sprint JIMINY-METRIC-PARTITION-001 (task #158) — verifiability class
+	// property + CLI. Mirrors mark/list-informational shape.
+	cmd.AddCommand(newJiminyConstraintSetClassCmd())
+	cmd.AddCommand(newJiminyConstraintListClassesCmd())
+	cmd.AddCommand(newJiminyConstraintSeedClassesCmd())
 	return cmd
 }
 

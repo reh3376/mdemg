@@ -1531,6 +1531,15 @@
         "plugin_create.uats.json"
       ]
     },
+    "/v1/process/event": {
+      "consumers": [
+        ".claude/hooks/post-tool-observe.py",
+        "internal/cli/hook_templates/post-tool-observe.py"
+      ],
+      "disposition": "IN_USE",
+      "notes": "JIMINY-PROCESS-OBSERVER-01 (task #160). Fire-and-forget event ingest from the client-side post-tool-observe hook. Returns 202 on accept. Returns 503 when PROCESS_EVENTS_ENABLED=false. Consumers: post-tool-observe hook (and its shipped template mirror; HOOKSYNC-001 parity). UATS spec deferred (batch-event shape); ships in a follow-up sprint alongside the second observer.",
+      "uats_specs": []
+    },
     "/v1/prometheus": {
       "consumers": [],
       "disposition": "OPERATOR_SURFACE",
