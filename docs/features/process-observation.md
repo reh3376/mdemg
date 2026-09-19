@@ -65,6 +65,18 @@ Semantics per design spec §B4:
 6. Else → `process_missed` (0.0 credit).
 7. If no prior `file_write` → fail-open skip (docs-only commit; not a violation).
 
+### `sequential-epics` matcher (second observer — JIMINY-PROCESS-OBSERVER-02)
+
+Grades the `sequential-epics` Jiminy rule ("Execute sprint epics SEQUENTIALLY — Epic N MUST complete fully before Epic N+1 begins"). The hook captures the actual commit message via `git log -1 --format=%B` (bounded 500 chars, fail-open on error) into `metadata.commit_message`; the matcher parses it.
+
+Semantics:
+1. Given a `git_commit` event on session S at time T with a commit message,
+2. Extract the `Epic N` marker via `(?i)\bepic\s+(\d+)\b` (word-boundary),
+3. If no marker → fail-open skip (chore/docs/refactor commits are NOT graded),
+4. Query same-session prior `git_commit` events; find max prior Epic N,
+5. If max prior ≤ current → `process_followed` (monotonic sequence maintained; equal N is fine — same epic, multiple commits),
+6. If max prior > current → `process_incomplete` (out-of-order — exactly what the rule prohibits).
+
 ## How to use
 
 ### Enable end-to-end (default-off in code, opt-in via `.env`)
@@ -74,6 +86,7 @@ Semantics per design spec §B4:
 PROCESS_EVENTS_ENABLED=true
 PROCESS_GRADER_ENABLED=true
 PROCESS_MATCHER_LINT_BEFORE_COMMIT_ENABLED=true
+PROCESS_MATCHER_SEQUENTIAL_EPICS_ENABLED=true    # JIMINY-PROCESS-OBSERVER-02
 ```
 
 Then `mdemg service restart` (or `docker compose up -d`).
@@ -114,6 +127,7 @@ Flip any of the 3 env vars to `false` and restart. The V0036 tables persist (dat
 | `PROCESS_GRADER_ENABLED` | `false` | Enable the periodic matcher loop |
 | `PROCESS_GRADER_INTERVAL_SEC` | `60` | Grader loop cadence (floor 15) |
 | `PROCESS_MATCHER_LINT_BEFORE_COMMIT_ENABLED` | `false` | Enable the lint-before-commit matcher |
+| `PROCESS_MATCHER_SEQUENTIAL_EPICS_ENABLED` | `false` | Enable the sequential-epics matcher (JIMINY-PROCESS-OBSERVER-02) |
 
 ## Adding a new observer (sibling sprints)
 
