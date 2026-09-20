@@ -132,10 +132,11 @@
       "readers": [
         "internal/cli/data_curate.go (data curate-guidance)",
         "internal/api/guidance_audit.go (guidance-audit relabel job)",
-        "dashboards/mdemg-jiminy.json (heuristic-fraction gauge)"
+        "dashboards/mdemg-jiminy.json (heuristic-fraction gauge)",
+        "internal/api/human_class_queue_dataset.go (HITL pending-queue reader \u2014 JIMINY-HITL-HUMAN-CLASS-INTEGRATION-001)"
       ],
       "disposition": "IN_USE",
-      "notes": "Retrain evidence corpus for JIMINY guidance. GUIDANCE-AUDIT-001 relabels heuristic rows; data curate-guidance emits the versioned corpus."
+      "notes": "Retrain evidence corpus for JIMINY guidance. GUIDANCE-AUDIT-001 relabels heuristic rows; data curate-guidance emits the versioned corpus. V0037 added verifiability_class column + two new outcome_type values ('pending_human_review', 'graded_human_review') used by JIMINY-HITL-HUMAN-CLASS-INTEGRATION-001 as the HITL pending queue for human-class rules."
     },
     "llm_endpoint_health_events": {
       "writers": [
@@ -298,7 +299,7 @@
         "internal/grader/process/matchers/lint_before_commit.go"
       ],
       "disposition": "IN_USE",
-      "notes": "JIMINY-PROCESS-OBSERVER-01 (task #160) — V0036 hypertable capturing client-side process observations (lint runs, git commits, file writes, model calls, mcp calls, retrieval calls, plan-mode entries). Written via POST /v1/process/event (fire-and-forget from .claude/hooks/post-tool-observe.py). Read by the internal grader loop + per-rule matchers. Path 2 platform of JIMINY-METRIC-DENOMINATOR-DESIGN-001."
+      "notes": "JIMINY-PROCESS-OBSERVER-01 (task #160) \u2014 V0036 hypertable capturing client-side process observations (lint runs, git commits, file writes, model calls, mcp calls, retrieval calls, plan-mode entries). Written via POST /v1/process/event (fire-and-forget from .claude/hooks/post-tool-observe.py). Read by the internal grader loop + per-rule matchers. Path 2 platform of JIMINY-METRIC-DENOMINATOR-DESIGN-001."
     },
     "process_outcomes": {
       "writers": [
@@ -309,7 +310,7 @@
         "internal/tsdb/dataset_builder.go"
       ],
       "disposition": "IN_USE",
-      "notes": "JIMINY-PROCESS-OBSERVER-01 (task #160) — V0036 hypertable parallel to constraint_outcomes; one row per process-graded outcome (process_followed | process_missed | process_incomplete). Written by the grader loop (matchers per rule). Read by DatasetBuilder.GuidanceEffectivenessByClass via UNION with constraint_outcomes so the mdemg_jiminy_follow_rate_process_verifiable gauge (JIMINY-METRIC-PARTITION-001 #158) picks up rows without further wiring."
+      "notes": "JIMINY-PROCESS-OBSERVER-01 (task #160) \u2014 V0036 hypertable parallel to constraint_outcomes; one row per process-graded outcome (process_followed | process_missed | process_incomplete). Written by the grader loop (matchers per rule). Read by DatasetBuilder.GuidanceEffectivenessByClass via UNION with constraint_outcomes so the mdemg_jiminy_follow_rate_process_verifiable gauge (JIMINY-METRIC-PARTITION-001 #158) picks up rows without further wiring."
     }
   }
 }
