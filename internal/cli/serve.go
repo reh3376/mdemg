@@ -560,6 +560,19 @@ func runServe(cmd *cobra.Command, _ []string, port int, dbURI string, autoMigrat
 				// (was hardcoded 0.30 which flapped chronically on healthy substrate).
 				rules = append(rules, alert.JiminyFollowRateRules(
 					cfg.JiminyFollowRateAlertFloor)...)
+				// JIMINY-METRIC-PARTITION-ALERTS-PANELS-001 (2026-09-20):
+				// per-verifiability-class follow-rate alerts. Each class
+				// has its own rule + distinct Service (NOSILENT-001).
+				// Supersedes the aggregate rule above per JIMINY-CEILING-
+				// INVESTIGATION-002 arch rule. Any class-floor ≤ 0 skips
+				// that class (human today; PENDING JIMINY-HITL-HUMAN-
+				// CLASS-INTEGRATION-001).
+				rules = append(rules, alert.JiminyFollowRateClassRules(map[string]float64{
+					"classifier": cfg.JiminyFollowRateClassifierFloor,
+					"process":    cfg.JiminyFollowRateProcessFloor,
+					"hybrid":     cfg.JiminyFollowRateHybridFloor,
+					"human":      cfg.JiminyFollowRateHumanFloor,
+				})...)
 				// JIMINY-TRACKER-TTL-001 (2026-08-02): symptom-monitor for the
 				// dropped-feedback class (guidance_id expired from in-memory
 				// tracker before feedback POST arrived). Post-fix (disk-persist

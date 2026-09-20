@@ -150,11 +150,77 @@ func JiminyFeedbackDropRules(threshold int, lookbackMin int) []AlertRule {
 	}
 }
 
-// JiminyFollowRateRules returns the raw follow-rate alert (moved out of DefaultRules by
-// FOLLOW-RATE-CALIBRATE-001 to accept a config-driven floor). The default 0.30 was hardcoded
-// from before JIMINY-CORPUS-001 established the honest ~0.30 steady state, causing the rule
-// to flap chronically. Extract to config lets operators set a floor BELOW the steady state
-// so only genuine collapse fires. Floor ≤ 0 → rule disabled entirely.
+// JIMINY-METRIC-PARTITION-ALERTS-PANELS-001 (2026-09-20): rule + config
+// factory for the per-verifiability-class follow-rate alerts that
+// close the observability loop on JIMINY-METRIC-PARTITION-001 (#158).
+// See JIMINY-CEILING-INVESTIGATION-002 pinned arch rule: aggregate
+// follow rate over mixed verifiability classes is dishonest; each
+// class needs its own rule so the honest classifier-only signal is
+// legible independent of the process/hybrid/human class mix.
+//
+// Returns one rule per class whose floor > 0 in the input map. A
+// floor ≤ 0 SKIPS that class entirely (used by the human class today
+// — no writer ships until JIMINY-HITL-HUMAN-CLASS-INTEGRATION-001).
+//
+// Contract:
+//   - Distinct Service per rule (NOSILENT-001 cooldown-key contract):
+//     "jiminy-classifier" / "jiminy-process" / "jiminy-hybrid" /
+//     "jiminy-human". Any new class MUST get its own Service.
+//   - COALESCE(AVG(value), 1.0) → idle-safe on a `lt` operator
+//     (TSDB-CONSUME-001).
+//   - Reads `time` column, not `recorded_at` (HIDDEN-CHURN-001 pin).
+//   - Threshold matches the floor exactly.
+func JiminyFollowRateClassRules(floors map[string]float64) []AlertRule {
+	// Ordered so `DefaultRules()` sweep tests see deterministic output.
+	classes := []struct {
+		name    string   // stable classifier name for input map lookup
+		metric  string   // `mdemg_jiminy_follow_rate_*` gauge
+		service string   // NOSILENT-001 cooldown-key
+	}{
+		{"classifier", "mdemg_jiminy_follow_rate_classifier_verifiable", "jiminy-classifier"},
+		{"process", "mdemg_jiminy_follow_rate_process_verifiable", "jiminy-process"},
+		{"hybrid", "mdemg_jiminy_follow_rate_hybrid", "jiminy-hybrid"},
+		{"human", "mdemg_jiminy_follow_rate_human", "jiminy-human"},
+	}
+	var rules []AlertRule
+	for _, c := range classes {
+		floor, ok := floors[c.name]
+		if !ok || floor <= 0 {
+			continue
+		}
+		rules = append(rules, AlertRule{
+			ID:          "jiminy_follow_rate_drop_" + c.name,
+			Title:       "Jiminy Follow Rate Drop (" + c.name + "-verifiable)",
+			Service:     c.service,
+			Severity:    SeverityMedium,
+			Interval:    60 * time.Second,
+			ForDuration: 30 * time.Minute,
+			// Windowed AVG + COALESCE-to-healthy on absence
+			// (ALERT-TRUTH-001; TSDB-CONSUME-001 idle-safe).
+			QuerySQL: `SELECT COALESCE(AVG(value), 1.0) AS follow_rate FROM metric_samples
+					WHERE metric_name = '` + c.metric + `'
+					  AND metric_type = 'gauge'
+					  AND time > now() - interval '30 minutes'`,
+			Threshold: floor,
+			Operator:  "lt",
+			Enabled:   true,
+		})
+	}
+	return rules
+}
+
+// JiminyFollowRateRules returns the AGGREGATE follow-rate alert (moved out of
+// DefaultRules by FOLLOW-RATE-CALIBRATE-001 to accept a config-driven floor).
+//
+// SUPERSEDED by JiminyFollowRateClassRules (JIMINY-METRIC-PARTITION-ALERTS-
+// PANELS-001, 2026-09-20). Per JIMINY-CEILING-INVESTIGATION-002 the aggregate
+// gauge is class-mix-dominated and can't tell you which class dropped. Code
+// default flipped to 0 (disables the aggregate alert on fresh installs).
+// Operators with explicit `JIMINY_FOLLOW_RATE_ALERT_FLOOR` in `.env` keep
+// the aggregate alert firing — no silent breakage.
+//
+// The aggregate gauge itself is retained per #158 (honest label in help text).
+// Floor ≤ 0 → rule disabled entirely.
 func JiminyFollowRateRules(floor float64) []AlertRule {
 	if floor <= 0 {
 		return nil

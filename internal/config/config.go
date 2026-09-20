@@ -1373,7 +1373,15 @@ type Config struct {
 	// "Follow rate on guidance that SHOULD have been followed" (actionable
 	// constraint/correction types) — excludes correctly-ignored advisory items.
 	GuidanceShouldFollowRateFloor     float64 // GUIDANCE_SHOULD_FOLLOW_RATE_FLOOR — alert when actionable-compliance rate drops below this (default: 0.05 — must sit BELOW the ~0.10-0.14 by-design steady state so only genuine collapse fires; was 0.5 pre-JIMINY-ACTIONABILITY-INVERSION-001 verdict; 0 disables the rule)
-	JiminyFollowRateAlertFloor        float64 // JIMINY_FOLLOW_RATE_ALERT_FLOOR — alert when the raw `mdemg_jiminy_follow_rate` gauge drops below this (default: 0.05 per JIMINY-HEURISTIC-DEFAULT-001; investigation at docs/development/jiminy-follow-rate-decline-2026-08-10/. 0 disables the rule)
+	JiminyFollowRateAlertFloor        float64 // JIMINY_FOLLOW_RATE_ALERT_FLOOR — alert when the AGGREGATE `mdemg_jiminy_follow_rate` gauge drops below this. SUPERSEDED 2026-09-20 by JIMINY-METRIC-PARTITION-ALERTS-PANELS-001 per-class alerts; default flipped 0.05→0 (disabled) because the aggregate is class-mix-dominated per JIMINY-CEILING-INVESTIGATION-002. Operators with explicit `.env` value keep the aggregate. 0 disables the rule.
+	// JIMINY-METRIC-PARTITION-ALERTS-PANELS-001 (2026-09-20): per-verifiability-class
+	// follow-rate alert floors. Each class has its own alert rule (distinct Service
+	// per NOSILENT-001) so operators see the honest class-specific signal instead of
+	// the class-mix-dominated aggregate. Any floor ≤ 0 disables its class rule.
+	JiminyFollowRateClassifierFloor float64 // JIMINY_FOLLOW_RATE_CLASSIFIER_FLOOR — floor for `mdemg_jiminy_follow_rate_classifier_verifiable` alert (default 0.10; sits below live 24h ~0.17 with margin so only genuine collapse fires). This is the class LLM retraining CAN improve; the gate rule per PHASE-4B-GATE-DECISION-001.
+	JiminyFollowRateProcessFloor    float64 // JIMINY_FOLLOW_RATE_PROCESS_FLOOR — floor for `mdemg_jiminy_follow_rate_process_verifiable` alert (default 0.25; live-smoke revealed 30-min window swings to ~0.43 while 24h avg is ~0.74 — sparse denominator + 3-value credit math (followed=1.0/incomplete=0.5/missed=0.0) → 0.25 floor means "on average, majority of outcomes are incomplete or worse" which is a legitimate collapse signal). Watch-item: recalibrate at T+30d once denominator accumulates across all 6 matchers.
+	JiminyFollowRateHybridFloor     float64 // JIMINY_FOLLOW_RATE_HYBRID_FLOOR — floor for `mdemg_jiminy_follow_rate_hybrid` alert (default 0.15; small denominator today — 2 hybrid rules).
+	JiminyFollowRateHumanFloor      float64 // JIMINY_FOLLOW_RATE_HUMAN_FLOOR — floor for `mdemg_jiminy_follow_rate_human` alert (default 0 = DISABLED; human class has no writer until JIMINY-HITL-HUMAN-CLASS-INTEGRATION-001 ships. Operator flips to a real number when the writer lands).
 	JiminyFeedbackDropThreshold       int     // JIMINY_FEEDBACK_DROP_THRESHOLD — alert when dropped feedbacks over the lookback exceed this (default: 20 — post-JIMINY-TRACKER-TTL-001 fix drops should be ~0; a non-zero drop rate is a real regression signal). 0 disables.
 	JiminyFeedbackDropLookbackMin     int     // JIMINY_FEEDBACK_DROP_LOOKBACK_MIN — window for the drop counter (default: 60 min)
 	GuidanceShouldFollowLookbackHours int     // GUIDANCE_SHOULD_FOLLOW_LOOKBACK_HOURS — window for the should-follow rate (default: 168 = 7d, floor: 1)
@@ -4121,7 +4129,27 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	jiminyFollowRateAlertFloor, err := atof("JIMINY_FOLLOW_RATE_ALERT_FLOOR", 0.05)
+	// JIMINY-METRIC-PARTITION-ALERTS-PANELS-001 (2026-09-20): aggregate
+	// default flipped 0.05 → 0 (disables the class-mix-dominated aggregate
+	// alert on fresh installs). Per-class rules below are the honest
+	// scoreboard. Operators with explicit `.env` value keep the aggregate.
+	jiminyFollowRateAlertFloor, err := atof("JIMINY_FOLLOW_RATE_ALERT_FLOOR", 0)
+	if err != nil {
+		return Config{}, err
+	}
+	jiminyFollowRateClassifierFloor, err := atof("JIMINY_FOLLOW_RATE_CLASSIFIER_FLOOR", 0.10)
+	if err != nil {
+		return Config{}, err
+	}
+	jiminyFollowRateProcessFloor, err := atof("JIMINY_FOLLOW_RATE_PROCESS_FLOOR", 0.25)
+	if err != nil {
+		return Config{}, err
+	}
+	jiminyFollowRateHybridFloor, err := atof("JIMINY_FOLLOW_RATE_HYBRID_FLOOR", 0.15)
+	if err != nil {
+		return Config{}, err
+	}
+	jiminyFollowRateHumanFloor, err := atof("JIMINY_FOLLOW_RATE_HUMAN_FLOOR", 0)
 	if err != nil {
 		return Config{}, err
 	}
@@ -6630,6 +6658,10 @@ func FromEnv() (Config, error) {
 		GuidanceAuditInitialDelaySec:                   guidanceAuditInitialDelaySec,
 		GuidanceShouldFollowRateFloor:                  guidanceShouldFollowRateFloor,
 		JiminyFollowRateAlertFloor:                     jiminyFollowRateAlertFloor,
+		JiminyFollowRateClassifierFloor:                jiminyFollowRateClassifierFloor,
+		JiminyFollowRateProcessFloor:                   jiminyFollowRateProcessFloor,
+		JiminyFollowRateHybridFloor:                    jiminyFollowRateHybridFloor,
+		JiminyFollowRateHumanFloor:                     jiminyFollowRateHumanFloor,
 		JiminyFeedbackDropThreshold:                    jiminyFeedbackDropThreshold,
 		JiminyFeedbackDropLookbackMin:                  jiminyFeedbackDropLookbackMin,
 		GuidanceShouldFollowLookbackHours:              guidanceShouldFollowLookbackHours,
