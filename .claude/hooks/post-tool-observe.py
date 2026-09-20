@@ -582,6 +582,19 @@ def _process_events_for_tool(tool_name: str, tool_input: dict, tool_output_str: 
         ev["metadata"] = {"file_path": file_path}
         events.append(ev)
 
+        # JIMINY-PROCESS-OBSERVER-06: capture Claude model on planning-file
+        # Write (not Edit — Edit is iteration; Write is the planning moment).
+        # Fires on sprint_plan.md / plan.md at any path depth.
+        base = os.path.basename(file_path)
+        if tool_name == "Write" and base in ("sprint_plan.md", "plan.md"):
+            model = os.environ.get("ANTHROPIC_MODEL", "")
+            ev2 = dict(common)
+            ev2["event_type"] = "model_call"
+            ev2["event_subtype"] = "planning"
+            ev2["outcome"] = "success"
+            ev2["metadata"] = {"model": model, "file_path": file_path}
+            events.append(ev2)
+
     # JIMINY-PROCESS-OBSERVER-03: filesystem_search events (Glob / Grep tool)
     # for the query-cms-first matcher's terminal event.
     if tool_name == "Glob":
