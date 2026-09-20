@@ -13,7 +13,8 @@ import (
 // row_id=0, time=1, space_id=2, session_id=3, instance_id=4, guidance_id=5,
 // guidance_type=6, guidance_content=7, source_node_id=8, source_role_type=9,
 // source_layer=10, action_summary=11, outcome_type=12, similarity=13,
-// classifier_source=14, constraint_code=15.
+// classifier_source=14, constraint_code=15, verifiability_class=16
+// (V0037, JIMINY-HITL-HUMAN-CLASS-INTEGRATION-001).
 
 func sampleGuidanceRow() GuidanceTrainingRow {
 	l := 3
@@ -55,8 +56,8 @@ func TestGuidanceTrainingWriter_RecordThenFlush_WritesAllRowsAndCUID(t *testing.
 	if got := last.tableName[0]; got != "guidance_training_rows" {
 		t.Errorf("table name = %q, want guidance_training_rows", got)
 	}
-	if len(last.columns) != 16 {
-		t.Errorf("got %d columns, want 16", len(last.columns))
+	if len(last.columns) != 17 {
+		t.Errorf("got %d columns, want 17 (V0037 added verifiability_class)", len(last.columns))
 	}
 	if len(last.rows) != 3 {
 		t.Fatalf("got %d rows, want 3", len(last.rows))

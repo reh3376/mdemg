@@ -157,7 +157,7 @@ git revert <sha>
 - ✅ ~~**Grafana panel updates**~~ — SHIPPED as JIMINY-METRIC-PARTITION-ALERTS-PANELS-001 (2026-09-20). See §Per-class alerts + panels below.
 - ✅ ~~**Per-class alert rules**~~ — SHIPPED as JIMINY-METRIC-PARTITION-ALERTS-PANELS-001 (2026-09-20). See §Per-class alerts + panels below.
 - ✅ ~~**Path 2 observers**~~ — JIMINY-PROCESS-OBSERVER-{01..06} SHIPPED 2026-09-18 → 2026-09-19; the `process` class gauge now has 6 live matchers (live 24h ~74%).
-- **HITL human-class routing** — `JIMINY-HITL-HUMAN-CLASS-INTEGRATION-001` will populate the `human` class gauge (currently dormant at 0; alert rule disabled by default at floor=0)
+- ✅ ~~**HITL human-class routing**~~ — SHIPPED as JIMINY-HITL-HUMAN-CLASS-INTEGRATION-001 (2026-09-20). See §Human-class writer below.
 
 ## Per-class alerts + panels (JIMINY-METRIC-PARTITION-ALERTS-PANELS-001 — 2026-09-20)
 
@@ -201,3 +201,71 @@ mdemg_jiminy_follow_rate{space_id="mdemg-dev"}                       = 0.252
 ```
 
 The classifier follow rate is **25.2%** — a meaningful lift over the pre-sprint aggregate of 16.74% (Path 4+1 measured value), obtained by routing the classifier-unverifiable class OUT of the numerator+denominator. This is the honest scoreboard on which any future retrain (Phase 4b) should be evaluated.
+
+## Human-class writer (JIMINY-HITL-HUMAN-CLASS-INTEGRATION-001 — 2026-09-20)
+
+The 4th (last) class gauge (`mdemg_jiminy_follow_rate_human`) now has a writer — the HITL platform. Human-verifiability rules are defined as the class the LLM classifier CANNOT verify from action-text (design spec #157 taxonomy); the honest signal is operator judgment.
+
+### Shape
+
+1. **V0037** adds `verifiability_class TEXT NOT NULL DEFAULT 'classifier'` to `guidance_training_rows` (mirrors V0035 on `constraint_outcomes`).
+2. **RecordOutcome emit branch** (`internal/jiminy/service.go`): when `s.cfg.JiminyHumanClassQueueEnabled=true` AND the source node's class='human', the training-row emit tags:
+   - `outcome_type = 'pending_human_review'`
+   - `verifiability_class = 'human'`
+
+   The constraint_outcomes routing above is UNCHANGED — informational→NA override still fires. This means aggregate follow-rate + escalation + corpus-audit signals stay byte-identical.
+3. **HITL dataset** `human_class_queue` (`internal/api/human_class_queue_dataset.go`):
+   - `FetchCandidates`: `SELECT ... FROM guidance_training_rows LEFT JOIN review_grades ... WHERE outcome_type='pending_human_review' AND verifiability_class='human' AND r.item_id IS NULL` (HITL-CURATION-003 dedup pattern — pending rows exit the queue automatically once graded at the current rubric_version).
+   - `Rubric`: single dimension `followed` 0-4 (`hc-v1`).
+   - `Sink`: writes to `constraint_outcomes` with `verifiability_class='human'` + `classifier_source='operator'`. Grade mapping: `>=3 → followed`, `<=1 → ignored`, `==2 → defer/no-op`.
+4. **Auto-grader REJECTED at sink** — human class is by construction LLM-unverifiable. `Preview` + `Apply` both refuse `grader_id LIKE 'auto:%'` with named error `errAutograderRejected` citing the taxonomy source. This is the sole HITL dataset with this inversion; every other dataset allows auto:* grades under HITL-CURATION-002's non-reinforcing invariant.
+5. **`GuidanceEffectivenessByClass` SQL** extended to exclude `outcome_type IN ('pending_human_review','graded_human_review')` from credit — pending backlog does not contribute to the class rate.
+
+### Config
+
+- `JIMINY_HUMAN_CLASS_QUEUE_ENABLED` — writer-side gate. Default `false` in code AND `.env` (HEBB-ETA-001 contract). Operator flips in `.env` after live smoke.
+- `JIMINY_FOLLOW_RATE_HUMAN_FLOOR` — alert floor for `mdemg_jiminy_follow_rate_human`. Default `0` (disabled). Operator raises to a real number after the gauge accumulates enough operator-graded rows to establish a steady state (~30d suggested).
+
+### Live Tier-3 (mdemg-dev, 2026-09-20)
+
+End-to-end verified:
+- Synthesized pending row → visible in `/v1/review/candidates?dataset_id=human_class_queue`
+- Operator grade (dim `followed=4`, `reinforce=true`) → `grade_recorded=true, reinforcement_applied=true`
+- Buffered writers flushed → `constraint_outcomes` row landed with `outcome=followed, class=human, source=operator`
+- LEFT JOIN dedup fired → `item_count: 1 → 0` post-grade
+- **`mdemg_jiminy_follow_rate_human = 1.0000`** on the next RSIC assessment tick — the dormant-since-#158 gauge moved off 0
+- Auto-grader smoke (fresh row + `force:true` to bypass 409): sink refused with server-side error; **0 rows in `review_grades` with `grader_id LIKE 'auto:%'` on this dataset; 0 constraint_outcomes rows with auto:* source**
+
+### Semantics of the pending queue
+
+The pending row's `outcome_type='pending_human_review'` is a queue signal, not an outcome. `GuidanceEffectivenessByClass` explicitly excludes it from the credit computation — the class rate reflects only operator-graded outcomes in `constraint_outcomes`. This is by design: the human class gauge answers "of the actions the operator has graded against this class of rule, what fraction followed?" — NOT "how big is the backlog?"
+
+To see queue depth, use the shipped HITL analytics tile pattern (HITL-ANALYTICS-TILE-001) or run:
+
+```sql
+SELECT count(*)
+FROM guidance_training_rows g
+LEFT JOIN review_grades r ON r.dataset_id='human_class_queue'
+    AND r.item_id=g.row_id AND r.reversed=FALSE AND r.rubric_version='hc-v1'
+WHERE g.space_id='<space>'
+  AND g.outcome_type='pending_human_review'
+  AND g.verifiability_class='human'
+  AND r.item_id IS NULL;
+```
+
+### Deferred
+
+- **Grafana panel for queue depth + operator grading cadence** — optional Epic 6 in the sprint plan; ship if operator throughput proves insufficient without visibility. Uses the shipped HITL-ANALYTICS-TILE-001 pattern.
+- **Per-rule sampling / rate limit** — v1 emits every human-class item that fires the classifier. If volume proves unmanageable, add a sampling gate (mirror the `PROCESS_MATCHER_*_ENABLED` per-rule pattern).
+- **Retroactive backfill** — human-class events never landed anywhere pre-sprint (the informational→NA route dropped them entirely). No source to backfill from; forward-only is honest.
+
+### Rollback
+
+Non-destructive with two flags of protection:
+1. `JIMINY_HUMAN_CLASS_QUEUE_ENABLED=false` + restart → stops new emits.
+2. `DELETE FROM constraint_outcomes WHERE verifiability_class='human' AND classifier_source='operator'` → undo human-class grade rows (operator judgment; grading is real data, may want to keep).
+3. `DELETE FROM guidance_training_rows WHERE outcome_type='pending_human_review'` → undo pending queue rows.
+4. Migration rollback (last resort): `ALTER TABLE guidance_training_rows DROP COLUMN verifiability_class; UPDATE tsdb_schema_meta SET value='36';`.
+5. `git revert <shas>` → undoes Go code + writer + sink + config + docs.
+
+Reversibility preserved end-to-end.

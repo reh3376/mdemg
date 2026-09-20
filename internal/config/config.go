@@ -1335,7 +1335,7 @@ type Config struct {
 	TSDBFlushIntervalSec      int    // TSDB_FLUSH_INTERVAL_SEC — metric writer flush interval in seconds (default: 60)
 	TSDBRawRetentionDays      int    // TSDB_RAW_RETENTION_DAYS — raw sample retention in days (default: 90)
 	TSDBHourlyRetentionDays   int    // TSDB_HOURLY_RETENTION_DAYS — hourly aggregate retention in days (default: 365)
-	TSDBRequiredSchemaVersion int    // TSDB_REQUIRED_SCHEMA_VERSION — minimum required TSDB schema version (default: 36 post-JIMINY-PROCESS-OBSERVER-01 V0036 process_events + process_outcomes hypertables)
+	TSDBRequiredSchemaVersion int    // TSDB_REQUIRED_SCHEMA_VERSION — minimum required TSDB schema version (default: 37 post-JIMINY-HITL-HUMAN-CLASS-INTEGRATION-001 V0037 guidance_training_rows.verifiability_class)
 	TSDBOptional              bool   // TSDB_OPTIONAL — if true, TSDB failure is non-fatal on startup (default: true)
 	InstanceID                string // MDEMG_INSTANCE_ID — identifies this node for multi-instance coordination (default: "{hostname}-{space_id}")
 	LLMInteractionLogging     bool   // LLM_INTERACTION_LOGGING — log all LLM calls to llm_interactions table (default: true)
@@ -1382,6 +1382,16 @@ type Config struct {
 	JiminyFollowRateProcessFloor    float64 // JIMINY_FOLLOW_RATE_PROCESS_FLOOR — floor for `mdemg_jiminy_follow_rate_process_verifiable` alert (default 0.25; live-smoke revealed 30-min window swings to ~0.43 while 24h avg is ~0.74 — sparse denominator + 3-value credit math (followed=1.0/incomplete=0.5/missed=0.0) → 0.25 floor means "on average, majority of outcomes are incomplete or worse" which is a legitimate collapse signal). Watch-item: recalibrate at T+30d once denominator accumulates across all 6 matchers.
 	JiminyFollowRateHybridFloor     float64 // JIMINY_FOLLOW_RATE_HYBRID_FLOOR — floor for `mdemg_jiminy_follow_rate_hybrid` alert (default 0.15; small denominator today — 2 hybrid rules).
 	JiminyFollowRateHumanFloor      float64 // JIMINY_FOLLOW_RATE_HUMAN_FLOOR — floor for `mdemg_jiminy_follow_rate_human` alert (default 0 = DISABLED; human class has no writer until JIMINY-HITL-HUMAN-CLASS-INTEGRATION-001 ships. Operator flips to a real number when the writer lands).
+	// JIMINY-HITL-HUMAN-CLASS-INTEGRATION-001 (2026-09-20 — Q5 §3 #2):
+	// gate for emitting the human-class pending-queue row in RecordOutcome.
+	// When true AND the source node's verifiability_class='human', the
+	// existing training-row emit tags outcome_type='pending_human_review'
+	// + verifiability_class='human' instead of the classifier's verdict
+	// (usually not_applicable via the informational→NA override). Sink
+	// writes the operator-graded outcome to constraint_outcomes with
+	// class='human' + classifier_source='operator'. HEBB-ETA-001 contract:
+	// default off in code AND in .env; operator flips post-live-smoke.
+	JiminyHumanClassQueueEnabled bool // JIMINY_HUMAN_CLASS_QUEUE_ENABLED — enable human-class HITL pending queue (default false)
 	JiminyFeedbackDropThreshold       int     // JIMINY_FEEDBACK_DROP_THRESHOLD — alert when dropped feedbacks over the lookback exceed this (default: 20 — post-JIMINY-TRACKER-TTL-001 fix drops should be ~0; a non-zero drop rate is a real regression signal). 0 disables.
 	JiminyFeedbackDropLookbackMin     int     // JIMINY_FEEDBACK_DROP_LOOKBACK_MIN — window for the drop counter (default: 60 min)
 	GuidanceShouldFollowLookbackHours int     // GUIDANCE_SHOULD_FOLLOW_LOOKBACK_HOURS — window for the should-follow rate (default: 168 = 7d, floor: 1)
@@ -4153,6 +4163,8 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	jiminyHumanClassQueueEnabled := getBool("JIMINY_HUMAN_CLASS_QUEUE_ENABLED", false)
+
 	jiminyFeedbackDropThreshold, err := atoi("JIMINY_FEEDBACK_DROP_THRESHOLD", 20)
 	if err != nil {
 		return Config{}, err
@@ -5590,7 +5602,7 @@ func FromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	tsdbRequiredSchemaVersion, err := atoi("TSDB_REQUIRED_SCHEMA_VERSION", 36)
+	tsdbRequiredSchemaVersion, err := atoi("TSDB_REQUIRED_SCHEMA_VERSION", 37)
 	if err != nil {
 		return Config{}, err
 	}
@@ -6662,6 +6674,7 @@ func FromEnv() (Config, error) {
 		JiminyFollowRateProcessFloor:                   jiminyFollowRateProcessFloor,
 		JiminyFollowRateHybridFloor:                    jiminyFollowRateHybridFloor,
 		JiminyFollowRateHumanFloor:                     jiminyFollowRateHumanFloor,
+		JiminyHumanClassQueueEnabled:                   jiminyHumanClassQueueEnabled,
 		JiminyFeedbackDropThreshold:                    jiminyFeedbackDropThreshold,
 		JiminyFeedbackDropLookbackMin:                  jiminyFeedbackDropLookbackMin,
 		GuidanceShouldFollowLookbackHours:              guidanceShouldFollowLookbackHours,

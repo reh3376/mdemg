@@ -2174,21 +2174,42 @@ func (s *Service) RecordOutcome(ctx context.Context, req GuidanceFeedbackRequest
 			}
 			roleType, layer, _ := s.resolveSourceMeta(ctx, sourceNodeID)
 			maxBytes := s.cfg.GuidanceCorpusMaxContentBytes
+			// JIMINY-HITL-HUMAN-CLASS-INTEGRATION-001: for human-class items,
+			// tag the row as the HITL pending queue (outcome_type='pending_
+			// human_review', verifiability_class='human'). The class was
+			// computed above at the constraint_outcomes routing site
+			// (`primaryVerifiabilityClass`); recompute here — the training-row
+			// emit block is outside that scope. Class='human' items previously
+			// landed as the classifier's verdict (usually `not_applicable`
+			// after the informational→NA override). The pending-queue tag
+			// makes them queryable as an operator-graded backlog without
+			// changing any other downstream signal (constraint_outcomes,
+			// escalation, corpus-audit still see the informational-NA route).
+			outcomeType := string(outcome)
+			verifiabilityClass := ""
+			if s.cfg.JiminyHumanClassQueueEnabled && len(item.SourceNodes) > 0 {
+				vc := s.primaryVerifiabilityClass(item.SourceNodes, verifiabilityClassMap)
+				if vc == VerifiabilityHuman {
+					outcomeType = "pending_human_review"
+					verifiabilityClass = string(VerifiabilityHuman)
+				}
+			}
 			s.guidanceTrainingWriter.RecordTrainingRow(GuidanceTrainingRecord{
-				SpaceID:          req.SpaceID,
-				SessionID:        feedbackSessionID,
-				InstanceID:       s.cfg.InstanceID,
-				GuidanceID:       req.GuidanceID,
-				GuidanceType:     string(item.Type),
-				GuidanceContent:  truncateBytes(item.Content, maxBytes),
-				SourceNodeID:     sourceNodeID,
-				SourceRoleType:   roleType,
-				SourceLayer:      layer,
-				ActionSummary:    truncateBytes(req.ActionSummary, maxBytes),
-				OutcomeType:      string(outcome),
-				Similarity:       cr.Confidence,
-				ClassifierSource: cr.Source,
-				ConstraintCode:   item.ConstraintCode,
+				SpaceID:            req.SpaceID,
+				SessionID:          feedbackSessionID,
+				InstanceID:         s.cfg.InstanceID,
+				GuidanceID:         req.GuidanceID,
+				GuidanceType:       string(item.Type),
+				GuidanceContent:    truncateBytes(item.Content, maxBytes),
+				SourceNodeID:       sourceNodeID,
+				SourceRoleType:     roleType,
+				SourceLayer:        layer,
+				ActionSummary:      truncateBytes(req.ActionSummary, maxBytes),
+				OutcomeType:        outcomeType,
+				Similarity:         cr.Confidence,
+				ClassifierSource:   cr.Source,
+				ConstraintCode:     item.ConstraintCode,
+				VerifiabilityClass: verifiabilityClass,
 			})
 		}
 

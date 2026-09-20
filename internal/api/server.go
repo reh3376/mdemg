@@ -1600,6 +1600,30 @@ func (s *Server) SetTSDBClient(client *tsdb.Client) {
 					slog.Info("review: contradicted_drafts dataset + Correct sink registered")
 				}
 			}
+			// JIMINY-HITL-HUMAN-CLASS-INTEGRATION-001 Epic 3 — human-class
+			// pending-queue dataset. Reads guidance_training_rows rows tagged
+			// verifiability_class='human' + outcome_type='pending_human_review'
+			// (written by RecordOutcome when JIMINY_HUMAN_CLASS_QUEUE_ENABLED
+			// is true). Sink writes operator grades to constraint_outcomes
+			// with verifiability_class='human' — the class gauge picks it up
+			// via GuidanceEffectivenessByClass.
+			//
+			// Registered EVEN WHEN the writer-side flag is off, so any
+			// existing pending rows are still reviewable under a flag-flip
+			// rollback. Needs the pool + constraint_outcomes writer.
+			if client.Pool() != nil && s.constraintOutcomesWriter != nil {
+				hcq := &humanClassQueueDataset{
+					pool:          client.Pool(),
+					writer:        s.constraintOutcomesWriter,
+					rubricVersion: s.cfg.ReviewRubricVersion,
+					instanceID:    s.cfg.InstanceID,
+				}
+				if err := s.reviewRegistry.Register(hcq); err != nil {
+					slog.Warn("review: human_class_queue dataset registration failed", "error", err)
+				} else {
+					slog.Info("review: human_class_queue dataset registered")
+				}
+			}
 			// HITL-REVIEW-001 — the 16 MDEMG LLM call sites as reviewable
 			// datasets (gold-only review of llm_interactions outputs → SFT/quality
 			// training data). Gated by REVIEW_LLM_DATASETS_ENABLED.
@@ -1822,8 +1846,9 @@ func (a *guidanceTrainingAdapter) RecordTrainingRow(row jiminy.GuidanceTrainingR
 		ActionSummary:    row.ActionSummary,
 		OutcomeType:      row.OutcomeType,
 		Similarity:       row.Similarity,
-		ClassifierSource: row.ClassifierSource,
-		ConstraintCode:   row.ConstraintCode,
+		ClassifierSource:   row.ClassifierSource,
+		ConstraintCode:     row.ConstraintCode,
+		VerifiabilityClass: row.VerifiabilityClass,
 	})
 }
 

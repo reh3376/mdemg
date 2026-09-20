@@ -50,6 +50,12 @@ type GuidanceTrainingRow struct {
 	Similarity       float64
 	ClassifierSource string // NOT NULL ("" allowed)
 	ConstraintCode   string
+	// VerifiabilityClass tags the row for HITL human-class queue routing.
+	// V0037 column; NOT NULL DEFAULT 'classifier'. Empty string preserves
+	// backward-compat by falling back to the DB default. See
+	// JIMINY-HITL-HUMAN-CLASS-INTEGRATION-001 for the pending-queue semantic
+	// (outcome_type='pending_human_review' + verifiability_class='human').
+	VerifiabilityClass string
 }
 
 // GuidanceTrainingRowsWriter buffers V0027 rows and flushes them via CopyFrom.
@@ -179,6 +185,13 @@ func (w *GuidanceTrainingRowsWriter) Flush(ctx context.Context) error {
 		if rec.SourceLayer != nil {
 			layer = *rec.SourceLayer
 		}
+		// V0037: verifiability_class NOT NULL DEFAULT 'classifier'. An empty
+		// VerifiabilityClass falls back to the shipped default so pre-#158
+		// callers keep working unchanged.
+		cls := rec.VerifiabilityClass
+		if cls == "" {
+			cls = "classifier"
+		}
 		rows = append(rows, []any{
 			rec.RowID,
 			rec.Time,
@@ -196,6 +209,7 @@ func (w *GuidanceTrainingRowsWriter) Flush(ctx context.Context) error {
 			rec.Similarity,
 			rec.ClassifierSource,
 			nullableString(rec.ConstraintCode),
+			cls,
 		})
 	}
 
@@ -206,7 +220,7 @@ func (w *GuidanceTrainingRowsWriter) Flush(ctx context.Context) error {
 			"guidance_id", "guidance_type", "guidance_content",
 			"source_node_id", "source_role_type", "source_layer",
 			"action_summary", "outcome_type", "similarity",
-			"classifier_source", "constraint_code",
+			"classifier_source", "constraint_code", "verifiability_class",
 		},
 		pgx.CopyFromRows(rows),
 	)
