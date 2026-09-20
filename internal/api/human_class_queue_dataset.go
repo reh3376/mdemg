@@ -156,11 +156,26 @@ func isAutoGrader(g review.Grade) bool {
 }
 
 // errAutograderRejected is the named error returned when Apply refuses
-// an auto:* grader_id. Exported var so tests can errors.Is against it.
-var errAutograderRejected = fmt.Errorf(
-	"human_class_queue: auto-grader rejected — human-verifiability class is " +
+// an auto:* grader_id. Package-level sentinel so tests can errors.Is
+// against it. HITL-ERROR-VISIBLE-001 (2026-09-20) wrapped this in a
+// clientVisibleError so the taxonomy-citing text surfaces to the API
+// client (was previously opaque "internal error during …" per the
+// sanitizeError default).
+var errAutograderRejected = &clientVisibleError{
+	msg: "human_class_queue: auto-grader rejected — human-verifiability class is " +
 		"operator-only by construction (LLM cannot verify these rules; see " +
-		"JIMINY-METRIC-DENOMINATOR-DESIGN-001 taxonomy)")
+		"JIMINY-METRIC-DENOMINATOR-DESIGN-001 taxonomy)",
+}
+
+// clientVisibleError implements the ClientVisibleError interface (defined
+// in server.go). Sinks/handlers use this to opt errors into surfacing at
+// the API boundary while every other error path remains sanitized.
+type clientVisibleError struct {
+	msg string
+}
+
+func (e *clientVisibleError) Error() string          { return e.msg }
+func (e *clientVisibleError) ClientVisible() string  { return e.msg }
 
 func (s humanClassQueueSink) Preview(_ context.Context, g review.Grade) (review.ReinforcementPreview, error) {
 	if isAutoGrader(g) {

@@ -3341,10 +3341,35 @@ func isCallerCancelled(err error) bool {
 // Caller-cancellations log at INFO (not ERROR) — the SERVER did its job right
 // up to the point the client walked away; an ERROR line for every impatient
 // curl is noise, not signal.
+// ClientVisibleError is an opt-in for errors that carry a safe-to-surface
+// message. sanitizeError uses it via errors.As before falling back to the
+// generic "internal error during X". Sinks/handlers implement this ONLY for
+// errors that MUST NOT leak internal detail (e.g. named policy violations
+// citing a taxonomy source, operator-actionable validation errors) — every
+// other error stays sanitized so the security contract is preserved.
+//
+// HITL-ERROR-VISIBLE-001 (2026-09-20): closes the JIMINY-HITL-HUMAN-CLASS-
+// INTEGRATION-001 self-disclosed follow-up where the human_class_queue
+// sink's named `errAutograderRejected` was wrapped as the opaque generic
+// message, hiding the operator-actionable "this dataset is operator-only
+// by construction; taxonomy source: ..." text from the client.
+type ClientVisibleError interface {
+	error
+	ClientVisible() string
+}
+
 func sanitizeError(err error, operation string) string {
 	if isCallerCancelled(err) {
 		slog.Info("operation cancelled by caller", "operation", operation, "error", err)
 		return "request cancelled during " + operation
+	}
+	// HITL-ERROR-VISIBLE-001: check for a ClientVisibleError before the
+	// generic fallback. Log at INFO (not ERROR) since a named client-visible
+	// error is an operator-visible policy signal, not an internal fault.
+	var cv ClientVisibleError
+	if errors.As(err, &cv) {
+		slog.Info("operation refused with client-visible reason", "operation", operation, "reason", cv.ClientVisible())
+		return cv.ClientVisible()
 	}
 	slog.Error("operation failed", "operation", operation, "error", err)
 	return "internal error during " + operation
