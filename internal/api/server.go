@@ -2488,6 +2488,9 @@ func (s *Server) StartSupervisedBackground() {
 		if s.cfg.ProcessMatcherUxtsFrameworksEnabled {
 			g.Register(procmatchers.NewUxtsFrameworks())
 		}
+		if s.cfg.ProcessMatcherNeverHaikuEnabled {
+			g.Register(procmatchers.NewNeverHaikuPlanning())
+		}
 		if g.MatcherCount() > 0 {
 			s.goSupervised("process-grader", g.Run)
 			slog.Info("process grader: wired",
