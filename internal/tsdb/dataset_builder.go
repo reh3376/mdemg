@@ -333,6 +333,12 @@ func (b *DatasetBuilder) GuidanceEffectivenessByClass(ctx context.Context, space
 	// tuples the outer aggregate averages. LEFT JOIN would drop-vs-UNION the
 	// zero-row case; UNION lets both tables independently contribute rows.
 	// Wrapped in a subquery so GROUP BY + COALESCE apply uniformly.
+	// JIMINY-HITL-HUMAN-CLASS-INTEGRATION-001: constraint_outcomes now has
+	// rows for the human class written by the HITL sink (verifiability_class
+	// ='human', classifier_source='operator', outcome_type in the shipped
+	// {followed, partial_compliance, ignored} enum). The pending-queue rows
+	// live in guidance_training_rows (outcome_type='pending_human_review')
+	// and MUST NOT contribute credit — they're the ungraded backlog.
 	const query = `
 		WITH combined AS (
 			SELECT
@@ -342,6 +348,7 @@ func (b *DatasetBuilder) GuidanceEffectivenessByClass(ctx context.Context, space
 				     ELSE 0.0 END AS credit
 			FROM constraint_outcomes
 			WHERE space_id = $1 AND time >= $2
+			  AND outcome_type NOT IN ('pending_human_review', 'graded_human_review')
 
 			UNION ALL
 

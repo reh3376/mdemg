@@ -1822,8 +1822,9 @@ func (a *guidanceTrainingAdapter) RecordTrainingRow(row jiminy.GuidanceTrainingR
 		ActionSummary:    row.ActionSummary,
 		OutcomeType:      row.OutcomeType,
 		Similarity:       row.Similarity,
-		ClassifierSource: row.ClassifierSource,
-		ConstraintCode:   row.ConstraintCode,
+		ClassifierSource:   row.ClassifierSource,
+		ConstraintCode:     row.ConstraintCode,
+		VerifiabilityClass: row.VerifiabilityClass,
 	})
 }
 

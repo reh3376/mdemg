@@ -351,6 +351,12 @@ type GuidanceTrainingRecord struct {
 	Similarity       float64
 	ClassifierSource string
 	ConstraintCode   string
+	// VerifiabilityClass tags the row for HITL human-class queue routing.
+	// Values: 'classifier' | 'process' | 'hybrid' | 'human' (empty falls back
+	// to 'classifier' via the DB DEFAULT). JIMINY-HITL-HUMAN-CLASS-INTEGRATION-001
+	// uses class='human' + outcome_type='pending_human_review' as the HITL
+	// pending-queue signal.
+	VerifiabilityClass string
 }
 
 // --- J12: Escalation types ---
