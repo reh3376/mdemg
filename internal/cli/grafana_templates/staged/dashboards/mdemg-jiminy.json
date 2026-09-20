@@ -1212,6 +1212,296 @@
           "sort": "desc"
         }
       }
+    },
+    {
+      "title": "Follow Rate by Verifiability Class (JIMINY-METRIC-PARTITION-001)",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 63
+      },
+      "panels": []
+    },
+    {
+      "title": "Classifier-verifiable (honest ~17%, target retrain-gate)",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 64
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_jiminy_follow_rate_classifier_verifiable' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "noValue": "N/A",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.1
+              },
+              {
+                "color": "green",
+                "value": 0.15000000000000002
+              }
+            ]
+          },
+          "description": "JIMINY-METRIC-PARTITION-001 (task #158) per-class follow rate. Live 24h ~17%. Alert floor 0.10 (JIMINY-METRIC-PARTITION-ALERTS-PANELS-001 \u00a7 verifiability-class arch rule)."
+        }
+      }
+    },
+    {
+      "title": "Process-verifiable (post-OBSERVER-arc ~74%/24h, ~43%/30m sparse)",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 64
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_jiminy_follow_rate_process_verifiable' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "noValue": "N/A",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.25
+              },
+              {
+                "color": "green",
+                "value": 0.3
+              }
+            ]
+          },
+          "description": "JIMINY-METRIC-PARTITION-001 (task #158) per-class follow rate. Live 24h ~74%. Alert floor 0.50 (JIMINY-METRIC-PARTITION-ALERTS-PANELS-001 \u00a7 verifiability-class arch rule)."
+        }
+      }
+    },
+    {
+      "title": "Hybrid (~22%, small denominator)",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 64
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_jiminy_follow_rate_hybrid' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "noValue": "N/A",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.15
+              },
+              {
+                "color": "green",
+                "value": 0.2
+              }
+            ]
+          },
+          "description": "JIMINY-METRIC-PARTITION-001 (task #158) per-class follow rate. Live 24h ~22%. Alert floor 0.15 (JIMINY-METRIC-PARTITION-ALERTS-PANELS-001 \u00a7 verifiability-class arch rule)."
+        }
+      }
+    },
+    {
+      "title": "Human (writer pending)",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 64
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "rawSql": "SELECT time, value FROM metric_samples WHERE metric_name = 'mdemg_jiminy_follow_rate_human' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series"
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "noValue": "N/A (writer pending)",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "grey",
+                "value": null
+              }
+            ]
+          },
+          "description": "Human-verifiable class gauge \u2014 writer awaits JIMINY-HITL-HUMAN-CLASS-INTEGRATION-001. Panel renders N/A until that sprint ships."
+        }
+      }
+    },
+    {
+      "title": "Follow Rate \u2014 All Classes (168h trajectory)",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 68
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "time_series",
+          "rawSql": "SELECT time, value AS classifier FROM metric_samples WHERE metric_name = 'mdemg_jiminy_follow_rate_classifier_verifiable' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time"
+        },
+        {
+          "refId": "B",
+          "format": "time_series",
+          "rawSql": "SELECT time, value AS process FROM metric_samples WHERE metric_name = 'mdemg_jiminy_follow_rate_process_verifiable' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time"
+        },
+        {
+          "refId": "C",
+          "format": "time_series",
+          "rawSql": "SELECT time, value AS hybrid FROM metric_samples WHERE metric_name = 'mdemg_jiminy_follow_rate_hybrid' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time"
+        },
+        {
+          "refId": "D",
+          "format": "time_series",
+          "rawSql": "SELECT time, value AS human FROM metric_samples WHERE metric_name = 'mdemg_jiminy_follow_rate_human' AND metric_type = 'gauge' AND space_id = '$space_id' AND $__timeFilter(time) ORDER BY time"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "mean",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "description": "Per-verifiability-class follow-rate trajectory. Per JIMINY-CEILING-INVESTIGATION-002 arch rule: aggregate follow rate over mixed classes is dishonest \u2014 this panel is the honest scoreboard. Human class stays flat at 0 until JIMINY-HITL-HUMAN-CLASS-INTEGRATION-001 ships. See CLAUDE.md \u00a7 Architecture Notes for retrain-gate class-differential rule.",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never"
+          }
+        }
+      }
     }
   ],
   "schemaVersion": 39,
