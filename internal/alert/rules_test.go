@@ -100,6 +100,120 @@ func TestJiminyFollowRateRules(t *testing.T) {
 	}
 }
 
+// JIMINY-METRIC-PARTITION-ALERTS-PANELS-001 (2026-09-20) — per-class alert
+// contract. Each class gets its own rule with distinct Service + gauge
+// name; any class with floor ≤ 0 is skipped. The empty-map case yields
+// zero rules (opt-out contract mirroring JiminyFollowRateRules).
+func TestJiminyFollowRateClassRules_ShapeAndDefaults(t *testing.T) {
+	// All four classes with non-zero floors → 4 rules in class order.
+	rs := JiminyFollowRateClassRules(map[string]float64{
+		"classifier": 0.10,
+		"process":    0.25,
+		"hybrid":     0.15,
+		"human":      0.05,
+	})
+	if len(rs) != 4 {
+		t.Fatalf("expected 4 rules, got %d", len(rs))
+	}
+
+	// Deterministic order: classifier, process, hybrid, human (matches
+	// the factory's fixed slice — required for downstream sweep-test
+	// determinism).
+	wantOrder := []struct{ id, svc, metric string }{
+		{"jiminy_follow_rate_drop_classifier", "jiminy-classifier", "mdemg_jiminy_follow_rate_classifier_verifiable"},
+		{"jiminy_follow_rate_drop_process", "jiminy-process", "mdemg_jiminy_follow_rate_process_verifiable"},
+		{"jiminy_follow_rate_drop_hybrid", "jiminy-hybrid", "mdemg_jiminy_follow_rate_hybrid"},
+		{"jiminy_follow_rate_drop_human", "jiminy-human", "mdemg_jiminy_follow_rate_human"},
+	}
+	for i, w := range wantOrder {
+		r := rs[i]
+		if r.ID != w.id || r.Service != w.svc {
+			t.Errorf("rule[%d]: id=%q svc=%q, want id=%q svc=%q", i, r.ID, r.Service, w.id, w.svc)
+		}
+		if !strings.Contains(r.QuerySQL, w.metric) {
+			t.Errorf("rule[%d] QuerySQL missing metric %q", i, w.metric)
+		}
+		// Every class rule MUST satisfy the shipped contracts.
+		if r.Operator != "lt" {
+			t.Errorf("rule[%d] Operator = %q, want lt", i, r.Operator)
+		}
+		if !strings.Contains(r.QuerySQL, "COALESCE") || !strings.Contains(r.QuerySQL, "AVG") {
+			t.Errorf("rule[%d] SQL missing COALESCE/AVG (TSDB-CONSUME-001 idle-safe contract)", i)
+		}
+		if strings.Contains(r.QuerySQL, "LIMIT 1") {
+			t.Errorf("rule[%d] uses forbidden LIMIT 1 anti-pattern", i)
+		}
+		if !strings.Contains(r.QuerySQL, "time >") {
+			t.Errorf("rule[%d] missing time-column filter (HIDDEN-CHURN-001 contract)", i)
+		}
+	}
+
+	// Threshold matches floor exactly per class.
+	if rs[0].Threshold != 0.10 {
+		t.Errorf("classifier threshold=%v want 0.10", rs[0].Threshold)
+	}
+	if rs[1].Threshold != 0.25 {
+		t.Errorf("process threshold=%v want 0.25", rs[1].Threshold)
+	}
+}
+
+func TestJiminyFollowRateClassRules_FloorZeroDisablesClass(t *testing.T) {
+	// Human at 0 (the default — no writer yet) → skipped; others emit.
+	rs := JiminyFollowRateClassRules(map[string]float64{
+		"classifier": 0.10,
+		"process":    0.50,
+		"hybrid":     0.15,
+		"human":      0,
+	})
+	if len(rs) != 3 {
+		t.Fatalf("expected 3 rules (human skipped), got %d", len(rs))
+	}
+	for _, r := range rs {
+		if r.Service == "jiminy-human" {
+			t.Errorf("human class MUST be skipped when floor=0, got rule id=%q", r.ID)
+		}
+	}
+
+	// Negative floor also disables (parity with JiminyFollowRateRules).
+	rs = JiminyFollowRateClassRules(map[string]float64{"classifier": -0.5, "process": 0.50})
+	if len(rs) != 1 || rs[0].Service != "jiminy-process" {
+		t.Fatalf("neg-floor must skip; got %+v", rs)
+	}
+
+	// Missing key = skip (nil map, empty map, unknown class name).
+	if got := JiminyFollowRateClassRules(nil); got != nil {
+		t.Errorf("nil map must yield nil, got %d rules", len(got))
+	}
+	if got := JiminyFollowRateClassRules(map[string]float64{}); got != nil {
+		t.Errorf("empty map must yield nil, got %d rules", len(got))
+	}
+	if got := JiminyFollowRateClassRules(map[string]float64{"unknown-class": 0.5}); got != nil {
+		t.Errorf("unknown-class key must yield nil, got %d rules", len(got))
+	}
+}
+
+func TestJiminyFollowRateClassRules_DistinctServicesPerClass(t *testing.T) {
+	// NOSILENT-001 cooldown-key contract: each class MUST have a distinct
+	// Service name so a fire on the classifier alert doesn't cool the
+	// process/hybrid/human alerts (or vice versa).
+	rs := JiminyFollowRateClassRules(map[string]float64{
+		"classifier": 0.10, "process": 0.50, "hybrid": 0.15, "human": 0.05,
+	})
+	seen := map[string]int{}
+	for i, r := range rs {
+		seen[r.Service]++
+		if seen[r.Service] > 1 {
+			t.Errorf("service %q duplicated (first at rule[< %d])", r.Service, i)
+		}
+	}
+	// Also assert the shipping-arc contract: the aggregate `jiminy` service
+	// (used by JiminyFollowRateRules) is NEVER reused by a class rule —
+	// keeps the aggregate + class alerts independent.
+	if _, has := seen["jiminy"]; has {
+		t.Errorf("class rules must not reuse the aggregate service name 'jiminy'")
+	}
+}
+
 func TestCoverageRules(t *testing.T) {
 	r := CoverageRules(0)[0]
 	if r.ID != "low_conversation_coverage" || r.Service != "conversation-coverage" {
