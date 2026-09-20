@@ -1,0 +1,244 @@
+{
+  "config": {
+    "base_url": "http://localhost:9999",
+    "space_id": "mdemg-dev",
+    "top_k": 10,
+    "pairs_source": "neo4j",
+    "query_template": "types that implement {interface} in this codebase"
+  },
+  "n_pairs": 10,
+  "mean_strict_recall": 0.021182266009852214,
+  "mean_lenient_recall": 0.021182266009852214,
+  "per_pair": [
+    {
+      "interface": "LanguageParser",
+      "n_expected": 29,
+      "strict_hits": 2,
+      "lenient_hits": 2,
+      "strict_recall": 0.06896551724137931,
+      "lenient_recall": 0.06896551724137931,
+      "hits_strict": [
+        "javaparser",
+        "typescriptparser"
+      ],
+      "hits_lenient": [
+        "javaparser",
+        "typescriptparser"
+      ],
+      "expected": [
+        "contextawareparser",
+        "cparser",
+        "cppparser",
+        "csharpparser",
+        "cudaparser",
+        "cypherparser",
+        "dockerfileparser",
+        "goparser",
+        "graphqlparser",
+        "iniparser",
+        "javaparser",
+        "jsonparser",
+        "kotlinparser",
+        "luaparser",
+        "makefileparser",
+        "markdownparser",
+        "openapiparser",
+        "phpparser",
+        "protobufparser",
+        "pythonparser",
+        "rustparser",
+        "scrapermarkdownparser",
+        "shellparser",
+        "sqlparser",
+        "terraformparser",
+        "tomlparser",
+        "typescriptparser",
+        "xmlparser",
+        "yamlparser"
+      ],
+      "n_results": 10,
+      "query": "types that implement LanguageParser in this codebase"
+    },
+    {
+      "interface": "NodeCreator",
+      "n_expected": 12,
+      "strict_hits": 0,
+      "lenient_hits": 0,
+      "strict_recall": 0.0,
+      "lenient_recall": 0.0,
+      "hits_strict": [],
+      "hits_lenient": [],
+      "expected": [
+        "clustersummarystep",
+        "comparisonstep",
+        "concernstep",
+        "configstep",
+        "constraintstep",
+        "correctionstep",
+        "dynamicedgesstep",
+        "dynamicemergencestep",
+        "emergentl5step",
+        "hiddenstep",
+        "temporalstep",
+        "uistep"
+      ],
+      "n_results": 10,
+      "query": "types that implement NodeCreator in this codebase"
+    },
+    {
+      "interface": "Embedder",
+      "n_expected": 7,
+      "strict_hits": 1,
+      "lenient_hits": 1,
+      "strict_recall": 0.14285714285714285,
+      "lenient_recall": 0.14285714285714285,
+      "hits_strict": [
+        "embedder"
+      ],
+      "hits_lenient": [
+        "embedder"
+      ],
+      "expected": [
+        "cachedembedder",
+        "embedder",
+        "nilembedder",
+        "ollama",
+        "openai",
+        "ratelimitedembedder",
+        "stub"
+      ],
+      "n_results": 10,
+      "query": "types that implement Embedder in this codebase"
+    },
+    {
+      "interface": "Embedder",
+      "n_expected": 6,
+      "strict_hits": 0,
+      "lenient_hits": 0,
+      "strict_recall": 0.0,
+      "lenient_recall": 0.0,
+      "hits_strict": [],
+      "hits_lenient": [],
+      "expected": [
+        "cachedembedder",
+        "nilembedder",
+        "ollama",
+        "openai",
+        "ratelimitedembedder",
+        "stub"
+      ],
+      "n_results": 10,
+      "query": "types that implement Embedder in this codebase"
+    },
+    {
+      "interface": "Column",
+      "n_expected": 6,
+      "strict_hits": 0,
+      "lenient_hits": 0,
+      "strict_recall": 0.0,
+      "lenient_recall": 0.0,
+      "hits_strict": [],
+      "hits_lenient": [],
+      "expected": [
+        "bm25column",
+        "contextcolumn",
+        "embeddingcolumn",
+        "graphcolumn",
+        "structuralcolumn",
+        "virtualcolumn"
+      ],
+      "n_results": 10,
+      "query": "types that implement Column in this codebase"
+    },
+    {
+      "interface": "modelInstallPool",
+      "n_expected": 4,
+      "strict_hits": 0,
+      "lenient_hits": 0,
+      "strict_recall": 0.0,
+      "lenient_recall": 0.0,
+      "hits_strict": [],
+      "hits_lenient": [],
+      "expected": [
+        "contradictedpooliface",
+        "execer",
+        "jobeventpool",
+        "reviewpooliface"
+      ],
+      "n_results": 10,
+      "query": "types that implement modelInstallPool in this codebase"
+    },
+    {
+      "interface": "AuthMethodConfig",
+      "n_expected": 4,
+      "strict_hits": 0,
+      "lenient_hits": 0,
+      "strict_recall": 0.0,
+      "lenient_recall": 0.0,
+      "hits_strict": [],
+      "hits_lenient": [],
+      "expected": [
+        "apikeyconfig",
+        "jwtconfig",
+        "noneconfig",
+        "samlconfig"
+      ],
+      "n_results": 10,
+      "query": "types that implement AuthMethodConfig in this codebase"
+    },
+    {
+      "interface": "Authenticator",
+      "n_expected": 4,
+      "strict_hits": 0,
+      "lenient_hits": 0,
+      "strict_recall": 0.0,
+      "lenient_recall": 0.0,
+      "hits_strict": [],
+      "hits_lenient": [],
+      "expected": [
+        "apikeyauthenticator",
+        "jwtauthenticator",
+        "noneauthenticator",
+        "samlauthenticator"
+      ],
+      "n_results": 10,
+      "query": "types that implement Authenticator in this codebase"
+    },
+    {
+      "interface": "execer",
+      "n_expected": 4,
+      "strict_hits": 0,
+      "lenient_hits": 0,
+      "strict_recall": 0.0,
+      "lenient_recall": 0.0,
+      "hits_strict": [],
+      "hits_lenient": [],
+      "expected": [
+        "contradictedpooliface",
+        "jobeventpool",
+        "modelinstallpool",
+        "reviewpooliface"
+      ],
+      "n_results": 10,
+      "query": "types that implement execer in this codebase"
+    },
+    {
+      "interface": "jobEventPool",
+      "n_expected": 4,
+      "strict_hits": 0,
+      "lenient_hits": 0,
+      "strict_recall": 0.0,
+      "lenient_recall": 0.0,
+      "hits_strict": [],
+      "hits_lenient": [],
+      "expected": [
+        "contradictedpooliface",
+        "execer",
+        "modelinstallpool",
+        "reviewpooliface"
+      ],
+      "n_results": 10,
+      "query": "types that implement jobEventPool in this codebase"
+    }
+  ]
+}
