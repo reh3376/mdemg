@@ -179,6 +179,40 @@ Flip any of the 3 env vars to `false` and restart. The V0036 tables persist (dat
 | `SPRINT_DOCS_ROOT` | `docs/development` | Filesystem root the UIED matcher joins the kebab-lower sprint code under (relative to cwd) |
 | `PROCESS_MATCHER_UIED_MAX_FILE_BYTES` | `200000` | Safety cap on sprint_plan.md read size; over-cap → skip; floor 4096 |
 | `PROCESS_MATCHER_UXTS_FRAMEWORKS_ENABLED` | `false` | Enable the uxts-frameworks matcher (JIMINY-PROCESS-OBSERVER-05) |
+| `PROCESS_MATCHER_NEVER_HAIKU_ENABLED` | `false` | Enable the never-haiku-for-planning matcher (JIMINY-PROCESS-OBSERVER-06) |
+
+## Observer 06 — `never-haiku-for-planning` (arc final)
+
+Graded rule (constraint code `never-haiku-for-planning`, operator-authored user preference): "When planning complex features or fixes, ALWAYS use the most advanced coding model (Opus). Haiku only for simple mechanical tasks."
+
+Terminal event: `model_call` with `event_subtype='planning'`.
+
+Emitter: `.claude/hooks/post-tool-observe.py::_process_events_for_tool`. Fires on `Write` of a file whose basename is `sprint_plan.md` or `plan.md`, records the ANTHROPIC_MODEL environment variable (empty string when the hook can't see it) into `metadata.model`. No cross-table query; the model identity is captured at the moment of the planning write.
+
+Verdict (fail-open):
+
+- `event_subtype != 'planning'` OR `metadata.model` empty → **skip** (reserved for future subtypes; cannot grade what wasn't captured).
+- model name contains `haiku` (case-insensitive) → **`process_incomplete`** — reason names the model.
+- else → **`process_followed`** — reason names the model.
+
+Purely metadata-driven. No filesystem read, no cross-session lookup — the whole verdict is one row from `process_events`.
+
+## JIMINY-PROCESS-OBSERVER arc closeout (2026-09-19)
+
+The arc closes at 6/6 observers shipped. Every rule surfaced by JIMINY-METRIC-DENOMINATOR-DESIGN-001 as **process-verifiable or hybrid** now has a live grader:
+
+| # | Sprint | Rule graded | Terminal event | Live-smoke landing |
+|---|--------|-------------|----------------|--------------------|
+| 01 | JIMINY-PROCESS-OBSERVER-01 | `lint-before-commit` | `git_commit` | 2026-09-18 |
+| 02 | JIMINY-PROCESS-OBSERVER-02 | `sequential-epics` | `git_commit` | 2026-09-18 |
+| 03 | JIMINY-PROCESS-OBSERVER-03 | `query-mdemg-cms-file-paths` | `filesystem_search` | 2026-09-18 |
+| 04 | JIMINY-PROCESS-OBSERVER-04 | `unit-integration-e2e-docs` | `git_commit` | 2026-09-19 |
+| 05 | JIMINY-PROCESS-OBSERVER-05 | `must-use-uxts-frameworks-consistently` | `file_write` | 2026-09-19 |
+| 06 | JIMINY-PROCESS-OBSERVER-06 | `never-haiku-for-planning` | `model_call` | 2026-09-19 |
+
+Downstream (already wired in OBSERVER-01): `DatasetBuilder.GuidanceEffectivenessByClass` UNIONs `process_outcomes` rows into the `process` class — every new matcher moves `mdemg_jiminy_follow_rate_process_verifiable` the moment its verdicts land. No further wiring required per new observer.
+
+Platform totals: 2 hypertables (V0036), 1 endpoint (`POST /v1/process/event`), 1 grader loop, 5 emitter event types actually used by shipped matchers (`git_commit`, `filesystem_search`, `retrieval_call`, `file_write`, `model_call`), 13 config knobs (all default-off in code AND `.env`), and 6 matcher files at ~90 LOC each. New rule-verification arc's marginal cost: one 2-3h sprint per matcher, no schema change.
 
 ## Adding a new observer (sibling sprints)
 
