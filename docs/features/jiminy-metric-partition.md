@@ -154,10 +154,40 @@ git revert <sha>
 
 ## What is deferred (design spec Phase 2/3 follow-ups)
 
-- **Grafana panel updates** — retire the aggregate follow-rate panel + add 5 per-class panels (separate sprint; big JSON diff)
-- **Per-class alert rules** — `classifier_follow_rate_low` reading `constraint_outcomes.verifiability_class='classifier'` (separate sprint)
-- **Path 2 observers** — `JIMINY-PROCESS-OBSERVER-{01..06}` will populate the `process` class gauge (currently dormant at 0)
-- **HITL human-class routing** — `JIMINY-HITL-HUMAN-CLASS-INTEGRATION-001` will populate the `human` class gauge (currently dormant at 0)
+- ✅ ~~**Grafana panel updates**~~ — SHIPPED as JIMINY-METRIC-PARTITION-ALERTS-PANELS-001 (2026-09-20). See §Per-class alerts + panels below.
+- ✅ ~~**Per-class alert rules**~~ — SHIPPED as JIMINY-METRIC-PARTITION-ALERTS-PANELS-001 (2026-09-20). See §Per-class alerts + panels below.
+- ✅ ~~**Path 2 observers**~~ — JIMINY-PROCESS-OBSERVER-{01..06} SHIPPED 2026-09-18 → 2026-09-19; the `process` class gauge now has 6 live matchers (live 24h ~74%).
+- **HITL human-class routing** — `JIMINY-HITL-HUMAN-CLASS-INTEGRATION-001` will populate the `human` class gauge (currently dormant at 0; alert rule disabled by default at floor=0)
+
+## Per-class alerts + panels (JIMINY-METRIC-PARTITION-ALERTS-PANELS-001 — 2026-09-20)
+
+Closes the observability loop the parent sprint left as a follow-up. Ships:
+
+- **3 new alert rules** via `alert.JiminyFollowRateClassRules(map[string]float64)` (`internal/alert/rules.go`):
+  - `jiminy_follow_rate_drop_classifier` — Service `jiminy-classifier`, reads `mdemg_jiminy_follow_rate_classifier_verifiable`
+  - `jiminy_follow_rate_drop_process` — Service `jiminy-process`, reads `mdemg_jiminy_follow_rate_process_verifiable`
+  - `jiminy_follow_rate_drop_hybrid` — Service `jiminy-hybrid`, reads `mdemg_jiminy_follow_rate_hybrid`
+  - (`jiminy_follow_rate_drop_human` — Service `jiminy-human`, disabled at floor=0 until the writer ships)
+
+  Every rule uses `COALESCE(AVG(value), 1.0)` idle-safe SQL over a 30-min window (TSDB-CONSUME-001), reads the `time` column, and `lt` operator. Distinct Service per rule (NOSILENT-001 cooldown-key contract).
+
+- **4 new config knobs** in `internal/config/config.go`:
+  - `JIMINY_FOLLOW_RATE_CLASSIFIER_FLOOR` default **0.10** (below live 24h ~0.17)
+  - `JIMINY_FOLLOW_RATE_PROCESS_FLOOR` default **0.25** (live-smoke-calibrated below the sparse 30-min window ~0.43; 24h avg ~0.74)
+  - `JIMINY_FOLLOW_RATE_HYBRID_FLOOR` default **0.15** (below live 24h ~0.22)
+  - `JIMINY_FOLLOW_RATE_HUMAN_FLOOR` default **0** (disabled until JIMINY-HITL-HUMAN-CLASS-INTEGRATION-001)
+
+- **Aggregate alert retired**: `JIMINY_FOLLOW_RATE_ALERT_FLOOR` code default flipped 0.05 → 0 (rule disabled on fresh installs). The class-mix-dominated aggregate can't tell you which class dropped; the per-class rules are the honest scoreboard per JIMINY-CEILING-INVESTIGATION-002. Operators with explicit `.env` value keep the aggregate rule active — no silent breakage.
+
+- **5 new Grafana panels** on `mdemg-jiminy.json` in the row `Follow Rate by Verifiability Class (JIMINY-METRIC-PARTITION-001)`:
+  - 4 stat panels (classifier / process / hybrid / human), thresholds pinned to each class's alert floor
+  - 1 overlaid timeseries showing all 4 classes on the selected time range
+
+  Panel titles embed the live steady-state number in parens (DASHBOARD-TRUTH-002/003 pattern: e.g., `Classifier-verifiable (honest ~17%, target retrain-gate)`). Datasource UID = literal `timescaledb` (ARC-TRAJECTORY-PANEL-001 contract).
+
+**Live Tier-3 (mdemg-dev, 2026-09-20)**: post-restart, all 3 active rules query real TSDB and return non-null: classifier=0.175, process=0.397, hybrid=0.400 — all above floor. Zero class-fires in `~/.mdemg/alerts/current.json` in 45s post-restart. Alert evaluator started with `rules=35`.
+
+**Recalibration lesson (pinned in-plan)**: the process floor's first-cut value (0.50, calibrated on 24h avg) fired the alert on the live 30-min window (0.43). The **FOLLOW-RATE-CALIBRATE-001 arch rule** — floor must sit BELOW the live steady state, not below the smoothed long-window mean — was live-caught mid-smoke and recalibrated to 0.25 before ship. Watch-item at T+30d: process floor may drift as denominator accumulates.
 
 ## Live verification (mdemg-dev, 2026-09-10)
 
