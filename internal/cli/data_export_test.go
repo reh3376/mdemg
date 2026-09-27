@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -28,7 +29,10 @@ func TestResolveInstanceID_EnvFallback(t *testing.T) {
 
 func TestResolveInstanceID_AutoGenerate(t *testing.T) {
 	// When both empty, auto-generate as {hostname}-{spaceID}
+	// INSTANCE-ID-PIN-001: point PIN_PATH at tempdir so the operator's
+	// real pin file doesn't interfere with the auto-generate assertion.
 	t.Setenv("MDEMG_INSTANCE_ID", "")
+	t.Setenv("MDEMG_INSTANCE_ID_PIN_PATH", filepath.Join(t.TempDir(), "instance_id"))
 	got := resolveInstanceID("", "mdemg-dev")
 	hostname, _ := os.Hostname()
 	expected := fmt.Sprintf("%s-mdemg-dev", hostname)
@@ -39,7 +43,9 @@ func TestResolveInstanceID_AutoGenerate(t *testing.T) {
 
 func TestResolveInstanceID_NonEmpty(t *testing.T) {
 	// Auto-generated value must never be empty
+	// INSTANCE-ID-PIN-001: isolate pin path per note above.
 	t.Setenv("MDEMG_INSTANCE_ID", "")
+	t.Setenv("MDEMG_INSTANCE_ID_PIN_PATH", filepath.Join(t.TempDir(), "instance_id"))
 	got := resolveInstanceID("", "test-space")
 	if got == "" {
 		t.Error("resolveInstanceID returned empty string — this causes invalid exports")
@@ -50,7 +56,9 @@ func TestExportIDNoDoubleDash(t *testing.T) {
 	// Simulate the export_id construction pattern from tsdb.RunExport:
 	// export_id = "exp-{instanceID}-{timestamp}"
 	// When instanceID was empty, this produced "exp--{timestamp}" (double-dash)
+	// INSTANCE-ID-PIN-001: isolate pin path per note above.
 	t.Setenv("MDEMG_INSTANCE_ID", "")
+	t.Setenv("MDEMG_INSTANCE_ID_PIN_PATH", filepath.Join(t.TempDir(), "instance_id"))
 	instanceID := resolveInstanceID("", "mdemg-dev")
 	exportID := fmt.Sprintf("exp-%s-%s", instanceID, time.Now().Format("20060102-150405"))
 	if strings.Contains(exportID, "--") {
@@ -62,7 +70,9 @@ func TestExportFilenameNoDoubleDash(t *testing.T) {
 	// Simulate the output filename pattern:
 	// "mdemg-export-{instanceID}-{timestamp}.tar.gz"
 	// When instanceID was empty, this produced "mdemg-export--{timestamp}.tar.gz"
+	// INSTANCE-ID-PIN-001: isolate pin path per note above.
 	t.Setenv("MDEMG_INSTANCE_ID", "")
+	t.Setenv("MDEMG_INSTANCE_ID_PIN_PATH", filepath.Join(t.TempDir(), "instance_id"))
 	instanceID := resolveInstanceID("", "mdemg-dev")
 	filename := fmt.Sprintf("mdemg-export-%s-%s.tar.gz",
 		instanceID, time.Now().Format("20060102-150405"))
