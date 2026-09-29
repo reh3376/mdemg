@@ -93,7 +93,7 @@ CMS provides session-aware memory for AI agents. At session start, the agent cal
 
 ### What languages does symbol extraction support?
 
-27 languages validated via UPTS (Unified Parser Test Schema): Go, Rust, C, C++, CUDA, Java, Kotlin, C#, Python, TypeScript/JavaScript, Lua, Shell, Protocol Buffers, GraphQL, OpenAPI, YAML, TOML, JSON, INI, Terraform/HCL, Dockerfile, Makefile, SQL, Cypher, Markdown, XML, and Scraper Markdown.
+28 languages validated via UPTS (Unified Parser Test Schema): Go, Rust, C, C++, CUDA, Java, Kotlin, C#, Python, TypeScript/JavaScript, PHP, Lua, Shell, Protocol Buffers, GraphQL, OpenAPI, YAML, TOML, JSON, INI, Terraform/HCL, Dockerfile, Makefile, SQL, Cypher, Markdown, XML, and Scraper Markdown.
 
 ### How do I use MDEMG with my IDE?
 

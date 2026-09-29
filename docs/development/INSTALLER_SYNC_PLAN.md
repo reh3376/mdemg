@@ -237,13 +237,13 @@ Both repos share identical doc content. Changes are made once, applied to both.
 
 **Files**: `internal/config/config.go` (MDEMG repo), `docs/cli-reference.md` (both repos)
 
-### 2.7 Update Language Count (LOW)
+### 2.7 Update Language Count (LOW) — RESOLVED 2026-09-29
 
-**Gap**: Docs say "28 languages" but the actual parser count is 26-27 (depending on how JavaScript/TypeScript sharing is counted). Need consistent, accurate count across all docs.
+**Original gap** (as-noted, historical): Docs say "28 languages" but the actual parser count is 26-27 (depending on how JavaScript/TypeScript sharing is counted). Need consistent, accurate count across all docs.
 
-**Authoritative source**: `internal/languages/` directory — count distinct parser files, document exact list.
+**Resolution**: Ground-truth count is **28** — verified via `ls docs/lang-parser/lang-parse-spec/upts/specs/ | wc -l` (28) matching fixtures count (28) matching `.github/workflows/parser-tests.yml` (28). The historical 26-27 range predated PHP addition. Live docs corrected 2026-09-29 doc-drift sweep (README beta count + FAQ + ingestion-guide + api-spec/uats README + uxts01 README).
 
-**Files**: `docs/cli-reference.md`, `docs/ingestion-guide.md` (both repos)
+**Authoritative source** (pinned): `docs/lang-parser/lang-parse-spec/upts/specs/*.upts.json` — count spec files, they name the language. `internal/languages/` directory was an earlier reference that never converged; UPTS specs won as canonical.
 
 ---
 

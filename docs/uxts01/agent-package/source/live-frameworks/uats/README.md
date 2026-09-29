@@ -286,7 +286,7 @@ jobs:
 
 | Aspect | UPTS (Parsers) | UATS (APIs) |
 |--------|----------------|-------------|
-| Scope | 27 languages | 124 API specs |
+| Scope | 28 languages | 124 API specs |
 | Input | Source files | HTTP requests |
 | Output | Symbols JSON | HTTP responses |
 | Validation | Symbol matching | Status, headers, body |

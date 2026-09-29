@@ -56,7 +56,7 @@ mdemg ingest --path .\src --space-id myproject --dry-run
 
 ### Language Support (27 Languages)
 
-MDEMG includes dedicated parsers for 27 languages and file formats. Each parser extracts structured code elements (functions, classes, structs, modules) and optionally detailed symbols.
+MDEMG includes dedicated parsers for 28 languages and file formats. Each parser extracts structured code elements (functions, classes, structs, modules) and optionally detailed symbols.
 
 List all supported languages:
 ```bash

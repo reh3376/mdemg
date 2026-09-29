@@ -104,3 +104,5 @@ README_BETA           # BETA-DOCS-MODEL-VERSIONING-001 pin + docs/features/beta-
 # Non-CLAUDE.md prose
 ISSUE_TEMPLATE        # docs/user/cli-reference.md: filesystem path `.github/ISSUE_TEMPLATE/beta-bug-report.yml`
 MTIME_UTC             # docs/features/adapter-swap.md: column header in a tabular CLI-output example
+
+INSTALLER_SYNC_PLAN  # filename token in CLAUDE.md DOC-DRIFT-LANG-COUNT-001 note (docs/development/INSTALLER_SYNC_PLAN.md)
