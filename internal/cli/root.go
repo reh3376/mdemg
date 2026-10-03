@@ -4,7 +4,10 @@ package cli
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -37,7 +40,19 @@ func resolveSpaceID(cmd *cobra.Command) string {
 // resolveInstanceID returns the instance ID using the following priority:
 //  1. Explicit value (from flag)
 //  2. MDEMG_INSTANCE_ID environment variable
-//  3. Auto-generate as "{hostname}-{spaceID}"
+//  3. Pin-file at ~/.mdemg/instance_id (or MDEMG_INSTANCE_ID_PIN_PATH override)
+//  4. Auto-generate as "{hostname}-{spaceID}" AND write to pin-file for future runs
+//
+// INSTANCE-ID-PIN-001 (2026-09-25): closes the INSTANCE-ID-HOSTNAME-DRIFT-001
+// bug class where a hostname change silently orphaned every TSDB row tagged
+// with the previous hostname. The pin-file persists the first-run derived
+// value so subsequent runs are hostname-change-safe.
+//
+// Env `MDEMG_INSTANCE_ID_PIN_PATH` overrides the default path. Setting it to
+// `=-` disables pinning entirely (falls back to the shipped
+// hostname-only behavior — advanced escape hatch; mirrors MDEMG-DOCS-INGEST-002
+// pattern). Best-effort write: pin-file write failures WARN + don't fail
+// the resolution (derived value still returned).
 func resolveInstanceID(explicit, spaceID string) string {
 	if explicit != "" {
 		return explicit
@@ -45,8 +60,80 @@ func resolveInstanceID(explicit, spaceID string) string {
 	if v := os.Getenv("MDEMG_INSTANCE_ID"); v != "" {
 		return v
 	}
+	pinPath, pinEnabled := instanceIDPinPath()
+	if pinEnabled {
+		if pinned, ok := readInstanceIDPin(pinPath); ok {
+			return pinned
+		}
+	}
 	hostname, _ := os.Hostname()
-	return fmt.Sprintf("%s-%s", hostname, spaceID)
+	derived := fmt.Sprintf("%s-%s", hostname, spaceID)
+	if pinEnabled {
+		writeInstanceIDPin(pinPath, derived)
+	}
+	return derived
+}
+
+// instanceIDPinPath returns (path, enabled). Enabled=false only when the
+// operator sets `MDEMG_INSTANCE_ID_PIN_PATH=-` (mirrors MDEMG_DOCS_INGEST_EXCLUDE_DIRS's
+// `=-` escape hatch).
+func instanceIDPinPath() (string, bool) {
+	override := os.Getenv("MDEMG_INSTANCE_ID_PIN_PATH")
+	if override == "-" {
+		return "", false
+	}
+	if override != "" {
+		return override, true
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		// Best-effort: no home → no pin. Not an error condition — falls
+		// through to derivation-only, same as pre-INSTANCE-ID-PIN-001 behavior.
+		return "", false
+	}
+	return filepath.Join(home, ".mdemg", "instance_id"), true
+}
+
+// readInstanceIDPin reads the pin-file and returns (value, ok). Malformed or
+// empty content → ok=false (fall through to derivation). WARN on unexpected
+// filesystem errors; missing file returns ok=false silently (first-run case).
+func readInstanceIDPin(path string) (string, bool) {
+	data, err := os.ReadFile(path) // #nosec G304 — path is derived from HOME or explicit env override, not user input
+	if err != nil {
+		if !os.IsNotExist(err) {
+			slog.Warn("instance_id pin read failed; falling back to hostname derivation", "path", path, "error", err)
+		}
+		return "", false
+	}
+	trimmed := strings.TrimSpace(string(data))
+	if trimmed == "" {
+		slog.Warn("instance_id pin is empty; falling back to hostname derivation", "path", path)
+		return "", false
+	}
+	return trimmed, true
+}
+
+// writeInstanceIDPin persists the derived value at first-run. Best-effort:
+// filesystem errors WARN but don't fail the caller. Atomic via tmp+rename so
+// concurrent writers don't corrupt (last-writer wins; safe because both
+// derive the same value on the same host).
+func writeInstanceIDPin(path, value string) {
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		slog.Warn("instance_id pin mkdir failed", "dir", dir, "error", err)
+		return
+	}
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, []byte(value+"\n"), 0o644); err != nil {
+		slog.Warn("instance_id pin write failed", "path", tmp, "error", err)
+		return
+	}
+	if err := os.Rename(tmp, path); err != nil {
+		slog.Warn("instance_id pin rename failed", "path", path, "error", err)
+		_ = os.Remove(tmp)
+		return
+	}
+	slog.Info("instance_id pinned at first-run", "path", path, "value", value)
 }
 
 // Build-time variables set via -ldflags

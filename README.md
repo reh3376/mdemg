@@ -15,7 +15,7 @@ A persistent memory system for AI agents built on Neo4j with native vector index
 
 **Current beta**: `v0.11.0-beta.1` (2026-08-06). Thank you for testing.
 
-- **Beta test plan** (69 tests across 7 tiers): [`packaging/homebrew-mdemg/mdemg_beta_testing.md`](packaging/homebrew-mdemg/mdemg_beta_testing.md)
+- **Beta test plan** (62 tests across 7 tiers): [`packaging/homebrew-mdemg/mdemg_beta_testing.md`](packaging/homebrew-mdemg/mdemg_beta_testing.md)
 - **Report an issue**: https://github.com/reh3376/mdemg/issues/new/choose
 - **First-run gotcha**: on macOS, run `brew trust reh3376/mdemg` BEFORE `brew install` — Homebrew's default-blocks-untrusted-taps policy will otherwise fail with a Sorbet stack trace
 - **You do NOT need an OpenAI or Ollama key to start** — `mdemg init --defaults` falls back to disabled mode; you can write observations, open the dashboard, and inspect data without any external provider
