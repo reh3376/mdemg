@@ -1,0 +1,124 @@
+{
+  "uats_version": "1.0.0",
+  "api": {
+    "name": "Node Get",
+    "base_url": "${MDEMG_BASE_URL}",
+    "version": "v1",
+    "service": "mdemg",
+    "tags": [
+      "memory",
+      "node",
+      "provenance",
+      "j17"
+    ]
+  },
+  "metadata": {
+    "author": "reh3376",
+    "created": "2026-10-14",
+    "description": "Validates GET /v1/memory/nodes/{node_id}?space_id=X \u2014 the provenance-resolution endpoint for J17 agent-briefing-packet v1.1's src:NODE_ID contract. See docs/features/j17-agent-briefing-packet.md \u00a7 Provenance contract.",
+    "test_type": "contract",
+    "priority": "medium"
+  },
+  "config": {
+    "timeout_ms": 10000,
+    "sha256": "b5ad3387c7aaddff1b58f572d6034a627fbd108e7dbbb8d7da6180cc0146c7ea"
+  },
+  "variables": {
+    "test_space": "mdemg-dev"
+  },
+  "request": {
+    "method": "GET",
+    "path": "/v1/memory/nodes/aaaabbbbccccddddeeee",
+    "query": {
+      "space_id": "{{test_space}}"
+    }
+  },
+  "expected": {
+    "status": 404,
+    "body_assertions": [
+      {
+        "path": "$.error",
+        "op": "equals",
+        "expected": "node not found"
+      },
+      {
+        "path": "$.node_id",
+        "op": "equals",
+        "expected": "aaaabbbbccccddddeeee"
+      },
+      {
+        "path": "$.space_id",
+        "op": "equals",
+        "expected": "mdemg-dev"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "name": "missing_space_id",
+      "description": "Returns 400 when space_id query parameter is empty. Explicit empty-string override per UATS-GAP-001 (CLAUDE.md pin): omitting `query` would inherit the base's non-empty space_id via deep-merge.",
+      "request": {
+        "method": "GET",
+        "path": "/v1/memory/nodes/aaaabbbbccccddddeeee",
+        "query": {
+          "space_id": ""
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "op": "contains",
+            "expected": "space_id"
+          }
+        ]
+      }
+    },
+    {
+      "name": "empty_node_id",
+      "description": "Returns 400 when node_id path segment is empty",
+      "request": {
+        "method": "GET",
+        "path": "/v1/memory/nodes/",
+        "query": {
+          "space_id": "{{test_space}}"
+        }
+      },
+      "expected": {
+        "status": 400,
+        "body_assertions": [
+          {
+            "path": "$.error",
+            "op": "contains",
+            "expected": "node_id"
+          }
+        ]
+      }
+    },
+    {
+      "name": "method_not_allowed_put",
+      "description": "Returns 405 for PUT requests (not a dispatched method on handleNodeOperation)",
+      "request": {
+        "method": "PUT",
+        "path": "/v1/memory/nodes/aaaabbbbccccddddeeee",
+        "body": {}
+      },
+      "expected": {
+        "status": 405
+      }
+    },
+    {
+      "name": "method_not_allowed_patch",
+      "description": "Returns 405 for PATCH requests",
+      "request": {
+        "method": "PATCH",
+        "path": "/v1/memory/nodes/aaaabbbbccccddddeeee",
+        "body": {}
+      },
+      "expected": {
+        "status": 405
+      }
+    }
+  ]
+}

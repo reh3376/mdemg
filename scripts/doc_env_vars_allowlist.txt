@@ -106,3 +106,6 @@ ISSUE_TEMPLATE        # docs/user/cli-reference.md: filesystem path `.github/ISS
 MTIME_UTC             # docs/features/adapter-swap.md: column header in a tabular CLI-output example
 
 INSTALLER_SYNC_PLAN  # filename token in CLAUDE.md DOC-DRIFT-LANG-COUNT-001 note (docs/development/INSTALLER_SYNC_PLAN.md)
+
+ENV_VARS  # placeholder in ${ENV_VARS} substitution example in docs/features/uxts-frameworks.md § Anatomy
+UXTS_FRAMEWORK_GAP_ASSESSMENT_20260226  # filename reference in docs/features/uxts-frameworks.md § References (docs/research/UXTS_FRAMEWORK_GAP_ASSESSMENT_20260226.md)

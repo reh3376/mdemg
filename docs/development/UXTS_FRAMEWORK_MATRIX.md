@@ -14,7 +14,7 @@ Last updated: 2026-07-21 (DOC-CURRENCY-002 — §2/§3/§5 refreshed to on-disk 
 | ------- | ---- | ------------- | ------ | ----- |
 | UNTS | Universal Hash Test Specification | Hash integrity registry, verification, revert | active | N/A (registry) |
 | UDTS | Universal DevSpace Test Specification | gRPC contract tests | active | 15 canonical, 4 drafts |
-| UATS | Universal API Test Specification | HTTP endpoint acceptance contracts | active | 214 canonical, 7 drafts |
+| UATS | Universal API Test Specification | HTTP endpoint acceptance contracts | active | 215 canonical, 7 drafts |
 | UPTS | Universal Parser Test Specification | Language parser conformance | active | 28 |
 | UBTS | Universal Benchmark Test Specification | Throughput/latency/load benchmarking | active | 3 specs, 3 profiles |
 | USTS | Universal Security Test Specification | Security behavior and hardening tests | active | 5 canonical, 2 drafts |
@@ -37,7 +37,7 @@ Last updated: 2026-07-21 (DOC-CURRENCY-002 — §2/§3/§5 refreshed to on-disk 
 | --------- | ------ | ----- | ---------------- | --------------- |
 | UNTS | n/a (registry format in docs) | `docs/specs/unts-hash-verification.md`, `docs/specs/unts-registry.json` | `internal/unts/` (Go gRPC service + scanner + registry) | no dedicated CI gate |
 | UDTS | `docs/api/api-spec/udts/schema/udts.schema.json` | Canonical: `docs/api/api-spec/udts/specs/` (15); Drafts: `docs/api/api-spec/udts/drafts/` (4) | `tests/udts/contract_test.go` (hand-coded per RPC) | canonical dialect guard via `uxts-canonical-specs.yml` |
-| UATS | `docs/api/api-spec/uats/schema/uats.schema.json` | `docs/api/api-spec/uats/specs/` (214) | `docs/api/api-spec/uats/runners/uats_runner.py` v1.1.0 | merge-blocking in `ci.yml` (validate-all vs live server + TSDB) |
+| UATS | `docs/api/api-spec/uats/schema/uats.schema.json` | `docs/api/api-spec/uats/specs/` (215) | `docs/api/api-spec/uats/runners/uats_runner.py` v1.2.0 | merge-blocking in `ci.yml` (validate-all vs live server + TSDB) |
 | UPTS | `docs/lang-parser/lang-parse-spec/upts/schema/upts.schema.json` | `docs/lang-parser/lang-parse-spec/upts/specs/` (28) | `docs/lang-parser/lang-parse-spec/upts/runners/upts_runner.py` | CI-gated in `parser-tests.yml` |
 | UBTS | `docs/tests/ubts/schema/ubts.schema.json` | `docs/tests/ubts/specs/` (3), profiles under `docs/tests/ubts/profiles/` (3) | `docs/tests/ubts/runners/ubts_runner.py` v1.1.0 | CI smoke gate in `ci.yml` (soft-fail) |
 | USTS | `docs/tests/usts/schema/usts.schema.json` | Canonical: `docs/tests/usts/specs/` (5); Drafts: `docs/tests/usts/drafts/` (2) | `docs/tests/usts/runners/usts_runner.py` | merge-blocking in `ci.yml` (UXTS-CI-001) |

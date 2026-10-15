@@ -3295,6 +3295,11 @@ func (s *Server) handleNodeOperation(w http.ResponseWriter, r *http.Request) {
 		s.handleArchiveNode(w, r)
 	case strings.HasSuffix(path, "/unarchive"):
 		s.handleUnarchiveNode(w, r)
+	case r.Method == http.MethodGet:
+		// GET /v1/memory/nodes/{node_id}?space_id=X — provenance lookup
+		// (J17 agent briefing packet v1.1 provenance contract — resolve a
+		// src:NODE_ID citation to its author/content/escalation state).
+		s.handleGetNode(w, r)
 	default:
 		// DELETE /v1/memory/nodes/{node_id} - permanent deletion
 		s.handleDeleteNode(w, r)
