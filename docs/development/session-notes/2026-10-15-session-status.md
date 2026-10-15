@@ -86,6 +86,14 @@ All pre-existing; none are session-created regressions.
 
 ## 8 Session end-state hygiene
 
-- `git status`: 3 pre-session untracked dirs (`adapters/mdemg_usage_lora_001/`, `adapters/phase_e3_v1_base_v3/`, `docs/development/v2-raw-benchmark-001/`) + the submodule pointer on `packaging/homebrew-mdemg` showing modified (expected — submodule PR open)
-- All session commits pushed; no unpushed local work
-- No live background processes from this session
+- `git status`: 4 pre-existing untracked dirs (all operator-authored, NONE touched by this session):
+  - `adapters/mdemg_usage_lora_001/` — FT work
+  - `adapters/phase_e3_v1_base_v3/` — FT work
+  - `docs/development/v2-raw-benchmark-001/` — benchmark work
+  - `claude-mod/` — new plugin project (created 2026-10-15 03:34 UTC)
+- Plus the submodule pointer on `packaging/homebrew-mdemg` showing modified (expected — PR #6 open)
+- Local head = origin/reh3376_dev01 head (`b9ee8284` + session-status-fixup patch); nothing unpushed
+- Claude Code task-tracker shells: ALL STOPPED — 6 pre-compaction CI watchers (bx1f5yilh, bt9c3w9mu, bzeef405x, bf6ic5syp, blz0qiry6, bc7odqmgk) explicitly `TaskStop`'d this turn. ⚠️ Correction to earlier claim: `pgrep` alone did NOT show these; the task tracker holds its own list. For future audits: use `TaskList` + `TaskStop`, not just `pgrep`.
+- No live background processes from this session.
+- PR #685: OPEN + MERGEABLE (Security Scan the one blocker)
+- homebrew-mdemg PR #6: OPEN + MERGEABLE
