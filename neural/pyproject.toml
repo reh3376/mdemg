@@ -6,7 +6,9 @@ requires-python = ">=3.10"
 dependencies = [
     "fastapi>=0.115.0",
     "uvicorn>=0.34.0",
-    "sentence-transformers>=3.0.0",
+    "sentence-transformers>=5.6.0",  # CVE-2026-68770 CRITICAL (RCE via security-control bypass; fixed in 5.6.0)
+    "fsspec>=2026.6.0",  # CVE-2026-104851 HIGH (RCE via crafted input; fixed in 2026.6.0); transitive via huggingface-hub + torch, forced direct
+    "certifi>=2026.10.19",  # GHSA-6q48-6c7w-9gw2 CRITICAL (bundled emSign root CAs with compromised private key; fixed in 2026.10.19); transitive via httpx/requests/huggingface-hub, forced direct
     "pydantic-settings>=2.14.2",
     "scipy>=1.11.0",
 ]

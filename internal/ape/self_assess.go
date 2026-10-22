@@ -858,20 +858,30 @@ func (a *Assessor) publishGuidanceMetrics(spaceID string, stats JiminyStatsResul
 	m := metrics.Metrics()
 
 	m.JiminyFollowRate(spaceID).Set(stats.FollowRate)
-	// JIMINY-METRIC-PARTITION-001 (task #158): per-class honest follow rate.
-	// Empty map (dormant classes, no data) → all 4 gauges publish 0 — the
-	// safe idle state (per TSDB-CONSUME-001 idle-safe contract).
+	// JIMINY-METRIC-PARTITION-001 (task #158) + MDEMG-ALERT-NOISE-REDUCTION-001
+	// (2026-10-22): per-class honest follow rate. ⚠️ When a class has
+	// Samples==0 in the window, do NOT Set the gauge — a 0-sample class means
+	// "no data this window", NOT "0% follow rate". The alert rule
+	// `JiminyFollowRateClassRules` reads `COALESCE(AVG(value), 1.0)` which
+	// returns the healthy baseline when metric_samples has no rows for the
+	// class → no false fire. Pre-fix: Set(0.0) landed as a sample →
+	// AVG=0.0 < floor → chronic alert fires on classes with no writer yet
+	// (hybrid, process on instances without the observer platform enabled).
+	// Dormant classes stay silent until their writer path ships traffic.
 	for _, class := range []string{"classifier", "process", "hybrid", "human"} {
-		rate := stats.FollowRateByClass[class].Rate
+		cr := stats.FollowRateByClass[class]
+		if cr.Samples == 0 {
+			continue
+		}
 		switch class {
 		case "classifier":
-			m.JiminyFollowRateClassifierVerifiable(spaceID).Set(rate)
+			m.JiminyFollowRateClassifierVerifiable(spaceID).Set(cr.Rate)
 		case "process":
-			m.JiminyFollowRateProcessVerifiable(spaceID).Set(rate)
+			m.JiminyFollowRateProcessVerifiable(spaceID).Set(cr.Rate)
 		case "hybrid":
-			m.JiminyFollowRateHybrid(spaceID).Set(rate)
+			m.JiminyFollowRateHybrid(spaceID).Set(cr.Rate)
 		case "human":
-			m.JiminyFollowRateHuman(spaceID).Set(rate)
+			m.JiminyFollowRateHuman(spaceID).Set(cr.Rate)
 		}
 	}
 	// jiminy_constraint_effectiveness retired METRICS-DEPRECATE-JIMINY-CONSTRAINT-EFF-001 (2026-08-10).

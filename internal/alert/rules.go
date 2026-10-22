@@ -992,6 +992,14 @@ func Neo4jBackupStalenessRule(stalenessHours int) AlertRule {
 // Idle-safe SQL: aggregate + COALESCE, no ORDER BY … LIMIT 1
 // (TSDB-CONSUME-001 contract).
 // Distinct Service label (NOSILENT-001 cooldown-key contract).
+//
+// ⚠️ MDEMG-ALERT-NOISE-REDUCTION-001 (2026-10-22): "never-ran" is NOT the
+// same class as "ran-once-and-went-stale". A fresh install (empty
+// benchmark_runs) is the natural baseline — not a regression. The rule
+// now distinguishes via `COUNT(*)`: zero rows → age=0 (healthy); ≥1 row →
+// real age. Operators who want a "benchmark never ran" alert file it as
+// a separate rule class (same shape as `backup_no_recent_success` but
+// gated on EVER-ran instead of recently-ran).
 func FTBenchmarkStalenessRule(stalenessDays int) AlertRule {
 	if stalenessDays <= 0 {
 		stalenessDays = 7
@@ -1003,7 +1011,10 @@ func FTBenchmarkStalenessRule(stalenessDays int) AlertRule {
 		Severity:    SeverityHigh,
 		Interval:    1 * time.Hour,
 		ForDuration: 0,
-		QuerySQL: `SELECT COALESCE(EXTRACT(EPOCH FROM (now() - MAX(completed_at))) / 86400.0, 999.0) AS age_days
+		QuerySQL: `SELECT CASE
+				WHEN COUNT(*) = 0 THEN 0.0
+				ELSE COALESCE(EXTRACT(EPOCH FROM (now() - MAX(completed_at))) / 86400.0, 0.0)
+			END AS age_days
 			FROM benchmark_runs
 			WHERE completed_at IS NOT NULL`,
 		Threshold: float64(stalenessDays),
