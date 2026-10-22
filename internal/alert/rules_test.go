@@ -407,6 +407,14 @@ func TestFTBenchmarkStalenessRule(t *testing.T) {
 	if def.Operator != "gt" {
 		t.Errorf("Operator = %q, want gt (fires when age exceeds threshold)", def.Operator)
 	}
+	// MDEMG-ALERT-NOISE-REDUCTION-001 (2026-10-22): never-ran gate — a
+	// fresh install with empty `benchmark_runs` must NOT fire. The SQL
+	// returns age=0 when COUNT(*)=0 so operators who never benchmarked
+	// aren't paged on day one. "Never ran" is a different alert class
+	// than "ran once + went stale"; this rule covers the latter only.
+	if !strings.Contains(def.QuerySQL, "COUNT(*) = 0 THEN 0.0") {
+		t.Errorf("query must distinguish never-ran (COUNT(*)=0 → 0.0 healthy) from stale (got: %s)", def.QuerySQL)
+	}
 }
 
 // TSDB-CONSUME-001: writer flush-failure rule pins — per-writer MAX-MIN

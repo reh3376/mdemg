@@ -997,3 +997,78 @@ func TestScoreRetrieval_FallbackToEnum_WhenNoDataset(t *testing.T) {
 	})
 	assertClose(t, got, 0.9, 0.001, "zero-query dataset falls back to enum")
 }
+
+// ─── MDEMG-ALERT-NOISE-REDUCTION-001 (2026-10-22) ───
+// Per-class gauges emit honestly: Samples==0 → skip Set, so metric_samples
+// has no row for that class → alert rule's COALESCE(AVG(value), 1.0)
+// returns healthy baseline → no false fire on dormant classes.
+// The sibling-pattern precedent is TestPublishProtocolMetrics_SkipsZeroEvent
+// above (compression + tier fraction).
+
+func TestPublishGuidanceMetrics_SkipsClassGaugeWhenZeroSamples(t *testing.T) {
+	m := metrics.Metrics()
+	sid := "mdemg-test-noise-reduction-001"
+
+	// Seed sentinel values on each class gauge. A publish with Samples==0
+	// must NOT overwrite them (would land a 0.0 sample in metric_samples
+	// → AVG=0.0 < floor → chronic false fire on classes with no writer).
+	m.JiminyFollowRateClassifierVerifiable(sid).Set(0.42)
+	m.JiminyFollowRateProcessVerifiable(sid).Set(0.74)
+	m.JiminyFollowRateHybrid(sid).Set(0.55)
+	m.JiminyFollowRateHuman(sid).Set(0.33)
+
+	a := &Assessor{}
+	a.publishGuidanceMetrics(sid, JiminyStatsResult{
+		FollowRate: 0.0,
+		// All four classes have Samples==0 — the dormant-class state on
+		// instances without the writer path enabled (hybrid, process
+		// everywhere today; classifier on fresh installs; human until
+		// JIMINY-HITL-HUMAN-CLASS-INTEGRATION-001 writer ships).
+		FollowRateByClass: map[string]tsdb.GuidanceClassRate{
+			"classifier": {Rate: 0.0, Samples: 0},
+			"process":    {Rate: 0.0, Samples: 0},
+			"hybrid":     {Rate: 0.0, Samples: 0},
+			"human":      {Rate: 0.0, Samples: 0},
+		},
+	})
+
+	if got := m.JiminyFollowRateClassifierVerifiable(sid).Value(); got != 0.42 {
+		t.Errorf("zero-samples publish overwrote classifier sentinel: got %v, want 0.42 (Set must be skipped)", got)
+	}
+	if got := m.JiminyFollowRateProcessVerifiable(sid).Value(); got != 0.74 {
+		t.Errorf("zero-samples publish overwrote process sentinel: got %v, want 0.74", got)
+	}
+	if got := m.JiminyFollowRateHybrid(sid).Value(); got != 0.55 {
+		t.Errorf("zero-samples publish overwrote hybrid sentinel: got %v, want 0.55", got)
+	}
+	if got := m.JiminyFollowRateHuman(sid).Value(); got != 0.33 {
+		t.Errorf("zero-samples publish overwrote human sentinel: got %v, want 0.33", got)
+	}
+}
+
+func TestPublishGuidanceMetrics_PublishesWhenSamplesNonZero(t *testing.T) {
+	m := metrics.Metrics()
+	sid := "mdemg-test-noise-reduction-002"
+
+	// Baseline values that MUST be overwritten by a real publish.
+	m.JiminyFollowRateClassifierVerifiable(sid).Set(0.0)
+	m.JiminyFollowRateHybrid(sid).Set(0.0)
+
+	a := &Assessor{}
+	a.publishGuidanceMetrics(sid, JiminyStatsResult{
+		FollowRate: 0.5,
+		FollowRateByClass: map[string]tsdb.GuidanceClassRate{
+			"classifier": {Rate: 0.17, Samples: 42}, // real data
+			"process":    {Rate: 0.0, Samples: 0},   // dormant — skip
+			"hybrid":     {Rate: 0.33, Samples: 9},  // real data
+			"human":      {Rate: 0.0, Samples: 0},   // dormant — skip
+		},
+	})
+
+	if got := m.JiminyFollowRateClassifierVerifiable(sid).Value(); got != 0.17 {
+		t.Errorf("classifier gauge not updated on real publish: got %v, want 0.17", got)
+	}
+	if got := m.JiminyFollowRateHybrid(sid).Value(); got != 0.33 {
+		t.Errorf("hybrid gauge not updated on real publish: got %v, want 0.33", got)
+	}
+}
