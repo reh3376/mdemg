@@ -1,7 +1,8 @@
 # MDEMG Onboarding — Speaker Notes Companion
 
-**Pair with**: `mdemg-onboarding-deck.md`
-**Format**: one `## Slide N — <Title>` section per slide
+**Entry point**: [`README.md`](./README.md) · **Paired deck**: [`mdemg-onboarding-deck.md`](./mdemg-onboarding-deck.md) · **Governance**: [`../features/mdemg-onboarding-deck.md`](../features/mdemg-onboarding-deck.md)
+
+**Format**: one `## Slide N — <Title>` section per deck slide
 **Last verified**: 2026-10-22
 
 Advanced Slides supports inline `note:` blocks (already in the deck). This companion is for operators who brief new team members WITHOUT Obsidian installed — flat markdown is universally readable.
@@ -14,9 +15,36 @@ Advanced Slides supports inline `note:` blocks (already in the deck). This compa
 
 ---
 
+## Table of Contents
+
+| § | Section (first slide #) | Jump to notes | Jump to deck |
+|---|---|---|---|
+| F1 | Opening (slide 2) | [▸](#f1--opening) | [deck](./mdemg-onboarding-deck.md#f1--opening) |
+| F2 | Substrate Core (slide 14) | [▸](#f2--substrate-core) | [deck](./mdemg-onboarding-deck.md#f2--substrate-core) |
+| F3 | Retrieval Pipeline (slide 26) | [▸](#f3--retrieval-pipeline) | [deck](./mdemg-onboarding-deck.md#f3--retrieval-pipeline) |
+| F4 | Jiminy + Enforcement + J17 (slide 36) | [▸](#f4--jiminy--enforcement--j17) | [deck](./mdemg-onboarding-deck.md#f4--jiminy--enforcement--j17) |
+| F5 | LoRA + Qwen + Model Dist (slide 52) | [▸](#f5--lora--qwen--model-distribution) | [deck](./mdemg-onboarding-deck.md#f5--lora--qwen--model-distribution) |
+| F6 | UxTS Framework Family (slide 65) | [▸](#f6--uxts-framework-family) | [deck](./mdemg-onboarding-deck.md#f6--uxts-framework-family) |
+| F7 | Ops (slide 72) | [▸](#f7--ops) | [deck](./mdemg-onboarding-deck.md#f7--ops) |
+| F8 | CLI + Hooks + MCP (slide 88) | [▸](#f8--cli-hooks-mcp-multi-instance) | [deck](./mdemg-onboarding-deck.md#f8--cli-hooks-mcp-multi-instance) |
+| F9 | Beta + Security + Dormant (slide 94) | [▸](#f9--beta-program--security--dormant-census) | [deck](./mdemg-onboarding-deck.md#f9--beta-program--security--dormant-census) |
+| F10 | Conclusion (slide 99) | [▸](#f10--conclusion) | [deck](./mdemg-onboarding-deck.md#f10--conclusion) |
+| — | [Quarterly Refresh Checklist](#quarterly-refresh-checklist) | | |
+| — | [PM-Fallback Phrasings](#simplify-for-pm-phrasings-quick-reference) | | |
+
+**Natural reading paths**:
+- *Pre-briefing async read*: flat top-to-bottom (~45 min).
+- *Jump to one section*: click the TOC link, read, use the [⇤ TOC](#table-of-contents) link at each F-section head to return.
+- *Live walkthrough support*: Obsidian speaker view already shows inline `note:` from the deck — this file is for cases where the operator can't run Obsidian.
+
+---
+
 ## Slide 1 — Title
 
 Audience: senior engineers / technical PMs who were senior engineers. Not for exec summaries, product owners, or beginners. Every substantive claim traces back to CLAUDE.md, docs/features, sprint records, or shipped code. **Pause 1 min for questions on audience fit** before continuing. Explicitly say: "If any claim here feels marketing-shaped, flag it — we'll trace it live."
+
+<a id="f1--opening"></a>
+### [⇤ TOC](#table-of-contents) · [deck ▸ F1](./mdemg-onboarding-deck.md#f1--opening)
 
 ## Slide 2 — F1 Section Header
 
@@ -68,6 +96,9 @@ Pause 2 min for questions. **This is the heaviest Q&A gate** — unresolved conf
 
 ---
 
+<a id="f2--substrate-core"></a>
+### [⇤ TOC](#table-of-contents) · [deck ▸ F2](./mdemg-onboarding-deck.md#f2--substrate-core)
+
 ## Slide 14 — F2 Section Header
 
 Target: 12-16 slides. 1 full (Neo4j CMS + Hebbian + consolidation) + 1 mini (TSDB). Load-bearing section — the surface everything else reads/writes.
@@ -118,6 +149,9 @@ V0025 added retention + compression to EVERY previously-unbounded hypertable (`e
 
 ---
 
+<a id="f3--retrieval-pipeline"></a>
+### [⇤ TOC](#table-of-contents) · [deck ▸ F3](./mdemg-onboarding-deck.md#f3--retrieval-pipeline)
+
 ## Slide 26 — F3 Section Header
 
 Target: 10-14 slides. 1 full (RRF) + 3 mini (context fingerprint, sparse gate, rerank).
@@ -159,6 +193,9 @@ Pattern: ship mechanism default-off, let 7d of A/B data decide. NEURAL-RERANK-PR
 Length-mismatch counter + corrective retry — never silent-default (RERANK-LENGTH-STRICT-001). Determinism required (`rerankTemperature=0.0`) + pre-check budget guard. Operator opt-in via `.env` RERANK_PROVIDER=neural if latency matters more than consistency.
 
 ---
+
+<a id="f4--jiminy--enforcement--j17"></a>
+### [⇤ TOC](#table-of-contents) · [deck ▸ F4](./mdemg-onboarding-deck.md#f4--jiminy--enforcement--j17)
 
 ## Slide 36 — F4 Section Header
 
@@ -226,6 +263,9 @@ Peer-Opus-5.5 review surfaced v1.0 compliance-shape; v1.1 reframed as data-not-c
 
 ---
 
+<a id="f5--lora--qwen--model-distribution"></a>
+### [⇤ TOC](#table-of-contents) · [deck ▸ F5](./mdemg-onboarding-deck.md#f5--lora--qwen--model-distribution)
+
 ## Slide 52 — F5 Section Header
 
 Target: 12-16 slides. 1 full (LoRA on Qwen) + 2 mini (recursive loop, homebrew dist).
@@ -280,6 +320,9 @@ Data-decided. Each rejected option had quantifiable disqualifier. Rollback: rest
 
 ---
 
+<a id="f6--uxts-framework-family"></a>
+### [⇤ TOC](#table-of-contents) · [deck ▸ F6](./mdemg-onboarding-deck.md#f6--uxts-framework-family)
+
 ## Slide 65 — F6 Section Header
 
 Target: 7-10 slides. 1 full (UxTS forcing-function family). The pattern that keeps the system honest.
@@ -309,6 +352,9 @@ CI gating means a class never re-opens once drift is spec'd. Zombie checks (cont
 When a new sprint introduces drift-prone surface, sprint plan MUST include UxTS forcing function. Non-negotiable.
 
 ---
+
+<a id="f7--ops"></a>
+### [⇤ TOC](#table-of-contents) · [deck ▸ F7](./mdemg-onboarding-deck.md#f7--ops)
 
 ## Slide 72 — F7 Section Header
 
@@ -376,6 +422,9 @@ When editing any file under `deploy/docker/grafana/`, run `make sync-grafana-emb
 
 ---
 
+<a id="f8--cli-hooks-mcp-multi-instance"></a>
+### [⇤ TOC](#table-of-contents) · [deck ▸ F8](./mdemg-onboarding-deck.md#f8--cli-hooks-mcp-multi-instance)
+
 ## Slide 88 — F8 Section Header
 
 Target: 6-8 slides. 2 mini + mentions.
@@ -402,6 +451,9 @@ Hostname-as-identity is fragile — pin derived values at first-use is the arch 
 
 ---
 
+<a id="f9--beta-program--security--dormant-census"></a>
+### [⇤ TOC](#table-of-contents) · [deck ▸ F9](./mdemg-onboarding-deck.md#f9--beta-program--security--dormant-census)
+
 ## Slide 94 — F9 Section Header
 
 Target: 4-6 slides. 2 mini + mentions.
@@ -423,6 +475,9 @@ Import-time invariant enforced in `importGuidanceRows`. Stable prefix-based keyi
 Verifier scripts: `scripts/verify_route_consumers.py`, `verify_tsdb_consumers.py`, `verify_metrics_consumers.py`. Pre-commit hook gate (PRE-COMMIT-INVENTORY-GATE-001) blocks `git commit` when trigger-file staged without paired adjudication.
 
 ---
+
+<a id="f10--conclusion"></a>
+### [⇤ TOC](#table-of-contents) · [deck ▸ F10](./mdemg-onboarding-deck.md#f10--conclusion)
 
 ## Slide 99 — F10 Section Header
 
@@ -460,6 +515,8 @@ CLI reference comprehensive; `--help` on every subcommand. Dashboards + /ui are 
 
 ## Simplify-for-PM Phrasings (Quick Reference)
 
+[⇤ TOC](#table-of-contents) · [Quarterly Refresh ▸](#quarterly-refresh-checklist)
+
 If a slide gets a "wait, what?" from a non-engineer in the room:
 
 | Jargon | PM-ready phrasing |
@@ -476,6 +533,8 @@ If a slide gets a "wait, what?" from a non-engineer in the room:
 
 ## Quarterly Refresh Checklist
 
+[⇤ TOC](#table-of-contents) · [PM Phrasings ▸](#simplify-for-pm-phrasings-quick-reference)
+
 Operator or delegate re-walks before each quarterly refresh:
 - [ ] CLAUDE.md pin count (grep -c '^- \*\*' CLAUDE.md)
 - [ ] UxTS framework count (vs. UXTS_FRAMEWORK_MATRIX.md)
@@ -487,10 +546,14 @@ Operator or delegate re-walks before each quarterly refresh:
 
 ---
 
+**Return to**: [⇤ TOC](#table-of-contents) · [README (entry point)](./README.md) · [Deck](./mdemg-onboarding-deck.md) · [Governance](../features/mdemg-onboarding-deck.md)
+
 ## Documents Accessed
 
-- `mdemg-onboarding-deck.md` (sibling, this companion)
-- `../development/mdemg-onboarding-deck-001/presentation_spec.md`
-- `../development/mdemg-onboarding-deck-001/global_roadmap.md`
-- `../development/mdemg-onboarding-deck-001/roadmaps/F1-opening.md`
-- `../development/mdemg-onboarding-deck-001/roadmaps/F2-F10-roadmaps.md`
+- [`README.md`](./README.md) (sibling, entry point)
+- [`mdemg-onboarding-deck.md`](./mdemg-onboarding-deck.md) (sibling, paired deck)
+- [`../features/mdemg-onboarding-deck.md`](../features/mdemg-onboarding-deck.md) (governance)
+- [`../development/mdemg-onboarding-deck-001/presentation_spec.md`](../development/mdemg-onboarding-deck-001/presentation_spec.md)
+- [`../development/mdemg-onboarding-deck-001/global_roadmap.md`](../development/mdemg-onboarding-deck-001/global_roadmap.md)
+- [`../development/mdemg-onboarding-deck-001/roadmaps/F1-opening.md`](../development/mdemg-onboarding-deck-001/roadmaps/F1-opening.md)
+- [`../development/mdemg-onboarding-deck-001/roadmaps/F2-F10-roadmaps.md`](../development/mdemg-onboarding-deck-001/roadmaps/F2-F10-roadmaps.md)
