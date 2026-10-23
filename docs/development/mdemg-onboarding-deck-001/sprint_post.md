@@ -79,8 +79,9 @@ Advanced Slides HTML export produces `docs/onboarding/mdemg-onboarding-deck.html
 - [x] Trajectory language on sub-target metrics (follow rate ~13% framed as arc delta, not "by design")
 - [x] Quarterly-refresh commitment documented
 - [x] Feature doc shipped
+- [x] CLAUDE.md pin shipped (MDEMG-ONBOARDING-DECK-001 architecture pin live)
+- [x] Deliverable consolidated into single directory `docs/onboarding/` with entry-point README + bidirectional intra-doc navigation (2026-10-23)
 - [ ] Epic 6 live walkthrough — DEFERRED (requires operator-driven rehearsal session)
-- [ ] CLAUDE.md pin (sibling commit)
 
 ---
 

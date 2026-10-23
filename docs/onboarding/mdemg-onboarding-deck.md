@@ -13,18 +13,49 @@ Onboarding deck · engineering-dense · ~115 min walkthrough
 
 `Last verified: 2026-10-22`
 
+**Entry point**: [`README.md`](./README.md) · **Speaker notes**: [`mdemg-onboarding-notes.md`](./mdemg-onboarding-notes.md)
+
 note:
 - Audience: senior engineers / technical PMs who were senior engineers.
 - Not for exec summaries, product owners, or beginners.
 - Every substantive claim traces to CLAUDE.md, docs/features, sprint records, or shipped code.
 - "If any claim here feels marketing-shaped, flag it — we'll trace it live."
+- Keyboard: ← → nav · ESC overview · F fullscreen · S speaker view · ? help
 - Pause 1 min for questions on audience fit before continuing.
+
+---
+
+## Table of Contents
+
+**[F1 Opening](#f1--opening)** → **[F2 Substrate](#f2--substrate-core)** → **[F3 Retrieval](#f3--retrieval-pipeline)** → **[F4 Jiminy + Enforcement + J17](#f4--jiminy--enforcement--j17)** → **[F5 LoRA + Qwen + Model Dist](#f5--lora--qwen--model-distribution)** → **[F6 UxTS](#f6--uxts-framework-family)** → **[F7 Ops](#f7--ops)** → **[F8 CLI + Hooks + MCP](#f8--cli-hooks-mcp-multi-instance)** → **[F9 Beta + Security + Dormant](#f9--beta-program--security--dormant-census)** → **[F10 Conclusion](#f10--conclusion)**
+
+| § | Section | Target | Natural Q&A anchor |
+|---|---|---:|---|
+| [F1](#f1--opening) | Opening — mission + analogy + history + 10k-ft | ~10 min | after F1.5 recap |
+| [F2](#f2--substrate-core) | Substrate Core — Neo4j CMS, Hebbian, consolidation, TSDB | ~15 min | — |
+| [F3](#f3--retrieval-pipeline) | Retrieval Pipeline — RRF 4-column + fingerprinting + rerank | ~12 min | — |
+| [F4](#f4--jiminy--enforcement--j17) | **Jiminy + Enforcement + J17** (headline) | ~25 min | after F4.1 "why" |
+| [F5](#f5--lora--qwen--model-distribution) | LoRA + Qwen + Model Distribution | ~14 min | — |
+| [F6](#f6--uxts-framework-family) | UxTS Framework Family — the forcing-function matrix | ~8 min | — |
+| [F7](#f7--ops) | Ops — RSIC, HITL, backup/restore, Grafana | ~16 min | — |
+| [F8](#f8--cli-hooks-mcp-multi-instance) | CLI + Hooks + MCP + Multi-Instance | ~7 min | — |
+| [F9](#f9--beta-program--security--dormant-census) | Beta + Security + Dormant Census | ~5 min | — |
+| [F10](#f10--conclusion) | Conclusion — honest state + vision + Q&A | ~8 min | final (longest) |
+
+In Obsidian Advanced Slides: **ESC** → overview grid → click any section → Enter to resume.
+
+note:
+- 107 slides total · 15 Mermaid diagrams · ~115 min including Q&A.
+- Use this slide as the home base — ESC overview + click-to-this-slide works as a return.
+- Mention that F4 is the headline section; the other sections lead into or follow from it.
 
 ---
 
 <!-- SECTION F1 — OPENING -->
 
 # F1 · Opening
+
+**Nav**: [⇤ TOC](#table-of-contents) · [Notes ▸ F1](./mdemg-onboarding-notes.md#f1--opening) · [F2 →](#f2--substrate-core)
 
 note:
 - Target: 12 slides, ~10 min.
@@ -296,6 +327,8 @@ note:
 
 # F2 · Substrate Core
 
+**Nav**: [← F1](#f1--opening) · [⇤ TOC](#table-of-contents) · [Notes ▸ F2](./mdemg-onboarding-notes.md#f2--substrate-core) · [F3 →](#f3--retrieval-pipeline)
+
 note:
 - Target: 12-16 slides. 1 full (Neo4j CMS + Hebbian + consolidation) + 1 mini (TSDB).
 - Load-bearing section — this is the surface everything else reads/writes.
@@ -495,6 +528,8 @@ note:
 
 # F3 · Retrieval Pipeline
 
+**Nav**: [← F2](#f2--substrate-core) · [⇤ TOC](#table-of-contents) · [Notes ▸ F3](./mdemg-onboarding-notes.md#f3--retrieval-pipeline) · [F4 →](#f4--jiminy--enforcement--j17)
+
 note:
 - Target: 10-14 slides. 1 full (RRF) + 3 mini (context fingerprint, sparse gate, rerank).
 
@@ -654,6 +689,8 @@ note:
 <!-- SECTION F4 — JIMINY + ENFORCEMENT + J17 (HEADLINE) -->
 
 # F4 · Jiminy + Enforcement + J17
+
+**Nav**: [← F3](#f3--retrieval-pipeline) · [⇤ TOC](#table-of-contents) · [Notes ▸ F4](./mdemg-onboarding-notes.md#f4--jiminy--enforcement--j17) · [F5 →](#f5--lora--qwen--model-distribution)
 
 note:
 - Target: 20-26 slides. The headline section.
@@ -951,6 +988,8 @@ note:
 
 # F5 · LoRA + Qwen + Model Distribution
 
+**Nav**: [← F4](#f4--jiminy--enforcement--j17) · [⇤ TOC](#table-of-contents) · [Notes ▸ F5](./mdemg-onboarding-notes.md#f5--lora--qwen--model-distribution) · [F6 →](#f6--uxts-framework-family)
+
 note:
 - Target: 12-16 slides. 1 full (LoRA on Qwen) + 2 mini (recursive loop, homebrew dist).
 
@@ -1172,6 +1211,8 @@ note:
 
 # F6 · UxTS Framework Family
 
+**Nav**: [← F5](#f5--lora--qwen--model-distribution) · [⇤ TOC](#table-of-contents) · [Notes ▸ F6](./mdemg-onboarding-notes.md#f6--uxts-framework-family) · [F7 →](#f7--ops)
+
 note:
 - Target: 7-10 slides. 1 full (UxTS forcing-function family).
 - The pattern that keeps the system honest.
@@ -1299,6 +1340,8 @@ note:
 <!-- SECTION F7 — OPS -->
 
 # F7 · Ops
+
+**Nav**: [← F6](#f6--uxts-framework-family) · [⇤ TOC](#table-of-contents) · [Notes ▸ F7](./mdemg-onboarding-notes.md#f7--ops) · [F8 →](#f8--cli-hooks-mcp-multi-instance)
 
 note:
 - Target: 14-18 slides. 2 full (RSIC + alert-correctness; HITL + curation) + 2 mini (backup + Grafana).
@@ -1561,6 +1604,8 @@ note:
 
 # F8 · CLI, Hooks, MCP, Multi-Instance
 
+**Nav**: [← F7](#f7--ops) · [⇤ TOC](#table-of-contents) · [Notes ▸ F8](./mdemg-onboarding-notes.md#f8--cli-hooks-mcp-multi-instance) · [F9 →](#f9--beta-program--security--dormant-census)
+
 note:
 - Target: 6-8 slides. 2 mini + mentions.
 
@@ -1672,6 +1717,8 @@ note:
 
 # F9 · Beta Program + Security + Dormant Census
 
+**Nav**: [← F8](#f8--cli-hooks-mcp-multi-instance) · [⇤ TOC](#table-of-contents) · [Notes ▸ F9](./mdemg-onboarding-notes.md#f9--beta-program--security--dormant-census) · [F10 →](#f10--conclusion)
+
 note:
 - Target: 4-6 slides. 2 mini + mentions.
 
@@ -1757,6 +1804,8 @@ note:
 <!-- SECTION F10 — CONCLUSION -->
 
 # F10 · Conclusion
+
+**Nav**: [← F9](#f9--beta-program--security--dormant-census) · [⇤ TOC](#table-of-contents) · [Notes ▸ F10](./mdemg-onboarding-notes.md#f10--conclusion) · [End ⇥](#thank-you)
 
 note:
 - Target: 6-8 slides. Operator-authored.
@@ -1894,6 +1943,11 @@ Questions welcome. Everything here is traceable.
 `Last verified`: 2026-10-22
 `Quarterly refresh`: next Q1
 
+---
+
+**Return to**: [⇤ TOC](#table-of-contents) · [README (entry point)](./README.md) · [Speaker notes](./mdemg-onboarding-notes.md) · [Governance](../features/mdemg-onboarding-deck.md)
+
 note:
 - Pause for Q&A — this is the longest Q&A anchor in the deck.
 - If a specific concern or arc wasn't covered in depth, that's deliberate — reference the feature doc + follow up offline.
+- After Q&A, return-links above let viewers re-enter the deck or move to companion material.

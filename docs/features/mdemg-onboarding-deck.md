@@ -2,10 +2,16 @@
 
 **Feature doc** for the MDEMG onboarding presentation (sprint MDEMG-ONBOARDING-DECK-001).
 
-**Deck**: `docs/onboarding/mdemg-onboarding-deck.md`
-**Speaker notes**: `docs/onboarding/mdemg-onboarding-notes.md`
-**Section roadmaps**: `docs/development/mdemg-onboarding-deck-001/roadmaps/`
-**Sprint**: `docs/development/mdemg-onboarding-deck-001/`
+**Entry point** (operator & new-reader home base): [`../onboarding/README.md`](../onboarding/README.md) — index + how-to-view + navigation hub for the whole deliverable.
+
+**Deliverable artifacts** (all under `docs/onboarding/`, self-contained):
+- [`../onboarding/mdemg-onboarding-deck.md`](../onboarding/mdemg-onboarding-deck.md) — 107-slide Obsidian Advanced Slides deck
+- [`../onboarding/mdemg-onboarding-notes.md`](../onboarding/mdemg-onboarding-notes.md) — flat speaker-notes companion
+- [`../onboarding/README.md`](../onboarding/README.md) — directory landing page with Section Index + Governance summary
+
+**Sprint records** (development history, not deliverable surface):
+- Section roadmaps: `docs/development/mdemg-onboarding-deck-001/roadmaps/`
+- Sprint: `docs/development/mdemg-onboarding-deck-001/`
 
 ## 1 Why This Exists
 
@@ -65,10 +71,14 @@ Numbers rot. Per `presentation_spec.md` §9: "Last verified: YYYY-MM-DD" footer 
 
 ### 3.1 Format
 
-- Single markdown file: `docs/onboarding/mdemg-onboarding-deck.md`
+- Self-contained directory: `docs/onboarding/` (README + deck + notes + assets)
+- Entry point: `docs/onboarding/README.md` — the directory landing page a GitHub reader sees first
+- Deck: single markdown file `docs/onboarding/mdemg-onboarding-deck.md`
 - Advanced Slides frontmatter: theme=night, width=1280, height=720
 - `---` horizontal separator for new slide; `--` vertical for sub-slide stacks
 - `note:` block inline per slide — mirrored in `docs/onboarding/mdemg-onboarding-notes.md`
+- **Intra-deck navigation**: Table-of-Contents slide (slide 2) with anchor links to every F-section; each F-section header carries a nav line (`← prev · ⇤ TOC · Notes ▸ · next →`); Thank-You closing slide loops back to TOC + README + notes
+- **Cross-document navigation**: README Section Index deep-links to both deck and notes per section; notes TOC deep-links back to deck per section; feature doc and sprint records link to README; Obsidian ESC-overview + arrow-keyboard remains the primary live-walkthrough affordance
 
 ### 3.2 Section families + slide budget
 
