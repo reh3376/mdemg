@@ -1,0 +1,1899 @@
+---
+theme: night
+transition: slide
+width: 1280
+height: 720
+---
+
+# MDEMG
+
+## Cognitive Substrate for AI-Assisted Development
+
+Onboarding deck · engineering-dense · ~115 min walkthrough
+
+`Last verified: 2026-10-22`
+
+note:
+- Audience: senior engineers / technical PMs who were senior engineers.
+- Not for exec summaries, product owners, or beginners.
+- Every substantive claim traces to CLAUDE.md, docs/features, sprint records, or shipped code.
+- "If any claim here feels marketing-shaped, flag it — we'll trace it live."
+- Pause 1 min for questions on audience fit before continuing.
+
+---
+
+<!-- SECTION F1 — OPENING -->
+
+# F1 · Opening
+
+note:
+- Target: 12 slides, ~10 min.
+- Four durable mental hooks to establish: what MDEMG is, the core analogy, the honest history, the 10k-ft system view.
+- F1 is intentionally shallow — depth lives in F2–F9.
+
+---
+
+## What MDEMG Is Trying To Do
+
+> **Help developers create software that connects in a manner that increases the likelihood of making better decisions.**
+
+- **Persistent memory + cognitive substrate** — not a tool
+- **Decisions are the atomic unit** — not features, not metrics
+- **Connections** (memory → retrieval → classification → synthesis) are what the system optimizes
+
+note:
+- This verbatim sentence is from CLAUDE.md's `project_mdemg_purpose` memory. Quote it.
+- Rank future design options against the purpose, not against aggregate scores.
+- Everything downstream — Jiminy, J17, LoRA, UxTS — moves one of those connection qualities.
+
+---
+
+## MDEMG : artificial NN :: internal dialogue : biological NN
+
+> MDEMG is the LLM's persistent memory and cognitive substrate. Markdown files are **REMINDERS AND KEYS only** — real memory lives in CMS (Neo4j, `mdemg-dev` space).
+
+- CMS disconnected ⇒ **cognitive outage**, not graceful degradation
+- Hooks + MCP are the dialogue's sensory + motor channels
+- The agent (Claude Code) is the **voice** reading/writing to the substrate
+
+note:
+- If someone calls MDEMG a "tool" during Q&A, pause and reframe. The tool framing is the wrong mental model.
+- Pause for questions on this slide — the analogy is load-bearing.
+
+---
+
+## History — Build Trajectory
+
+```mermaid
+flowchart LR
+  A[Concept origin] --> B[Phases 1-105<br/>Substrate + Retrieval + Hebbian]
+  B --> C[Sidecar phases<br/>101-105 cognitive gaps]
+  C --> D[RSIC<br/>self-improvement]
+  D --> E[Jiminy inner-voice<br/>+/strict enforcement]
+  E --> F[J17 protocol<br/>compressed messaging]
+  F --> G[LoRA on Qwen3-14B<br/>mdemg-llm-v1]
+  G --> H[Recursive retraining<br/>FT-RECURSIVE-001..004]
+  H --> I[UxTS framework family<br/>16 drift gates]
+  I --> J[Enforcement outcome<br/>JIMINY-ENFORCE-001..005]
+  J --> K[JIMINY-CEILING-BREAK-2<br/>follow rate ≥80% arc]
+```
+
+note:
+- ~2 years of work.
+- Linear reading left-to-right; actual dependencies branch.
+- Next slide is the "if you only had 5 min" view: the honest pivots.
+
+---
+
+## Honest Pivots
+
+- **2026-04-22 — MoE → dense pivot.** Metal 499K MTLResource ceiling blocked MoE LoRA backward pass. Qwen3-14B-4bit dense replaced Qwen3.6-35B-A3B.
+- **2026-05-03 — mlx_lm.server → llama.cpp cutover.** mlx_lm.server crashed every ~14 min via Metal OOM; llama-server bounds KV architecturally.
+- **2026-06-26 — Intent translation disabled.** UVTS A/B OFF 0.4170 vs ON 0.4070 (net-negative); was 70% of all LLM errors.
+- **2026-04-22 — FT-OAI-003 dropped.** All FT targets local MLX LoRA; OpenAI API only as teacher.
+- **2026-08-01 — Jiminy is an ENFORCER.** Prior framing as opt-in advisor superseded.
+
+note:
+- Each decision was "the data decided," not an opinion.
+- Playbook: measure before flipping; honest no-ops are legitimate verdicts.
+- Pause here for 2 min — these are the operator-opinionated moments that invite real Q&A.
+
+---
+
+## Where We Are Today
+
+| | |
+|---|---|
+| Architecture pins | ~105 in CLAUDE.md |
+| LLM call sites | 16 (all single-shot, no-tool-calling) |
+| UxTS frameworks | 16 (all CI-gated) |
+| Ingested languages | 28 (verified via UPTS specs) |
+| Production model | `mdemg-llm-v1.Q5_K_M` (Qwen3-14B base + Phase 5 SFT LoRA) |
+| Benchmark aggregate | 0.9188 on 16-task augmented eval |
+| Open arc | JIMINY-CEILING-BREAK-2 (follow rate ~13% → target ≥80%) |
+
+note:
+- Numbers rot — quarterly refresh commitment.
+- The follow-rate number is what'll move most. It's the live measure of substrate quality from the receiver side.
+
+---
+
+## MDEMG — System Overview
+
+```mermaid
+flowchart TB
+  subgraph Agent[Claude Code Agent]
+    H[Hooks]
+    M[MCP]
+  end
+  subgraph Core[MDEMG Core]
+    A[HTTP API :9999]
+    R[Retrieval RRF 4-col]
+    J[Jiminy Classifier]
+    S[J17 Protocol]
+    L[llama-server :8102]
+  end
+  subgraph Substrate[Substrate]
+    N[Neo4j CMS<br/>mdemg-dev]
+    T[TSDB telemetry<br/>+ corpora]
+  end
+  subgraph Learning[Learning]
+    HE[Hebbian]
+    RS[RSIC assessor]
+    HI[HITL review]
+    FT[FT recursive loop]
+  end
+  subgraph Obs[Observability]
+    G[Grafana 8 dashboards]
+    AL[Alert evaluator<br/>35+ rules]
+  end
+  H & M --> A
+  A --> R --> N
+  A --> J --> L
+  J --> T
+  N <--> HE
+  T --> RS --> A
+  HI --> N
+  FT --> L
+  Core & Learning --> T
+  T --> G & AL
+```
+
+note:
+- Spend ~1 min per cluster. Don't go deep — F2-F9 do depth.
+- 12 nodes, 18 edges. Legible at 1280×720.
+
+---
+
+## The 5-Layer Memory Hierarchy
+
+```mermaid
+flowchart BT
+  L0["L0 — Raw observations<br/>obs_type ∈ {constraint, correction, decision, error, progress, ...}"]
+  L1["L1 — Promoted durable rules<br/>role_type ∈ {constraint, correction}<br/>via consolidation gates"]
+  L2["L2 — Themes<br/>clusters by centroid cosine"]
+  L3["L3 — Emergent concepts<br/>abstracted patterns"]
+  L4["L4 — Higher-order concepts"]
+  L5["L5 — Meta / global patterns"]
+  L0 -->|CreateConstraintNodes<br/>CreateCorrectionNodes| L1
+  L1 -->|ClusterConversations<br/>phase 20| L2
+  L2 -->|CreateHiddenNodes<br/>phase 21| L3
+  L3 -->|BackwardPass<br/>phase 22| L4
+  L4 -->|ABSTRACTS_TO| L5
+```
+
+note:
+- Retrieval traverses this hierarchy; abstraction edges (GENERALIZES, ABSTRACTS_TO) link L0→L5.
+- Each layer has shipped consolidation code; name the step on each arrow.
+- F2 goes deeper.
+
+---
+
+## Hot Path — What Happens On a Tool Use
+
+```mermaid
+sequenceDiagram
+  participant Agent as Claude Code
+  participant Hook as .claude/hooks
+  participant API as HTTP API :9999
+  participant J as Jiminy
+  participant CMS as Neo4j CMS
+  Agent->>Hook: PostToolUse (Write/Edit/Bash)
+  Hook->>API: POST /v1/conversation/observe
+  Hook->>API: POST /v1/jiminy/classify (if write-shape)
+  API->>J: evaluate
+  J-->>Hook: verdict (deny/pass)
+  Note over Hook: /strict + deny → BLOCK + HIGH alert
+  Hook->>API: POST /v1/jiminy/warm (background)
+  API->>CMS: embed + retrieve + guide
+  Note over Agent: next prompt
+  Hook->>API: GET /v1/jiminy/latest
+  API-->>Hook: guidance narrative
+  Note over Agent: guidance appended as system-reminder
+```
+
+note:
+- This loop runs on every tool use.
+- Observability: Grafana `mdemg-jiminy` dashboard + alert evaluator.
+- F4 goes deeper on Jiminy.
+
+---
+
+## The Recursive-Improvement Arc
+
+```mermaid
+flowchart LR
+  subgraph Hebb[Hebbian — sub-second]
+    H1[ApplyCoactivation]
+    H2[CoactivateSession]
+    H3[ApplySymbolCoactivation]
+    H4[ApplyNegativeFeedback]
+  end
+  subgraph Jim[Jiminy outcomes — per tool use]
+    JX[surface] --> JA[agent acts] --> JF[feedback classify]
+    JF --> JO[constraint_outcomes + trust EMA]
+  end
+  subgraph RSIC[RSIC — per 30 min]
+    RA[assess 7-dim] --> RR[reflect LLM]
+    RR --> RI[insights] --> RD[dispatcher]
+  end
+  subgraph FT[FT-RECURSIVE — per week]
+    FD[drift] --> FE[export] --> FC[curate] --> FTR[train]
+    FTR --> FCV[convert] --> FG[gate] --> FP[promote]
+  end
+  HITL[HITL review] --> Jim
+  Hebb --> CMS[(CMS substrate)]
+  Jim --> CMS
+  RSIC --> CMS
+  FT --> CMS
+```
+
+note:
+- 4 loops at different time constants against the same substrate.
+- Default-off on FT loop; opt-in via `FT_LOOP_ENABLED`.
+- F7 goes deeper on RSIC + HITL; F5 goes deeper on FT; F2 goes deeper on Hebbian.
+
+---
+
+## How We Know It's Working
+
+**Metrics**
+- Live: `GET /v1/metrics/snapshot` (JSON)
+- Historical: TSDB `metric_samples`
+- No `/metrics` endpoint — 404 by design (PROMETHEUS-SCRAPE-INVESTIGATION-001)
+
+**Dashboards (8)**
+- mdemg-overview, mdemg-rsic, mdemg-jiminy, mdemg-j17
+- mdemg-llm-routing, mdemg-ft-training, mdemg-hitl, mdemg-graph-topology
+
+**Alerts**
+- ~35 TSDB-query rules + dispatcher
+- `~/.mdemg/alerts/current.json` file backend
+- Latest sprint: MDEMG-ALERT-NOISE-REDUCTION-001 (2026-10-22)
+
+note:
+- Alert-truth family (ALERT-TRUTH-001, DASHBOARD-TRUTH-001/002/003) is the paper trail.
+- Most "scary" alerts are measurement artifacts, not real regressions. Triage before fixing.
+
+---
+
+## F1 Recap → F2
+
+1. MDEMG = **cognitive substrate**, not a tool
+2. **5-layer hierarchy** (L0 → L5) is what retrieval traverses
+3. Every tool use completes a **hook → classify → observe → guide → feedback** loop
+4. **Four learning loops** run at different time constants against the same substrate
+
+**Next: F2 — Substrate Core** (Neo4j CMS + Hebbian + consolidation)
+
+note:
+- Pause 2 min for questions. This is the heaviest Q&A gate.
+- Unresolved confusion here contaminates everything downstream.
+
+---
+
+<!-- SECTION F2 — SUBSTRATE CORE -->
+
+# F2 · Substrate Core
+
+note:
+- Target: 12-16 slides. 1 full (Neo4j CMS + Hebbian + consolidation) + 1 mini (TSDB).
+- Load-bearing section — this is the surface everything else reads/writes.
+
+---
+
+## F2.1 Neo4j CMS — What It Is
+
+- **Backend**: Neo4j (community + enterprise both tested)
+- **Protected space**: `mdemg-dev` — hardcoded deletion protection (`internal/safety/validator.go`)
+- **Primary node type**: `MemoryNode` with `role_type`, `layer`, `is_archived`, `activation_confidence`, `created_at`, `embedding`
+- **Edge types**: CO_ACTIVATED_WITH, GENERALIZES, ABSTRACTS_TO, IMPLEMENTS_CORRECTION, IMPLEMENTS_CONSTRAINT, CONTRADICTS, GUIDANCE_OUTCOME, REFERENCES_SYMBOL
+
+note:
+- Space is the top-level isolation unit. One graph per space.
+- `mdemg-dev` is the operator's primary space. Beta testers get `beta-tester-<submission_id>`.
+
+---
+
+## F2.1 Why Graph Over Vector-Only
+
+Connections ARE the deliverable (vs. doc chunks).
+
+- Rejected: **ChromaDB** — pure vector, no graph edges
+- Rejected: **Weaviate** — hybrid but weaker Cypher
+- Chose: **Neo4j** — mature Cypher, vector index, battle-tested graph DB
+
+The "better decisions through better connections" vision requires edges as first-class citizens, not metadata on docs.
+
+note:
+- Vector similarity is one signal. Edge traversal is a different signal. RRF (F3) fuses them.
+- A pure vector DB forces every "related to" relationship into similarity space; graph edges preserve typed semantics.
+
+---
+
+## F2.1 How It Works — Node + Edge Schema
+
+```mermaid
+erDiagram
+  MemoryNode {
+    string node_id PK
+    string space_id
+    string role_type
+    int layer
+    bool is_archived
+    float activation_confidence
+    datetime created_at
+    datetime last_accessed
+    array embedding
+  }
+  MemoryNode ||--o{ CO_ACTIVATED_WITH : "weight + evidence_count"
+  MemoryNode ||--o{ GENERALIZES : "parent → child abstraction"
+  MemoryNode ||--o{ ABSTRACTS_TO : "cosine-weighted"
+  MemoryNode ||--o{ IMPLEMENTS_CORRECTION : "L0 obs → L1 correction"
+  MemoryNode ||--o{ CONTRADICTS : "weaken-path"
+  MemoryNode ||--o{ GUIDANCE_OUTCOME : "self-loop audit"
+```
+
+note:
+- CUIDv2 identifiers — never UUID (feedback_cuidv2_required).
+- `embedding` dimension matches configured provider; vector-index backs cosine queries.
+- `GUIDANCE_OUTCOME` is a self-loop pattern (edge on the target node) — the sink the Jiminy outcomes write to.
+
+---
+
+## F2.1 The Tombstone Invariant
+
+**Never delete. Always `is_archived=true` + `archive_reason` + `archived_at`.**
+
+- Reversible: `is_archived=false` + remove archive_reason
+- Preserves forensic history + undo capability
+- Load-bearing filter — every retrieval Cypher includes `NOT coalesce(n.is_archived, false)`
+- Exception: GUIDANCE-OUTCOME-SINK-INVESTIGATE-001 regression class — queries missing archive filters silently serve stale rules
+
+note:
+- Protected space (`mdemg-dev`) adds code-level deletion refusal even on `is_archived=true` writes.
+- Audit any new Cypher that queries by `role_type='constraint'` for the archive-filter — JIMINY-ARCHIVED-CODE-FILTER-001 arch rule.
+
+---
+
+## F2.1 Why It's Important
+
+- **Everything downstream reads this surface** — retrieval, Jiminy, J17, RSIC, HITL, FT all terminate here
+- **Delete == lose history** — the tombstone invariant is the single most load-bearing data rule
+- **Space isolation is first-class** — one agent cannot see another's substrate without explicit cross-space query
+- **Vector index + Cypher** — hybrid queries (role-filtered cosine, layer-scoped traversal) are 1 statement
+
+note:
+- Backup/restore (F7) is the second line of defense; the primary line is the never-delete invariant.
+- The space-isolation contract is tested via UATS specs.
+
+---
+
+## F2.1 How It Will Improve
+
+- **Shipped**: CONSOLIDATE-PERF-001/002 (dynamic_edges rewrite O(n²) → O(n·logn))
+- **Shipped**: RETRIEVAL-TYPED-EDGES-002 (typed-edge weight in RRF, default-on)
+- **Open**: Concept-layer growth under JIMINY-CEILING-BREAK-2 (more L2+ emergent concepts → more surface for Lever D)
+- **Open**: HEBB-ETA-001 precision-weighted η (primitives shipped default-off; needs confidence-update wiring)
+
+note:
+- The substrate is mature; most innovation now moves one layer up (classifier semantics, retrieval precision).
+- Open items are primitives, not blockers.
+
+---
+
+## F2.2 Hebbian Learning — 4 Paths
+
+```mermaid
+flowchart LR
+  subgraph On retrieve
+    AC[ApplyCoactivation]
+  end
+  subgraph On conversation
+    CS[CoactivateSession]
+    AS[ApplySymbolCoactivation]
+  end
+  subgraph On feedback
+    ANF[ApplyNegativeFeedback]
+  end
+  AC --> E1[CO_ACTIVATED_WITH<br/>weight update]
+  CS --> E1
+  AS --> E1
+  ANF --> E2[CONTRADICTS edge<br/>OR weaken existing]
+  E1 & E2 --> EV[reinforcement_events<br/>TSDB V0022]
+```
+
+note:
+- All 4 federated via EVENTGRAPH-001..004 to `reinforcement_events`.
+- Default-off entrypoints before fix: `CoactivateSession` had NO caller (nil-guard swallowed every observation); fixed via `convSvc.SetLearningService(lea)`.
+- `ApplyNegativeFeedback` endpoint has no automated producer yet — telemetry-before-the-producer.
+
+---
+
+## F2.2 Consolidation — 22-Phase Pipeline
+
+- Runs ~5-min cycles (automated) + manual trigger via `handleConsolidate`
+- 22 phases: observe → classify → promote constraints → promote corrections → cluster themes → cluster hidden patterns → emergent concepts → dynamic edges → backward pass → ... (+ 13 more)
+- **Pre-fix: ~38 min for full re-cluster on 83k nodes** (CPU-saturation driver)
+- **Post-CONSOLIDATE-PERF-001/002: ~47 sec steady-state** incremental path
+- Instrumentation: `mdemg_consolidation_phase_duration_seconds{space_id, phase}` + per-step `step:<name>` timing
+
+note:
+- The 38-min cost was `dynamic_edges` doing a Cartesian product over 8705 L≥minLayer nodes.
+- Fix: vector-index per-node top-K query → O(n·logn).
+- Full re-cluster retained as `concepts recluster` escape hatch for operator-triggered quality maintenance.
+
+---
+
+## F2.2 Incremental Hidden Clustering (CHURN-003)
+
+- **Default** (`HIDDEN_INCREMENTAL_ENABLED=true`): fetch only ORPHAN L0 nodes → assign to nearest existing pattern (cosine ≥ 0.80) → cluster only unassigned remainder
+- **Patterns never destroyed or re-clustered** — gives identity stability
+- **Steady-state cycle**: ~10s (82 orphans) vs. ~360s full re-cluster
+- Full re-cluster retained as `mdemg concepts recluster --space-id` escape hatch
+- Live Tier-3: **100% survival** across cycles (4484/4484)
+
+note:
+- Pre-CHURN-003: destroy-recreate anti-pattern = 25% residual churn per cycle (CHURN-002 partial fix) → 100% survival (CHURN-003).
+- Trade-off: pattern count grows slowly; `concepts recluster` is the quality maintenance.
+
+---
+
+## F2.3 TSDB Telemetry Plane
+
+- **26 hypertables** inventory-adjudicated via DORMANT-CENSUS-002
+- Buffered CopyFrom writer pattern (new buffered writers MUST call `registerWriterStats`)
+- Retention: 90d telemetry / 180d forensics / 365d training-corpora
+- Access model: **TSDB-only** — `/metrics` 404 by design (PROMETHEUS-SCRAPE-INVESTIGATION-001)
+
+note:
+- `metric_samples` time column is `time`, NOT `recorded_at`. Alert rules crossing this silently fail.
+- Grafana reads via `timescaledb` datasource — do NOT wire `promhttp.Handler()` at `/metrics`.
+- Every TSDB table declared in migrations/*.sql MUST be adjudicated in `docs/api/tsdb_consumer_inventory.json`.
+
+---
+
+## F2.3 TSDB Writer + Reader Contract
+
+| | |
+|---|---|
+| Writer | Buffered → periodic flush → CopyFrom |
+| Reader | Direct SQL via `pgxpool` |
+| Alert rules | TSDB-query-SQL (idle-safe COALESCE+aggregate) |
+| Hypertables | 7d chunks default (match telemetry family), 180d retention |
+| Compression | After 7d, segmentby + orderby policy |
+
+**Idempotency**: every writer resumes cleanly across restarts via SUPERVISOR-002 goroutine supervisor.
+
+note:
+- V0025 migration added retention + compression to EVERY previously-unbounded hypertable (`embedding_events` was 2.7 GB).
+- Rule: never alert on lifetime-cumulative percentile synthetics — latency `_p95/_p99` gauges are WINDOWED now.
+
+---
+
+<!-- SECTION F3 — RETRIEVAL PIPELINE -->
+
+# F3 · Retrieval Pipeline
+
+note:
+- Target: 10-14 slides. 1 full (RRF) + 3 mini (context fingerprint, sparse gate, rerank).
+
+---
+
+## F3.1 RRF Retrieval — What It Is
+
+**Reciprocal Rank Fusion** over 4 parallel columns.
+
+| Column | Weight (default) | Signal |
+|---|---|---|
+| Embedding | 0.50 | Cosine over vector-index |
+| BM25 | 0.20 | Lexical sparse |
+| Graph | 0.15 | CO_ACTIVATED_WITH spreading |
+| Structural | 0.15 | Typed-edge walk (via RETRIEVAL-TYPED-EDGES-002) |
+
+**Default-on** since Phase 13.1 (2026-05-03).
+
+note:
+- Phase 13 initial equal-weights failed (q 69 regression); Phase 13.1 embedding-heavy weights passed +5.9% mean.
+- Cache key includes `scorerVersion()` so weight changes flip the namespace automatically.
+
+---
+
+## F3.1 RRF — Why 4 Columns Beat 1
+
+Single-signal retrieval misses different classes:
+
+- **Embedding alone**: topic-adjacent but mechanism-wrong (e.g., "commit docs" retrieves "no-direct-main-commits")
+- **BM25 alone**: exact-token good, semantic-weak
+- **Graph alone**: well-connected nodes dominate, isolated nodes starve
+- **Structural alone**: typed edges rich on mature graphs, zero on fresh
+
+**RRF fusion** = `1 / (k + rank)` with k=60 — robust to score-scale differences across columns.
+
+note:
+- The score scale changed when Phase 13.1 shipped — downstream consumers that hardcoded thresholds broke silently (RRF-SCALE-001 class). Never gate on absolute `Score`.
+
+---
+
+## F3.1 RRF — How It Works
+
+```mermaid
+flowchart LR
+  Q[Query] --> E[Embed]
+  Q --> KW[BM25 keywords]
+  E --> VI[Vector-index<br/>top-K]
+  KW --> BM[BM25 fetch]
+  VI & BM --> GC[Graph column<br/>activation spread]
+  VI & BM --> SC[Structural column<br/>typed-edge walk]
+  VI --> F[RRF fusion<br/>1/(k+rank)]
+  BM --> F
+  GC --> F
+  SC --> F
+  F --> RK[Optional LLM rerank<br/>cross-encoder]
+  RK --> TK[topK]
+```
+
+note:
+- Rerank is default via cross-encoder (openai). Neural alternative shipped but same mean quality 20× slower.
+- RETRIEVAL-REVERSE-LOOKUP-001 adds filesystem-grep post-rerank for reverse-lookup-shaped queries (gated by query shape).
+
+---
+
+## F3.1 RRF — Score-Scale Contract
+
+**Downstream consumers MUST NOT hardcode absolute thresholds against `RetrieveResult.Score`.**
+
+The score scale changes when the scorer changes. Phase 13.1 Column-Voting dropped scales from `>1.0` (legacy) to `~0.49–0.58` (RRF strong matches). This silently broke:
+
+- EVENTGRAPH-001's `Activation` drop (24-day Hebbian no-op)
+- `consulting/service.go` 0.55 constraint gate (9-week guidance dormancy)
+- Score→confidence sigmoid (midpoint=1.5 crushed RRF confidence to ~0.1-0.2)
+
+**Fix**: gate via config (RRF-calibrated default). RE-AUDIT every `RetrieveResult.Score` comparison on scorer change.
+
+note:
+- This is the RRF-SCALE-001 arch rule. Burn it in.
+- `scorerVersion()` returns `"v1-rrf4|e=0.500|b=0.200|g=0.150|s=0.150|hops=2|emb=true|..."` — weight/hop/enable changes flip the cache namespace.
+
+---
+
+## F3.1 RRF — Why It's Important
+
+- **Every memory recall** = this pipeline
+- **Every Jiminy guide** = this pipeline
+- **Every HITL candidate query** = this pipeline
+- **Latency SLO**: p95 < 120s (ALERT_RETRIEVE_P95_MS = 120000)
+- Live-measured 7d p95 = 61.6s (comfortably under)
+
+note:
+- One pipeline, many consumers. Changes propagate everywhere.
+- The SLO was recalibrated post-ALERT-TRUTH-001 to match honest p95 (was clamped at 10s pre-fix).
+
+---
+
+## F3.1 RRF — How It Will Improve
+
+**Shipped default-off** (opt-in via URL param or `.env` flag):
+- RETRIEVAL-LAYER-BALANCE-001 — concrete-recall quota (post-rerank injection to counter abstract crowding)
+- RETRIEVAL-REVERSE-LOOKUP-001 — filesystem-grep for reverse-lookup-shape queries ("who consumes X?")
+- LEVER-D-CONCEPT-BIAS-001 — L2+ concept-only cosine column
+
+**Measurement first** — operator decides enable-by-default based on real traffic.
+
+note:
+- The pattern: ship the mechanism default-off, let 7d of A/B data decide. Live-caught during NEURAL-RERANK-PRECHECK-001 that neural rerank is 20× faster at same quality — kept default openai anyway (operator opt-in).
+
+---
+
+## F3.2 Context Fingerprinting (Mini)
+
+- **256-bit sparse vectors per observation** — bits allocated 32/32/192 (role×layer / path-segment tokens / full-paths)
+- Default-on since Phase 14.2.3
+- Catalog builder refreshes weekly (stage 6 of consolidation)
+- Discriminates same-node-in-different-context — same memory, different ambient
+
+```
+?context=auto     — vector-based query→fingerprint derivation
+?strict_context=true — drop below Jaccard 0.25 pre-score
+```
+
+note:
+- 5th RRF column; weight-tunable.
+- Depth: `docs/features/context-fingerprinting.md`.
+
+---
+
+## F3.3 Sparse Retrieval Gate (Mini)
+
+- **Percentile-activation gate** fires post-aggregation, pre-rerank
+- Default-on since Phase 14.1.1 with `SPARSE_MIN_ACTIVE=15`
+- Per-category override: `data_flow_integration` → min=20 (handles q302's 4-required-files pattern)
+- ~**25% rerank-input reduction** on most calls, full-passthrough on data_flow_integration
+- Per-request override: `?sparse=true|false&sparse_percentile=N`
+
+note:
+- 120q UVTS A/B: mean +0.003, 0 regressions, 10 improvements → safe default-on.
+- `V0019 sparse_gate_metrics` hypertable persists per-call rows.
+
+---
+
+## F3.4 Rerank (Mini)
+
+- **Cross-encoder (openai, default)**: p95 ~11.1s; good quality
+- **Neural (shipped alternative)**: p95 ~1s; same mean quality, 20× faster
+- **Default stays openai** per NEURAL-RERANK-QUALITY-AB-001 verdict (parity-at-mean = no-flip)
+- `rerankTemperature=0.0` — determinism required (RERANK-LENGTH-STRICT-001)
+- Pre-check budget guard — skip when remaining ctx deadline < budget (12s LLM, 1.5s neural)
+
+note:
+- Operator opt-in via `.env` RERANK_PROVIDER=neural if latency matters more than consistency with historical runs.
+- Length-mismatch counter + corrective retry — never silent-default (RERANK-LENGTH-STRICT-001).
+
+---
+
+<!-- SECTION F4 — JIMINY + ENFORCEMENT + J17 (HEADLINE) -->
+
+# F4 · Jiminy + Enforcement + J17
+
+note:
+- Target: 20-26 slides. The headline section.
+- Carries the deck's weight — Jiminy is the primary user-facing cognitive surface.
+- 2 full components + 1 mini.
+
+---
+
+## F4.1 Jiminy — What It Is
+
+**Inner-voice classifier**: turns raw retrieval into imperative-ish guidance.
+
+**Endpoints**:
+- `POST /v1/jiminy/classify` — verdict on action: pass/deny
+- `POST /v1/jiminy/warm` — background guide computation
+- `GET /v1/jiminy/latest` — fetch warm-computed guidance
+- `POST /v1/jiminy/feedback` — outcome record
+- `POST /v1/jiminy/strict` — toggle enforcement mode
+
+note:
+- Think "inner voice" — not "linter," not "lookup."
+- The internal-dialogue analogy from F1.2.2 lands here concretely.
+
+---
+
+## F4.1 Jiminy — Why We Use It
+
+**The connection-layer bet**: a well-tuned inner voice beats dumping raw retrieval into the agent's prompt.
+
+**Forcing function (pre-Jiminy)**:
+- Agent ignored durable rules even when surfaced in prompt-context
+- Classifier verdicts were unweighted (every surfaced rule equally urgent)
+- No signal fed back to substrate (rule effectiveness unmeasurable)
+
+Post-Jiminy: outcomes flow back → trust EMA → surface weighting → feedback-driven corpus curation.
+
+note:
+- Rejected: inline "assistant memory" via prompt stuffing (agent attention is finite, dilution problem).
+- Rejected: pure retrieval (no priority signal).
+
+---
+
+## F4.1 Jiminy — Flow (Mermaid)
+
+```mermaid
+flowchart LR
+  H[PostToolUse hook] --> C{Write/Edit/Bash?}
+  C -->|yes + /strict| CL[classify]
+  CL --> V{verdict}
+  V -->|deny| B[BLOCK<br/>+ HIGH alert<br/>+ pre-write-check]
+  V -->|pass| OK[allow]
+  H -->|UserPromptSubmit| W[warm /v1/jiminy/warm]
+  W --> R[retrieve]
+  R --> LC[Lever C actionable fetch]
+  LC --> LD[Lever D concept bias]
+  LD --> LA[Lever A quota]
+  LA --> LB[Lever B effectiveness prior]
+  LB --> N[narrative synthesis]
+  N --> S[warm store]
+  PP[prompt-context hook] --> GL[GET /v1/jiminy/latest]
+  GL --> SR[prepend to next prompt]
+```
+
+note:
+- 3 Levers compose on the surface pool: A quota, B effectiveness prior, C actionable direct-fetch, D concept bias.
+- Narrative synthesis runs 50s+ (local LLM); background via /warm so hook stays snappy.
+
+---
+
+## F4.1 Jiminy — Four Levers
+
+| Lever | What | Default |
+|---|---|---|
+| A | Surface composition quota (per-type weight + actionable fraction + abstraction cap) | ON (quota=0.3) |
+| B | Effectiveness prior (soft re-rank by followed/surfaced ratio) | ON (weight=0.3) |
+| C | Actionable direct-fetch (role-filtered cosine over constraint/correction partition) | ON (topK=4, floor=0.55) |
+| D | L2+ concept bias (role+layer-filtered cosine; separate pool) | OFF (default) |
+
+All config-driven. All measurement-decided default states. All reversible.
+
+note:
+- Lever C is the one that moved the needle most (actionable fraction 11.1% → 47.7% in controlled A/B).
+- Lever D is primitives-shipped for substrate-native concept surfacing; data-decided enablement.
+
+---
+
+## F4.1 Jiminy — Classifier Semantics
+
+Classifier = tier1 (embedding) + tier2 (LLM) with 3 credit clauses:
+
+| Clause | Routes | Config flag |
+|---|---|---|
+| Non-violation credit | `must_not + action-didn't-violate` → not_applicable | JIMINY_NONVIOLATION_CREDIT_ENABLED |
+| Context-mismatch credit | Durable rule + wrong context → not_applicable | JIMINY_CONTEXT_MISMATCH_CREDIT_ENABLED |
+| Mechanism-scope gate | Mechanism-verb absent from action → not_applicable | JIMINY_MECHANISM_SCOPE_CREDIT_ENABLED |
+
+**All default-off in code (preserves ULTS prompt hash pin); default-on in `.env` after live smoke.**
+
+note:
+- Each clause splices after its predecessor; recency-weighted LLM attention gives strongest-gate-last.
+- CLASSIFIER-CONTEXT-002 shipped the mechanism-scope gate (hard-precedence).
+- JIMINY-CLASSIFIER-META-SCOPE-001 shipped the mention-vs-perform clause — currently ship-dormant until smoke data justifies flip.
+
+---
+
+## F4.1 Jiminy — Why It's Important
+
+**Follow rate is the receiver-side view of substrate quality.**
+
+- Current honest actionable follow rate: **~13%**
+- Target: **≥80%** per JIMINY-CEILING-BREAK-2 arc
+- Arc trajectory panel on `mdemg-jiminy` dashboard (ARC-TRAJECTORY-PANEL-001)
+
+The LLM-classifier metric partition (JIMINY-METRIC-PARTITION-001) splits the follow rate across 4 verifiability classes: classifier / process / hybrid / human. Only "classifier" has writer traffic today; others wait for their respective sinks.
+
+note:
+- Trajectory language — do NOT normalize low follow rate as "by design" (trust-signal-must-be-persisted-never-ignore-honest rule).
+- The current ~13% is the honest baseline + the arc target is ≥80%; closes the delta.
+
+---
+
+## F4.1 Jiminy — How It Will Improve (JIMINY-CEILING-BREAK-2)
+
+**5-phase arc shipped progressively**:
+
+1. **Phase 1 — Corpus purge (shipped JIMINY-CORPUS-003)**: 64 → 33 constraint nodes; audit kept quality rules, tombstoned noise
+2. **Phase 2 — Retrieval precision (LEVER-C-TIGHTEN-002)**: scope-gate for over-surfacing
+3. **Phase 3 — Classifier semantics (CLASSIFIER-CONTEXT-002)**: mechanism-scope hard-precedence gate
+4. **Phase 4a — HITL velocity (shipped)**: keyboard-driven bulk-grade UI (0..4 keys, auto-advance)
+5. **Phase 4b — Retrain**: blocked on classifier follow-rate honest ≥20% + N=500+ gold corpus
+6. **Phase 5 — Model swap**: future (post-beta)
+
+Composite ceiling arithmetic: 12% + 5% + 10% + 15% + 10% + 25% = **77-80%+**.
+
+note:
+- Each phase is measurable + reversible.
+- Phase 4b retrain is gated on data: don't retrain until the corpus justifies it.
+
+---
+
+## F4.2 Enforcement Arc — 5 Sprints (Overview)
+
+| Sprint | Delivered |
+|---|---|
+| ENFORCE-001 (2026-08-01) | /strict default-on + alert-on-deny + fail-open-with-marker |
+| ENFORCE-002 (2026-08-02) | Bash coverage (2-check: destructive-guard fail-closed + classify fail-open + read-only whitelist) |
+| ENFORCE-003 (2026-08-03) | Operator escape-hatch override CLI (`mdemg jiminy override apply`) + JSONL audit |
+| ENFORCE-004 (2026-08-03) | blocked_true_positive + blocked_false_positive outcome types → RSIC-consumable |
+| ENFORCE-005 (2026-08-03) | Post-hoc missed-violation detector via correction observations |
+
+**13 arch rules pinned to CLAUDE.md across the arc.**
+
+note:
+- Shipped as a sequential arc: each sprint lives against the next scoping, informed by live smoke of the predecessor.
+- Three arc-adjacent follow-ups shipped: ENFORCE-OVERRIDES-TSDB + ENFORCE-UI-OVERRIDES + ENFORCE-AUTO-EXECUTE.
+
+---
+
+## F4.2 Enforcement — Deny Taxonomy
+
+```mermaid
+flowchart LR
+  A[Action attempted] --> C[Jiminy classify]
+  C --> V{verdict}
+  V -->|pass| OK[allow]
+  V -->|deny no-override| DN[blocked_true_positive<br/>enforcement worked]
+  V -->|deny + operator override| DO[blocked_false_positive<br/>classifier wrong]
+  Later[Later: correction observed] --> M[missed_violation<br/>classifier missed]
+  DN & DO & M --> O[constraint_outcomes TSDB]
+  O --> R[RSIC reader<br/>→ archive_ineffective_constraints<br/>→ adjust_guidance_confidence]
+```
+
+note:
+- 3 distinct outcome types — each has a distinct alert rule.
+- The missed_violation path is post-hoc (correction observation → embedding match → outcome record).
+- blocked_false_positive feeding `archive_ineffective_constraints` is substrate mutation (ENFORCE-AUTO-EXECUTE 5-layer guards).
+
+---
+
+## F4.2 Enforcement — Operator Escape Hatch
+
+**Time-boxed overrides** so classifier false-positives don't deadlock.
+
+```bash
+mdemg jiminy override apply --constraint <code> \
+  --reason "<required>" --duration 15m
+mdemg jiminy override list [--session-id X]
+mdemg jiminy override revoke --constraint <code>
+```
+
+- Session-scoped (NEVER global)
+- Duration > 0 required (unbounded = silent disable)
+- Audit to JSONL + V0033 `constraint_overrides` hypertable
+- UI tab (ENFORCE-UI-OVERRIDES) shows active overrides + revoke buttons + 7d timeline
+
+note:
+- Three arch rules pinned: time-boxed; reason-required; session-scoped (never global).
+- The audit trail is forensic record, not load-bearing.
+
+---
+
+## F4.2 Enforcement — Auto-Execute (default-off)
+
+**ENFORCE-AUTO-EXECUTE** elevates `enforcement_false_positive_high` from insight to real substrate mutation:
+
+**5-layer guard sequence**:
+1. Empty TargetCode → skip
+2. `ENFORCEMENT_AUTO_EXECUTE_ENABLED=false` → skip (default)
+3. Protected space → skip
+4. Rate limit (3/hr) + per-code cooldown (24h) → skip
+5. `_DRY_RUN=true` → log-only (default)
+
+Only when all 5 pass: `archive_constraint_by_code` fires with reversible `is_archived=true` + archive_reason.
+
+note:
+- `adjust_guidance_confidence` NOT yet auto-executed (needs HITL — scalar mutation requires pre-change snapshot).
+- `Dispatcher.cfg` reads happen at dispatch time, NOT constructor time — flag-flip-via-env+restart; never a memoize-at-constructor trap.
+
+---
+
+## F4.2 Enforcement — Mode Selector
+
+**First-class enum**: `JIMINY_MODE=strict|suggest` (default strict).
+
+Settable from 3 surfaces:
+- `.env` `JIMINY_MODE=strict`
+- CLI `mdemg jiminy mode [strict|suggest]`
+- **UI Jiminy tab** two-button toggle
+
+Boot log: `jiminy: mode strict|suggest ... session_id=claude-core`
+
+note:
+- Operator directive 2026-08-02: user-facing config toggle MUST be reachable from UI, not just env + CLI.
+- `JIMINY_STRICT_DEFAULT_ENABLED` kept as backward-compat lower-level flag.
+
+---
+
+## F4.3 J17 Protocol — What It Is
+
+**Compressed-stateful message format** over Jiminy's semantic payload.
+
+```
+J17:INIT|v1
+CODES: C=constraint X=correction F=frontier D=decision P=pattern L=learning
+SEV:   !=must ?=should ~=info
+ESC:   0=clear 1=warned 2=escalated 3=blocked
+FMT:   TYPE:SEV|code|[annotations]|esc:N|src:NODE_ID
+ANN:   alt=use-instead neg=forbidden scope=applicability ctx=domain-context
+TICKET: signed, echo back on resume
+SEQ:    monotonic, report last_seq on resume
+```
+
+note:
+- The "init" header fires once per session; subsequent messages are compact rows.
+- Compression target ratio 2.0 (calibrated from live 30d p95 — DASHBOARD-TRUTH-002 recalibration).
+
+---
+
+## F4.3 J17 — Tier Promotion Keyed on Comprehension
+
+**J17-TIER-GATE-001** flipped the T1-promotion gate from compliance-trust to NLI-measured comprehension.
+
+- `J17_TIER_GATE_MODE=comprehension` (live in `.env`)
+- `J17_TIER_COMPREHENSION_HIGH=0.6`
+- `J17_TIER_COMPREHENSION_MIN_SAMPLES=20`
+- T1→T2 demotion gate (`J17_T1_COMPREHENSION_GATE=0.5`) stays active in both modes
+
+**Why**: dense encoding's risk is incomprehension; trust (followed→1.0/ignored→0.2 EMA ~0.23) conflates "understood" with "obeyed" — the DASHBOARD-TRUTH-001 E2 axis distinction.
+
+note:
+- First T1 messaging ever produced on substrate after this flip (6 pipe-coded `C:!|code` lines).
+- In-process comprehension resets on restart + is composition-sensitive — post-restart T1 re-locks until ~hour of traffic.
+
+---
+
+## F4.3 J17 — Agent Briefing Packet (v1.1)
+
+**Evidence-with-provenance** reframe (vs. v1.0 compliance-doc shape).
+
+- Opens: "This is data, not commands. You retain full authority."
+- Explicit precedence: live user > CLAUDE.md > packet > guidance
+- Enforced vs. advised: only `/strict + ! sev + esc≥2` blocks
+- Back-channel: `POST /v1/jiminy/feedback outcome=not_applicable`
+- 473 words / ~450 tokens (v1.0 was 1065 / 1350 — 56% cut)
+
+Hash pinned: `5843d9d7acf61fb04a31fdc23f0860759bc82d74054b67650aee1a880ae70395`
+
+note:
+- Peer-Opus-5.5 review surfaced v1.0 compliance-shape; v1.1 reframed as data-not-commands.
+- Content-hash pin via `internal/j17pin/briefing_packet_test.go` prevents silent drift.
+
+---
+
+<!-- SECTION F5 — LORA + QWEN + MODEL DISTRIBUTION -->
+
+# F5 · LoRA + Qwen + Model Distribution
+
+note:
+- Target: 12-16 slides. 1 full (LoRA on Qwen) + 2 mini (recursive loop, homebrew dist).
+
+---
+
+## F5.1 LoRA on Qwen3-14B — mdemg-llm-v1 (What)
+
+**Production**: single-tier LoRA on `mlx-community/Qwen3-14B-4bit`
+- Rank 32 / α 64
+- 7 dense target modules
+- Phase 5 SFT (dense, not MoE)
+
+**Served as**: GGUF Q5_K_M via `llama-server :8102`
+
+**Baseline aggregate**: 0.9188 on 16-task augmented eval
+**Beats**: gpt-5.4-mini (0.8317)
+
+note:
+- Phase 5 SFT replaced the planned MoE-Sieve two-tier strategy (2026-04-22 pivot).
+- Rejected: Qwen3.6-35B-A3B MoE (Metal 499K MTLResource ceiling blocked backward pass).
+
+---
+
+## F5.1 LoRA — Why Fine-Tune Our Own
+
+**The connection-layer bet applied to the LLM itself.**
+
+- 16 LLM call sites — each has its own prompt shape + output contract (all single-shot structured outputs)
+- Fine-tuned on MDEMG's own corpora + call-site traces
+- Per-site better than generic gpt-mini (verified via UBENCH)
+
+**Rejected alternative**: OpenAI fine-tuning (FT-OAI-003 dropped 2026-04-22) — all FT now local MLX LoRA, teacher-only for OpenAI.
+
+note:
+- The 16 call sites: ape.reflect, jiminy.classify, jiminy.synthesize, consulting.classify, retrieval.rerank_cross, retrieval.intent_translate, guardrail.evaluate, hidden.summarize, hidden.reclassify, emergence.name, context_cooler.stability, retrieval.consensus, j17.synthesize, j17.classify, agent.pre_write_check, data.curate.
+
+---
+
+## F5.1 LoRA — Pipeline
+
+```mermaid
+flowchart LR
+  SF[MLX safetensors<br/>Phase 5 SFT training] --> F[mlx_lm.fuse --dequantize<br/>→ 28 GB bf16 HF safetensors]
+  F --> CV[convert_hf_to_gguf.py --outtype f16<br/>→ 29.5 GB f16 GGUF]
+  CV --> Q[llama-quantize Q5_K_M<br/>→ 10.5 GB Q5_K_M GGUF]
+  Q --> LS[llama-server<br/>--ctx-size 32768 --parallel 4<br/>--cont-batching --jinja<br/>:8102]
+  LS --> CS[16 LLM call sites<br/>via llmclient]
+```
+
+**Conversion time**: ~5 min on M5 Max.
+
+note:
+- The MLX form stays as research/training canonical; GGUF is the production serving form.
+- Phase 13.5 cutover 2026-05-03: replaced mlx_lm.server with llama-server (14-min Metal OOM → bounded KV).
+
+---
+
+## F5.1 LoRA — Standing Policies
+
+**No tool-calling architectural policy**:
+- All 16 call sites single-shot structured output / reasoning
+- 9 banned patterns grep-audited every sprint
+- `tool_use`, `tool_call`, `tool_response`, `toolCalls`, `function_call`, `--tool-call-parser`, `enable-auto-tool-choice`, `tools: [`, `preserve_thinking`
+
+**Overfitting prevention** (forcing function: FT-OAI-001 step-1200 overfit):
+- Epoch cap = 3 on all LoRA runs
+- Early-stop on `val_loss > best × 1.05` (SFT) / `val_reward < best × 0.95` (RL)
+- `n_epochs=auto` DISALLOWED
+
+note:
+- Both policies are grep-auditable + CI-gated.
+- The 2-epoch overfit incident is the forcing function that pins the 3-epoch cap.
+
+---
+
+## F5.1 LoRA — Why It's Important
+
+- **Honest aggregate 0.9188** (16-task augmented eval, run `ed062ea8`, 2026-07-21)
+- Beats gpt-mini on every retrain-gated task
+- APE-REFLECT-EVAL-REFRESH-001 cleaned the eval rows frozen pre-APE-PROMPT-BUDGET-001 (prompts clipped at 8192 KV / 4 slots = 7489 avg tokens)
+- Current E3 target: 7503 training rows (503 stripped v3 corpus + 7000 task-behavior)
+
+note:
+- Honest number vs. the 0.8389 pre-refresh. The eval rows had been measuring the OLD KV-unbounded serving behavior.
+- When production serving changes, audit the pinned evals for rows embodying the OLD serving.
+
+---
+
+## F5.1 LoRA — How It Will Improve
+
+- **E1 shipped**: Corpus audit (81% substrate-covered; 2203 rows strip-eligible)
+- **E2 shipped**: Phase E2 strip (claude_code_knowledge_v3_stripped — 503 rows)
+- **E3 target**: 7503 rows (503 stripped + 7000 task-behavior)
+- **E4 blocked**: Homebrew installer update required for the new Qwen model (HOMEBREW-INSTALLER-QWEN-UPDATE-001 Phase B shipped operator-runbook + ModelName-guarded SHA verify)
+- **Future**: Qwen3.8-27B base swap (MODEL-SWAP-QWEN27B-EVAL #91 winner, +0.11 lift)
+
+note:
+- E4 promote unblocked once Phase A+C ship (operator-authored external work).
+- Follow-up HOMEBREW-INSTALLER-QWEN-UPDATE-002: wire the real v2 manifest with SHAs, extend LoadQuantManifest to pick by cfg.ModelName.
+
+---
+
+## F5.2 Recursive-Retraining Loop
+
+```mermaid
+flowchart LR
+  PD[Production drift<br/>ft_production_drift alert] --> EX[Export<br/>mdemg data export]
+  EX --> CU[Curate<br/>paradigm_router]
+  CU --> TR[Train<br/>MLX LoRA]
+  TR --> CV[Convert<br/>fuse → f16 → Q5_K_M GGUF]
+  CV --> GT[Gate<br/>benchmark vs threshold]
+  GT --> PR{PASS?}
+  PR -->|yes| PROM[Promote<br/>defense-in-depth swap]
+  PR -->|no| HALT[promote_pending halt<br/>operator confirms]
+  PROM --> TW[Post-swap tripwire<br/>auto-rollback on failure]
+```
+
+**Default-off**: `FT_LOOP_ENABLED=false`. 4-phase arc complete (Phases 6a / 6b / 7 / 9).
+
+note:
+- Phase 6a shipped observability (`mdemg ft-loop report-stage` + jobhealth).
+- Phase 6b shipped actuator + 5-stage pipeline (export → curate → train → convert → gate).
+- Phase 7 shipped promotion defense-in-depth (3 layers).
+- Phase 9 shipped drift detection + loop-never-ran alert + scheduled benchmark.
+
+---
+
+## F5.2 Recursive Loop — Why Default-Off
+
+**Single-flight invariant**: ledger (`ft_training_cycles`) is source of truth for "is a cycle running," NOT RSIC 300s in-memory cooldown.
+
+**Compute lease** (`ftloop.AcquireLease`, single-host lockfile) reclaimable on expiry so crashed trainer can't wedge RSIC forever.
+
+**Quiesce**: `OrchestrationPolicy.Quiesce(until)` pauses new RSIC triggers while retrain holds box (on-box training saturates machine + degrades production `llama-server`).
+
+note:
+- Design-fork-7: the trigger stays diagnostic; the mutating-action class is Phase 7 (promote).
+- Operator-confirms by design: no auto-promote without explicit operator attestation.
+
+---
+
+## F5.2 Recursive Loop — Promotion Defense in Depth (Phase 7)
+
+**3 layers protect production serving**:
+
+1. **Pre-swap structural canary** — zero-restart block if candidate doesn't resolve
+2. **Fail-closed SwapServing** via NEW serving symlink `FT_LOOP_SERVING_SYMLINK`
+3. **Post-swap tripwire** — auto-rollback on failure within configurable window
+
+**Autonomy knob**: `FT_LOOP_AUTO_PROMOTE_AFTER` (tick-based, after N operator confirms; `0=never`)
+
+Every layer **drilled live same-day**.
+
+note:
+- Class-5 issue filer: fingerprint-idempotent `gh` + CapabilityGap.
+- `ft_model_versions` revived in Phase 7.
+
+---
+
+## F5.3 Model Distribution — mdemg model
+
+```bash
+mdemg model pull [--adapter] [--quant Q5_K_M]
+mdemg model list
+mdemg model verify
+mdemg model remove --name mdemg-llm-v1 --yes
+mdemg model where
+```
+
+**Channel**: Ollama Library (v1; pluggable via `Fetcher` interface)
+- `reh3376/mdemg-llm-v1:Q4_K_M` — 9.0 GB (12 GB RAM min)
+- `reh3376/mdemg-llm-v1:Q5_K_M` — 11 GB (14 GB RAM min, production canonical)
+- `reh3376/mdemg-llm-v1:Q8_0` — 16 GB (20 GB RAM min)
+
+note:
+- Ollama is DISTRIBUTION only. Runtime stays llama-server (Phase 13.5).
+- Adapter-only path (MODEL-DIST-002): 257 MB GGUF LoRA, `--adapter` flag.
+
+---
+
+## F5.3 Model Dist — How It Works
+
+Steps per `mdemg model pull`:
+1. `ollama pull reh3376/mdemg-llm-v1:Q5_K_M` under the hood
+2. Locate GGUF via Ollama manifest layout (`<OLLAMA_MODELS>/manifests/<OLLAMA_HOST>/<ns>/<name>/<tag>`)
+3. Follow layer with `mediaType: application/vnd.ollama.image.model`
+4. Symlink blob to `<MDEMG_MODEL_DIR>/<name>.<quant>.gguf`
+5. SHA-verify against embedded `internal/cli/quant_manifest.json`
+
+RAM auto-detection via `sysctl hw.memsize` (darwin) or `/proc/meminfo` (linux); dispatch via `MDEMG_MODEL_RAM_TIERS` JSON.
+
+note:
+- All 11 operator-visible values are dynamic (no-hardcoding rule).
+- Air-gapped: override via `MDEMG_MODEL_MANIFEST_PATH`.
+
+---
+
+## F5.3 Why Not Ollama/LM Studio/MLC-LLM Runtime
+
+Decision table from 2026-05-03 bake-off (`phase_13_5_bakeoff_results.md`):
+
+| Alternative | Rejected because |
+|---|---|
+| Ollama runtime | Broken on M5 + macOS 26.3.x (8+ open issues, matmul2d static_assert) |
+| LM Studio | Closed-source operability risk for a cognitive-substrate framework |
+| MLC-LLM | 1.6× slower every percentile; smaller community; hardware-target-locked TVM .dylib |
+| mlx_lm.server (incumbent) | Officially "not recommended for production"; crashed every ~14 min Metal OOM |
+| **llama.cpp llama-server (chosen)** | Architecturally-bounded KV (`--ctx-size × --parallel`); graceful HTTP 500 on OOM |
+
+**Bake-off result**: 0 crashes / 160 min / 301 calls; p50 latency 17s → 3.0s (5.6× faster); UVTS parity (0.396 = 0.396).
+
+note:
+- Data-decided. Each rejected option had quantifiable disqualifier.
+- Rollback: restore `com.mdemg.mlx-server.plist` from `.disabled-phase13_5` — would reintroduce the 14-min crash cycle.
+
+---
+
+<!-- SECTION F6 — UXTS FRAMEWORK FAMILY -->
+
+# F6 · UxTS Framework Family
+
+note:
+- Target: 7-10 slides. 1 full (UxTS forcing-function family).
+- The pattern that keeps the system honest.
+
+---
+
+## F6.1 UxTS — What It Is
+
+**16 framework specifications**, each a schema + spec dir + CI runner + matrix adjudication.
+
+```
+UATS     API contract tests
+UVTS     Validation retrieval-quality tests
+ULTS     LLM task tests (system prompts, hashes)
+UBTS     Benchmark tests
+UOBS     Observability metric contracts
+UITS     Ingestion tests
+UDTS     Datasets tests
+UETS     Error-handling tests
+UOTS     Operational artifact contracts
+UATS01   Agent task contracts
+UBENCH   Benchmark framework
+UAITS    Agent-interaction tests
+UDTS     Dataset tests (second-generation)
+UTDS     Training dataset specs
+USTS     Symbol tests
+UAMS     Agent memory specs
+```
+
+**Source of truth**: `docs/development/UXTS_FRAMEWORK_MATRIX.md`
+
+note:
+- 16 frameworks. New frameworks added when a new drift class is discovered.
+- UXTS_FRAMEWORK_MATRIX.md is the single-source-of-truth for the count — add a spec, update the matrix count in the same PR.
+
+---
+
+## F6.1 UxTS — Why We Use It
+
+**Forcing function**: when a drift class is caught, the fix is a UxTS spec that CI gates on.
+
+**Prevents regression by making the drift class itself impossible.**
+
+Examples caught by UxTS gates:
+- **UATS** caught pre-bash-check reformulate 500 defect
+- **ULTS** catches prompt drift (`system_prompt_hash` pin)
+- **UBENCH** catches benchmark freshness drift (FT-BENCH-REFRESH-001)
+- **UOBS** catches metric-emission drift
+
+note:
+- "Measure, lock, repeat" — the deck's governing engineering value lives here.
+- A new drift class that CI isn't gating on is incomplete work. Define the forcing function.
+
+---
+
+## F6.1 UxTS — How It Works (Pattern)
+
+```mermaid
+flowchart LR
+  D[Drift class discovered] --> S[Schema<br/>docs/tests/x/schema.json]
+  S --> SP[Specs<br/>docs/tests/x/specs/*.x.json]
+  SP --> R[Runner<br/>docs/tests/x/runners/]
+  R --> CI[CI job<br/>make test-x-lint + run]
+  CI --> M[Matrix adjudication<br/>UXTS_FRAMEWORK_MATRIX.md]
+  M --> P[PR merge gate]
+```
+
+**Pattern invariants**:
+- Every spec validates against the schema
+- Every runner reads specs + reports to CI
+- Every drift triggers a merge-blocking failure
+
+note:
+- Pattern is identical across the 16 frameworks; only the drift class changes.
+- `make test-api` runs UATS; `make test-uvts-quick` runs UVTS; etc.
+
+---
+
+## F6.1 UxTS — Framework Matrix (Snapshot)
+
+| Framework | Purpose | CI gate | Last drift caught |
+|---|---|---|---|
+| UATS | API contract | `make test-api` | UATS-GAP-001 (reformulate 500) |
+| UVTS | Retrieval quality | `make test-uvts-quick` | Phase 13.1 column weights |
+| ULTS | LLM prompts | `make test-ults --verify-hashes` | APE-PROMPT-BUDGET-001 |
+| UBTS | Backup tests | `make test-ubts` | BACKUP-RESTORE-VERIFY-001 |
+| UOBS | Metric emission | drift checker | EMBED-CALLSITE-001/002 |
+| UBENCH | Benchmark | `make test-ubench-contract` | FT-BENCH-REFRESH-001 |
+
+(remaining frameworks per matrix)
+
+note:
+- Each row is a shipped fix of a specific drift class.
+- The matrix is the forcing function on the forcing functions.
+
+---
+
+## F6.1 UxTS — Why It's Important
+
+- **UATS caught the pre-bash-check-reformulate 500 defect** before it hit production
+- **ULTS catches prompt drift** — when you edit a system prompt, re-pin `system_prompt_hash` in the same PR
+- **UBENCH catches benchmark drift** — stale benchmark rows alerted via `ft_benchmark_stale`
+- **UOBS catches metric emission drift** — EMBED-CALLSITE-001/002 class
+
+CI gating means **a class never re-opens** once a drift is spec'd.
+
+note:
+- Zombie checks (continue-on-error) are the enemy — un-zombie them (UXTS-CI-001 arch rule).
+
+---
+
+## F6.1 UxTS — How It Will Improve
+
+- **New frameworks added when a new drift class is discovered** — follow the pattern: new drift → spec it → gate CI → close the class
+- Open: UOBS presence contracts for new metrics (per-metric declaration + 7d sample check)
+- Open: UATS continues to grow — contract-cover every new endpoint
+
+**The matrix is the honest answer** to "what have we locked down?"
+
+note:
+- When a new sprint introduces a drift-prone surface, the sprint plan MUST include the UxTS forcing function. Non-negotiable.
+
+---
+
+<!-- SECTION F7 — OPS -->
+
+# F7 · Ops
+
+note:
+- Target: 14-18 slides. 2 full (RSIC + alert-correctness; HITL + curation) + 2 mini (backup + Grafana).
+
+---
+
+## F7.1 RSIC — What It Is
+
+**Recursive Self-Improvement Cycle**: 7-dim health assessment.
+
+**`/v1/self-improve/assess`** returns normalized weighted-confidence sum:
+
+`overall = Σ(w_i·c_i·s_i) / Σ(w_i·c_i)` (DH-005 formula)
+
+**Dimensions**:
+- Retrieval, Memory, Edge, Task, Guidance, Protocol, Synergy
+
+**Flow**: Assess → LLM reflector → insights → recommended actions → dispatcher
+
+note:
+- 7 dimensions, each config-weighted (RSIC_HEALTH_WEIGHT_*).
+- Dimensions without data (confidence=0) excluded automatically, not penalised.
+
+---
+
+## F7.1 RSIC — Why We Use It
+
+**Honest observability of substrate state.**
+
+The alert-correctness family (ALERT-TRUTH-001, DASHBOARD-TRUTH-001/002/003) is the sister work:
+- Most "scary" alerts are measurement artifacts, not regressions
+- Panel threshold recalibration based on honest steady-state
+- Config-extraction of hardcoded floors that no longer match reality
+
+note:
+- The dashboard-truth family has now shown 4 times: ~75-90% of operator-flagged "low" metrics are artifacts.
+- Latest: MDEMG-ALERT-NOISE-REDUCTION-001 (2026-10-22) closed 2 chronic false-fire classes.
+
+---
+
+## F7.1 RSIC — Alert Correctness Family
+
+**Shared contracts**:
+
+| Contract | What |
+|---|---|
+| NOSILENT-001 | Distinct Service per rule (cooldown-key) |
+| TSDB-CONSUME-001 | Idle-safe aggregates (COALESCE, never ORDER BY ... LIMIT 1) |
+| ORPHAN-ALERT-001 | Min-nodes floor (never alert on tiny spaces) |
+| MDEMG-ALERT-NOISE-REDUCTION-001 | Honest emission (skip Set when samples==0) |
+
+**Pattern**: when a measurement surface misfires chronically, fix the SURFACE, not the alert threshold.
+
+note:
+- Rule: trajectory language, never "by design" language on sub-50% follow rate.
+- When a dashboard reads scary but direct query returns healthy: triage before fixing.
+
+---
+
+## F7.1 RSIC — Why It's Important
+
+- **Latest sprint MDEMG-ALERT-NOISE-REDUCTION-001 (2026-10-22) closed 2 chronic false-fire classes**:
+  1. Jiminy per-class gauges emit honestly (skip Set when samples==0 — hybrid/process classes with no writer no longer chronically alert)
+  2. FT benchmark staleness distinguishes never-ran from stale (fresh install no longer pages immediately)
+
+**ORPHAN-ALERT-001 pattern generalizes**: never alert on "no data = regression."
+
+note:
+- Each sprint in the family adds a shared contract. The next drift class to catch has the pattern available.
+
+---
+
+## F7.1 RSIC — How It Will Improve
+
+- **Open**: per-space graph-health alerts need min-nodes floor (DASHBOARD-TRUTH-002 extended)
+- **New alerts** must follow NOSILENT-001 + TSDB-CONSUME-001 contracts
+- **Dashboard-truth** family continues as metrics age (quarterly recalibration + title-embedded design-intent-numbers)
+
+note:
+- The honest-steady-state-first-then-alert-floor-below rule generalizes to every new alert.
+
+---
+
+## F7.2 HITL Review + Curation — What It Is
+
+**Human-in-the-loop review surface**: 17 datasets registered.
+
+- **Guidance Corpus** (`ReviewableDataset` for `guidance_training_rows`)
+- **16 LLM call-site datasets** (one per call site in `llm_interactions`)
+
+**Endpoints**: `POST /v1/review/datasets`, `/v1/review/grade`, `/v1/review/reverse`, `/v1/review/autograde-preview`, `/v1/review/candidates`
+
+**UI**: Review tab at `localhost:9999/ui`
+
+note:
+- Dataset-agnostic — a new dataset is an interface impl, not a platform change.
+- 17 datasets registered with zero platform edits (proven in HITL-REVIEW-001 ship).
+
+---
+
+## F7.2 HITL — Why We Use It
+
+**Corpus-quality lever.**
+
+Operator-authored gold is the retrain-trigger signal (JIMINY-RELEVANCE-001 arc):
+- `gold_fraction` in manifest = future-FT-trigger when ≥N
+- Phase 4b retrain blocked on classifier follow-rate honest ≥20% + N=500+ gold corpus
+
+The `suggested_guidance` column on `review_grades` carries SME-authored "what would have been better guidance" — the highest-value retrain signal.
+
+note:
+- REVIEW-SUGGESTED-GUIDANCE-CONSUME-001 shipped the consumer: `scripts/curate_guidance_corpus.py` LEFT JOINs with length-gate.
+- SME writes propagate to the retrain corpus.
+
+---
+
+## F7.2 HITL — How It Works
+
+```mermaid
+flowchart LR
+  CQ[Candidate queue] --> OP[Operator grades]
+  OP --> SN{Sink}
+  SN -->|reinforce=true| SUB[Substrate mutation<br/>conversation.Correct]
+  SN -->|reinforce=false, auto-dismiss| DQ[Status update only]
+  SN -->|reinforce=true, approve correction| L0[New L0 correction obs]
+  L0 --> C21[Phase 20 consolidation] --> L1[L1 correction node]
+  SUB --> JT[Jiminy trust EMA]
+  OP -.-> SUG[suggested_guidance → retrain corpus]
+```
+
+note:
+- Reinforcement is OPT-IN per submission (`REVIEW_REINFORCE_DEFAULT=false`).
+- Idempotent per `(dataset_id, item_id, rubric_version)`.
+- Reversible via `/v1/review/reverse` — captures prior trust + inverse-delta.
+
+---
+
+## F7.2 HITL — Keyboard-Driven Bulk Grade
+
+**JIMINY-HITL-VELOCITY-001** attacks operator throughput.
+
+- `0..4` keys set rubric dimension
+- `Space`/`Enter` submit
+- `n` next, `u` reverse, `?` help, `Esc` close-help / cancel-auto-advance
+- 400ms auto-advance post-submit with visible status-line
+- Session-counter banner at top of item card
+
+**Pre-sprint ~0.5 items/day → post-sprint grind 40+/sitting.**
+
+note:
+- UI corpus-growth features MUST unlock keyboard-only flow (arch rule).
+- Auto-advance MUST have visible cancel window (arch rule).
+
+---
+
+## F7.2 HITL — Auto-Grade Schedule
+
+**AUTOGRADE-SCHEDULE-001** runs 6h scheduled autograde loop.
+
+- Subprocess-spawned CLI: `mdemg review autograde --dataset X --space-id Y`
+- Reuses all shipped grade-writing logic
+- `grader_id LIKE 'auto:%'` invariant pin-tested
+- `reinforce: false` always → never substrate-mutates
+- Default off: `REVIEW_AUTOGRADE_SCHEDULE_ENABLED=false`
+
+**HITL-AUTO-DISMISS-001** added `NonReinforcingApplier` for dim=0 dismissals (invariant-preserving queue drain).
+
+note:
+- SOLE HITL dataset refusing auto-grader: `human_class_queue` (JIMINY-HITL-HUMAN-CLASS-INTEGRATION-001 — LLM cannot verify by construction).
+
+---
+
+## F7.2 HITL — Why It's Important
+
+**Corpus quality is the ceiling on retrain quality.**
+
+- Shipped: HITL-CURATION-003 extends auto-grade to `guidance` dataset
+- Shipped: `oldest-ungraded` sample strategy for starvation-free backfill
+- Shipped: contradicted-draft bridge → HITL approval → real L1 correction (JIMINY-CONTRADICTED-BRIDGE-001)
+- Shipped: structured correction propagation (incorrect/correct/context triple as first-class fields — JIMINY-STRUCTURED-CORRECTION-001)
+
+note:
+- The retrain pipeline consumes `guidance_training_rows`; `constraint_outcomes` is telemetry-only.
+
+---
+
+## F7.3 Backup + Scheduled Jobs (Mini)
+
+**Dual-sink backup** (BACKUP-RESTORE-VERIFY-001):
+- Neo4j dump + TSDB export
+- Partial always bundles `mdemg-dev`
+- Quota retention NEVER deletes newest-per-type
+
+**Scheduled-job health** (NOSILENT-001):
+- `scheduled_job_events` V0024 hypertable
+- Rule `scheduled_job_recent_failure` (any failure in lookback)
+- Rule `backup_no_recent_success` ("never ran" guarantee)
+- Distinct Service per job (cooldown-key contract)
+
+note:
+- Launchd minimal PATH gotcha → `MDEMG_DOCKER_BIN` override + well-known docker locations.
+- The 3 scheduled Go jobs (TSDB backup, maintenance, export-auto) all route through jobhealth.Report.
+
+---
+
+## F7.3 Backup — Restore Correctness
+
+**Fails closed on**:
+- Manifest SHA-256 mismatch
+- Pre-restore safety snapshot incomplete (polled; was 2s-sleep race pre-fix)
+- File-completeness validation against new `file_*_count` manifest fields
+- `nodeProps` empty-string collision with `memorynode_path_unique` constraint
+
+**Tier-3 drill caught**:
+- 2 GB default quota deleting every 3 GB backup ~80 ms after completion (`backup_no_recent_success` would fire pre-fix)
+- Observation-bearing restore broken by proto null → literal "" collision
+
+note:
+- The restore path's correctness is backup system's correctness.
+- Scratch-space drills pay full partial-backup cost (known limitation).
+
+---
+
+## F7.3 Supervisor (Mini)
+
+**SUPERVISOR-002** supervises 15 background loops.
+
+- Panic recovery + restarts + alerts
+- Restart budget sliding window: 3 within 60 min, backoff base 5s
+- Worker contract: blocking `func(ctx) error`
+- **nil return = intentional completion (no restart)**
+- panic/error = supervised restart
+
+Rule-health meta-alert: evaluator query failures log Warn + fire after 3 consecutive failures. Per-rule `rule-health-<id>` when peers succeed; ONE `alert-evaluator-degraded` per outage when nothing succeeds.
+
+note:
+- New background loops MUST route through `goSupervised` or `SetSupervise` — never bare `go func()`.
+- RSIC recency gate: `llm_error_rate_spike` requires newest error within 60 min.
+
+---
+
+## F7.4 Grafana (Mini)
+
+**8 dashboards** (Catppuccin theme, dark-first):
+- mdemg-overview, mdemg-rsic, mdemg-jiminy, mdemg-j17
+- mdemg-llm-routing, mdemg-ft-training, mdemg-hitl, mdemg-graph-topology
+
+**RELEASE-HYGIENE-001** shipped `//go:embed` + materialize-on-init:
+- `internal/cli/grafana_templates/staged/**` mirrors `deploy/docker/grafana/**`
+- `make sync-grafana-embed` + CI drift check
+- Operator-edit-safe (sha256 compare; different content preserved)
+
+note:
+- When editing any file under `deploy/docker/grafana/`, run `make sync-grafana-embed` in the same commit.
+- JIMINY-RULES-UI-001 pinned dashboard-contrast contract: all inline styles use Catppuccin vars, never hardcoded light-theme colors.
+
+---
+
+<!-- SECTION F8 — CLI, HOOKS, MCP, MULTI-INSTANCE -->
+
+# F8 · CLI, Hooks, MCP, Multi-Instance
+
+note:
+- Target: 6-8 slides. 2 mini + mentions.
+
+---
+
+## F8.1 Hooks — The Sensory + Motor Channel
+
+**7 hooks** in `.claude/hooks/`:
+
+| Hook | Fires on | Does |
+|---|---|---|
+| `session-start.sh` | New session | Resumes CMS memory + RSIC health + synergy fingerprint |
+| `prompt-context.sh` | UserPromptSubmit | Recalls CMS context + fetches Jiminy guidance |
+| `post-tool-observe.py` | PostToolUse | Captures decisions, errors, progress; emits process events |
+| `pre-compact.sh` | PreCompact | Saves snapshot to CMS + Jiminy health check |
+| `pre-bash-check.py` | Bash | Blocks destructive ops; Jiminy classify under /strict |
+| `pre-write-check.py` | Write/Edit | Jiminy classify under /strict; fail-open with marker |
+
+**HOOKSYNC-001 contract**: `.claude/hooks/*` + `internal/cli/hook_templates/*` byte-match modulo `{{SPACE_ID}}` — CI-gated.
+
+note:
+- Hook stdin contract (HOOKWIRE-001): `prompt` not `user_prompt`; `tool_response` not `tool_output`; always normalize via `_response_text`.
+- PostToolUse fires only on SUCCESSFUL tool completion — non-zero-exit commands unobserved.
+
+---
+
+## F8.1 Hooks — Hook-Channel Health
+
+**Templates in `internal/cli/hook_templates/` = single source**. CI gates byte-match.
+
+- Hooks display pending alerts + clear them via `POST /v1/alerts/clear` (cleared = delivered)
+- Heartbeats → `POST /v1/hooks/event` → V0024 hypertable
+- Evaluator rule `hook_channel_silent` fires when sessions active but prompt-context never fires
+- Triage: `mdemg hooks doctor`
+
+**Fail-open guardrail**: pre-write-check writes `~/.mdemg/.jiminy-server-unreachable` marker on CMS unreachable → prompt-context surfaces it every prompt until cleared.
+
+note:
+- Compose binds `${MDEMG_BIND_ADDR:-127.0.0.1}`.
+- Neural sidecar on `127.0.0.1:8100` (not 8101 — mlx_lm.server decommissioned).
+
+---
+
+## F8.2 MCP — Agent Memory Channel
+
+**MCP-REVIVE-001**: unified channel. `.mcp.json` sets `MDEMG_SPACE_ID=mdemg-dev` so agent + hook share one space.
+
+**23 MCP tools**:
+- `memory_recall`, `memory_store`, `memory_retrieve`, `memory_associate`, `memory_reject`
+- `memory_symbols`, `memory_ingest_files`, `memory_ingest_status`, ...
+- `eventgraph_reinforcement_neighborhood`, `eventgraph_guidance_outcome_neighborhood`
+- `jiminy_guide`, `jiminy_strict`
+- `validate_changes`
+
+**Contract**: every MCP tool resolves space as explicit `space_id` param > `MDEMG_SPACE_ID` env > `ide-agent`.
+
+note:
+- Contract suite at `internal/cli/mcp_contract_test.go` — new tools MUST add a contract.
+- Plugin orphans: `kickstart -k` skips `Manager.Stop`; `startModuleInstance` pgrep-reaps prior-generation processes.
+
+---
+
+## F8.3 CLI — Command Surface
+
+**21 top-level command groups**:
+
+```
+mdemg init|serve|teardown|upgrade
+mdemg data|tsdb|synergy|graph|concepts|corrections
+mdemg jiminy|j17|watchdog|hooks|service
+mdemg model|ft-loop|review|eventgraph|symbols
+mdemg beta-import|beta-janitor
+```
+
+**Recent additions**:
+- `mdemg jiminy constraint mark|set-class|seed-classes|list-informational`
+- `mdemg jiminy mode [strict|suggest]`
+- `mdemg jiminy override apply|list|revoke`
+- `mdemg ft-loop report-stage` / `promote` / `rollback`
+- `mdemg review autograde`
+
+note:
+- Every command accepts `--help` + `-h` + flags are env-var-overridable.
+- Operator-authorized destructive ops require `--yes` (see teardown + model remove + concepts repair).
+
+---
+
+## F8.4 Multi-Instance (Mention)
+
+**Each instance**: 5 containers, 6 ports, ~2.3 GiB RAM fresh.
+
+- `COMPOSE_PROJECT_NAME=mdemg-{dirname}` provides isolation
+- See `docs/user/multi-instance.md`
+- **Known limitation**: LaunchAgent labels not instance-scoped
+
+**Instance identity pinning** (INSTANCE-ID-PIN-001):
+- Hostname-derived identity pinned at first-use to `~/.mdemg/instance_id`
+- Priority: explicit arg > env `MDEMG_INSTANCE_ID` > pin-file > derive-and-persist
+- `MDEMG_INSTANCE_ID_PIN_PATH=-` disables (advanced escape hatch)
+- Fail-open WARN on write failure (locked / read-only paths degrade gracefully)
+
+note:
+- Hostname-as-identity is fragile — pin derived values at first-use is the arch rule.
+- Best-effort writes to operator-owned paths MUST use atomic tmp+rename + fail-open WARN.
+
+---
+
+<!-- SECTION F9 — BETA + SECURITY + DORMANT CENSUS -->
+
+# F9 · Beta Program + Security + Dormant Census
+
+note:
+- Target: 4-6 slides. 2 mini + mentions.
+
+---
+
+## F9.1 Beta Corpus Loop
+
+```bash
+# Tester side
+mdemg data export            # produces UTDS archive
+mdemg data export-auto       # daily export with retention
+
+# Maintainer side
+mdemg beta-import <bundle>   # 2-gate verify + import
+mdemg beta-janitor delete    # retention enforcement
+mdemg beta-janitor sweep     # 30-day sweep
+```
+
+**Trust gates** before any DB write:
+1. **Per-JSONL SHA-256** vs `manifest.tables[t].sha256`
+2. **Privacy re-scrub** — every text-field re-runs `llmclient.ScrubStringExcluding`
+
+Any diff → REJECT.
+
+note:
+- Receiver-side re-scrub is REQUIRED, not optional — exporter's write-time scrub can be bypassed by a hand-crafted bundle.
+
+---
+
+## F9.1 Beta — Attribution Invariant
+
+**Every imported row's `space_id` + `instance_id` remapped to `beta-tester-<submission_id>`.**
+
+- Tester's original space_id (might be `mdemg-dev` on their side!) is DROPPED
+- Row `time` preserved; `row_id` re-minted via `cuid2.Generate()`
+- Janitor sweeps by prefix `space_id LIKE 'beta-tester-%'`
+- **Beta-tester data NEVER lands in operator's own space**
+
+**Backward compat**: beta.1/.2/.3 bundles (schema 8) carry no corpus → "Lite mode" notice, SHA + rescrub still gated.
+
+note:
+- Import-time invariant enforced in `importGuidanceRows`.
+- Stable prefix-based keying gives janitor safe 30-day retention sweeps.
+
+---
+
+## F9.2 Security Hardening — Shipped Tranches
+
+**SEC-TRANCHE-2 (path injection)**: `pathsafe.SafeJoinUnderDir` CodeQL-recognized sanitizer. 8 HTTP-reachable sites wired. 13 alerts dismissed via `gh api` with rationale.
+
+**SEC-TRANCHE-3 (33 alerts closed)**: regex-anchor `\b` prefixes, URL-scheme deny-list widening (`data:` + `vbscript:`), defensive 10000-element allocation caps, int32 bounds-checks, Python `urlparse().hostname` fixes, XSS-DOM fix with CUIDv2 validation.
+
+**Latest (today)**:
+- MDEMG-ALERT-NOISE-REDUCTION-001 — 2 chronic false-fire classes
+- Certifi CVE closure for CI gates (PR #685 merged)
+
+note:
+- `#nosec` is gosec-only; CodeQL ignores it.
+- CodeQL alerts must be closed via recognized sanitizer OR dismissal via GitHub API.
+
+---
+
+## F9.3 Dormant Census (Forcing-Function Registries)
+
+**3 CI merge-blocking registries**:
+
+| Registry | Surface | File |
+|---|---|---|
+| DORMANT-CENSUS-001 | HTTP routes | `docs/api/route_consumer_inventory.json` |
+| DORMANT-CENSUS-002 | TSDB tables | `docs/api/tsdb_consumer_inventory.json` |
+| DORMANT-CENSUS-003 | Metrics | `docs/api/metrics_consumer_inventory.json` |
+
+**Pattern**: every new route/table/metric declared → inventory entry adjudicated in same PR. CI fails on missing entries.
+
+**Dispositions**: IN_USE, IN_USE_TSDB_ONLY, DORMANT_TO_REMOVE, REMOVED.
+
+note:
+- Verifier scripts: `scripts/verify_route_consumers.py`, `verify_tsdb_consumers.py`, `verify_metrics_consumers.py`.
+- Pre-commit hook gate (PRE-COMMIT-INVENTORY-GATE-001) blocks `git commit` when a trigger-file is staged without paired adjudication.
+
+---
+
+<!-- SECTION F10 — CONCLUSION -->
+
+# F10 · Conclusion
+
+note:
+- Target: 6-8 slides. Operator-authored.
+- Slow down here — invite questions, land the long-term vision.
+
+---
+
+## F10.1 Where We Are Today — Honest
+
+**Follow rate**: ~13% actionable compliance (as of 2026-10-22). Target ≥80% via JIMINY-CEILING-BREAK-2 arc.
+
+**Benchmark aggregate**: 0.9188 on 16-task augmented eval. Beats gpt-mini.
+
+**Alerts pending**: ~44. Most measurement artifacts (dashboard-truth family paper trail). Latest sprint MDEMG-ALERT-NOISE-REDUCTION-001 closed 2 chronic false-fire classes today.
+
+**Fresh PRs**: #694 (mcp-go 1.3) + #695 (cuid2 1.1.1) in-flight. 4 Dependabot bumps + 1 certifi fix merged today.
+
+**Trajectory language, not "by design" language.**
+
+note:
+- Honest is the only language the architectural directive accepts.
+- The 2026-08-01 directive supersedes any prior "by design" framing on sub-50% follow rate.
+
+---
+
+## F10.2 What's Shipped vs. What's Left
+
+| Shipped | Open frontier |
+|---|---|
+| ~105 arch pins in CLAUDE.md | JIMINY-CEILING-BREAK-2 Phase 2-5 (retrieval precision, classifier, HITL, retrain) |
+| 16 UxTS frameworks CI-gated | FT-RECURSIVE-004 drift observation window |
+| 16 LLM call sites single-shot | HITL corpus growth to N=500+ gold |
+| 28 ingested languages | Qwen3.8-27B base swap (post-beta) |
+| Phase 5 SFT LoRA → GGUF Q5_K_M | HEBB-ETA-001 precision-weighted η wiring |
+| 4 learning loops operational | More L2+ emergent concepts (growth under JIMINY-CEILING-BREAK-2) |
+| Enforcement arc 5 sprints | Autonomous FT promote (post operator-confirms-N) |
+| 8 Grafana dashboards | Multi-instance LaunchAgent scoping |
+
+note:
+- Right column IS the pin-list for the next 6-12 months.
+- Each has a named sprint-line in `docs/development/`.
+
+---
+
+## F10.3 End Goal — Vision
+
+**By quarter N**:
+- ≥80% actionable follow rate
+- >10 beta testers active
+- FT recursive loop auto-promotes once per quarter without operator intervention
+- UxTS matrix stable at ~20 frameworks (steady-state)
+- Multi-instance deployed at ≥3 operators
+
+**Beyond quarter N**: cognitive substrate earns its persistence. The ≥80% follow rate IS the trust-threshold crossing — below that, the substrate is advisory + ignored; above, it's load-bearing.
+
+note:
+- "Earns its persistence" — if the substrate isn't followed, it's just a database.
+- The connection-layer bet: better decisions through better connections = cognitive substrate at utility threshold.
+
+---
+
+## F10.4 Why It's Important — Tie-Back
+
+MDEMG : artificial neural network :: internal dialogue : biological neural network.
+
+- The 2026-08-01 architectural directive established enforcement
+- The ongoing arcs establish trustworthiness
+- The vision is a cognitive substrate that WORKS as persistent memory
+
+**Below the follow-rate trust threshold**: database with pretensions.
+**Above the trust threshold**: cognitive substrate with authority.
+
+The arc from one to the other is this quarter's work.
+
+note:
+- Call back to F1.2.2 — the internal-dialogue analogy.
+- If someone's convinced of the vision but skeptical of the current state: that's honest; the state will shift.
+
+---
+
+## F10.5 Continuous Improvement — The Four Loops
+
+```mermaid
+flowchart LR
+  Hebb[Hebbian<br/>per-tool-use] --> CMS[(Substrate)]
+  Jim[Jiminy outcomes<br/>per-tool-use] --> CMS
+  RSIC[RSIC<br/>per-30-min] --> CMS
+  FT[FT recursive<br/>per-week] --> CMS
+  CMS --> Metrics[Grafana + Alerts]
+  CMS --> HITL[Operator review]
+  HITL --> CMS
+  Metrics -.-> Operator((Operator))
+  Operator -.->|intervenes| CMS
+```
+
+**Four loops at four time constants against the same substrate** = continuous improvement.
+
+note:
+- The substrate is a single surface; the loops write to it + read from it.
+- Operator-in-the-loop is explicit — this isn't a fully autonomous system.
+- The autonomy knob is HITL-approvals-based (FT_LOOP_AUTO_PROMOTE_AFTER).
+
+---
+
+## F10.6 Where To Go Next
+
+**Learn**:
+- `CLAUDE.md` — architecture pins
+- `docs/features/*.md` — reference material
+- `docs/development/UXTS_FRAMEWORK_MATRIX.md` — forcing-function matrix
+
+**Operate**:
+- `localhost:9999/ui` — live dashboard
+- Grafana — observability
+- `mdemg jiminy mode strict` — enable enforcement
+
+**Contribute**:
+- Dev branches `<handle>_dev<01-09>` (never direct to main)
+- Auto-PR workflow — just push
+- Each sprint = sequential epics + 3-tier testing + feature doc + sprint post
+
+note:
+- The CLI reference is comprehensive; `--help` on every subcommand.
+- Dashboards + /ui are read-only unless you flip strict mode.
+
+---
+
+## Thank You
+
+**MDEMG** — Cognitive Substrate for AI-Assisted Development
+
+Questions welcome. Everything here is traceable.
+
+`Deck owner`: reh3376
+`Last verified`: 2026-10-22
+`Quarterly refresh`: next Q1
+
+note:
+- Pause for Q&A — this is the longest Q&A anchor in the deck.
+- If a specific concern or arc wasn't covered in depth, that's deliberate — reference the feature doc + follow up offline.
