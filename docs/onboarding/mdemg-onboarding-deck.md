@@ -1,8 +1,12 @@
 ---
 theme: night
 transition: slide
-width: 1280
-height: 720
+width: 1600
+height: 900
+margin: 0.04
+minScale: 0.2
+maxScale: 2.0
+css: slides-overrides.css
 ---
 
 # MDEMG
