@@ -81,6 +81,16 @@ adapters/_archive_*
 # GoReleaser build artifacts
 dist/
 
+# ONBOARDING-TUTORIAL-SERVE-001: force-include the tutorial embed subpaths
+# that the broad `dist/` rule above would otherwise swallow. The staged/
+# dir is the //go:embed source-of-truth and MUST be fully tracked —
+# dropping dist/* (reveal.js runtime) and mermaid/dist/* (diagram
+# renderer) leaves the binary shipping a broken slideshow.
+!internal/cli/tutorial_templates/staged/dist/
+!internal/cli/tutorial_templates/staged/dist/**
+!internal/cli/tutorial_templates/staged/mermaid/dist/
+!internal/cli/tutorial_templates/staged/mermaid/dist/**
+
 # Generated man pages (built at release time)
 man/
 
