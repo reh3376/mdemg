@@ -3181,6 +3181,12 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/eventgraph/guidance-outcome-neighborhood", s.handleEventgraphGuidanceOutcomeNeighborhood)
 	// JIMINY-PROCESS-OBSERVER-01 (task #160) — Path 2 process-event ingest.
 	mux.HandleFunc("/v1/process/event", s.handleProcessEvent)
+	// ONBOARDING-TUTORIAL-SERVE-001 E2: serve the embedded onboarding deck
+	// at /ui/tutorial/*. Registered BEFORE /ui/ because Go's mux dispatches
+	// to the longest-prefix match (so /ui/tutorial/foo lands here, not in
+	// the uiHandler fallback).
+	mux.Handle("/ui/tutorial/", http.StripPrefix("/ui/tutorial/", s.tutorialHandler(s.cfg.TutorialEnabled)))
+	logTutorialBootStatus(s.cfg.TutorialEnabled)
 	mux.Handle("/ui/", http.StripPrefix("/ui/", uiHandler()))
 
 	// Synergy: Claude Code ↔ MDEMG token optimization

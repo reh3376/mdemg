@@ -2,13 +2,14 @@
 name = "neural-sidecar"
 version = "0.1.0"
 description = "MDEMG Neural Sidecar — cross-encoder re-ranking and NLI classification"
-requires-python = ">=3.10"
+requires-python = ">=3.14"
 dependencies = [
     "fastapi>=0.115.0",
     "uvicorn>=0.34.0",
     "sentence-transformers>=5.6.0",  # CVE-2026-68770 CRITICAL (RCE via security-control bypass; fixed in 5.6.0)
     "fsspec>=2026.6.0",  # CVE-2026-104851 HIGH (RCE via crafted input; fixed in 2026.6.0); transitive via huggingface-hub + torch, forced direct
     "certifi>=2026.10.19",  # GHSA-6q48-6c7w-9gw2 CRITICAL (bundled emSign root CAs with compromised private key; fixed in 2026.10.19); transitive via httpx/requests/huggingface-hub, forced direct
+    "filelock>=4.2.1",  # CVE-2026-112940 HIGH (arbitrary file overwrite via insecure database file reopening; fixed in 4.2.1); transitive via huggingface-hub + torch, forced direct
     "pydantic-settings>=2.14.2",
     "scipy>=1.11.0",
 ]
@@ -43,9 +44,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.ruff]
-target-version = "py310"
+target-version = "py314"
 line-length = 120
 
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.14"
 strict = true

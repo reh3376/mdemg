@@ -1,0 +1,13 @@
+{
+  "name": "mdemg-tutorial-exporter",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Build-time tooling to export docs/onboarding/mdemg-onboarding-deck.md to a static reveal.js HTML bundle for the ONBOARDING-TUTORIAL-SERVE-001 feature. Not shipped at operator runtime — regenerate the embed via `make sync-tutorial-embed`.",
+  "dependencies": {
+    "reveal-md": "6.1.4",
+    "mermaid": "11.4.1"
+  },
+  "scripts": {
+    "export": "node ../tutorial/export.mjs"
+  }
+}

@@ -529,3 +529,31 @@ verify-grafana-embed:
 	@diff -qr deploy/docker/grafana internal/cli/grafana_templates/staged \
 		|| (echo ""; echo "DRIFT: run 'make sync-grafana-embed' and commit the result."; exit 1)
 	@echo "  OK — no drift"
+
+# ============================================================
+# ONBOARDING-TUTORIAL-SERVE-001 E1 — Tutorial reveal.js embed sync
+# ============================================================
+# The canonical tutorial source is docs/onboarding/mdemg-onboarding-deck.md.
+# `make sync-tutorial-embed` runs `node scripts/tutorial/export.mjs`, which
+# invokes reveal-md to export a static reveal.js bundle, bundles mermaid.min.js
+# (reveal-md references but doesn't copy it in --static mode), and writes a
+# SOURCE_SHA256.txt breadcrumb into internal/cli/tutorial_templates/staged/.
+# `make verify-tutorial-embed` is the CI drift gate — if the deck source or
+# the CSS override changed without re-running the sync, the SHA breadcrumb
+# won't match the current source and CI fails merge. Mirrors the GRAFANA-SHIP
+# pattern (RELEASE-HYGIENE-001 E2).
+#
+# One-time setup on a fresh checkout: `cd scripts/tutorial && npm ci`
+.PHONY: sync-tutorial-embed verify-tutorial-embed
+sync-tutorial-embed:
+	@echo "Syncing internal/cli/tutorial_templates/staged from docs/onboarding/mdemg-onboarding-deck.md..."
+	@test -x scripts/tutorial/node_modules/.bin/reveal-md \
+		|| (echo "reveal-md not installed; run: cd scripts/tutorial && npm ci" && exit 1)
+	@node scripts/tutorial/export.mjs
+	@echo "  done ($$(find internal/cli/tutorial_templates/staged -type f | wc -l | tr -d ' ') files, $$(du -sh internal/cli/tutorial_templates/staged | cut -f1))"
+
+verify-tutorial-embed:
+	@echo "Verifying internal/cli/tutorial_templates/staged matches deck source..."
+	@python3 scripts/verify_tutorial_embed.py \
+		|| (echo ""; echo "DRIFT: run 'make sync-tutorial-embed' and commit the result."; exit 1)
+	@echo "  OK — no drift"
