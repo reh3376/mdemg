@@ -201,3 +201,8 @@ tests/e2e/browser-ui/screenshots/*.png
 
 # Parser spec (generated)
 parser-spec/
+
+# ONBOARDING-TUTORIAL-SERVE-001: dev-tool npm deps for the tutorial
+# export pipeline. Only needed when regenerating the embed via
+# `make sync-tutorial-embed`; not shipped at operator runtime.
+scripts/tutorial/node_modules/

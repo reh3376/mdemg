@@ -435,6 +435,18 @@ jobs:
         # to every fresh install. This check fails fast.
         run: make verify-grafana-embed
 
+      - name: Tutorial embed drift check (merge-blocking)
+        # ONBOARDING-TUTORIAL-SERVE-001 E1: internal/cli/tutorial_templates/
+        # staged/ is a built-at-sync-time reveal.js bundle derived from
+        # docs/onboarding/mdemg-onboarding-deck.md + slides-overrides.css.
+        # The staged dir carries a SOURCE_SHA256.txt breadcrumb recording
+        # the hashes of both sources at the time of the last sync; this
+        # verifier re-hashes the sources and fails if they drift. An edit
+        # to the deck without `make sync-tutorial-embed` would ship a
+        # stale tutorial to every operator who runs `mdemg tutorial`.
+        # Pure-stdlib Python verifier — no npm dependency on the CI side.
+        run: make verify-tutorial-embed
+
       - name: TSDB consumer guard (merge-blocking)
         # DORMANT-CENSUS-002: every declared TSDB table (via a
         # `CREATE TABLE` in internal/tsdb/migrations/*.sql) must have an
