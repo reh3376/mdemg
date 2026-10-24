@@ -66,6 +66,16 @@
       "notes": "Embedded operator dashboard (internal/api/ui_embed.go; CLAUDE.md documents http://localhost:9999/ui/); ui/api.js drives 30+ admin/backup/learning routes.",
       "uats_specs": []
     },
+    "/ui/tutorial/": {
+      "consumers": [
+        "cli:tutorial (operator-visible \u2014 Epic 5)",
+        "dashboard:mdemg-overview (Grafana text-panel button \u2014 Epic 5)",
+        "ui:internal/api/handlers_tutorial.go"
+      ],
+      "disposition": "ACTIVE",
+      "notes": "Embedded reveal.js onboarding tutorial served from internal/cli/tutorial_templates/staged/ (built via `make sync-tutorial-embed` from docs/onboarding/mdemg-onboarding-deck.md). Gated by TUTORIAL_ENABLED (default true). ONBOARDING-TUTORIAL-SERVE-001 Epic 2 landed the handler; Epics 5+ wire the operator-facing entry points.",
+      "uats_specs": []
+    },
     "/v1/admin/breakers": {
       "consumers": [],
       "disposition": "OPERATOR_SURFACE",
