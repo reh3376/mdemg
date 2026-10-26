@@ -10,6 +10,11 @@ css: docs/onboarding/slides-overrides.css
 revealOptions:
   view: scroll
   scrollProgress: auto
+  # Continuous scroll (operator UX directive 2026-10-26): the default
+  # scrollSnap: 'mandatory' snaps to tile boundaries during scroll, which
+  # feels awkward on a deck meant to be read continuously. `false` lets
+  # the browser scroll naturally like a long document.
+  scrollSnap: false
 ---
 
 # MDEMG

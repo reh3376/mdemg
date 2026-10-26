@@ -104,6 +104,43 @@ html::-webkit-scrollbar-track {
 }
 
 /*
+ * ONBOARDING-TUTORIAL-ENDUSER-001 (2026-10-26): fragment-navigation safety.
+ * When a TOC anchor jumps to a slide (e.g. #how-jiminy-thinks), the browser
+ * aligns the target to viewport-top. Reveal-md's `<!-- .slide: id="..." -->`
+ * directive attaches the id to the HEADING element inside the section (not
+ * the section itself), so we target any element carrying an id — this
+ * leaves comfortable breathing room above any anchored heading, button,
+ * figure, or other element, independent of what tag reveal-md picks.
+ */
+.reveal section[id],
+.reveal section [id] {
+  scroll-margin-top: 64px;
+}
+
+/*
+ * ONBOARDING-TUTORIAL-ENDUSER-001 (2026-10-26) scroll-view clip fix:
+ *
+ * Reveal.js scroll-view wraps every slide in `.scroll-page-content` with
+ * `overflow: hidden` and the inner `<section>` is `position: absolute`
+ * with a top offset. For most slides this works, but when a slide's
+ * target heading (via `<!-- .slide: id -->`) is at a y-coordinate ABOVE
+ * the scroll-page-content's own box top, the heading gets clipped by the
+ * overflow:hidden even though it's logically inside the section's layout.
+ *
+ * The clip is invisible to debugging — getBoundingClientRect returns a
+ * valid rect for the heading, but the pixels never render because the
+ * parent's overflow clip-zone excludes them.
+ *
+ * Fix: let scroll-page-content show overflow. The slide content stays
+ * laid out by reveal's absolute positioning; this just stops the clip.
+ * Applies to every slide (works for any current and future heading,
+ * figure, table, or deep-linked target).
+ */
+.reveal .scroll-page-content {
+  overflow: visible !important;
+}
+
+/*
  * ONBOARDING-TUTORIAL-ENDUSER-001 interactive SVG viewer (2026-10-26):
  *
  * Every hand-authored diagram is wrapped in <figure class="svg-figure">
