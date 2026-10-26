@@ -4,6 +4,33 @@
  * Tune heading sizes and spacing down from the night-theme defaults.
  */
 
+/*
+ * ONBOARDING-TUTORIAL-ENDUSER-001 E5 fix (2026-10-26):
+ * Reveal.js slides don't scroll by default — content taller than the
+ * viewport is CLIPPED, not scrollable. The TOC + several U-section
+ * slides exceed 900px when the deck is dense. Allow per-slide vertical
+ * scroll so dense content isn't lost.
+ */
+.reveal .slides {
+  overflow-y: visible;
+}
+.reveal .slides section {
+  overflow-y: auto;
+  max-height: 100vh;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.4) transparent;
+}
+.reveal .slides section::-webkit-scrollbar {
+  width: 8px;
+}
+.reveal .slides section::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.4);
+  border-radius: 4px;
+}
+.reveal .slides section::-webkit-scrollbar-track {
+  background: transparent;
+}
+
 .reveal h1 {
   font-size: 2.0em;
   line-height: 1.1;
