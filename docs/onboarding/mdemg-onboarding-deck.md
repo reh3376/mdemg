@@ -2517,7 +2517,9 @@ note:
 
 ## How Jiminy Thinks
 
-![How Jiminy Thinks: two-phase loop. BEFORE action: retrieve rules + synthesize directive. AFTER action: classify verdict + feed trust, RSIC, Grafana.](./assets/svg/u4-how-jiminy-thinks.svg)
+<figure class="svg-figure">
+  <img src="./assets/svg/u4-how-jiminy-thinks.svg" alt="How Jiminy Thinks: two-phase loop. BEFORE action: retrieve rules + synthesize directive. AFTER action: classify verdict + feed trust, RSIC, Grafana." />
+</figure>
 
 Jiminy is a loop in two halves. **BEFORE** retrieves durable rules and synthesizes a directive the agent should respect. **AFTER** classifies whether the agent respected it, then feeds the outcome to trust, self-improvement, and operator visibility.
 

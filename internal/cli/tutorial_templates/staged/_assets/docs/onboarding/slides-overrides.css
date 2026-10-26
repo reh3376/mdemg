@@ -102,3 +102,55 @@ html::-webkit-scrollbar-track {
 .reveal section > h3:first-child {
   margin-top: 0;
 }
+
+/*
+ * ONBOARDING-TUTORIAL-ENDUSER-001 (2026-10-26):
+ * Responsive SVG container for hand-authored diagrams.
+ *
+ * Operator-direction: diagrams should scale to the viewer's container
+ * (desktop, phone, embedded preview). A reveal.js slide is 1600×900 natural;
+ * we cap diagram width at a comfortable 85% of slide width (max 1360px
+ * natural, scales freely below). The SVG files declare only viewBox (no
+ * fixed width/height) so this CSS controls display size exclusively.
+ */
+.reveal .svg-figure,
+.reveal figure.svg-figure {
+  display: block;
+  width: 100%;
+  max-width: 85%;
+  margin: 0.5em auto;
+  padding: 0;
+}
+
+.reveal .svg-figure img {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  margin: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.reveal .svg-figure figcaption {
+  font-size: 0.6em;
+  line-height: 1.3;
+  color: #94a3b8;
+  text-align: center;
+  margin-top: 0.3em;
+  font-style: italic;
+}
+
+/*
+ * Reveal-md wraps standalone markdown images in <p><img></p>. Give those a
+ * cap too for diagrams that aren't yet wrapped in .svg-figure (fallback
+ * so a plain ![alt](file.svg) still scales politely).
+ */
+.reveal p > img[src$=".svg"] {
+  max-width: 85%;
+  height: auto;
+  display: block;
+  margin: 0.5em auto;
+}
