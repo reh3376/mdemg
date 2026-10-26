@@ -73,6 +73,8 @@ A ~30-40 slide end-user walkthrough that an operator can navigate (keyboard or c
 - Translation / localization
 - Standalone end-user HTML export separate from `/ui/tutorial/` serving
 - Operator-captured screenshots embedded in the deck (operator decides at review time if any are worth adding; assets dir empty-by-design today)
+- **Dev-path F1 alignment with the 4-question opening framing** (operator directive 2026-10-26): the end-user path adopts the 4 strategic questions in U1; the dev-path F1 is already partially aligned via its "What MDEMG Is Trying To Do" mission slide but may need audit/additions. Deferred to a follow-up MDEMG-ONBOARDING-DECK-002 or similar.
+- **Dev-path topology section** (operator directive 2026-10-26): dev-path (F-sections) needs a dedicated topology section detailing the 5 containers, how they run, what they do, with cross-reference links back to F2 (Neo4j substrate), F3 (retrieval → neural-sidecar), F7 (ops/Grafana), etc. This content is DEV-PATH scope (not end-user); deferred to the same follow-up sprint that audits F1.
 
 ### Hard constraints (invariants that MUST hold)
 1. **Factual provenance** — every substantive end-user claim (dashboard panel names, CLI flags, env vars, alert names) traces to shipped code, a feature doc, or CLAUDE.md. Fabrication = sprint failure.

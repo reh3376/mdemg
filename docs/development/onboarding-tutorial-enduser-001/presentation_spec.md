@@ -9,6 +9,33 @@
 
 ---
 
+## 1a. Opening Framing (operator directive 2026-10-26)
+
+The slideshow (both paths — end-user AND dev) opens by answering 4 strategic questions + an integrating slide, and each subsequent section is an in-depth answer to a piece of those questions:
+
+1. **What is MDEMG?**
+2. **What problem(s) does it attempt to solve?**
+3. **How does it solve those problems?**
+4. **How does it continuously get better at solving those problems?**
+5. **How does it all work together?** (the integrator — one Mermaid showing the whole loop)
+
+**Where answered**:
+- At the top of each path: U1 (end-user) / F1 (dev) — one slide per question + landing
+- Then each U-section (resp. F-section) is one or more in-depth answers mapped back to those questions
+
+**End-user U-section → question mapping**:
+
+| Question | Where deep |
+|---|---|
+| Q1 What is MDEMG? | U1 (overview); recurring throughout as the system's identity surfaces |
+| Q2 What problems does it solve? | U3 Memory (context loss) · U4 Jiminy (behavioral drift) · U16 Alerts (silent failures) |
+| Q3 How does it solve them? | U2 Stack · U3-U15 the surfaces that implement the solution |
+| Q4 How does it continuously improve? | U5 RSIC · U6 UxTS · U7 HITL · U8 Learning/Training · the trajectory language across the whole deck |
+
+Dev-path F1 is already shipped and partially aligned (opens with "What MDEMG Is Trying To Do" mission quote). **Deferred follow-up**: audit dev-path F1 against this 4-question structure in a future sprint; may require minor F1 slide additions.
+
+---
+
 ## 1. Audience
 
 **Target audience**: Operators of a running MDEMG instance.
@@ -30,50 +57,35 @@ The slideshow forks at the landing slide into **2 paths**: end-user (this one) a
 
 ---
 
-## 2. Slide-Count Envelope
+## 2. Slide-Count + Visual-Element Policy
 
-**Target**: **comprehensive — no upper cap** (operator-directed 2026-10-26). Expected range ~80-120 slides.
-**Lower bound**: 60 slides (below this, major topics are getting undercovered).
+**No caps** (operator directive 2026-10-26): "do not set unnecessary constraints on figures, tables, diagrams, or slides. This will take as much as necessary to provide the data required."
 
-**Rationale**: operator directed "extensive and highly informative onboarding mechanism for users and software devs / contributors" + "I am not overly concerned about the total number of slides or time required to review." Prior envelopes (28-40 → 45-60) were optimizing for brevity; this one optimizes for depth of each topic. Dev-path deck is 107 slides at ~115 min; end-user path can be similar scale when covering 17 topics at full depth.
+- No upper bound on total slide count.
+- No upper bound on Mermaid diagrams, tables, images, code blocks, or any other visual element per slide or per section.
+- No lower bound either — a topic that covers cleanly in 2 slides doesn't need padding to 5.
 
-**Per-topic depth guideline** (soft; `global_roadmap.md` carries live numbers):
+**Rule**: each slide / figure / table / diagram EARNS its place by conveying information the viewer needs AND cannot easily get from the preceding slide. If removing an element would leave a gap the viewer can't fill from context, keep it. If it's redundant with the slide before, drop it.
 
-Each major topic (U-section) covers:
-1. **Section landing** — 1 slide — what this covers, why it matters
-2. **Mental model** — 1-2 slides, optionally Mermaid — the thing operator should carry away
-3. **Where to see it** — 1-2 slides — UI tab(s), Grafana panel(s), log patterns
-4. **How to touch it** — 1-2 slides — CLI commands, API endpoints
-5. **Current state (honest)** — 1 slide — "today it looks like this; here's why; here's the arc moving it"
-6. **Gotchas** — 0-1 slides — common footguns, misconceptions
-7. **Where to go deeper** — 1 slide — feature doc link, CLAUDE.md pin reference, sprint record
+**Depth template** (guide, not straitjacket):
 
-That's **5-9 slides per topic**. 17 topics × avg 6-7 = **~100-120 slides** total.
+Each major topic (U-section) typically covers:
+1. **Section landing** — what this covers, why it matters
+2. **Mental model** — the mental model the operator should carry away (Mermaid if it genuinely helps)
+3. **Where to see it** — UI tab(s), Grafana panel(s), log patterns
+4. **How to touch it** — CLI commands, API endpoints
+5. **Current state (honest)** — today's state + arc moving the needle (trajectory language)
+6. **Gotchas** — common footguns, misconceptions
+7. **Where to go deeper** — feature doc, CLAUDE.md pin, sprint record
 
-Per-section ballpark targets:
+**Topics may expand elements as needed**:
+- U3 Memory may need 2-3 Mermaid diagrams (hierarchy + Hebbian flow + consolidation lifecycle) if that's what the operator needs to carry the mental model.
+- U6 UxTS may need a full table of the 15 shipped frameworks + their forcing-function pattern per family.
+- U15 APIs may need the full route-table reference as a scroll-through slide.
 
-| § | Topic | Target slides |
-|---|---|---:|
-| U1 | Welcome / What's Running | 5 |
-| U2 | Status + Health | 5 |
-| U3 | Memory (CMS) | 8 |
-| U4 | Jiminy | 9 |
-| U5 | RSIC | 7 |
-| U6 | UxTS Framework Family | 8 |
-| U7 | Review / HITL | 6 |
-| U8 | Learning / Training Data | 6 |
-| U9 | Backup + Ops | 5 |
-| U10 | Logs | 4 |
-| U11 | Config + Features | 6 |
-| U12 | Plugins | 4 |
-| U13 | Grafana | 6 |
-| U14 | CLI | 7 |
-| U15 | APIs + gRPC | 7 |
-| U16 | Alerts + Enforcement | 6 |
-| U17 | Where To Go Next | 3 |
-| **Total** | | **~102** |
+The current `global_roadmap.md` section breakdown is a **working estimate**, not a budget. Author authors to the information requirement; the table updates to match. Operator E5 live-review is the final arbiter of "enough / too much / missing."
 
-Walk-time at ~45-60 sec/slide ≈ **~80-100 min**. Comparable to the dev-path deck's 115 min — appropriate for comprehensive onboarding of two audiences (operators + contributors).
+**Walk-time**: unmeasured. Operator can pause anytime (keyboard ESC → overview grid → resume anywhere).
 
 ---
 
@@ -142,17 +154,17 @@ TITLE + 1-sentence body + link table or bulleted next-steps.
 
 ### 4.2 Mermaid policy
 
-- **Default: minimal Mermaid.** End-user content explains OPERATIONS, not architecture — but at full-depth topic coverage, a few mental-model diagrams earn their place.
-- **Soft cap**: **4-6 Mermaid diagrams across the entire end-user path** (revised 2026-10-26 for full-depth coverage). Dev deck has 15 across 107 slides (~14%); end-user keeps similar density (~10%).
-- Operator-approved Mermaid slots (locked at E1):
-  - **U1.2** — the 5-container + mdemg server sketch (stack mental model)
-  - **U3** Memory — L0→L1→L2+ hierarchy sketch (how Hebbian consolidation flows)
-  - **U4** Jiminy — guidance → outcome → trust-signal loop
-  - **U5** RSIC — admission → cycle → outcome loop
-  - **U6** UxTS — the forcing-function diamond (spec → fixture → runner → CI gate)
-  - **U15** APIs + gRPC — surface map (operators via CLI → REST; plugins/transfer via gRPC)
-  - **U16** Alerts — override-flow sketch (block → operator → override → audit trail)
-- Any Mermaid NOT in the above list requires operator E5-review approval before shipping.
+- **No cap** (operator directive 2026-10-26). Diagrams earn their place by conveying mental models that prose can't easily carry.
+- **Minimum expected diagrams** (these are the ones the roadmap LOCKS as required; sections may add more as authoring demands):
+  - **U1.6** — the integrated system flow (memory + retrieval + Jiminy + RSIC + UxTS + HITL + retrain fitting together)
+  - **U2** — the 5-container + mdemg server stack sketch
+  - **U3 Memory** — L0→L1→L2+ hierarchy sketch; may need additional diagrams for Hebbian co-activation and consolidation lifecycle
+  - **U4 Jiminy** — guidance → outcome → trust-signal loop
+  - **U5 RSIC** — admission → cycle → outcome loop
+  - **U6 UxTS** — the forcing-function diamond (spec → fixture → runner → CI gate); likely needs a family-map table as well
+  - **U15 APIs + gRPC** — surface map (operators via CLI → REST; plugins/transfer via gRPC); may need per-service protocol diagrams
+  - **U16 Alerts** — override-flow sketch (block → operator → override → audit trail)
+- Sections that need MORE diagrams for completeness take them. Operator E5 review decides "enough / too much."
 
 ### 4.3 Screenshot policy
 

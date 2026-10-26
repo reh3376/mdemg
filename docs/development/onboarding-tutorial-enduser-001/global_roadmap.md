@@ -2,14 +2,16 @@
 
 **Sprint**: ONBOARDING-TUTORIAL-ENDUSER-001
 **Pattern**: adapted from [`../mdemg-onboarding-deck-001/global_roadmap.md`](../mdemg-onboarding-deck-001/global_roadmap.md) (F1-F10 → U1-U17)
-**Status**: v3 (operator-directed depth expansion 2026-10-26) — extensive + highly informative; dual-audience (operators + contributors)
-**Envelope**: no upper cap; ~80-120 slides expected (per revised `presentation_spec.md` §2); current proposal **~102 slides**
+**Status**: v4 (operator-directed no-caps 2026-10-26) — extensive + highly informative; operators-only (dev-path serves developers/contributors); slides/figures/tables/diagrams driven by information requirement, not an envelope
+**Envelope**: **NO CAPS** on slides, figures, tables, diagrams. Current working estimate ~105 slides but authoring may expand any U-section as needed to convey its content faithfully.
 
 > This roadmap sets the slide-count breakdown + section intent + natural stopping points for the end-user path. Per-section detail (slide-by-slide titles + content pointers) lives in `roadmaps/U*.md` and gets authored at E2.
 
 **v2 change log (2026-10-26)**: operator directed topic-per-section expansion covering every major MDEMG topic (RSIC, UxTS, Jiminy, Logs/Training Data, APIs+gRPC, etc.) instead of 7 operator-task sections. Envelope raised 28-40 → 45-60. Walk-time raised ~27 min → ~45 min. Covers all 13 /ui/ tabs + Grafana + CLI + APIs/gRPC + mental-model areas (RSIC, UxTS) not surfaced by any single tab.
 
-**v3 change log (2026-10-26)**: operator directed "extensive and highly informative onboarding mechanism" with "I am not overly concerned about the total number of slides or time required to review" — AND clarified the slideshow forks at landing into 2 paths (end-user vs software-dev-contributor); this end-user path targets operators only (the dev path is already comprehensive for developers/contributors, shipped as the F1-F10 107-slide deck). Per-topic depth expanded from 3-4 slides to 5-9 slides via a 7-element depth template (landing / mental-model / where-to-see / how-to-touch / current-state / gotchas / deeper). Envelope uncapped; expected range ~80-120 slides. Walk-time ~80-100 min.
+**v3 change log (2026-10-26)**: operator directed "extensive and highly informative onboarding mechanism" with "I am not overly concerned about the total number of slides or time required to review" — AND clarified the slideshow forks at landing into 2 paths (end-user vs software-dev-contributor); this end-user path targets operators only (the dev path is already comprehensive for developers/contributors, shipped as the F1-F10 107-slide deck). Per-topic depth expanded from 3-4 slides to 5-9 slides via a 7-element depth template (landing / mental-model / where-to-see / how-to-touch / current-state / gotchas / deeper). Envelope uncapped; expected range ~80-120 slides.
+
+**v4 change log (2026-10-26)**: operator directive — "do not set unnecessary constraints on figures, tables, diagrams, or slides. This will take as much as necessary to provide the data required." Removed all upper and lower caps on slide count, Mermaid diagrams, tables, and other visual elements. The 7-element depth template remains as a GUIDE (not a straitjacket). Section slide counts below are working estimates subject to expansion/contraction during E3 authoring. Also: U1 restructured as pure Opening (framing — 4 strategic questions + integrator per operator 2026-10-26); stack/running content moved into expanded U2. Added 1 approved Mermaid (U1.6 integrator).
 
 ---
 
@@ -17,26 +19,26 @@
 
 | § | Section | Slides | Running total | Walk-time | Natural Q&A anchor |
 |---|---|---:|---:|---:|---|
-| U1 | **Welcome + What's Running** | 5 | 5 | ~4 min | after U1 |
-| U2 | **Status + Health** | 5 | 10 | ~4 min | — |
-| U3 | **Memory (CMS)** | 8 | 18 | ~7 min | after U3 |
-| U4 | **Jiminy** (guidance + rules + mode) | 9 | 27 | ~8 min | after U4 |
-| U5 | **RSIC** (self-improvement) | 7 | 34 | ~6 min | after U5 |
-| U6 | **UxTS Framework Family** | 8 | 42 | ~7 min | after U6 |
-| U7 | **Review / HITL** | 6 | 48 | ~5 min | — |
-| U8 | **Learning / Training Data** | 6 | 54 | ~5 min | after U8 |
-| U9 | **Backup + Ops** | 5 | 59 | ~4 min | — |
-| U10 | **Logs** | 4 | 63 | ~3 min | — |
-| U11 | **Config + Features** | 6 | 69 | ~5 min | — |
-| U12 | **Plugins** | 4 | 73 | ~3 min | — |
-| U13 | **Grafana** | 6 | 79 | ~5 min | after U13 |
-| U14 | **CLI — The Full Command Surface** | 7 | 86 | ~6 min | — |
-| U15 | **APIs + gRPC** | 7 | 93 | ~6 min | after U15 |
-| U16 | **Alerts + Enforcement Escape Hatches** | 6 | 99 | ~5 min | after U16 |
-| U17 | **Where To Go Next** | 3 | 102 | ~2 min | — (end) |
-| **Totals** | | **102** | **102** | **~85 min** | — |
+| U1 | **Opening — The 4 Questions + Integrator** | 6 | 6 | ~5 min | after U1.6 |
+| U2 | **The Stack + Status + Health** | 7 | 13 | ~6 min | — |
+| U3 | **Memory (CMS)** | 8 | 21 | ~7 min | after U3 |
+| U4 | **Jiminy** (guidance + rules + mode) | 9 | 30 | ~8 min | after U4 |
+| U5 | **RSIC** (self-improvement) | 7 | 37 | ~6 min | after U5 |
+| U6 | **UxTS Framework Family** | 8 | 45 | ~7 min | after U6 |
+| U7 | **Review / HITL** | 6 | 51 | ~5 min | — |
+| U8 | **Learning / Training Data** | 6 | 57 | ~5 min | after U8 |
+| U9 | **Backup + Ops** | 5 | 62 | ~4 min | — |
+| U10 | **Logs** | 4 | 66 | ~3 min | — |
+| U11 | **Config + Features** | 6 | 72 | ~5 min | — |
+| U12 | **Plugins** | 4 | 76 | ~3 min | — |
+| U13 | **Grafana** | 6 | 82 | ~5 min | after U13 |
+| U14 | **CLI — The Full Command Surface** | 7 | 89 | ~6 min | — |
+| U15 | **APIs + gRPC** | 7 | 96 | ~6 min | after U15 |
+| U16 | **Alerts + Enforcement Escape Hatches** | 6 | 102 | ~5 min | after U16 |
+| U17 | **Where To Go Next** | 3 | 105 | ~2 min | — (end) |
+| **Totals** | | **105** | **105** | **~88 min** | — |
 
-**Depth template per section** (per `presentation_spec.md` §2): landing · mental-model · where-to-see · how-to-touch · current-state (honest trajectory) · gotchas · where-to-go-deeper.
+**Depth template per section** (per `presentation_spec.md` §2 — GUIDE, not straitjacket): landing · mental-model · where-to-see · how-to-touch · current-state (honest trajectory) · gotchas · where-to-go-deeper. Sections expand slides/figures/tables/diagrams as the content requires (operator directive 2026-10-26 — no caps).
 
 ---
 
