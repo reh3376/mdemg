@@ -1,7 +1,7 @@
-# Draft Slides — End-User Path (U1-U17)
+# Draft Slides · End-User Path (U1-U17)
 
 **Sprint**: ONBOARDING-TUTORIAL-ENDUSER-001 Epic 3
-**Status**: DRAFT — awaiting E4 stitch into `docs/onboarding/mdemg-onboarding-deck.md`
+**Status**: DRAFT, awaiting E4 stitch into `docs/onboarding/mdemg-onboarding-deck.md`
 **Last authored**: 2026-10-26
 
 > This file holds the actual slide content for the end-user path. At E4, these slides get stitched into the main deck (replacing the `#end-user-path` stub) and the staged embed resyncs. During E5 operator live-review, this file acts as the audit trail.
@@ -10,11 +10,11 @@
 
 ---
 
-<!-- SECTION U1 — OPENING -->
+<!-- SECTION U1, OPENING -->
 
 <!-- .slide: id="end-user-path" -->
 
-## U1 · Operator Onboarding — Start Here
+## U1 · Operator Onboarding · Start Here
 
 The next ~99 minutes answer four questions. Each U-section drills into a piece of the answer. You'll own the operator view by the end.
 
@@ -22,17 +22,17 @@ The next ~99 minutes answer four questions. Each U-section drills into a piece o
 2. **What problem(s) does it attempt to solve?**
 3. **How does it solve those problems?**
 4. **How does it continuously get better at solving those problems?**
-5. **How does it all work together?** (U1.6 — the integrator)
+5. **How does it all work together?** (U1.6, the integrator)
 
 **Mini-TOC**:
 
 | § | Topic | ~slides |
 |---|---|---:|
-| U1 | Opening — The 4 Questions + Integrator | 6 |
+| U1 | Opening, The 4 Questions + Integrator | 6 |
 | U2 | The Stack + Status + Health | 7 |
 | U3 | Memory (CMS) | 8 |
-| U4 | Jiminy — Guidance + Enforcement | 11 |
-| U5 | RSIC — Self-Improvement | 8 |
+| U4 | Jiminy, Guidance + Enforcement | 11 |
+| U5 | RSIC, Self-Improvement | 8 |
 | U6 | UxTS Framework Family | 9 |
 | U7 | Review / HITL | 7 |
 | U8 | Learning / Training Data | 7 |
@@ -41,7 +41,7 @@ The next ~99 minutes answer four questions. Each U-section drills into a piece o
 | U11 | Config + Features | 7 |
 | U12 | Plugins | 5 |
 | U13 | Grafana | 7 |
-| U14 | CLI — The Full Command Surface | 9 |
+| U14 | CLI, The Full Command Surface | 9 |
 | U15 | APIs + gRPC | 9 |
 | U16 | Alerts + Enforcement Escape Hatches | 7 |
 | U17 | Where To Go Next | 4 |
@@ -58,8 +58,8 @@ note:
 
 > **Help developers create software that connects in a manner that increases the likelihood of making better decisions.**
 
-- **Persistent memory + cognitive substrate** — not a tool
-- **Decisions are the atomic unit** — not features, not metrics
+- **Persistent memory + cognitive substrate**: not a tool
+- **Decisions are the atomic unit**: not features, not metrics
 - **Connections** (memory → retrieval → classification → synthesis) are what the system optimizes
 
 The analogy: internal dialogue is to a conscious biological neural network as **MDEMG is to an artificial neural network (an AI agent)**.
@@ -74,9 +74,9 @@ note:
 
 Three core problem classes:
 
-1. **Context loss across sessions** — the AI agent forgets everything between runs; MDEMG remembers (persistent CMS) → *expanded in U3 Memory*
-2. **Behavioral drift** — the agent repeats mistakes; MDEMG surfaces durable guidance that reminds it before action → *expanded in U4 Jiminy, U16 Alerts/Enforcement*
-3. **Silent failure modes** — the system degrades without anyone noticing; MDEMG observes itself continuously via alerts + Grafana + RSIC → *expanded in U13 Grafana, U16 Alerts, U5 RSIC*
+1. **Context loss across sessions**: the AI agent forgets everything between runs; MDEMG remembers (persistent CMS) → *expanded in U3 Memory*
+2. **Behavioral drift**: the agent repeats mistakes; MDEMG surfaces durable guidance that reminds it before action → *expanded in U4 Jiminy, U16 Alerts/Enforcement*
+3. **Silent failure modes**: the system degrades without anyone noticing; MDEMG observes itself continuously via alerts + Grafana + RSIC → *expanded in U13 Grafana, U16 Alerts, U5 RSIC*
 
 Honest note: the arcs that MOVE each needle are ongoing; U5 (RSIC) and U17 (Where to Go) carry the trajectory.
 
@@ -89,12 +89,12 @@ note:
 
 Four surfaces (each is a U-section):
 
-1. **Memory substrate** — Neo4j graph of observations + consolidation into layered abstractions → *U3 Memory*
-2. **Retrieval + guidance** — RRF 4-column retrieval + Jiminy surfaces durable rules on every prompt → *U3 Memory + U4 Jiminy*
-3. **Enforcement** — strict mode blocks violations; override escape hatches preserve operator agency → *U16 Alerts + Enforcement*
-4. **Observability** — Grafana + TSDB + alerts channel + /ui/ Status → *U2 Stack, U13 Grafana, U16 Alerts*
+1. **Memory substrate**: Neo4j graph of observations + consolidation into layered abstractions → *U3 Memory*
+2. **Retrieval + guidance**: RRF 4-column retrieval + Jiminy surfaces durable rules on every prompt → *U3 Memory + U4 Jiminy*
+3. **Enforcement**: strict mode blocks violations; override escape hatches preserve operator agency → *U16 Alerts + Enforcement*
+4. **Observability**: Grafana + TSDB + alerts channel + /ui/ Status → *U2 Stack, U13 Grafana, U16 Alerts*
 
-Mental model: **"sense → store → retrieve → classify → act → observe → learn"** — the full loop.
+Mental model: **"sense → store → retrieve → classify → act → observe → learn"**: the full loop.
 
 note:
 - If the four surfaces sound abstract, they get concrete starting in U2. This slide is the map; the territory starts next.
@@ -105,10 +105,10 @@ note:
 
 Four self-improvement loops:
 
-1. **RSIC** — recursive self-improvement cycle: reflect → trigger → admit → outcome → learn → *U5 RSIC*
-2. **UxTS forcing-functions** — contract-first framework family (UATS/UVTS/ULTS/…) prevents drift at merge time → *U6 UxTS*
-3. **HITL curation** — operator grading of guidance outcomes feeds the retrain corpus → *U7 Review/HITL*
-4. **Fine-tuning / recursive retrain** — the production LLM gets measurably better via Phase 5 SFT + the recursive-retrain loop → *U8 Learning/Training Data*
+1. **RSIC**: recursive self-improvement cycle: reflect → trigger → admit → outcome → learn → *U5 RSIC*
+2. **UxTS forcing-functions**: contract-first framework family (UATS/UVTS/ULTS/…) prevents drift at merge time → *U6 UxTS*
+3. **HITL curation**: operator grading of guidance outcomes feeds the retrain corpus → *U7 Review/HITL*
+4. **Fine-tuning / recursive retrain**: the production LLM gets measurably better via Phase 5 SFT + the recursive-retrain loop → *U8 Learning/Training Data*
 
 **Honest trajectory language** (operator directive 2026-08-01):
 - WRONG: "follow rate 13% by design"
@@ -147,22 +147,22 @@ The HITL → retrain arc is the newest piece, actively iterating.
 
 note:
 - This is the whole loop. Memorize this slide; everything after is a zoomed-in piece of it.
-- PM-fallback: think of it like a flight-test rig — the plane flies, instruments record, engineers review, next build improves. MDEMG is that for AI agents and their decisions.
+- PM-fallback: think of it like a flight-test rig, the plane flies, instruments record, engineers review, next build improves. MDEMG is that for AI agents and their decisions.
 
 ---
 
-<!-- SECTION U2 — THE STACK + STATUS + HEALTH -->
+<!-- SECTION U2, THE STACK + STATUS + HEALTH -->
 
 ## U2 · The Stack
 
-Everything in U3-U17 lives inside the 5-container stack. This section is the foundation — the stack picture, how to confirm it's up, how to probe its health, and what the watchdog + breakers protect against.
+Everything in U3-U17 lives inside the 5-container stack. This section is the foundation, the stack picture, how to confirm it's up, how to probe its health, and what the watchdog + breakers protect against.
 
 Preview: stack diagram → `docker compose ps` → 4-command path → `healthz` → watchdog → breakers → gotchas.
 
-Points back to U1.4 — this is the implementation of surface #1 (observability + substrate it runs on).
+Points back to U1.4, this is the implementation of surface #1 (observability + substrate it runs on).
 
 note:
-- U2 absorbs what was once "What's Running" — now paired with Health + Status because operators run them together.
+- U2 absorbs what was once "What's Running", now paired with Health + Status because operators run them together.
 
 ---
 
@@ -185,11 +185,11 @@ graph LR
 ```
 
 **Roles**:
-- **mdemg** — HTTP API + CLI backend (ghcr.io/reh3376/mdemg)
-- **neo4j** — graph substrate (CMS; the "cognitive" layer — U3 Memory)
-- **timescaledb** — telemetry hypertables (TSDB; the "measurement" layer — U13 Grafana)
-- **neural-sidecar** — rerank + NLI model inference (U15 APIs)
-- **grafana** — read-only observability panels (U13)
+- **mdemg**: HTTP API + CLI backend (ghcr.io/reh3376/mdemg)
+- **neo4j**: graph substrate (CMS; the "cognitive" layer, U3 Memory)
+- **timescaledb**: telemetry hypertables (TSDB; the "measurement" layer, U13 Grafana)
+- **neural-sidecar**: rerank + NLI model inference (U15 APIs)
+- **grafana**: read-only observability panels (U13)
 
 note:
 - This is the whole stack. Nothing else is required to run MDEMG. Everything in the next 100 slides lives inside this picture.
@@ -209,7 +209,7 @@ mdemg-neural-sidecar-1      Up (healthy)           0.0.0.0:8100->8100/tcp
 mdemg-grafana-1             Up (healthy)           0.0.0.0:3030->3000/tcp
 ```
 
-Expected: **5 × `Up (healthy)`**. Anything else (`Restarting`, `Exit (0)`) is a triage trigger — `docker compose logs <service>` is the next command.
+Expected: **5 × `Up (healthy)`**. Anything else (`Restarting`, `Exit (0)`) is a triage trigger, `docker compose logs <service>` is the next command.
 
 note:
 - This is the ground truth of 'is the stack up?'. Everything else assumes YES to this question.
@@ -237,7 +237,7 @@ note:
 
 ---
 
-## healthz — The Right-Now Probe
+## healthz · The Right-Now Probe
 
 **Healthy**:
 ```bash
@@ -255,11 +255,11 @@ circuit_breakers: {open: 1, names: [neural-sidecar]}
 ```
 
 **Fix order on `degraded`**:
-1. `docker compose ps` — is the subsystem actually up?
-2. `docker compose logs <subsystem>` — is it erroring?
-3. `curl -s http://localhost:9999/healthz | jq` — fresh HTTP reading
+1. `docker compose ps`, is the subsystem actually up?
+2. `docker compose logs <subsystem>`, is it erroring?
+3. `curl -s http://localhost:9999/healthz | jq`, fresh HTTP reading
 
-**Exit codes**: 0 if `status=ok`, 1 otherwise — scriptable in `until` loops.
+**Exit codes**: 0 if `status=ok`, 1 otherwise, scriptable in `until` loops.
 
 note:
 - healthz is cheap. Run it. Don't guess.
@@ -294,7 +294,7 @@ note:
 - Breakers almost always `open: 0`
 
 **Gotchas**:
-- `health: ok` with pending HIGH alerts (U16) is NOT contradictory — healthz samples NOW, alerts integrate over hours
+- `health: ok` with pending HIGH alerts (U16) is NOT contradictory, healthz samples NOW, alerts integrate over hours
 - `mdemg healthz` from a shell without `.env` loaded can show stale readings
 - `docker compose ps` showing `Up` but `healthz` saying `degraded` = TCP port open but handler misbehaving
 
@@ -306,11 +306,11 @@ note:
 
 ---
 
-<!-- SECTION U3 — MEMORY (CMS) -->
+<!-- SECTION U3, MEMORY (CMS) -->
 
-## U3 · Memory — The Cognitive Substrate
+## U3 · Memory · The Cognitive Substrate
 
-MDEMG remembers. Not in RAM, not in logs — in a Neo4j graph that grows, consolidates, and forgets honestly.
+MDEMG remembers. Not in RAM, not in logs, in a Neo4j graph that grows, consolidates, and forgets honestly.
 
 Preview: hierarchy mental model → UI → observe/recall/correct → honest state.
 
@@ -336,10 +336,10 @@ graph TD
   L2 --> L3
 ```
 
-- **L0** (raw observations) — operator/agent utterances; most volume
-- **L1** (constraint / correction) — promoted rules extracted from L0 patterns
-- **L2** (hidden_pattern) — clusters of L0 that co-activate
-- **L3+** (emergent_concept) — abstractions across layers
+- **L0** (raw observations), operator/agent utterances; most volume
+- **L1** (constraint / correction), promoted rules extracted from L0 patterns
+- **L2** (hidden_pattern), clusters of L0 that co-activate
+- **L3+** (emergent_concept), abstractions across layers
 
 Each layer: **fewer nodes, more durable, higher-value.** Role-filtered retrieval scopes by layer (e.g., Jiminy only surfaces L1+).
 
@@ -387,7 +387,7 @@ note:
 
 ---
 
-## Writing To Memory — `observe`
+## Writing To Memory · `observe`
 
 ```bash
 $ mdemg data observe --space-id mdemg-dev \
@@ -421,7 +421,7 @@ note:
 
 ---
 
-## Reading From Memory — `recall`
+## Reading From Memory · `recall`
 
 ```bash
 $ mdemg data recall --query "how do I toggle enforcement mode" --space-id mdemg-dev
@@ -433,19 +433,19 @@ $ mdemg data recall --query "how do I toggle enforcement mode" --space-id mdemg-
 **Under the hood**: 4-column RRF (embedding + BM25 + graph + structural); CONTEXT-FINGERPRINTING-001 adds a 5th column.
 
 **URL overrides** for A/B:
-- `?sparse=true|false` — sparse retrieval gate
-- `?intent=true|false` — intent translation
-- `?reverse_ref=true|false` — reverse-lookup grep
-- `?context=auto|<bytes>` — context fingerprinting
+- `?sparse=true|false`, sparse retrieval gate
+- `?intent=true|false`, intent translation
+- `?reverse_ref=true|false`, reverse-lookup grep
+- `?context=auto|<bytes>`, context fingerprinting
 
 Related: MCP tool `memory_recall` is the agent-facing version.
 
 note:
-- If recall feels empty, the first check is `/ui/ Memory` — maybe the content isn't there yet.
+- If recall feels empty, the first check is `/ui/ Memory`, maybe the content isn't there yet.
 
 ---
 
-## Correcting Memory — `correct`
+## Correcting Memory · `correct`
 
 ```bash
 $ mdemg data correct --space-id mdemg-dev \
@@ -458,9 +458,9 @@ obs_id: ...
 
 **Structured fields** land on the L0 obs; JIMINY-STRUCTURED-CORRECTION-001 propagates them to the eventual L1 node.
 
-**The triple** (`incorrect` + `correct` + `context`) is first-class — guidance synthesis uses both sides to produce imperative directives.
+**The triple** (`incorrect` + `correct` + `context`) is first-class, guidance synthesis uses both sides to produce imperative directives.
 
-**Related**: U7 Review HITL — contradicted drafts auto-feed into this surface via JIMINY-CONTRADICTED-BRIDGE-001.
+**Related**: U7 Review HITL, contradicted drafts auto-feed into this surface via JIMINY-CONTRADICTED-BRIDGE-001.
 
 note:
 - Correct beats re-observe. The structured triple is the training signal.
@@ -475,7 +475,7 @@ note:
 - Consolidation cycles ~every 5 min, completing in ~1-10s (post-CONSOLIDATE-PERF-001)
 
 **Gotchas**:
-- `mdemg-dev` is PROTECTED SPACE — hardcoded deletion protection; never bypassed
+- `mdemg-dev` is PROTECTED SPACE, hardcoded deletion protection; never bypassed
 - L0 obs with no `obs_type` tag defaults to `note` (lowest promotion priority)
 - Scheduled maintenance LaunchAgent default is `--dry-run=false` only for SCHEDULED runs; manual `mdemg maintenance` defaults to dry-run (safety)
 - Archived nodes stay forever by design (reversible); `graph repair` doesn't delete them
@@ -483,20 +483,20 @@ note:
 **Where to go deeper**: `docs/features/consolidation-performance.md`, CLAUDE.md "RSIC admission + archival attribution".
 
 note:
-- Protected-space rule applies even in dev. If you're bulk-deleting, you're doing it wrong — tombstone via `is_archived=true` instead.
-- Next up (U4): Jiminy — what USES this memory to tell the agent what to do.
+- Protected-space rule applies even in dev. If you're bulk-deleting, you're doing it wrong, tombstone via `is_archived=true` instead.
+- Next up (U4): Jiminy, what USES this memory to tell the agent what to do.
 
 ---
 
-<!-- SECTION U4 — JIMINY -->
+<!-- SECTION U4, JIMINY -->
 
-## U4 · Jiminy — The Inner Voice
+## U4 · Jiminy · The Inner Voice
 
 Jiminy is the subsystem that **READS memory** before every agent action, **SURFACES** applicable durable rules, **CLASSIFIES** whether the agent followed them, and (in strict mode) **ENFORCES** them.
 
 11-slide walkthrough: loop → classifier → corpus → UI → CLI → current state → gotchas.
 
-Points back to U1.3 — primary answer to "behavioral drift". Points to U1.4 — surface #2 (retrieval + guidance).
+Points back to U1.3, primary answer to "behavioral drift". Points to U1.4, surface #2 (retrieval + guidance).
 
 note:
 - This is the headline section of the end-user path. 11 slides. Buckle in.
@@ -523,11 +523,11 @@ graph LR
 Jiminy is a loop: **retrieve, surface, classify, measure, strengthen.**
 
 note:
-- PM-fallback: Jiminy is Jiminy Cricket from Pinocchio — the external conscience reminding the agent of durable rules before it acts, then recording whether the agent listened.
+- PM-fallback: Jiminy is Jiminy Cricket from Pinocchio, the external conscience reminding the agent of durable rules before it acts, then recording whether the agent listened.
 
 ---
 
-## How Jiminy Grades — Classifier Mechanics
+## How Jiminy Grades · Classifier Mechanics
 
 **Three verdict tiers**:
 - **Tier 1** (fast-path): embedding-similarity gate on `not_applicable` (sub-threshold = unrelated)
@@ -550,7 +550,7 @@ note:
 
 ---
 
-## What Jiminy Reads — The Rules Corpus
+## What Jiminy Reads · The Rules Corpus
 
 Rules live as `MemoryNode` with `role_type IN ['constraint', 'correction']`.
 
@@ -561,9 +561,9 @@ Each rule carries:
 - `verifiability_class` (classifier / process / hybrid / human)
 
 **Sources** (3):
-1. Hook-promoted L0 observations — operator `observe --obs-type=correction` → consolidation → L1 correction node
-2. UI-authored — `/ui/ Rules` tab authored directly (JIMINY-RULES-UI-001)
-3. Auto-mined — tagged `conversation_observation` content triggering `constraint:` regex
+1. Hook-promoted L0 observations, operator `observe --obs-type=correction` → consolidation → L1 correction node
+2. UI-authored, `/ui/ Rules` tab authored directly (JIMINY-RULES-UI-001)
+3. Auto-mined, tagged `conversation_observation` content triggering `constraint:` regex
 
 **Current corpus** (`mdemg-dev`): ~30-40 active rules post-JIMINY-CORPUS-003 purge.
 
@@ -586,14 +586,14 @@ note:
 - 2-button Mode toggle (strict ↔ suggest)
 - Per-row Revoke on active overrides
 
-**Related**: U16 Alerts + Enforcement is the operational twin — what alerts fire, how to respond.
+**Related**: U16 Alerts + Enforcement is the operational twin, what alerts fire, how to respond.
 
 note:
 - If you only remember two /ui/ tabs, make them Jiminy and Rules.
 
 ---
 
-## The Rules Tab — Author Durable Rules
+## The Rules Tab · Author Durable Rules
 
 **Where**: `/ui/` → **Rules**
 
@@ -604,7 +604,7 @@ note:
 - Tombstone (confirms via `prompt()`)
 - Create (gated by `JIMINY_RULES_UI_WRITE_ENABLED`, default off)
 
-**Dedup warn**: on Create, if cosine sim ≥ 0.75 against existing rule, UI prompts "nearly duplicate — override?"
+**Dedup warn**: on Create, if cosine sim ≥ 0.75 against existing rule, UI prompts "nearly duplicate, override?"
 
 **Related**: `mdemg jiminy constraint mark` CLI for `is_informational` flipping.
 
@@ -665,7 +665,7 @@ note:
 
 ---
 
-## Jiminy Today — Honest
+## Jiminy Today · Honest
 
 **Current state** (`mdemg-dev`, 2026-10):
 - Mode: strict (operator opt-in per JIMINY-MODE-001 default-off)
@@ -690,11 +690,11 @@ note:
 
 ## Jiminy Gotchas
 
-- **Mode is session-scoped** — toggling `strict` on session A doesn't affect session B
-- **Overrides don't persist beyond expiry** — forgotten override expires; the audit row stays
-- **`is_informational` rules DON'T grade** per-action — they surface via Lever D (concept bias) but don't contribute to follow-rate
-- **The classifier can mislabel** — HITL Review tab (U7) is where you correct false verdicts
-- **Fresh install starts in `suggest`** — strict mode is operator opt-in
+- **Mode is session-scoped**: toggling `strict` on session A doesn't affect session B
+- **Overrides don't persist beyond expiry**: forgotten override expires; the audit row stays
+- **`is_informational` rules DON'T grade** per-action, they surface via Lever D (concept bias) but don't contribute to follow-rate
+- **The classifier can mislabel**: HITL Review tab (U7) is where you correct false verdicts
+- **Fresh install starts in `suggest`**: strict mode is operator opt-in
 - **Rule tombstoning is REVERSIBLE** (`is_archived=true` with reason); never bypass to hard-delete
 
 note:
@@ -702,14 +702,14 @@ note:
 
 ---
 
-## Jiminy — Where To Go Deeper
+## Jiminy · Where To Go Deeper
 
 **Feature docs**:
-- `docs/features/jiminy-strict.md` — enforcement + override + fail-open
-- `docs/features/jiminy-actionability.md` — Lever A/B/C/D
-- `docs/features/jiminy-rules-ui.md` — UI tab mechanics
-- `docs/features/jiminy-metric-partition.md` — per-class gauges
-- `docs/features/jiminy-missed-violation.md` — post-hoc correction detector
+- `docs/features/jiminy-strict.md`, enforcement + override + fail-open
+- `docs/features/jiminy-actionability.md`, Lever A/B/C/D
+- `docs/features/jiminy-rules-ui.md`, UI tab mechanics
+- `docs/features/jiminy-metric-partition.md`, per-class gauges
+- `docs/features/jiminy-missed-violation.md`, post-hoc correction detector
 
 **CLAUDE.md arch pins**: 12+ Jiminy sprints documented
 
@@ -722,15 +722,15 @@ note:
 
 ---
 
-<!-- SECTION U5 — RSIC -->
+<!-- SECTION U5, RSIC -->
 
-## U5 · RSIC — The Self-Improvement Engine
+## U5 · RSIC · The Self-Improvement Engine
 
-RSIC asks "how well is MDEMG working?" every few minutes. When it finds a problem WITH a known action, it triggers improvement — sometimes a diagnostic alert, sometimes a real substrate mutation.
+RSIC asks "how well is MDEMG working?" every few minutes. When it finds a problem WITH a known action, it triggers improvement, sometimes a diagnostic alert, sometimes a real substrate mutation.
 
 Preview: cycle → admission → insight → action → UI → trajectory → gotchas.
 
-Points back to U1.5 — this is loop #1 (the top-level improvement orchestrator).
+Points back to U1.5, this is loop #1 (the top-level improvement orchestrator).
 
 note:
 - RSIC is the subsystem that MOST makes MDEMG unique. Everything else is machinery; RSIC is how the machinery learns.
@@ -750,15 +750,15 @@ graph LR
 ```
 
 **The 6 steps**:
-1. **Assess** — 7-dim health read → `SelfAssessmentReport`
-2. **Reflect** — pattern-match (SQL + LLM) → list of `Insight`s
-3. **Admit** — single-flight cooldown, protected-space check, rate limits
-4. **Act** — dispatch: alert / HITL / mutation
-5. **Record** — write cycle event to TSDB `ft_training_cycles`
-6. **Reflect again** — next cycle sees the outcome
+1. **Assess**: 7-dim health read → `SelfAssessmentReport`
+2. **Reflect**: pattern-match (SQL + LLM) → list of `Insight`s
+3. **Admit**: single-flight cooldown, protected-space check, rate limits
+4. **Act**: dispatch: alert / HITL / mutation
+5. **Record**: write cycle event to TSDB `ft_training_cycles`
+6. **Reflect again**: next cycle sees the outcome
 
 note:
-- PM-fallback: think of RSIC as the system's internal post-mortem engineer — writes a review after every shift and files one actionable fix.
+- PM-fallback: think of RSIC as the system's internal post-mortem engineer, writes a review after every shift and files one actionable fix.
 
 ---
 
@@ -770,12 +770,12 @@ note:
 
 **Live result** (`mdemg-dev` post-fix): ~1 admitted / 132 rejected in 4-min window.
 
-**Protected spaces**: `RSICProtectedSpaces` (default `mdemg-dev`) — RSIC can't mutate; it can only diagnose.
+**Protected spaces**: `RSICProtectedSpaces` (default `mdemg-dev`), RSIC can't mutate; it can only diagnose.
 
 **Rate limits per-action**: `ENFORCEMENT_AUTO_EXECUTE_MAX_PER_HOUR` (default 3), per-code cooldown (`_COOLDOWN_HOURS` default 24).
 
 note:
-- If you see RSIC rejecting many cycles in a short window — that's by design. The admit gate protects the LLM endpoint.
+- If you see RSIC rejecting many cycles in a short window, that's by design. The admit gate protects the LLM endpoint.
 
 ---
 
@@ -789,7 +789,7 @@ note:
 - Enforcement outcome patterns: `enforcement_false_positive_high`, `enforcement_missed_violation_high`
 - Production drift (`ft_production_drift` → `trigger_training_pipeline`)
 
-**1 LLM reflector** — novel-pattern discovery via GPT-5.4-mini on the assessment JSON. Deterministic alert emission REMOVED per RSIC-LLM-ALERT-GUARD-001 (LLM reflector can't mint hallucinated deterministic alerts).
+**1 LLM reflector**: novel-pattern discovery via GPT-5.4-mini on the assessment JSON. Deterministic alert emission REMOVED per RSIC-LLM-ALERT-GUARD-001 (LLM reflector can't mint hallucinated deterministic alerts).
 
 **AllowedLLMActions whitelist**: ~18 actions; new actions require explicit addition.
 
@@ -801,11 +801,11 @@ note:
 ## What RSIC Does
 
 **Three dispatch classes**:
-1. **Diagnostic alerts** — informational; routed via alert dispatcher (`service=rsic-<action>` per NOSILENT-001); NO substrate mutation
-2. **HITL queue items** — generate contradicted drafts or review candidates for operator grading
-3. **Substrate mutations** (auto-execute) — ONLY for safe, reversible, rate-limited actions:
-   - `archive_constraint_by_code` — ships default-off + dry-run-true behind 5 guards
-   - `trigger_training_pipeline` — gated by `FT_LOOP_ENABLED` default false
+1. **Diagnostic alerts**: informational; routed via alert dispatcher (`service=rsic-<action>` per NOSILENT-001); NO substrate mutation
+2. **HITL queue items**: generate contradicted drafts or review candidates for operator grading
+3. **Substrate mutations** (auto-execute), ONLY for safe, reversible, rate-limited actions:
+   - `archive_constraint_by_code`, ships default-off + dry-run-true behind 5 guards
+   - `trigger_training_pipeline`, gated by `FT_LOOP_ENABLED` default false
 
 **Reversibility check**: `archive_*` boolean = auto-executable; `adjust_*` scalar = HITL-only.
 
@@ -837,7 +837,7 @@ note:
 
 ---
 
-## RSIC Today — Honest
+## RSIC Today · Honest
 
 **Current state** (`mdemg-dev`, 2026-10):
 - Overall health: ~0.80 (dimension-weighted; DH-005)
@@ -855,12 +855,12 @@ note:
 
 ---
 
-## RSIC — Gotchas + More
+## RSIC · Gotchas + More
 
 **Gotchas**:
 - RSIC cycles reset on server restart (in-memory admission state)
-- Protected-space check is HARDCODED for `mdemg-dev` — never remove
-- `AllowedLLMActions` doesn't prevent HALLUCINATION — dispatcher IGNORES unknown action names loudly
+- Protected-space check is HARDCODED for `mdemg-dev`, never remove
+- `AllowedLLMActions` doesn't prevent HALLUCINATION, dispatcher IGNORES unknown action names loudly
 - Deterministic alerts MUST stay in `deterministicAlertActions` not `AllowedLLMActions`
 
 **Feature docs**:
@@ -874,13 +874,13 @@ note:
 
 note:
 - If a new RSIC action feels like it should auto-mutate, verify reversibility + guards + rate limit first. See ENFORCE-AUTO-EXECUTE invariants.
-- Transition: U6 — UxTS, the forcing-function family that prevents DRIFT at merge time.
+- Transition: U6, UxTS, the forcing-function family that prevents DRIFT at merge time.
 
 ---
 
-<!-- SECTION U6 — UxTS -->
+<!-- SECTION U6, UxTS -->
 
-## U6 · UxTS — Forcing-Functions That Prevent Drift
+## U6 · UxTS · Forcing-Functions That Prevent Drift
 
 A UxTS framework is a contract-first way to make a piece of system behavior impossible to drift without CI noticing: **spec → fixture → runner → CI gate**.
 
@@ -888,7 +888,7 @@ A UxTS framework is a contract-first way to make a piece of system behavior impo
 
 Preview: forcing-function diamond → full family inventory → how operators invoke → drift-gate principle → trajectory.
 
-Points back to U1.5 — this is loop #2 (prevents regression as system evolves).
+Points back to U1.5, this is loop #2 (prevents regression as system evolves).
 
 note:
 - If a sprint ships a feature + the matching UxTS contract, the feature CAN'T silently regress. If the matching contract is missing, that's the follow-up to open.
@@ -912,14 +912,14 @@ graph TD
 - Contract change missing spec update → CI fails
 - New feature without contract → UATS-GAP-001 class catches it
 
-**Why it works**: contract is HUMAN-READABLE JSON, maintained in-repo, runner is deterministic — operators + reviewers verify without re-running whole system.
+**Why it works**: contract is HUMAN-READABLE JSON, maintained in-repo, runner is deterministic, operators + reviewers verify without re-running whole system.
 
 note:
 - Every UxTS family is this shape. Learn one, you know them all.
 
 ---
 
-## The UxTS Family — All 16
+## The UxTS Family · All 16
 
 | Family | Full Name | Scope | Status | Specs |
 |---|---|---|---|---:|
@@ -971,9 +971,9 @@ note:
 ## Drift-Gate Principle
 
 **Three drift classes UxTS catches**:
-1. **Prompt drift** — ULTS `--verify-hashes` detects LLM system-prompt changes without pinning the new hash
-2. **Spec drift** — UATS runs 215 real HTTP endpoints; response-shape change breaking a documented contract fails merge
-3. **Framework drift** — UxTS drift checker enforces adding a NEW family/spec updates `UXTS_FRAMEWORK_MATRIX.md` in the same PR
+1. **Prompt drift**: ULTS `--verify-hashes` detects LLM system-prompt changes without pinning the new hash
+2. **Spec drift**: UATS runs 215 real HTTP endpoints; response-shape change breaking a documented contract fails merge
+3. **Framework drift**: UxTS drift checker enforces adding a NEW family/spec updates `UXTS_FRAMEWORK_MATRIX.md` in the same PR
 
 **UXTS-CI-001 (2026-06-11)** un-zombied the gates. ALL merge-blocking today: UATS, UNTS hash-verify, USTS, UOTS, ULTS `--verify-hashes`, UBENCH contract, neural pytest+ruff, UxTS matrix drift.
 
@@ -993,7 +993,7 @@ note:
 - Grafana `mdemg-ft-training`: UBENCH latest aggregate + per-task pass rate
 
 note:
-- UxTS is mostly a CI story. The UI reflects OUTCOMES — specs' current state — not the specs themselves.
+- UxTS is mostly a CI story. The UI reflects OUTCOMES, specs' current state, not the specs themselves.
 
 ---
 
@@ -1001,11 +1001,11 @@ note:
 
 **Trigger**: a new domain of system behavior that needs contract-level enforcement AND doesn't fit any existing family's scope.
 
-**Shape**: build the diamond — schema → specs → runner → CI gate.
+**Shape**: build the diamond, schema → specs → runner → CI gate.
 
 **Governance** (UATS-GAP-001): new family MUST register in `UXTS_FRAMEWORK_MATRIX.md` + the drift checker; new specs land under `specs/` not `drafts/` once vetted.
 
-**Common gotcha**: deep-merge semantics in runners — variant omitting a key inherits from base; required-field guards use empty-string overrides, not key omission.
+**Common gotcha**: deep-merge semantics in runners, variant omitting a key inherits from base; required-field guards use empty-string overrides, not key omission.
 
 **Example successful adds**: UBENCH (wraps Phase 10) + UITS (T1 encoding) + UOBS (runtime observability).
 
@@ -1014,7 +1014,7 @@ note:
 
 ---
 
-## UxTS Today — Honest
+## UxTS Today · Honest
 
 - 16 families · 15 active · ~300+ specs total
 - **CI merge-blocking**: UATS, UPTS, UOTS, ULTS hash-verify, USTS, UBENCH, UxTS matrix drift
@@ -1025,13 +1025,13 @@ note:
 **Known gap**: UDTS doesn't have `uxts-canonical-specs.yml` wiring yet (deferred, DORMANT-CENSUS-002 captured).
 
 note:
-- Soft-fail families are candidates to merge-block in the future as they stabilize. UVTS is intentionally live-gated — stub-embedder scoring would be dishonest.
+- Soft-fail families are candidates to merge-block in the future as they stabilize. UVTS is intentionally live-gated, stub-embedder scoring would be dishonest.
 
 ---
 
-## UxTS — Where To Go Deeper
+## UxTS · Where To Go Deeper
 
-**The matrix**: `docs/development/UXTS_FRAMEWORK_MATRIX.md` — ALL 16 families with schema path, spec dir, runner, CI gate, implementation status.
+**The matrix**: `docs/development/UXTS_FRAMEWORK_MATRIX.md`, ALL 16 families with schema path, spec dir, runner, CI gate, implementation status.
 
 **Per-family**:
 - Schemas: `docs/api/api-spec/<family>/schema/` + `docs/tests/<family>/schema/`
@@ -1043,19 +1043,19 @@ note:
 
 note:
 - UxTS is the SHAPE. The family is the APPLICATION. Learn the shape; the applications become obvious.
-- Transition: U7 — Review/HITL, where operators FEED the system by grading what UxTS can't automate.
+- Transition: U7, Review/HITL, where operators FEED the system by grading what UxTS can't automate.
 
 ---
 
-<!-- SECTION U7 — HITL REVIEW -->
+<!-- SECTION U7, HITL REVIEW -->
 
-## U7 · HITL — You Grade What The System Can't
+## U7 · HITL · You Grade What The System Can't
 
 The classifier can't tell if a `partial_compliance` verdict was actually `followed` with reasonable judgment. The retrain corpus needs human verdicts. HITL is the UI + CLI that makes operator grading fast enough to be sustainable.
 
 Preview: dataset registry → /ui/ Review → keyboard grading → auto-grader + schedule → sink invariant → trajectory.
 
-Points back to U1.5 — this is loop #3 (operator-fed training signal).
+Points back to U1.5, this is loop #3 (operator-fed training signal).
 
 note:
 - U7 is where operators make the biggest leverage contribution to the system's improvement.
@@ -1070,25 +1070,25 @@ note:
 - `FetchCandidates` / `FetchItem` / `Rubric` / `Sink`
 - Optional: `Description` + `AutogradePromptHinter` + `NonReinforcingApplier`
 
-**Rubrics are VERSIONED** (`rubric_version` field) — grades joined to source rows by `(dataset_id, item_id)`.
+**Rubrics are VERSIONED** (`rubric_version` field), grades joined to source rows by `(dataset_id, item_id)`.
 
-**Guidance corpus is the ONLY dataset with a REINFORCING sink** — grade → trust-score mutation + substrate reinforcement.
+**Guidance corpus is the ONLY dataset with a REINFORCING sink**: grade → trust-score mutation + substrate reinforcement.
 
-**All 16 LLM call-site datasets ship with `NoopSink`** — gold-only, no live mutation.
+**All 16 LLM call-site datasets ship with `NoopSink`**: gold-only, no live mutation.
 
 note:
 - Reviewing guidance CHANGES behavior. Reviewing LLM outputs produces training data without touching behavior. Different stakes.
 
 ---
 
-## The Review Tab — Grade Fast
+## The Review Tab · Grade Fast
 
 **Where**: `/ui/` → **Review**
 
 **Flow**:
 1. Pick a dataset from the registry dropdown
 2. See the next pending candidate (candidate_count displayed; backlog-capped at 200)
-3. Read the row — the rubric dimensions appear as 0-4 radio inputs below
+3. Read the row, the rubric dimensions appear as 0-4 radio inputs below
 4. Grade with keyboard: `0`-`4` set every dimension; `Space` or `Enter` submits; `n` next; `u` reverse; `?` help; `Esc` close-help/cancel-auto-advance
 5. Auto-advance 400ms after submit with visible status-line (reversible via `u`)
 
@@ -1105,7 +1105,7 @@ note:
 
 **CLI**: `mdemg review autograde --dataset <ds> --space-id <id> [--min-confidence 0.80] [--limit 50]`
 
-The auto-grader is an LLM-driven grader with per-dataset `AutogradePromptHinter` — teaches the model dataset-specific semantics.
+The auto-grader is an LLM-driven grader with per-dataset `AutogradePromptHinter`, teaches the model dataset-specific semantics.
 
 **Scheduled loop** (AUTOGRADE-SCHEDULE-001): opt-in via `REVIEW_AUTOGRADE_SCHEDULE_ENABLED=true` + `REVIEW_AUTOGRADE_SCHEDULE_DATASETS=<comma,separated>`; runs every `_INTERVAL_HOURS` (default 6).
 
@@ -1121,9 +1121,9 @@ note:
 ## Review Tab Context
 
 Review tab complements other HITL surfaces:
-- **Contradicted drafts** — LLM-authored "did the agent CONTRADICT this rule?" judgments; operator grades + optional auto-dismiss
-- **Guidance corpus** — classifier verdicts; operator correction here MUTATES substrate (reinforce=true)
-- **LLM audits** — 16 LLM call-site datasets; operator-graded output quality feeds future retrain corpus
+- **Contradicted drafts**: LLM-authored "did the agent CONTRADICT this rule?" judgments; operator grades + optional auto-dismiss
+- **Guidance corpus**: classifier verdicts; operator correction here MUTATES substrate (reinforce=true)
+- **LLM audits**: 16 LLM call-site datasets; operator-graded output quality feeds future retrain corpus
 
 **Related panels**:
 - Grafana `mdemg-hitl` dashboard: grade cadence, auto vs operator share, pending drafts queue, reinforcement applied 7d
@@ -1133,11 +1133,11 @@ Review tab complements other HITL surfaces:
 - `mdemg review reverse <grade_id>`
 
 note:
-- Grafana's `Reinforcement Applied 7d` panel is the HONEST answer to 'did substrate actually change this week?' — ONLY operator-approved guidance grades count.
+- Grafana's `Reinforcement Applied 7d` panel is the HONEST answer to 'did substrate actually change this week?', ONLY operator-approved guidance grades count.
 
 ---
 
-## HITL Today — Honest
+## HITL Today · Honest
 
 **Current state** (`mdemg-dev`, 2026-10):
 - 17 datasets registered
@@ -1147,19 +1147,19 @@ note:
 
 The AUTOGRADE-SCHEDULE-001 loop closes the drain mechanism: pre-sprint queue grew indefinitely; post-sprint it self-drains for auto-dismissible classes.
 
-**Trajectory arc**: `hitl-curation-stalled` alert fires if operator-grade count drops to 0 over 7d (excludes auto:* rows) — forces visibility.
+**Trajectory arc**: `hitl-curation-stalled` alert fires if operator-grade count drops to 0 over 7d (excludes auto:* rows), forces visibility.
 
 note:
 - If `hitl-curation-stalled` fires on your session, 10 minutes of keyboard-grading in /ui/ Review clears it.
 
 ---
 
-## HITL — Gotchas + More
+## HITL · Gotchas + More
 
 **Gotchas**:
 - `reinforce=true` + non-guidance dataset = ERROR (`NonReinforcingApplier` invariant protects every LLM-audit dataset from mutating substrate)
 - Reversing a grade (`POST /v1/review/reverse`) restores prior trust-score EXACTLY
-- Auto-grader can refuse to grade — `llm_dataset.FetchCandidates` filters `caller_canceled:*` + empty responses
+- Auto-grader can refuse to grade, `llm_dataset.FetchCandidates` filters `caller_canceled:*` + empty responses
 - `item_id` on grade POST MUST exist in the dataset (handler 404s on bogus; REVIEW-GRADE-VALIDATE-ITEM-ID-001 pin)
 
 **Feature docs**:
@@ -1172,26 +1172,26 @@ note:
 
 note:
 - HITL is where the system's long-term improvement budget LANDS. 10 min of grading today is a measurable improvement signal next retrain.
-- Transition: U8 — Learning / Training Data, where those grades get WOVEN into the next model generation.
+- Transition: U8, Learning / Training Data, where those grades get WOVEN into the next model generation.
 
 ---
 
-<!-- SECTION U8 — LEARNING / TRAINING DATA -->
+<!-- SECTION U8, LEARNING / TRAINING DATA -->
 
-## U8 · Learning + Training Data — How The Model Gets Better
+## U8 · Learning + Training Data · How The Model Gets Better
 
 MDEMG's production LLM is `mdemg-llm-v1` (Qwen3-14B-4bit + Phase 5 SFT), aggregate 0.9188 on the honest 16-task eval. The retrain pipeline (Phase 6b actuator SHIPPED default-off) can produce the next generation when triggered.
 
 Preview: FT line state → Learning tab → Training Data tab → recursive-retrain loop → UBENCH freshness → gotchas.
 
-Points back to U1.5 — this is loop #4 (model-level improvement; the slowest and most expensive loop).
+Points back to U1.5, this is loop #4 (model-level improvement; the slowest and most expensive loop).
 
 note:
 - This is the loop that produces measurable, promoted model generations.
 
 ---
 
-## What's Running — mdemg-llm-v1
+## What's Running · mdemg-llm-v1
 
 - **Production model**: `mdemg-llm-v1`
 - **Base**: `mlx-community/Qwen3-14B-4bit` (dense, after 2026-04-22 MoE→dense pivot)
@@ -1255,10 +1255,10 @@ note:
 
 ## When MDEMG Retrains Itself
 
-- **Phase 6a** (SHIPPED, FT-RECURSIVE-001): manual-path observability — operator runs each stage; each stage records to `scheduled_job_events`
-- **Phase 6b** (SHIPPED default-off, FT-RECURSIVE-002): actuator — `FT_LOOP_ENABLED=true` opts in; controller walks export→curate→train→convert→gate as supervised subprocesses
-- **Phase 7** (SHIPPED, FT-RECURSIVE-003): promotion is REAL + three-layer defended — pre-swap structural canary → fail-closed `SwapServing` → post-swap tripwire auto-rollback
-- **Phase 9** (SHIPPED, FT-RECURSIVE-004): drift-triggered retrain — `ft_production_drift` + `ft_loop_never_ran` rules fire RSIC `trigger_training_pipeline`
+- **Phase 6a** (SHIPPED, FT-RECURSIVE-001): manual-path observability, operator runs each stage; each stage records to `scheduled_job_events`
+- **Phase 6b** (SHIPPED default-off, FT-RECURSIVE-002): actuator, `FT_LOOP_ENABLED=true` opts in; controller walks export→curate→train→convert→gate as supervised subprocesses
+- **Phase 7** (SHIPPED, FT-RECURSIVE-003): promotion is REAL + three-layer defended, pre-swap structural canary → fail-closed `SwapServing` → post-swap tripwire auto-rollback
+- **Phase 9** (SHIPPED, FT-RECURSIVE-004): drift-triggered retrain, `ft_production_drift` + `ft_loop_never_ran` rules fire RSIC `trigger_training_pipeline`
 
 **Trigger sources** (2):
 - FT-RECURSIVE-001 training_data_ready (DATA readiness)
@@ -1271,7 +1271,7 @@ note:
 
 ---
 
-## UBENCH — Keep The Benchmark Fresh
+## UBENCH · Keep The Benchmark Fresh
 
 `benchmark_runs` TSDB hypertable: one row per aggregate run.
 
@@ -1289,20 +1289,20 @@ python -m neural.benchmarks.run_benchmark \
     --apply-tsdb
 ```
 
-⚠️ requires `psycopg` — pinned in `neural/pyproject.toml [training]`; run via `neural/.venv/bin/python`.
+⚠️ requires `psycopg`, pinned in `neural/pyproject.toml [training]`; run via `neural/.venv/bin/python`.
 
 note:
 - The current `FT Benchmark Not Refreshed` HIGH alert on your session fires because the last run was > 7d ago. Run the benchmark to clear it.
 
 ---
 
-## Learning — Gotchas + More
+## Learning · Gotchas + More
 
 **Gotchas**:
 - MoE→dense pivot (2026-04-22): Metal 499K cap is ARCHITECTURAL (not quant-specific); DO NOT propose MoE-Sieve work
 - Phase 13.5 moved serving from mlx_lm.server to llama-server (port 8101 decommissioned, 8102 is production); DO NOT reference the old port
-- KV slot bound (`--ctx-size × --parallel`): prompt + output share the slot — bound reflection prompts via `RSIC_LLM_REFLECT_PROMPT_BUDGET_TOKENS` (APE-PROMPT-BUDGET-001)
-- `FT_LOOP_ENABLED` default is FALSE — the loop is dormant until operator opts in
+- KV slot bound (`--ctx-size × --parallel`): prompt + output share the slot, bound reflection prompts via `RSIC_LLM_REFLECT_PROMPT_BUDGET_TOKENS` (APE-PROMPT-BUDGET-001)
+- `FT_LOOP_ENABLED` default is FALSE, the loop is dormant until operator opts in
 
 **Feature docs**:
 - `docs/features/ft-recursive-loop.md`
@@ -1315,11 +1315,11 @@ note:
 
 note:
 - If you're thinking about model updates, read `docs/features/ft-recursive-loop.md` cover-to-cover first. The three-layer promotion defense is the piece most newcomers underestimate.
-- Transition: U9 — Backup + Ops, the day-to-day maintenance surfaces.
+- Transition: U9, Backup + Ops, the day-to-day maintenance surfaces.
 
 ---
 
-<!-- SECTION U9 — BACKUP + OPS -->
+<!-- SECTION U9, BACKUP + OPS -->
 
 ## U9 · Backup + Ops
 
@@ -1336,9 +1336,9 @@ note:
 
 **Three scheduled jobs**:
 
-- **TSDB backup scheduler** — periodic `pg_dump` of TimescaleDB; schedule via `TSDB_BACKUP_SCHEDULE_*`; dockerbin resolver handles launchd minimal PATH that previously broke it silently
-- **Neo4j backup** — scheduled via `NEO4J_BACKUP_*`; dumps to `backups/`; staleness guard `neo4j_backup_no_recent_success` fires HIGH if silent
-- **Weekly maintenance** — LaunchAgent runs `mdemg maintenance` (decay + prune) with `--dry-run=false` on the SCHEDULE (CLI default stays `--dry-run=true` for safety); MAINT-LIVE-001 made this real
+- **TSDB backup scheduler**: periodic `pg_dump` of TimescaleDB; schedule via `TSDB_BACKUP_SCHEDULE_*`; dockerbin resolver handles launchd minimal PATH that previously broke it silently
+- **Neo4j backup**: scheduled via `NEO4J_BACKUP_*`; dumps to `backups/`; staleness guard `neo4j_backup_no_recent_success` fires HIGH if silent
+- **Weekly maintenance**: LaunchAgent runs `mdemg maintenance` (decay + prune) with `--dry-run=false` on the SCHEDULE (CLI default stays `--dry-run=true` for safety); MAINT-LIVE-001 made this real
 
 **Jobhealth**: all 3 record every run to `scheduled_job_events` (V0024 hypertable) via `internal/jobhealth.Report`; failures fire HIGH on distinct Services per NOSILENT-001 cooldown-key contract.
 
@@ -1365,7 +1365,7 @@ note:
 **Companion CLI**: `mdemg backup create/list/verify/restore`.
 
 note:
-- Backups are honest — a failed `scheduled_job_events` row MEANS the backup didn't happen. Don't paper over this.
+- Backups are honest, a failed `scheduled_job_events` row MEANS the backup didn't happen. Don't paper over this.
 
 ---
 
@@ -1387,7 +1387,7 @@ $ mdemg backup restore --manifest /path/to/manifest.json --db neo4j
 **`transfer.nodeProps` fix**: observations carry `path=NULL`; proto serializes NULL as `""`; writer OMITS empty path/name to avoid collision with `memorynode_path_unique`.
 
 note:
-- If restore fails SHA verification, the backup is corrupt — DO NOT force. Use an older verified backup.
+- If restore fails SHA verification, the backup is corrupt, DO NOT force. Use an older verified backup.
 
 ---
 
@@ -1407,7 +1407,7 @@ decay: reduced weight on 1234 edges
 prune: archived 56 nodes with reason='scheduled_maintenance'
 ```
 
-LaunchAgent schedules the live run weekly; MAINT-LIVE-001 made this ACTUALLY RUN (pre-sprint it was dry-run only — never executed in the project's history).
+LaunchAgent schedules the live run weekly; MAINT-LIVE-001 made this ACTUALLY RUN (pre-sprint it was dry-run only, never executed in the project's history).
 
 **Orphan disposition** is CONTEXT-DEPENDENT: `--exclude-role-types` or `PRUNE_EXCLUDE_ROLE_TYPES` env; schedule excludes `constraint,conversation_observation`.
 
@@ -1418,13 +1418,13 @@ note:
 
 ---
 
-## Backup + Ops — Gotchas + More
+## Backup + Ops · Gotchas + More
 
 **Gotchas**:
-- Scheduled backup WAITS on the queue-async job and reports jobhealth `job_name='neo4j-backup'` — not fire-forget
+- Scheduled backup WAITS on the queue-async job and reports jobhealth `job_name='neo4j-backup'`, not fire-forget
 - Backup quota default is 2 GB (comment/code drift was deleting every 3 GB backup ~80 ms after completion; BACKUP-RESTORE-VERIFY-001 Tier 3 drill caught it)
 - Batched `CALL { … } IN TRANSACTIONS` Cypher runs via `session.Run` (implicit tx); INSIDE `ExecuteWrite` Neo4j raises TransactionStartFailed
-- Schedule excludes `constraint,conversation_observation` for prune — intentional; operator can override
+- Schedule excludes `constraint,conversation_observation` for prune, intentional; operator can override
 
 **Feature docs**:
 - `docs/features/backup-restore.md`
@@ -1435,11 +1435,11 @@ note:
 
 note:
 - Backup health is a leading indicator of DATA LOSS risk. If `scheduled-job-staleness-*` alerts fire, pause other work and triage.
-- Transition: U10 — Logs — when stethoscope + alerts aren't enough and you need the raw details.
+- Transition: U10, Logs, when stethoscope + alerts aren't enough and you need the raw details.
 
 ---
 
-<!-- SECTION U10 — LOGS -->
+<!-- SECTION U10, LOGS -->
 
 ## U10 · Logs
 
@@ -1465,7 +1465,7 @@ note:
 **When you'd open it**:
 - "healthz says ok but a specific request errored"
 - "Post-restart I want to confirm boot sequence"
-- "Backup job finished — did it error silently?"
+- "Backup job finished, did it error silently?"
 
 note:
 - The Logs tab is a last-resort debugging surface. Normal operator work rarely needs it.
@@ -1492,13 +1492,13 @@ note:
 ## What Each Scope Means
 
 Common scopes you'll see:
-- `jiminy:` — guidance surfacing, classification, mode toggles, override apply/revoke
-- `retrieval:` — 4-column RRF + rerank + cache hits/misses
-- `rsic:` — self-improvement cycle events (admit/trigger/complete)
-- `tsdb:` — flushes, schema migrations, writer backpressure
-- `backup:` — scheduled backup lifecycle events
-- `embeddings:` — embed calls + call_site attribution (EMBED-CALLSITE-002)
-- `health:` — subsystem probe transitions (up/degraded/down)
+- `jiminy:`, guidance surfacing, classification, mode toggles, override apply/revoke
+- `retrieval:`, 4-column RRF + rerank + cache hits/misses
+- `rsic:`, self-improvement cycle events (admit/trigger/complete)
+- `tsdb:`, flushes, schema migrations, writer backpressure
+- `backup:`, scheduled backup lifecycle events
+- `embeddings:`, embed calls + call_site attribution (EMBED-CALLSITE-002)
+- `health:`, subsystem probe transitions (up/degraded/down)
 
 **Boot-sequence slogs** to watch for:
 - `tutorial handler enabled=true url=/ui/tutorial/ files=71 bytes=...` (SERVE-001)
@@ -1510,25 +1510,25 @@ note:
 
 ---
 
-## Logs — Gotchas + More
+## Logs · Gotchas + More
 
 **Gotchas**:
-- `docker compose logs -f` without a service name tails ALL containers — overwhelming; always name the service
+- `docker compose logs -f` without a service name tails ALL containers, overwhelming; always name the service
 - Logs are LOCAL to the container's lifetime; container restart wipes stdout history
-- PII scrubber runs at TSDB-write time, NOT at log-emission time — raw logs may contain env vars; be careful sharing
+- PII scrubber runs at TSDB-write time, NOT at log-emission time, raw logs may contain env vars; be careful sharing
 - Trace-level logging requires `LOG_LEVEL=DEBUG` + restart
 
 **Feeds into**: U13 Grafana (log-derived metrics panels), U16 Alerts (log-triggered alert rules), U14 CLI (`mdemg data clean` scrubs TSDB rows that came from loggy flows).
 
 note:
 - Logs tell you WHAT happened. The TSDB tells you how often. Grafana tells you the trend. All three answer different questions.
-- Transition: U11 — Config + Features, the two tabs for TOGGLING what the system does.
+- Transition: U11, Config + Features, the two tabs for TOGGLING what the system does.
 
 ---
 
-<!-- SECTION U11 — CONFIG + FEATURES -->
+<!-- SECTION U11, CONFIG + FEATURES -->
 
-## U11 · Config + Features — The Toggle Surface
+## U11 · Config + Features · The Toggle Surface
 
 ~400 config knobs ship with MDEMG. Most defaults are correct. This section covers the ones operators flip + how to tell which can be flipped live vs needing a restart.
 
@@ -1546,7 +1546,7 @@ note:
 **Shows**: current effective config values (post-FromEnv overlay); grouped by domain (LLM / embeddings / retrieval / Jiminy / RSIC / backup / etc.).
 
 **Interaction**:
-- View current effective values (sensitive values auto-masked — `AUTH_API_KEYS`, `TSDB_PASSWORD`, `RERANK_JINA_API_KEY`, `GRAFANA_PASSWORD`, `LINEAR_WEBHOOK_SECRET`, `AUTH_JWT_SECRET`, 2 more per SEC-TRANCHE-3)
+- View current effective values (sensitive values auto-masked, `AUTH_API_KEYS`, `TSDB_PASSWORD`, `RERANK_JINA_API_KEY`, `GRAFANA_PASSWORD`, `LINEAR_WEBHOOK_SECRET`, `AUTH_JWT_SECRET`, 2 more per SEC-TRANCHE-3)
 - See which values are env-override vs code-default
 - For admin-flagged knobs, flip live (gated by `AUTH_API_KEYS`)
 
@@ -1555,11 +1555,11 @@ note:
 - `mdemg config validate`
 
 note:
-- If an env var LOOKS sensitive but shows unmasked, that's a BUG — file it. isSensitive is the gatekeeper.
+- If an env var LOOKS sensitive but shows unmasked, that's a BUG, file it. isSensitive is the gatekeeper.
 
 ---
 
-## The Features Tab — Feature Flags
+## The Features Tab · Feature Flags
 
 **Where**: `/ui/` → **Features**
 
@@ -1602,14 +1602,14 @@ note:
 ## What's Hidden From You
 
 `internal/config/yaml_config.go::isSensitive` masks these in `mdemg config show`:
-- `AUTH_API_KEYS` — admin API-key list
-- `AUTH_JWT_SECRET` — JWT signing key
-- `TSDB_PASSWORD` — TSDB connect password
-- `LINEAR_WEBHOOK_SECRET` — Linear webhook signing
-- `RERANK_JINA_API_KEY` — if using Jina rerank
-- `GRAFANA_PASSWORD` — Grafana admin
-- `NEO4J_PASSWORD` — Neo4j connect
-- `OPENAI_API_KEY` — OpenAI client key (if set)
+- `AUTH_API_KEYS`, admin API-key list
+- `AUTH_JWT_SECRET`, JWT signing key
+- `TSDB_PASSWORD`, TSDB connect password
+- `LINEAR_WEBHOOK_SECRET`, Linear webhook signing
+- `RERANK_JINA_API_KEY`, if using Jina rerank
+- `GRAFANA_PASSWORD`, Grafana admin
+- `NEO4J_PASSWORD`, Neo4j connect
+- `OPENAI_API_KEY`, OpenAI client key (if set)
 
 Any env var with `PASSWORD` / `PASS` / `API_KEY` / `TOKEN` / `SECRET` in name should be masked; SEC-TRANCHE-3 widened the list from 2 to 8.
 
@@ -1622,7 +1622,7 @@ note:
 
 ## Why Every Operator-Visible Value Is Config-Driven
 
-CLAUDE.md invariant `feedback_no_hardcoded_values`: **"Never hardcode values — use CLI flags, env vars, config with sensible defaults."**
+CLAUDE.md invariant `feedback_no_hardcoded_values`: **"Never hardcode values, use CLI flags, env vars, config with sensible defaults."**
 
 **Why**: makes the system operable without code changes; makes operator-authored overrides discoverable.
 
@@ -1633,14 +1633,14 @@ CLAUDE.md invariant `feedback_no_hardcoded_values`: **"Never hardcode values —
 - Paths (model dir, backup dir, assets dir)
 - Model names (`LLM_MODEL`, `OPENAI_MODEL`)
 
-The MODEL-DIST-001 sprint pinned this: "every operator-visible value is dynamic" — 11+ env vars for one feature.
+The MODEL-DIST-001 sprint pinned this: "every operator-visible value is dynamic", 11+ env vars for one feature.
 
 note:
 - If you ever see a hardcoded value in code review, flag it. The system's operability depends on this.
 
 ---
 
-## Config + Features — Gotchas + More
+## Config + Features · Gotchas + More
 
 **Gotchas**:
 - DOC-CURRENCY-002 forcing function: `scripts/verify_doc_env_vars.py` catches env vars named in docs but absent from code (prevents fabricated-env-var class); run after any doc change
@@ -1655,14 +1655,14 @@ note:
 **Feeds into**: U15 APIs (`/v1/admin/*` surface flips flags via API), U16 Alerts (threshold values live here).
 
 note:
-- If you're about to flip a flag, read the feature doc FIRST — most behavior-changing flags have invariant protections you need to understand.
-- Transition: U12 — Plugins, the extension surface for external code.
+- If you're about to flip a flag, read the feature doc FIRST, most behavior-changing flags have invariant protections you need to understand.
+- Transition: U12, Plugins, the extension surface for external code.
 
 ---
 
-<!-- SECTION U12 — PLUGINS -->
+<!-- SECTION U12, PLUGINS -->
 
-## U12 · Plugins — The Extension Surface
+## U12 · Plugins · The Extension Surface
 
 Plugins are gRPC services the mdemg server talks to over the `mdemg-module` protocol. Four shipped: docs-scraper, uxts-module, linear-module, obsidian-module.
 
@@ -1718,10 +1718,10 @@ note:
 ## What's Shipped
 
 **4 shipped plugins**:
-- **docs-scraper** — mdemg-module interface; scrapes a URL set + ingests docs into a space
-- **uxts-module** — UxTS runner-as-plugin shape (experimental)
-- **linear-module** — Linear issue CRUD via plugin RPC (mirrors MCP Linear tools)
-- **obsidian-module** — Obsidian vault adapter; reads vault state as observations
+- **docs-scraper**: mdemg-module interface; scrapes a URL set + ingests docs into a space
+- **uxts-module**: UxTS runner-as-plugin shape (experimental)
+- **linear-module**: Linear issue CRUD via plugin RPC (mirrors MCP Linear tools)
+- **obsidian-module**: Obsidian vault adapter; reads vault state as observations
 
 Plugin manager at `internal/plugins/manager.go` supervises each plugin as a subprocess over a Unix socket.
 
@@ -1732,37 +1732,37 @@ note:
 
 ---
 
-## Plugins — Gotchas + More
+## Plugins · Gotchas + More
 
 **Gotchas**:
 - Plugin manager launches subprocess over Unix socket; `kickstart -k` reaps stale socket owners BEFORE spawning new
 - Plugin paths route through `pathsafe.SafeJoinUnderDir` at HTTP boundaries (SEC-TRANCHE-2)
-- A failing plugin doesn't bring down mdemg — plugin manager isolates failures per subprocess
+- A failing plugin doesn't bring down mdemg, plugin manager isolates failures per subprocess
 - Plugin RPC calls record to `embedding_events` with `call_site=plugin.<name>` (EMBED-CALLSITE-001)
 
 **Feature docs**:
-- `docs/features/plugins.md` (if shipped) — else `api/proto/mdemg-module.proto`
+- `docs/features/plugins.md` (if shipped), else `api/proto/mdemg-module.proto`
 - CLAUDE.md "SEC-TRANCHE-2" + "MCP-REVIVE-001"
 
 **Feeds into**: U15 APIs + gRPC (plugin RPC is a gRPC surface), U16 Alerts (plugin-crash alerts).
 
 note:
 - Vanilla MDEMG runs fine with zero plugins installed. These are extension surfaces.
-- Transition: U13 — Grafana, the historical companion to /ui/.
+- Transition: U13, Grafana, the historical companion to /ui/.
 
 ---
 
-<!-- SECTION U13 — GRAFANA -->
+<!-- SECTION U13, GRAFANA -->
 
-## U13 · Grafana — The Historical View
+## U13 · Grafana · The Historical View
 
 Grafana is the time-series companion to /ui/. /ui/ answers "right now"; Grafana answers "the last 24 hours / 7 days / 30 days."
 
-**Nine dashboards** covering ~70 panels — but 5 panels carry most operator attention.
+**Nine dashboards** covering ~70 panels, but 5 panels carry most operator attention.
 
 Preview: 9 dashboards → the daily 5 → honest reading patterns → alert panel links → dashboard provenance → gotchas.
 
-Points back to U1.5 — Grafana is the observability substrate for every improvement loop.
+Points back to U1.5, Grafana is the observability substrate for every improvement loop.
 
 note:
 - Grafana is where "the arcs are moving" becomes visible.
@@ -1773,22 +1773,22 @@ note:
 
 All datasource `timescaledb` literal UID per GRAFANA-SHIP:
 
-1. **mdemg-overview** — home dashboard; request rate, p95 latency, error rate, breakers; UVTS arc-trajectory panel
-2. **mdemg-jiminy** — follow-rate (classifier + per-class), outcome split, effectiveness, actionable compliance; JIMINY-CEILING-BREAK-2 trajectory panel
-3. **mdemg-rsic** — RSIC health dimensions (DH-005), cycle admission, insight stream
-4. **mdemg-neo4j** — Neo4j CPU/memory, null-weight edges, orphan ratio, graph node count
-5. **mdemg-ft-training** — Phase 10 benchmark aggregate, per-task pass rate, FT loop state, FT benchmark staleness
-6. **mdemg-graph-topology** — Hebbian weight entropy, dynamic-edge creation, reinforcement event rate
-7. **mdemg-hitl** — grade cadence (auto vs operator), pending drafts, reinforcement applied 7d
-8. **mdemg-j17** — J17 protocol compression, trust session count, NLI bias, auto-compact AVG
-9. **mdemg-llm-routing** — LLM request rate per task, error rate per task (filtered for caller_canceled), latency per task
+1. **mdemg-overview**: home dashboard; request rate, p95 latency, error rate, breakers; UVTS arc-trajectory panel
+2. **mdemg-jiminy**: follow-rate (classifier + per-class), outcome split, effectiveness, actionable compliance; JIMINY-CEILING-BREAK-2 trajectory panel
+3. **mdemg-rsic**: RSIC health dimensions (DH-005), cycle admission, insight stream
+4. **mdemg-neo4j**: Neo4j CPU/memory, null-weight edges, orphan ratio, graph node count
+5. **mdemg-ft-training**: Phase 10 benchmark aggregate, per-task pass rate, FT loop state, FT benchmark staleness
+6. **mdemg-graph-topology**: Hebbian weight entropy, dynamic-edge creation, reinforcement event rate
+7. **mdemg-hitl**: grade cadence (auto vs operator), pending drafts, reinforcement applied 7d
+8. **mdemg-j17**: J17 protocol compression, trust session count, NLI bias, auto-compact AVG
+9. **mdemg-llm-routing**: LLM request rate per task, error rate per task (filtered for caller_canceled), latency per task
 
 note:
 - You don't need to memorize all 9. Pin Overview + Jiminy to your Grafana sidebar; others open when a specific symptom demands.
 
 ---
 
-## What To Actually Watch — The Daily 5
+## What To Actually Watch · The Daily 5
 
 The 5 panels that catch most operational issues:
 
@@ -1798,7 +1798,7 @@ The 5 panels that catch most operational issues:
 4. **mdemg-ft-training** → **Latest Benchmark Age** (green <3d, yellow 3-7d, red >7d; FT-BENCH-REFRESH-001)
 5. **mdemg-neo4j** → **Neo4j Memory + CPU** (CPU AVG >500% over 5min actionable; CPU is per-SINGLE-core)
 
-**Alternative**: watch the terminal alerts channel (U16) — panels and alerts share thresholds, so operator attention stays coherent.
+**Alternative**: watch the terminal alerts channel (U16), panels and alerts share thresholds, so operator attention stays coherent.
 
 note:
 - If you only watch 5 things, these 5. Everything else is noise until these 5 go red.
@@ -1814,7 +1814,7 @@ note:
 - Latency buckets cover LLM path up to 120s
 - Stat panels showing a RATE use a single windowed aggregate (NEVER per-bucket ratio reduced to lastNotNull)
 
-Expect to see arc-trajectory numbers — this is BY DESIGN, not a bug.
+Expect to see arc-trajectory numbers, this is BY DESIGN, not a bug.
 
 note:
 - If a panel feels dishonest, read the TITLE first. 90% of 'this metric looks low' is 'this metric embeds its own honest target in the title.'
@@ -1835,7 +1835,7 @@ note:
 
 ---
 
-## When Alerts Fire — Where To Look
+## When Alerts Fire · Where To Look
 
 The alerts channel (U16) names the rule; each rule has a corresponding Grafana panel.
 
@@ -1853,13 +1853,13 @@ note:
 
 ---
 
-## Grafana — Gotchas + More
+## Grafana · Gotchas + More
 
 **Gotchas**:
 - Grafana admin credential printed by `mdemg init` ONCE; store it; default URL `http://localhost:3030`
-- Panels showing "No data" with known-good query are usually time-window issue — expand to 24h or 7d
+- Panels showing "No data" with known-good query are usually time-window issue, expand to 24h or 7d
 - Alert-rule changes land in `internal/alert/rules.go` + require server restart; Grafana `mdemg-*` dashboards are read-only (no inline alerting config)
-- Dashboard UIDs are STABLE: `mdemg-overview`, `mdemg-jiminy`, etc. — DO NOT RENAME
+- Dashboard UIDs are STABLE: `mdemg-overview`, `mdemg-jiminy`, etc., DO NOT RENAME
 
 **Feature docs**:
 - CLAUDE.md "Dashboard metric honesty" sprint family (001/002/003)
@@ -1868,14 +1868,14 @@ note:
 **Feeds into**: U14 CLI (healthz + synergy status + watchdog status), U15 APIs (Grafana reads TSDB directly via `timescaledb` datasource).
 
 note:
-- Grafana + /ui/ + CLI are the three operator surfaces. Pick the one that matches your TIMESCALE — now (/ui/), minutes (CLI), hours+ (Grafana).
-- Transition: U14 — the CLI command surface, now surveyed in full.
+- Grafana + /ui/ + CLI are the three operator surfaces. Pick the one that matches your TIMESCALE, now (/ui/), minutes (CLI), hours+ (Grafana).
+- Transition: U14, the CLI command surface, now surveyed in full.
 
 ---
 
-<!-- SECTION U14 — CLI -->
+<!-- SECTION U14, CLI -->
 
-## U14 · CLI — The Full Command Surface
+## U14 · CLI · The Full Command Surface
 
 `mdemg --help` lists 90+ commands. Operators regularly use ~15, grouped into 5 clusters.
 
@@ -1886,16 +1886,16 @@ note:
 
 ---
 
-## Lifecycle — Starting, Stopping, Checking
+## Lifecycle · Starting, Stopping, Checking
 
-- `mdemg init [--defaults|--quick] [--force]` — create `.env` + config
-- `mdemg start [--auto-migrate]` — launch server (native dev; `docker compose up -d` is production)
-- `mdemg stop` — graceful shutdown
-- `mdemg restart` — stop + start
-- `mdemg status` — PID, port, uptime, service state
-- `mdemg version` — version + git commit + build date
-- `mdemg healthz` — right-now subsystem probe (U2)
-- `mdemg tutorial [--url|--check]` — opens THIS deck (SERVE-001 E5)
+- `mdemg init [--defaults|--quick] [--force]`, create `.env` + config
+- `mdemg start [--auto-migrate]`, launch server (native dev; `docker compose up -d` is production)
+- `mdemg stop`, graceful shutdown
+- `mdemg restart`, stop + start
+- `mdemg status`, PID, port, uptime, service state
+- `mdemg version`, version + git commit + build date
+- `mdemg healthz`, right-now subsystem probe (U2)
+- `mdemg tutorial [--url|--check]`, opens THIS deck (SERVE-001 E5)
 
 **Group ID**: `start`.
 
@@ -1904,16 +1904,16 @@ note:
 
 ---
 
-## Memory — Observe, Recall, Correct
+## Memory · Observe, Recall, Correct
 
-- `mdemg data observe --space-id X --content "..." --obs-type Y` — writes L0 node (U3)
-- `mdemg data recall --query "..." --space-id X` — 4-column RRF (U3)
-- `mdemg data correct --space-id X --incorrect "X" --correct "Y" --context "Z"` — structured correction (U3)
-- `mdemg data clean --space-id X [--dry-run=false --force]` — purge errors + silent failures
-- `mdemg data curate` — UAITS-driven training data curation
-- `mdemg data validate` — UAITS spec schema validation
-- `mdemg data export [--instance-id X] [--out-dir Y]` — UTDS archive export
-- `mdemg data export-auto [--keep N]` — automated daily export with retention
+- `mdemg data observe --space-id X --content "..." --obs-type Y`, writes L0 node (U3)
+- `mdemg data recall --query "..." --space-id X`, 4-column RRF (U3)
+- `mdemg data correct --space-id X --incorrect "X" --correct "Y" --context "Z"`, structured correction (U3)
+- `mdemg data clean --space-id X [--dry-run=false --force]`, purge errors + silent failures
+- `mdemg data curate`, UAITS-driven training data curation
+- `mdemg data validate`, UAITS spec schema validation
+- `mdemg data export [--instance-id X] [--out-dir Y]`, UTDS archive export
+- `mdemg data export-auto [--keep N]`, automated daily export with retention
 
 **Group ID**: `memory`.
 
@@ -1922,36 +1922,36 @@ note:
 
 ---
 
-## Introspection — What's Going On?
+## Introspection · What's Going On?
 
-- `mdemg synergy status [--space-id X]` — Claude Code ↔ MDEMG health
-- `mdemg synergy check [--auto]` — connectivity + hook integrity
-- `mdemg synergy migrate [--dry-run]` — one-time synergy data migration
-- `mdemg watchdog status [--json]` — LLM-endpoint state (U2)
-- `mdemg jiminy mode [--session-id X]` — view/toggle enforcement (U4)
-- `mdemg jiminy constraint {set-class|list-classes|seed-classes|mark|list-informational}` — rule-metadata ops
-- `mdemg hooks doctor` — hook-channel health triage
-- `mdemg hooks install [--path .claude/hooks]` — install/refresh hooks
-- `mdemg tsdb status` — TSDB connection + schema version
-- `mdemg config show [--filter X]` — current effective config (sensitive values masked)
-- `mdemg config validate` — three-way state (not-started / ok / broken)
+- `mdemg synergy status [--space-id X]`, Claude Code ↔ MDEMG health
+- `mdemg synergy check [--auto]`, connectivity + hook integrity
+- `mdemg synergy migrate [--dry-run]`, one-time synergy data migration
+- `mdemg watchdog status [--json]`, LLM-endpoint state (U2)
+- `mdemg jiminy mode [--session-id X]`, view/toggle enforcement (U4)
+- `mdemg jiminy constraint {set-class|list-classes|seed-classes|mark|list-informational}`, rule-metadata ops
+- `mdemg hooks doctor`, hook-channel health triage
+- `mdemg hooks install [--path .claude/hooks]`, install/refresh hooks
+- `mdemg tsdb status`, TSDB connection + schema version
+- `mdemg config show [--filter X]`, current effective config (sensitive values masked)
+- `mdemg config validate`, three-way state (not-started / ok / broken)
 
 note:
 - These answer 'am I set up correctly?' + 'is the system coherent?' questions.
 
 ---
 
-## Ops — Backup, Upgrade, Maintenance
+## Ops · Backup, Upgrade, Maintenance
 
-- `mdemg backup create|list|verify|restore` — backup lifecycle (U9)
-- `mdemg upgrade [--docker-only|--no-docker]` — self-update binary + Docker images
-- `mdemg maintenance --space-id X [--dry-run=false --force]` — decay + prune cycle (U9)
-- `mdemg graph repair --space-id X` — weight-preserving dedup + vendor cleanup
-- `mdemg graph backfill-weights --space-id X` — fill null-weight edges
-- `mdemg embeddings backfill --space-id X` — fill missing embeddings
-- `mdemg teardown [--export]` — destroy local Docker instances (with backup if `--export`)
-- `mdemg beta-import <bundle.tar.gz>` — import beta-tester bundle (maintainer-side)
-- `mdemg beta-janitor {delete|sweep}` — 30-day retention sweeps on beta-tester data
+- `mdemg backup create|list|verify|restore`, backup lifecycle (U9)
+- `mdemg upgrade [--docker-only|--no-docker]`, self-update binary + Docker images
+- `mdemg maintenance --space-id X [--dry-run=false --force]`, decay + prune cycle (U9)
+- `mdemg graph repair --space-id X`, weight-preserving dedup + vendor cleanup
+- `mdemg graph backfill-weights --space-id X`, fill null-weight edges
+- `mdemg embeddings backfill --space-id X`, fill missing embeddings
+- `mdemg teardown [--export]`, destroy local Docker instances (with backup if `--export`)
+- `mdemg beta-import <bundle.tar.gz>`, import beta-tester bundle (maintainer-side)
+- `mdemg beta-janitor {delete|sweep}`, 30-day retention sweeps on beta-tester data
 
 **Group ID**: `advanced`.
 
@@ -1960,19 +1960,19 @@ note:
 
 ---
 
-## Specialized — RSIC, Models, FT Loop, etc.
+## Specialized · RSIC, Models, FT Loop, etc.
 
 - **RSIC**: `mdemg rsic status`, `mdemg rsic reflect` (manual trigger)
-- **Models**: `mdemg model {pull|list|verify|remove|where}` — MODEL-DIST-001/002
-- **FT loop**: `mdemg ft-loop {report-stage|promote}` — recursive-retrain manual path
+- **Models**: `mdemg model {pull|list|verify|remove|where}`, MODEL-DIST-001/002
+- **FT loop**: `mdemg ft-loop {report-stage|promote}`, recursive-retrain manual path
 - **Benchmarks**: `python -m neural.benchmarks.run_benchmark --config ... --apply-tsdb`
-- **Review**: `mdemg review {autograde|reverse|cadence}` — HITL CLI (U7)
-- **Eventgraph**: `mdemg eventgraph {reinforcement|guidance-outcome}-neighborhood` — federation reads
+- **Review**: `mdemg review {autograde|reverse|cadence}`, HITL CLI (U7)
+- **Eventgraph**: `mdemg eventgraph {reinforcement|guidance-outcome}-neighborhood`, federation reads
 - **Confidence**: `mdemg confidence backfill` (HEBB-ETA-001 precision-weighted η)
-- **Concepts**: `mdemg concepts {repair|trace|recluster}` — hidden-layer surgery
+- **Concepts**: `mdemg concepts {repair|trace|recluster}`, hidden-layer surgery
 - **Corrections**: `mdemg corrections rehydrate-structured`
 - **Symbols**: `mdemg extract-symbols` + `mdemg symbols analyze-go-implements`
-- **MCP**: `mdemg mcp` — standalone MCP server
+- **MCP**: `mdemg mcp`, standalone MCP server
 
 note:
 - Most of these you'll touch RARELY. Pin this slide for 'what CLI exists for X?' lookup.
@@ -1996,9 +1996,9 @@ note:
 
 ---
 
-## MCP — The Agent-Facing Alternative
+## MCP · The Agent-Facing Alternative
 
-`mdemg mcp` is the Model Context Protocol server MDEMG ships — exposes the memory + agent surfaces as MCP tools.
+`mdemg mcp` is the Model Context Protocol server MDEMG ships, exposes the memory + agent surfaces as MCP tools.
 
 **When MCP wins over CLI**:
 - You're an AI agent, not a human operator (hook flow)
@@ -2012,17 +2012,17 @@ note:
 - Eventgraph neighborhoods
 - jiminy_strict, validate_changes, memory_space_freshness
 
-Contract suite: `internal/cli/mcp_contract_test.go` — new tools MUST add a contract.
+Contract suite: `internal/cli/mcp_contract_test.go`, new tools MUST add a contract.
 
 note:
 - If you're writing a script that talks to MDEMG, prefer MCP tools over subprocess CLI invocations.
 
 ---
 
-## CLI — Gotchas + More
+## CLI · Gotchas + More
 
 **Gotchas**:
-- CLI reads `.env` via `godotenv.Load()` at command init — but ONLY from CWD; export shell env vars for cross-cwd invocations
+- CLI reads `.env` via `godotenv.Load()` at command init, but ONLY from CWD; export shell env vars for cross-cwd invocations
 - Destructive CLIs require explicit `--force` or `--dry-run=false`; dry-run default is a safety net
 - `--admin` flag presence: NEVER pass without explicit user authorization (CLAUDE.md governance pin)
 - CUIDv2 for ALL identifiers: `--run-id`, `--row-id`, `--grade-id` accept CUIDv2 only; UUID is TECH DEBT
@@ -2036,19 +2036,19 @@ note:
 
 note:
 - If you learn ONE pattern, learn `--help`. If you learn two, learn `--help` + the Memory group commands.
-- Transition: U15 — the APIs + gRPC surfaces that EVERY /ui/ click + CLI invocation hits.
+- Transition: U15, the APIs + gRPC surfaces that EVERY /ui/ click + CLI invocation hits.
 
 ---
 
-<!-- SECTION U15 — APIs + gRPC -->
+<!-- SECTION U15, APIs + gRPC -->
 
-## U15 · APIs + gRPC — The Programmatic Surfaces
+## U15 · APIs + gRPC · The Programmatic Surfaces
 
 /ui/ and CLI are user-facing; APIs + gRPC are what EVERYTHING hits internally. **199 shipped HTTP routes + 4 gRPC services.**
 
 Operators mostly OBSERVE these surfaces; developers extend them.
 
-Points back to U1.4 — implementation of surfaces #3 and #4.
+Points back to U1.4, implementation of surfaces #3 and #4.
 
 note:
 - The APIs are the central nervous system. Everything else is specialized protocols for performance or boundary reasons.
@@ -2075,7 +2075,7 @@ note:
 
 ---
 
-## The HTTP API — /v1/* Routes
+## The HTTP API · /v1/* Routes
 
 **199 routes** shipped (DORMANT-CENSUS-001 census). Grouped by domain:
 
@@ -2101,14 +2101,14 @@ note:
 
 ## The 4 gRPC Services
 
-- **mdemg-module** (`api/proto/mdemg-module.proto`) — plugin interface
-- **unts** (`api/proto/unts.proto`) — Hash Test Specification registry
-- **devspace** (`api/proto/devspace.proto`) — DevSpace workspace coordination
-- **space-transfer** (`api/proto/space-transfer.proto`) — export/import spaces across mdemg instances
+- **mdemg-module** (`api/proto/mdemg-module.proto`), plugin interface
+- **unts** (`api/proto/unts.proto`), Hash Test Specification registry
+- **devspace** (`api/proto/devspace.proto`), DevSpace workspace coordination
+- **space-transfer** (`api/proto/space-transfer.proto`), export/import spaces across mdemg instances
 
 All 4 use gRPC over **Unix sockets** for in-process communication (performance + easier security boundary vs TCP localhost).
 
-gRPC services NOT exposed over HTTP to external clients — internal to the mdemg process family.
+gRPC services NOT exposed over HTTP to external clients, internal to the mdemg process family.
 
 note:
 - gRPC is implementation detail unless you're writing a plugin. If you're writing a plugin, start with `api/proto/mdemg-module.proto`.
@@ -2139,7 +2139,7 @@ note:
 
 ---
 
-## How New Surfaces Stay Audited — DORMANT-CENSUS
+## How New Surfaces Stay Audited · DORMANT-CENSUS
 
 DORMANT-CENSUS forcing functions catch unused surfaces at merge time:
 
@@ -2169,7 +2169,7 @@ note:
 
 ---
 
-## APIs + gRPC Today — Honest
+## APIs + gRPC Today · Honest
 
 **Current state** (`mdemg-dev`, 2026-10):
 - 199 HTTP routes shipped, 195 live, 4 dormant (DORMANT-CENSUS-001 adjudicated)
@@ -2177,40 +2177,40 @@ note:
 - CodeQL backlog: SEC-TRANCHE-3/4 pre-existing (not caused by recent sprints)
 
 **Trajectory items**:
-- 199 routes is a LOT — DORMANT-CENSUS keeps this honest
+- 199 routes is a LOT, DORMANT-CENSUS keeps this honest
 - gRPC surface stable at 4; a 5th (recursive-retrain trigger) deferred to FT-RECURSIVE-005
 
-**No `/metrics` endpoint by design** — mdemg uses TSDB-recorded `metric_samples` + `/v1/metrics/snapshot` instead of Prometheus scrape (PROMETHEUS-SCRAPE-INVESTIGATION-001 verdict: DELIBERATE REMOVAL per 2026-03-28 migration).
+**No `/metrics` endpoint by design**: mdemg uses TSDB-recorded `metric_samples` + `/v1/metrics/snapshot` instead of Prometheus scrape (PROMETHEUS-SCRAPE-INVESTIGATION-001 verdict: DELIBERATE REMOVAL per 2026-03-28 migration).
 
 note:
 - If a dashboard looks for `/metrics` and 404s, that's intentional. Use `/v1/metrics/snapshot` for live + SQL over `metric_samples` for historical.
 
 ---
 
-## APIs + gRPC — Gotchas + More
+## APIs + gRPC · Gotchas + More
 
 **Gotchas**:
 - 199 routes isn't the right count to memorize; adjudicate via inventory JSON when needed
-- CodeQL doesn't recognize regex validation as a path-injection sanitizer — route through `pathsafe.SafeJoinUnderDir`
+- CodeQL doesn't recognize regex validation as a path-injection sanitizer, route through `pathsafe.SafeJoinUnderDir`
 - `#nosec` is gosec-only; CodeQL ignores it
-- `writeInternalError` auto-classifies caller cancellation as 499 (not 500) — any new handler routing through this helper inherits the behavior
+- `writeInternalError` auto-classifies caller cancellation as 499 (not 500), any new handler routing through this helper inherits the behavior
 - gRPC Unix sockets persist until mdemg restart; stale sockets reaped on `kickstart -k`
 
 **Feature docs**:
-- `docs/api/api-spec/uats/specs/*.json` — 215 UATS contracts covering most HTTP routes (U6)
+- `docs/api/api-spec/uats/specs/*.json`, 215 UATS contracts covering most HTTP routes (U6)
 - CLAUDE.md DORMANT-CENSUS-001/002/003 pins
 
 **Feeds into**: U13 Grafana (reads TSDB directly, bypasses this API surface), U16 Alerts (admin breaker-reset uses /v1/admin/*).
 
 note:
 - You rarely need to KNOW the API surface. You often need to PROBE it. `curl -s | jq` is the operator superpower.
-- Transition: U16 — Alerts + Enforcement Escape Hatches, the operational decision surface.
+- Transition: U16, Alerts + Enforcement Escape Hatches, the operational decision surface.
 
 ---
 
-<!-- SECTION U16 — ALERTS + ENFORCEMENT -->
+<!-- SECTION U16, ALERTS + ENFORCEMENT -->
 
-## U16 · Alerts + Enforcement — Operator Triage
+## U16 · Alerts + Enforcement · Operator Triage
 
 This is where you RESPOND. Alerts tell you what's wrong (historical, hours-scale). Enforcement is Jiminy preventing a durable constraint violation (right-now).
 
@@ -2218,7 +2218,7 @@ Both ship **escape hatches** that preserve operator agency.
 
 Preview: alerts channel → terminal banner → severity map → clearing → enforcement in-session → override flow → audit trail.
 
-Points back to U1.4 — the ENFORCEMENT surface.
+Points back to U1.4, the ENFORCEMENT surface.
 
 note:
 - U16 is the operational decision surface. When something goes wrong, this is where you LIVE.
@@ -2232,14 +2232,14 @@ note:
 **Shape**: `{severity, service, title, body, timestamp, cleared_at: null}`.
 
 **Severities**:
-- **CRITICAL** — immediate operator attention; typically triggers macOS notification
-- **HIGH** — significant degradation; operator-triage within hours
-- **MEDIUM** — regression trajectory; often arcs-in-progress; operator-aware
-- **LOW** — informational trajectory
+- **CRITICAL**: immediate operator attention; typically triggers macOS notification
+- **HIGH**: significant degradation; operator-triage within hours
+- **MEDIUM**: regression trajectory; often arcs-in-progress; operator-aware
+- **LOW**: informational trajectory
 
 **Sources**: RSIC alert actions (U5), circuit breaker state changes (U2), health prober transitions, server-native alert evaluator (24+ TSDB-query rules), Grafana webhook.
 
-The 44 pending alerts on your session banner are a mix of MEDIUM (Jiminy follow-rate — arcs-in-progress) + HIGH (FT benchmark staleness, scheduled-job-staleness) + LOW (cache hit ratio).
+The 44 pending alerts on your session banner are a mix of MEDIUM (Jiminy follow-rate, arcs-in-progress) + HIGH (FT benchmark staleness, scheduled-job-staleness) + LOW (cache hit ratio).
 
 note:
 - The banner at session start summarizes active alerts. Each line is one alert, severity-coded.
@@ -2250,7 +2250,7 @@ note:
 
 - **Session-start hook** (`.claude/hooks/session-start.sh`) reads `current.json` and surfaces CRITICAL + HIGH alerts
 - **Prompt-context hook** (`.claude/hooks/prompt-context.sh`) shows ALL pending alerts every prompt
-- Format: `[SEVERITY] [timestamp] service: title — body`
+- Format: `[SEVERITY] [timestamp] service: title, body`
 
 **Reading rules**:
 - Group by severity (CRITICAL + HIGH first)
@@ -2328,22 +2328,22 @@ note:
 
 **Rule**: `archive_*` boolean mutations auto-executable; `adjust_*` scalar mutations require HITL.
 
-**Audit**: every auto-execute emits a MEDIUM alert (`rsic-auto-archive` service) with REVERSAL CYPHER in the message body — operator sees + can reverse.
+**Audit**: every auto-execute emits a MEDIUM alert (`rsic-auto-archive` service) with REVERSAL CYPHER in the message body, operator sees + can reverse.
 
 note:
 - By default, the system doesn't mutate itself. If you flip auto-execute on, read the 5-guard sequence in CLAUDE.md FIRST.
 
 ---
 
-## Alerts + Enforcement — Gotchas + More
+## Alerts + Enforcement · Gotchas + More
 
 **Gotchas**:
-- `/v1/alerts/clear` is RECEIPT-OF-DELIVERY, not RESOLUTION — the underlying condition may still be true next evaluation window
-- 44 pending alerts is NOT a crisis — most are MEDIUM Jiminy follow-rate (arc-in-progress) + HIGH FT benchmark staleness (re-evaluates hourly)
+- `/v1/alerts/clear` is RECEIPT-OF-DELIVERY, not RESOLUTION, the underlying condition may still be true next evaluation window
+- 44 pending alerts is NOT a crisis, most are MEDIUM Jiminy follow-rate (arc-in-progress) + HIGH FT benchmark staleness (re-evaluates hourly)
 - Enforcement is session-scoped; multi-agent setups need per-agent session IDs
-- Overrides expire — forgotten overrides can't silently disable enforcement forever
+- Overrides expire, forgotten overrides can't silently disable enforcement forever
 - Auto-execute is OPT-IN; `ENFORCEMENT_AUTO_EXECUTE_ENABLED=false` default
-- Cooldown-key contract: distinct Services per rule — two rules sharing `(service, severity)` key would suppress each other
+- Cooldown-key contract: distinct Services per rule, two rules sharing `(service, severity)` key would suppress each other
 
 **Feature docs**:
 - `docs/features/service-alerts.md`
@@ -2354,20 +2354,20 @@ note:
 
 note:
 - Alerts are HONEST SIGNALS. Enforcement is PREEMPTIVE PROTECTION. Overrides are CONSCIOUS DISAGREEMENT. The three together are the operator's full agency surface.
-- Transition: U17 — where to go from here.
+- Transition: U17, where to go from here.
 
 ---
 
-<!-- SECTION U17 — WHERE TO GO NEXT -->
+<!-- SECTION U17, WHERE TO GO NEXT -->
 
-## U17 · Where To Go — Documentation
+## U17 · Where To Go · Documentation
 
-- `docs/features/*.md` — **41+ feature docs** (one per major shipped feature)
-- `docs/user/*` — user-facing operational docs
-- `docs/development/UXTS_FRAMEWORK_MATRIX.md` — authoritative UxTS registry (U6)
-- `docs/api/*.md` — endpoint reference + inventory
-- `CLAUDE.md` — architecture pins + governance (104+ shipped sprint records)
-- `README.md` — top-level entry + install + credits
+- `docs/features/*.md`, **41+ feature docs** (one per major shipped feature)
+- `docs/user/*`, user-facing operational docs
+- `docs/development/UXTS_FRAMEWORK_MATRIX.md`, authoritative UxTS registry (U6)
+- `docs/api/*.md`, endpoint reference + inventory
+- `CLAUDE.md`, architecture pins + governance (104+ shipped sprint records)
+- `README.md`, top-level entry + install + credits
 - Beta-tester guide: `packaging/homebrew-mdemg/mdemg_beta_testing.md`
 
 note:
@@ -2375,19 +2375,19 @@ note:
 
 ---
 
-## Honest — What's Open Right Now
+## Honest · What's Open Right Now
 
 **Current HIGH alerts** (trajectory language per `trust-signal-must-be-persisted-never-ignore-honest`):
-- **FT Benchmark Not Refreshed** — latest `benchmark_runs` row > 7d old; arc = schedule the next run or operator-triggered (U8)
-- **Scheduled-Job Staleness (Neo4j backup)** — no successful Neo4j backup in window; arc = investigate scheduler
-- **Scheduled-Job Staleness (TSDB backup)** — same class; arc = investigate scheduler
-- **Health probe failures** — neo4j/tsdb/neural_sidecar probes failing (likely Docker Desktop paused)
+- **FT Benchmark Not Refreshed**: latest `benchmark_runs` row > 7d old; arc = schedule the next run or operator-triggered (U8)
+- **Scheduled-Job Staleness (Neo4j backup)**: no successful Neo4j backup in window; arc = investigate scheduler
+- **Scheduled-Job Staleness (TSDB backup)**: same class; arc = investigate scheduler
+- **Health probe failures**: neo4j/tsdb/neural_sidecar probes failing (likely Docker Desktop paused)
 
 **MEDIUM arc-in-progress** (expected during JIMINY-CEILING-BREAK-2):
-- Jiminy Follow Rate Drop (classifier/process/hybrid) — current ~13%; target ≥80%
+- Jiminy Follow Rate Drop (classifier/process/hybrid), current ~13%; target ≥80%
 
 **LOW arcs**:
-- Cache Hit Ratio low — honest ~75% vs DH-004 baseline; expected pattern
+- Cache Hit Ratio low, honest ~75% vs DH-004 baseline; expected pattern
 
 These are HONEST and TRACKED; they fire because the system is honest about its state, not because operation is broken.
 
@@ -2399,8 +2399,8 @@ note:
 ## Contributing Observations + Issues
 
 **Operator contributions LAND at TWO points**:
-1. **Observations** via `mdemg data observe --obs-type correction --content "..."` — becomes L0 → consolidates to L1 → feeds Jiminy (U3-U4)
-2. **Rules authored in /ui/ Rules** — directly as L1 constraint nodes (JIMINY-RULES-UI-001; `JIMINY_RULES_UI_WRITE_ENABLED=true` to flip)
+1. **Observations** via `mdemg data observe --obs-type correction --content "..."`, becomes L0 → consolidates to L1 → feeds Jiminy (U3-U4)
+2. **Rules authored in /ui/ Rules**: directly as L1 constraint nodes (JIMINY-RULES-UI-001; `JIMINY_RULES_UI_WRITE_ENABLED=true` to flip)
 
 **Issue filing**:
 - GitHub Issues on the mdemg repo
@@ -2416,7 +2416,7 @@ note:
 
 ## Thank You
 
-**MDEMG** — Cognitive Substrate for AI-Assisted Development
+**MDEMG**: Cognitive Substrate for AI-Assisted Development
 
 Questions welcome. Everything in this deck traces to CLAUDE.md, feature docs, sprint records, or shipped code.
 
@@ -2428,4 +2428,4 @@ Questions welcome. Everything in this deck traces to CLAUDE.md, feature docs, sp
 
 note:
 - Pause here for Q&A. This is the longest Q&A anchor in the end-user path.
-- End of U17 — return to Landing Fork via the link row, or continue to the dev-path if curious about architecture.
+- End of U17, return to Landing Fork via the link row, or continue to the dev-path if curious about architecture.

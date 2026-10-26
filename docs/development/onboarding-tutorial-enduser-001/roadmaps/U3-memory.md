@@ -1,27 +1,27 @@
-# U3 — Memory (CMS) (8 slides)
+# U3 · Memory (CMS) (8 slides)
 
 **Intent**: The central idea. CMS mental model (L0 obs → L1 constraint/correction → L2+ emergent concept), `/ui/ Memory` tab, `mdemg data observe|recall|correct`.
 **Walk-time**: ~7 min
 **Target slides**: 8
-**Mermaid**: 1 (U3.2 — hierarchy flow)
+**Mermaid**: 1 (U3.2, hierarchy flow)
 **Natural Q&A anchor**: after U3
 
 **Depth template**:
-- Landing — U3.1
-- Mental model — U3.2 (Mermaid: layer hierarchy)
-- Mental model continued — U3.3 (Hebbian learning + consolidation)
-- Where to see — U3.4 (/ui/ Memory tab)
-- How to touch — U3.5 (observe), U3.6 (recall), U3.7 (correct)
-- Current state + gotchas — U3.8
+- Landing, U3.1
+- Mental model, U3.2 (Mermaid: layer hierarchy)
+- Mental model continued, U3.3 (Hebbian learning + consolidation)
+- Where to see, U3.4 (/ui/ Memory tab)
+- How to touch, U3.5 (observe), U3.6 (recall), U3.7 (correct)
+- Current state + gotchas, U3.8
 
 ---
 
-## U3.1 — Section Landing
+## U3.1 · Section Landing
 
-**Title**: `U3 · Memory — The Cognitive Substrate`
+**Title**: `U3 · Memory, The Cognitive Substrate`
 
 **Body**:
-- Intent: "MDEMG remembers. Not in RAM, not in logs — in a Neo4j graph that grows, consolidates, and forgets honestly."
+- Intent: "MDEMG remembers. Not in RAM, not in logs, in a Neo4j graph that grows, consolidates, and forgets honestly."
 - Preview: hierarchy mental model → UI → observe/recall/correct → honest state
 - Natural question this answers: "What does MDEMG actually store, and how do I inspect or change it?"
 
@@ -30,17 +30,17 @@
 
 ---
 
-## U3.2 — Mental Model: The L0→L1→L2+ Hierarchy
+## U3.2 · Mental Model: The L0→L1→L2+ Hierarchy
 
 **Title**: `How Memory Is Shaped`
 
 **Body**:
 - 1-sentence context: "MDEMG stores raw observations and gradually distills them into reusable rules and concepts."
 - **Mermaid #2** (vertical flow):
-  - L0 (`conversation_observation`, `obs_type=...`) — raw operator/agent utterances
-  - L1 (`role_type=constraint|correction`) — promoted rules extracted from L0 patterns
-  - L2 (`role_type=hidden_pattern`) — clusters of L0 that co-activate
-  - L3+ (`role_type=emergent_concept`) — abstractions across layers
+  - L0 (`conversation_observation`, `obs_type=...`), raw operator/agent utterances
+  - L1 (`role_type=constraint|correction`), promoted rules extracted from L0 patterns
+  - L2 (`role_type=hidden_pattern`), clusters of L0 that co-activate
+  - L3+ (`role_type=emergent_concept`), abstractions across layers
 - Each layer: fewer nodes, more durable, higher-value
 - Role-filtered retrieval scopes by layer (e.g., Jiminy only surfaces L1+)
 
@@ -54,7 +54,7 @@
 
 ---
 
-## U3.3 — Hebbian Learning + Consolidation
+## U3.3 · Hebbian Learning + Consolidation
 
 **Title**: `How Memory Strengthens`
 
@@ -75,7 +75,7 @@
 
 ---
 
-## U3.4 — /ui/ Memory Tab
+## U3.4 · /ui/ Memory Tab
 
 **Title**: `The Memory Tab`
 
@@ -94,7 +94,7 @@
 
 ---
 
-## U3.5 — `mdemg data observe`
+## U3.5 · `mdemg data observe`
 
 **Title**: `Writing To Memory`
 
@@ -120,7 +120,7 @@
 
 ---
 
-## U3.6 — `mdemg data recall`
+## U3.6 · `mdemg data recall`
 
 **Title**: `Reading From Memory`
 
@@ -141,11 +141,11 @@
 - CLAUDE.md "Context Fingerprinting (Phase 14.2.3)"
 
 **note**:
-- Operator cue: "If recall feels empty, the first check is `/ui/ Memory` — maybe the content isn't there yet."
+- Operator cue: "If recall feels empty, the first check is `/ui/ Memory`, maybe the content isn't there yet."
 
 ---
 
-## U3.7 — `mdemg data correct`
+## U3.7 · `mdemg data correct`
 
 **Title**: `Correcting Memory`
 
@@ -160,8 +160,8 @@
   (will promote to L1 on next consolidation)
   ```
 - Structured fields land on the L0 obs; JIMINY-STRUCTURED-CORRECTION-001 propagates them to the eventual L1 node
-- `incorrect` + `correct` + `context` triple is first-class — guidance synthesis uses both sides
-- Related: U7 Review HITL — contradicted drafts auto-feed into this surface via JIMINY-CONTRADICTED-BRIDGE-001
+- `incorrect` + `correct` + `context` triple is first-class, guidance synthesis uses both sides
+- Related: U7 Review HITL, contradicted drafts auto-feed into this surface via JIMINY-CONTRADICTED-BRIDGE-001
 
 **Provenance**:
 - CLAUDE.md "Structured correction propagation (JIMINY-STRUCTURED-CORRECTION-001)"
@@ -172,7 +172,7 @@
 
 ---
 
-## U3.8 — Current State + Gotchas
+## U3.8 · Current State + Gotchas
 
 **Title**: `Memory Honest State + Gotchas`
 
@@ -182,7 +182,7 @@
   - 128K+ CO_ACTIVATED_WITH edges with weight entropy ~0.27
   - Consolidation cycles ~every 5 min, completing in ~1-10s (post-CONSOLIDATE-PERF-001)
 - Gotchas:
-  - `mdemg-dev` is PROTECTED SPACE — hardcoded deletion protection; never bypassed
+  - `mdemg-dev` is PROTECTED SPACE, hardcoded deletion protection; never bypassed
   - L0 obs with no `obs_type` tag defaults to `note` (lowest promotion priority)
   - Scheduled maintenance LaunchAgent default is `--dry-run=false` only for the SCHEDULED run; manual `mdemg maintenance` defaults to dry-run (safety)
   - Archived nodes stay forever by design (reversible); `graph repair` doesn't delete them
@@ -194,5 +194,5 @@
 - CLAUDE.md "Consolidation Performance (CONSOLIDATE-PERF-001)"
 
 **note**:
-- Operator cue: "Protected-space rule applies even in dev. If you're bulk-deleting, you're doing it wrong — tombstone via `is_archived=true` instead."
-- Next up (U4): Jiminy — what USES this memory to tell the agent what to do.
+- Operator cue: "Protected-space rule applies even in dev. If you're bulk-deleting, you're doing it wrong, tombstone via `is_archived=true` instead."
+- Next up (U4): Jiminy, what USES this memory to tell the agent what to do.

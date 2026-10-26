@@ -1,37 +1,37 @@
-# U2 — The Stack + Status + Health (7 slides)
+# U2 · The Stack + Status + Health (7 slides)
 
-**Intent**: Show the operational foundation — 5 containers + mdemg server, the 4-command happy path, /ui/ Status, `healthz`, watchdog, breakers. Everything else in U3-U17 lives inside this picture.
+**Intent**: Show the operational foundation, 5 containers + mdemg server, the 4-command happy path, /ui/ Status, `healthz`, watchdog, breakers. Everything else in U3-U17 lives inside this picture.
 **Walk-time**: ~6 min
 **Target slides**: 7
-**Mermaid**: 1 (U2.2 — stack sketch)
-**Natural Q&A anchor**: — (operator pauses after U3 Memory next)
+**Mermaid**: 1 (U2.2, stack sketch)
+**Natural Q&A anchor**:, (operator pauses after U3 Memory next)
 
 **Depth template coverage**:
-- Landing — U2.1
-- Mental model — U2.2 (Mermaid: 5-container stack)
-- Where to see — U2.3 (`docker compose ps`, /ui/ Status, `healthz`)
-- How to touch — U2.4 (4-command happy path)
-- How to touch — U2.5 (healthz CLI deep dive)
-- Mental model — U2.6 (watchdog + circuit breakers)
-- Current state + gotchas — U2.7
+- Landing, U2.1
+- Mental model, U2.2 (Mermaid: 5-container stack)
+- Where to see, U2.3 (`docker compose ps`, /ui/ Status, `healthz`)
+- How to touch, U2.4 (4-command happy path)
+- How to touch, U2.5 (healthz CLI deep dive)
+- Mental model, U2.6 (watchdog + circuit breakers)
+- Current state + gotchas, U2.7
 
 ---
 
-## U2.1 — Section Landing
+## U2.1 · Section Landing
 
 **Title**: `U2 · The Stack`
 
 **Body**:
-- Intent: "Everything in U3-U17 lives inside the 5-container stack. This section is the foundation — the stack picture, how to confirm it's up, how to probe its health, and what the watchdog + breakers protect against."
+- Intent: "Everything in U3-U17 lives inside the 5-container stack. This section is the foundation, the stack picture, how to confirm it's up, how to probe its health, and what the watchdog + breakers protect against."
 - Preview: stack diagram → `docker compose ps` → 4-command path → `healthz` → watchdog → breakers → gotchas
-- Points back to U1.4 "How Does It Solve Them?" — this is the implementation of surface #1 (observability + the substrate it runs on)
+- Points back to U1.4 "How Does It Solve Them?", this is the implementation of surface #1 (observability + the substrate it runs on)
 
 **Provenance**:
 - CLAUDE.md "Project Context" + Docker Compose section
 
 ---
 
-## U2.2 — Mental Model: 5 Containers + 1 Server
+## U2.2 · Mental Model: 5 Containers + 1 Server
 
 **Title**: `What's Running`
 
@@ -42,11 +42,11 @@
   - `mdemg server` → `{neo4j :7687, timescaledb :5433, neural-sidecar :8100, grafana :3030}`
   - All five labeled as "Docker Compose services"
 - One-line role each:
-  - **mdemg** — HTTP API + CLI backend (ghcr.io/reh3376/mdemg)
-  - **neo4j** — graph substrate (CMS; the "cognitive" layer — U3 Memory)
-  - **timescaledb** — telemetry hypertables (TSDB; the "measurement" layer — U13 Grafana)
-  - **neural-sidecar** — rerank + NLI model inference (U15 APIs)
-  - **grafana** — read-only observability panels (U13)
+  - **mdemg**: HTTP API + CLI backend (ghcr.io/reh3376/mdemg)
+  - **neo4j**: graph substrate (CMS; the "cognitive" layer, U3 Memory)
+  - **timescaledb**: telemetry hypertables (TSDB; the "measurement" layer, U13 Grafana)
+  - **neural-sidecar**: rerank + NLI model inference (U15 APIs)
+  - **grafana**: read-only observability panels (U13)
 
 **Provenance**:
 - `docker-compose.yml` top-level `services:` section
@@ -58,7 +58,7 @@
 
 ---
 
-## U2.3 — Where To See It: `docker compose ps`
+## U2.3 · Where To See It: `docker compose ps`
 
 **Title**: `Confirm The Stack`
 
@@ -74,7 +74,7 @@
   mdemg-grafana-1             Up (healthy)           0.0.0.0:3030->3000/tcp
   ```
 - Expected: 5 × `Up (healthy)`
-- Anything else (`Restarting`, `Exit (0)`) is a triage trigger — `docker compose logs <service>` is the next command
+- Anything else (`Restarting`, `Exit (0)`) is a triage trigger, `docker compose logs <service>` is the next command
 
 **Provenance**:
 - `docker-compose.yml` port mappings
@@ -84,7 +84,7 @@
 
 ---
 
-## U2.4 — How To Touch It: The 4-Command Happy Path
+## U2.4 · How To Touch It: The 4-Command Happy Path
 
 **Title**: `The 4-Command Happy Path`
 
@@ -110,9 +110,9 @@
 
 ---
 
-## U2.5 — `mdemg healthz` Deep Dive
+## U2.5 · `mdemg healthz` Deep Dive
 
-**Title**: `healthz — The Right-Now Probe`
+**Title**: `healthz, The Right-Now Probe`
 
 **Body**:
 - CLI example (healthy):
@@ -129,22 +129,22 @@
   circuit_breakers: {open: 1, names: [neural-sidecar]}
   ```
 - Fix order on `degraded`:
-  1. `docker compose ps` — is the subsystem actually up?
-  2. `docker compose logs <subsystem>` — is it erroring?
-  3. `curl -s http://localhost:9999/healthz | jq` — fresh HTTP reading
-- Exit codes: 0 if `status=ok`, 1 otherwise — scriptable in `until` loops
+  1. `docker compose ps`, is the subsystem actually up?
+  2. `docker compose logs <subsystem>`, is it erroring?
+  3. `curl -s http://localhost:9999/healthz | jq`, fresh HTTP reading
+- Exit codes: 0 if `status=ok`, 1 otherwise, scriptable in `until` loops
 
 **Provenance**:
 - CLAUDE.md "Enhanced /healthz" section (DH-004)
 - `internal/api/handlers_health.go`
-- CONFIG-VALIDATE-TRANSIENT-DISTINGUISH-001 sprint — "not started" vs "broken"
+- CONFIG-VALIDATE-TRANSIENT-DISTINGUISH-001 sprint, "not started" vs "broken"
 
 **note**:
 - Operator cue: "healthz is cheap. Run it. Don't guess."
 
 ---
 
-## U2.6 — Watchdog + Circuit Breakers
+## U2.6 · Watchdog + Circuit Breakers
 
 **Title**: `What The Watchdog Watches`
 
@@ -166,7 +166,7 @@
 
 ---
 
-## U2.7 — Current State + Gotchas
+## U2.7 · Current State + Gotchas
 
 **Title**: `Honest State + Gotchas`
 
@@ -177,7 +177,7 @@
   - Breakers almost always `open: 0`
 - `/ui/ Status` tab is the GUI version of `healthz` + more (uptime, version, config knobs)
 - Gotchas:
-  - `health: ok` with pending HIGH alerts (U16) is NOT contradictory — healthz samples NOW, alerts integrate over hours
+  - `health: ok` with pending HIGH alerts (U16) is NOT contradictory, healthz samples NOW, alerts integrate over hours
   - `mdemg healthz` from a shell without `.env` loaded can show stale readings (CLI reads config at invoke time)
   - `docker compose ps` showing `Up` but `healthz` saying `degraded` means the subsystem's TCP port is open but the handler is misbehaving
 - Where to go deeper: `docs/features/mlx-watchdog.md`, CLAUDE.md "Service Alert System"
@@ -187,4 +187,4 @@
 
 **note**:
 - Operator cue: "healthz is the stethoscope check; alerts (U16) are the medical history. Both matter; different timescales."
-- Transition: "Stack confirmed. Next up: U3 — what MDEMG REMEMBERS, the central idea."
+- Transition: "Stack confirmed. Next up: U3, what MDEMG REMEMBERS, the central idea."

@@ -1,12 +1,12 @@
-# U9 — Backup + Ops (6 slides)
+# U9 · Backup + Ops (6 slides)
 
-**Intent**: `/ui/ Backup` tab + scheduled backup/maintenance/restore + manual CLI. Operator-facing durable-safety surface — what runs when, what the retention policy is, how to restore.
+**Intent**: `/ui/ Backup` tab + scheduled backup/maintenance/restore + manual CLI. Operator-facing durable-safety surface, what runs when, what the retention policy is, how to restore.
 **Target slides**: 6
 **Mermaid**: 0
 
 ---
 
-## U9.1 — Section Landing
+## U9.1 · Section Landing
 
 **Title**: `U9 · Backup + Ops`
 
@@ -20,14 +20,14 @@
 
 ---
 
-## U9.2 — Scheduled Jobs — The Three
+## U9.2 · Scheduled Jobs, The Three
 
 **Title**: `What Runs On Schedule`
 
 **Body**:
-- **TSDB backup scheduler** — periodic `pg_dump` of the TimescaleDB; schedule via `TSDB_BACKUP_SCHEDULE_*`; dockerbin resolver (`MDEMG_DOCKER_BIN` → PATH → well-known) handles the launchd minimal PATH that previously broke it silently
-- **Neo4j backup** — scheduled via `NEO4J_BACKUP_*`; dumps to `backups/` with staleness guard rule `neo4j_backup_no_recent_success` fires HIGH if silent
-- **Weekly maintenance** — LaunchAgent runs `mdemg maintenance` (combined decay + prune) with `--dry-run=false` on the SCHEDULE (CLI default stays `--dry-run=true` for safety); MAINT-LIVE-001 made this real
+- **TSDB backup scheduler**: periodic `pg_dump` of the TimescaleDB; schedule via `TSDB_BACKUP_SCHEDULE_*`; dockerbin resolver (`MDEMG_DOCKER_BIN` → PATH → well-known) handles the launchd minimal PATH that previously broke it silently
+- **Neo4j backup**: scheduled via `NEO4J_BACKUP_*`; dumps to `backups/` with staleness guard rule `neo4j_backup_no_recent_success` fires HIGH if silent
+- **Weekly maintenance**: LaunchAgent runs `mdemg maintenance` (combined decay + prune) with `--dry-run=false` on the SCHEDULE (CLI default stays `--dry-run=true` for safety); MAINT-LIVE-001 made this real
 - Jobhealth: all 3 record every run to `scheduled_job_events` (V0024 hypertable) via `internal/jobhealth.Report`; failures fire HIGH on distinct Services per NOSILENT-001 cooldown-key contract
 
 **Provenance**:
@@ -38,7 +38,7 @@
 
 ---
 
-## U9.3 — /ui/ Backup Tab
+## U9.3 · /ui/ Backup Tab
 
 **Title**: `The Backup Tab`
 
@@ -55,11 +55,11 @@
 - `internal/api/ui/tabs/backup.js`
 
 **note**:
-- Operator cue: "Backups are honest — a failed `scheduled_job_events` row MEANS the backup didn't happen. Don't paper over this."
+- Operator cue: "Backups are honest, a failed `scheduled_job_events` row MEANS the backup didn't happen. Don't paper over this."
 
 ---
 
-## U9.4 — Backup/Restore CLI
+## U9.4 · Backup/Restore CLI
 
 **Title**: `Backup + Restore From The CLI`
 
@@ -82,11 +82,11 @@
 - CLAUDE.md "Backups provably restore (BACKUP-RESTORE-VERIFY-001)"
 
 **note**:
-- Operator cue: "If restore fails SHA verification, the backup is corrupt — DO NOT force. Use an older verified backup."
+- Operator cue: "If restore fails SHA verification, the backup is corrupt, DO NOT force. Use an older verified backup."
 
 ---
 
-## U9.5 — Maintenance (`mdemg maintenance`)
+## U9.5 · Maintenance (`mdemg maintenance`)
 
 **Title**: `Weekly Maintenance`
 
@@ -103,7 +103,7 @@
   decay: reduced weight on 1234 edges
   prune: archived 56 nodes with reason='scheduled_maintenance'
   ```
-- LaunchAgent schedules the live run weekly; MAINT-LIVE-001 made this ACTUALLY RUN (pre-sprint it was dry-run only — never executed in the project's history)
+- LaunchAgent schedules the live run weekly; MAINT-LIVE-001 made this ACTUALLY RUN (pre-sprint it was dry-run only, never executed in the project's history)
 - Orphan disposition is CONTEXT-DEPENDENT: `--exclude-role-types` or `PRUNE_EXCLUDE_ROLE_TYPES` env; schedule excludes `constraint,conversation_observation`
 - Alert `maintenance_no_live_run` fires on the only-ever-dry-runs pattern
 
@@ -115,16 +115,16 @@
 
 ---
 
-## U9.6 — Gotchas + Where To Go Deeper
+## U9.6 · Gotchas + Where To Go Deeper
 
-**Title**: `Backup + Ops — Gotchas + More`
+**Title**: `Backup + Ops, Gotchas + More`
 
 **Body**:
 - Gotchas:
-  - Scheduled backup WAITS on the queue-async job and reports jobhealth `job_name='neo4j-backup'` — don't assume async-fire-forget success
+  - Scheduled backup WAITS on the queue-async job and reports jobhealth `job_name='neo4j-backup'`, don't assume async-fire-forget success
   - Backup quota default is 2 GB (comment/code drift was deleting every 3 GB backup ~80 ms after completion; BACKUP-RESTORE-VERIFY-001 Tier 3 drill caught it)
   - Batched `CALL { … } IN TRANSACTIONS` Cypher runs via `session.Run` (implicit tx); INSIDE `ExecuteWrite` Neo4j raises TransactionStartFailed (MAINT-LIVE-001 live catch)
-  - MAINT-LIVE-001 schedule excludes `constraint,conversation_observation` for prune — intentional; operator can override
+  - MAINT-LIVE-001 schedule excludes `constraint,conversation_observation` for prune, intentional; operator can override
 - Feature docs:
   - `docs/features/backup-restore.md`
   - `docs/features/scheduled-maintenance.md`
@@ -133,4 +133,4 @@
 
 **note**:
 - Operator cue: "Backup health is a leading indicator of DATA LOSS risk. If `scheduled-job-staleness-*` alerts fire, pause other work and triage."
-- Transition: "U10 next — Logs — when stethoscope + alerts aren't enough and you need the raw details."
+- Transition: "U10 next, Logs, when stethoscope + alerts aren't enough and you need the raw details."
