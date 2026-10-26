@@ -22,21 +22,21 @@
 | U1 | **Opening — The 4 Questions + Integrator** | 6 | 6 | ~5 min | after U1.6 |
 | U2 | **The Stack + Status + Health** | 7 | 13 | ~6 min | — |
 | U3 | **Memory (CMS)** | 8 | 21 | ~7 min | after U3 |
-| U4 | **Jiminy** (guidance + rules + mode) | 9 | 30 | ~8 min | after U4 |
-| U5 | **RSIC** (self-improvement) | 7 | 37 | ~6 min | after U5 |
-| U6 | **UxTS Framework Family** | 8 | 45 | ~7 min | after U6 |
-| U7 | **Review / HITL** | 6 | 51 | ~5 min | — |
-| U8 | **Learning / Training Data** | 6 | 57 | ~5 min | after U8 |
-| U9 | **Backup + Ops** | 5 | 62 | ~4 min | — |
-| U10 | **Logs** | 4 | 66 | ~3 min | — |
-| U11 | **Config + Features** | 6 | 72 | ~5 min | — |
-| U12 | **Plugins** | 4 | 76 | ~3 min | — |
-| U13 | **Grafana** | 6 | 82 | ~5 min | after U13 |
-| U14 | **CLI — The Full Command Surface** | 7 | 89 | ~6 min | — |
-| U15 | **APIs + gRPC** | 7 | 96 | ~6 min | after U15 |
-| U16 | **Alerts + Enforcement Escape Hatches** | 6 | 102 | ~5 min | after U16 |
-| U17 | **Where To Go Next** | 3 | 105 | ~2 min | — (end) |
-| **Totals** | | **105** | **105** | **~88 min** | — |
+| U4 | **Jiminy** (guidance + rules + mode) | 11 | 32 | ~9 min | after U4 |
+| U5 | **RSIC** (self-improvement) | 8 | 40 | ~7 min | after U5 |
+| U6 | **UxTS Framework Family** | 9 | 49 | ~7 min | after U6 |
+| U7 | **Review / HITL** | 7 | 56 | ~5 min | — |
+| U8 | **Learning / Training Data** | 7 | 63 | ~6 min | after U8 |
+| U9 | **Backup + Ops** | 6 | 69 | ~5 min | — |
+| U10 | **Logs** | 5 | 74 | ~4 min | — |
+| U11 | **Config + Features** | 7 | 81 | ~5 min | — |
+| U12 | **Plugins** | 5 | 86 | ~4 min | — |
+| U13 | **Grafana** | 7 | 93 | ~6 min | after U13 |
+| U14 | **CLI — The Full Command Surface** | 9 | 102 | ~7 min | — |
+| U15 | **APIs + gRPC** | 9 | 111 | ~7 min | after U15 |
+| U16 | **Alerts + Enforcement Escape Hatches** | 7 | 118 | ~6 min | after U16 |
+| U17 | **Where To Go Next** | 4 | 122 | ~3 min | — (end) |
+| **Totals** | | **122** | **122** | **~99 min** | — |
 
 **Depth template per section** (per `presentation_spec.md` §2 — GUIDE, not straitjacket): landing · mental-model · where-to-see · how-to-touch · current-state (honest trajectory) · gotchas · where-to-go-deeper. Sections expand slides/figures/tables/diagrams as the content requires (operator directive 2026-10-26 — no caps).
 
