@@ -2115,23 +2115,23 @@ note:
 ## How It All Works Together
 
 ```mermaid
-graph LR
-  Agent[Agent Action] -->|hook| Hook[pre-write / pre-bash / post-tool-observe]
-  Hook -->|classify + retrieve| Jiminy[Jiminy U4]
-  Jiminy -->|rules| Memory[Memory U3]
-  Agent -->|observe| Memory
+graph TD
+  Agent[Agent Action] -->|hook| Hook[Hooks]
+  Hook -->|classify| Jiminy
+  Jiminy[Jiminy U4] -->|retrieve rules| Memory
+  Agent -->|observe| Memory[Memory U3]
   Memory -->|consolidate| L1[L1/L2+ nodes]
   L1 --> Jiminy
   Jiminy -->|outcome| RSIC[RSIC U5]
-  Jiminy -->|outcome| HITL[HITL Review U7]
-  HITL --> Retrain[Retrain Corpus U8]
+  Jiminy -->|outcome| HITL[HITL U7]
+  HITL --> Retrain[Retrain U8]
   Retrain --> NextModel[Next Model Gen]
-  Memory --> TSDB[TSDB]
+  Memory --> TSDB[(TSDB)]
   Jiminy --> TSDB
   RSIC --> TSDB
   TSDB --> Grafana[Grafana U13]
   TSDB --> Alerts[Alerts U16]
-  UxTS[UxTS Contracts U6] -.->|gate every merge| Agent
+  UxTS[UxTS U6] -.->|gate merges| Agent
 ```
 
 **Operator sentence**: You observe → MDEMG remembers → classifies → acts → measures → learns → fine-tunes → you see all of it on the dashboards.
@@ -2502,15 +2502,15 @@ note:
 ## How Jiminy Thinks
 
 ```mermaid
-graph LR
-  Agent[Agent About To Act] -->|hook POST| Latest[/v1/jiminy/latest]
-  Latest -->|retrieve| Memory[(L1 Constraints + Corrections)]
-  Memory -->|top-K| Synth[Jiminy Synthesize]
+graph TD
+  Agent[Agent About To Act] -->|hook| Latest[POST /v1/jiminy/latest]
+  Latest --> Memory[(L1 Rules)]
+  Memory --> Synth[Synthesize]
   Synth -->|directive| Agent
-  Agent -->|action| World
-  World -->|hook POST| Feedback[/v1/jiminy/feedback]
+  Agent -->|action| World[World]
+  World -->|hook| Feedback[POST /v1/jiminy/feedback]
   Feedback -->|classify| Verdict[verdict: followed / ignored / partial / contradicted / NA]
-  Verdict -->|record| CO[constraint_outcomes]
+  Verdict --> CO[(constraint_outcomes)]
   CO --> Trust[Trust Score]
   CO --> RSIC[RSIC U5]
   CO --> Grafana[Grafana U13]
@@ -4303,15 +4303,15 @@ note:
 ## The Override Escape Hatch
 
 ```mermaid
-graph LR
-  Agent[Agent Action] -->|hook POST| Classify[/v1/jiminy/classify]
-  Classify -->|verdict=deny| Block[Block + Reason]
+graph TD
+  Agent[Agent Action] -->|hook| Classify[POST /v1/jiminy/classify]
+  Classify -->|deny| Block[Block + Reason]
   Block --> Op{Operator}
-  Op -->|run override apply| Override[/v1/jiminy/override]
+  Op -->|override apply| Override[POST /v1/jiminy/override]
   Override -->|audit| JSONL[~/.mdemg/jiminy-overrides.jsonl]
-  Override -->|audit| TSDB[constraint_overrides TSDB]
+  Override -->|audit| TSDB[(constraint_overrides TSDB)]
   Override -->|respects| Classify
-  Classify -->|verdict=pass| Allow[Allow Action]
+  Classify -->|pass| Allow[Allow Action]
 ```
 
 **Invariants**:
@@ -4513,7 +4513,7 @@ note:
       mermaid.initialize(mermaidOptions);
       const cb = function (event) {
         mermaid.init(mermaidOptions, '.stack.present > .present pre code.mermaid');
-        mermaid.init(mermaidOptions, '.slides > .present:not(.stack) pre code.mermaid');
+        mermaid.init(mermaidOptions, '.slides pre code.mermaid');  // ENDUSER-001 E5: render all slides (scroll view compat)
       }
       Reveal.addEventListener('ready', cb);
       Reveal.addEventListener('slidetransitionend', cb);

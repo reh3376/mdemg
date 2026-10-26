@@ -45,15 +45,38 @@
 
 <!-- Operator fills in below as review progresses. Use the template above for each slide. -->
 
-<!-- Example:
-### U1.1 — Operator Onboarding — Start Here
-- Verdict: pass
-- Notes: Mini-TOC renders; fork link resolves; keyboard nav works.
+---
 
-### U1.2 — What Is MDEMG?
-- Verdict: fix
-- Notes: The analogy sentence should say "artificial neural network" lowercase; also want to add a line about the dev-path cross-link.
--->
+## Agent-driven plumbing + initial content audit (2026-10-26 — via claude-in-chrome)
+
+Agent ran a full plumbing + content audit before operator content review. Findings:
+
+### Plumbing (fixed)
+- ✅ Reveal.js initializes (view=scroll, 231 slides, 122 U-slides)
+- ✅ 28 section IDs all present (F1-F10, U1 via `end-user-path`, U2-U17, landing-fork, TOC, `u17-thank-you`)
+- ✅ 73 content fragment links, 0 broken (the "NaN" is reveal.js internal slide-number)
+- ✅ 18 external GitHub links resolve correctly
+- ✅ TOC click → body scroll verified (F4 at 59348px, U13 at 311176px)
+- ✅ 23 Mermaid diagrams render as SVG (fixed via `export.mjs` post-processing to patch mermaid init for scroll view)
+- ✅ U1.6 integrator Mermaid readable (converted LR → TD + shortened labels)
+- ✅ U4.2 Jiminy loop + U16.5 Override flow Mermaids readable (converted LR → TD + shortened labels)
+
+### Content audit (via DOM text scan + source cross-check)
+- ✅ Trajectory-language audit: 9 `by design` occurrences audited; all 9 are LEGITIMATE (teaching the rule / naming stable design features / quoting panel-title conventions). No violations.
+- ✅ All 17 U-section landing titles match the global_roadmap spec exactly.
+- ✅ Mermaid diagram count: 8 U-side (matches plan).
+
+### Out-of-scope follow-ups (dev-path, surface during review but belong to a different sprint)
+- ⚠️ **Dev-path F1.4 "History — Build Trajectory" Mermaid** renders too wide (3828px natural, text unreadable). Convert LR → TD.
+- ⚠️ **Dev-path F3.1 "RRF — How It Works" Mermaid** renders too wide (2412px natural, text unreadable). Convert LR → TD.
+- ⚠️ **Server bug — gzip middleware on 404s**: mdemg HTTP compresses 404 bodies without `Content-Encoding: gzip` header. Reproducer: `curl -H 'Accept-Encoding: gzip' http://localhost:9999/ui/tutorial/foo.md`. Filed as follow-up sprint.
+
+---
+
+## Operator-driven content review (section below)
+
+<!-- Operator reviews CONTENT and UX here. Plumbing + obvious rendering issues above. -->
+
 
 ---
 
