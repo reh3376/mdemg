@@ -13,42 +13,67 @@
 
 **Target audience**: Operators of a running MDEMG instance.
 - Someone who ran `brew install reh3376/mdemg/mdemg` or `mdemg init --defaults && docker compose up -d`
-- Someone who wants to USE the system — not build it, not extend it, not understand its architecture
-- Technical enough to use a terminal and read SQL / JSON output
+- Someone who wants to USE the system — the operator's view
+
+The slideshow forks at the landing slide into **2 paths**: end-user (this one) and software dev / contributor (the shipped F1-F10 107-slide dev deck). Each path is comprehensive for the audience of that path (end-user path for operators, dev path for developers/contributors); viewers pick one path and stay in it.
 
 **Explicit NON-audience**:
-- Software developers extending MDEMG → they go through the dev-path 107-slide deck (shipped by MDEMG-ONBOARDING-DECK-001)
-- Non-technical users / exec summaries → not an MDEMG use case today; different artifact if ever needed
-- Beta testers specifically → they have `packaging/homebrew-mdemg/mdemg_beta_testing.md`; this walkthrough SUPPLEMENTS that doc but doesn't replace it
+- Software developers extending MDEMG → they take the dev-path at the fork
+- Non-technical users / exec summaries → not an MDEMG use case today
+- Pure architecture / "how is this built" questions → that's the dev-path's job
 
-**Posture**:
-- **Operator-first**: show what to click, type, watch — not why it works that way
-- **Terse**: operators arrive with time pressure; dense slides lose them
-- **CLI-example heavy**: show commands + expected output verbatim
+**Posture** (operator-directed 2026-10-26: "extensive and highly informative onboarding mechanism"):
+- **Comprehensive-first, terse-second**: cover every major topic in genuine depth; don't trim for brevity
+- **Operator-task shaped**: show what to click / type / watch — plus the mental model, current state, and gotchas for each topic so the operator truly OWNS the surface
+- **CLI-example heavy**: commands + output verbatim remain the backbone
 - **Honest trajectory language**: inherited from dev-path governance — no "by design" framing on sub-target metrics
 
 ---
 
 ## 2. Slide-Count Envelope
 
-**Target**: 28-40 slides total across U1-U7.
-**Hard upper bound**: 45 slides (if the roadmap exceeds this, cut scope or split U-sections).
-**Hard lower bound**: 20 slides (below this, the walkthrough is probably skipping something load-bearing).
+**Target**: **comprehensive — no upper cap** (operator-directed 2026-10-26). Expected range ~80-120 slides.
+**Lower bound**: 60 slides (below this, major topics are getting undercovered).
 
-**Rationale**: dev deck is 107 slides at ~115 min for senior engineers; end-user path targets operators who should get through the walkthrough in **~20-30 min**. Slide-density stays similar; count shrinks because scope shrinks.
+**Rationale**: operator directed "extensive and highly informative onboarding mechanism for users and software devs / contributors" + "I am not overly concerned about the total number of slides or time required to review." Prior envelopes (28-40 → 45-60) were optimizing for brevity; this one optimizes for depth of each topic. Dev-path deck is 107 slides at ~115 min; end-user path can be similar scale when covering 17 topics at full depth.
 
-**Per-section targets** (soft):
+**Per-topic depth guideline** (soft; `global_roadmap.md` carries live numbers):
 
-| § | Target slides | Rationale |
-|---|---:|---|
-| U1 Welcome + What You Have | 3-4 | Shortest; sets context, lists containers, names the 4-command happy path |
-| U2 The /ui/ Dashboard | 5-7 | 4 tabs × ~1-2 slides each; the central operator surface |
-| U3 Grafana — What To Actually Watch | 4-6 | Opinionated: don't walk 9 dashboards, name 3-5 panels |
-| U4 CLI — The ~15 Commands You'll Use | 6-8 | 4 command groups × ~2 slides each; one slide per group's rationale, one per group's command list |
-| U5 Memory — Inspect + Correct | 4-6 | observe / recall / correct are the operator-facing memory surface |
-| U6 Alerts + Enforcement Escape Hatches | 4-6 | Reading the terminal banner + jiminy mode + override |
-| U7 Where To Go Next | 2-3 | Pointers to docs/FAQ/issues; honest about which sprints are open |
-| **Total** | **28-40** | Fits envelope |
+Each major topic (U-section) covers:
+1. **Section landing** — 1 slide — what this covers, why it matters
+2. **Mental model** — 1-2 slides, optionally Mermaid — the thing operator should carry away
+3. **Where to see it** — 1-2 slides — UI tab(s), Grafana panel(s), log patterns
+4. **How to touch it** — 1-2 slides — CLI commands, API endpoints
+5. **Current state (honest)** — 1 slide — "today it looks like this; here's why; here's the arc moving it"
+6. **Gotchas** — 0-1 slides — common footguns, misconceptions
+7. **Where to go deeper** — 1 slide — feature doc link, CLAUDE.md pin reference, sprint record
+
+That's **5-9 slides per topic**. 17 topics × avg 6-7 = **~100-120 slides** total.
+
+Per-section ballpark targets:
+
+| § | Topic | Target slides |
+|---|---|---:|
+| U1 | Welcome / What's Running | 5 |
+| U2 | Status + Health | 5 |
+| U3 | Memory (CMS) | 8 |
+| U4 | Jiminy | 9 |
+| U5 | RSIC | 7 |
+| U6 | UxTS Framework Family | 8 |
+| U7 | Review / HITL | 6 |
+| U8 | Learning / Training Data | 6 |
+| U9 | Backup + Ops | 5 |
+| U10 | Logs | 4 |
+| U11 | Config + Features | 6 |
+| U12 | Plugins | 4 |
+| U13 | Grafana | 6 |
+| U14 | CLI | 7 |
+| U15 | APIs + gRPC | 7 |
+| U16 | Alerts + Enforcement | 6 |
+| U17 | Where To Go Next | 3 |
+| **Total** | | **~102** |
+
+Walk-time at ~45-60 sec/slide ≈ **~80-100 min**. Comparable to the dev-path deck's 115 min — appropriate for comprehensive onboarding of two audiences (operators + contributors).
 
 ---
 
@@ -117,11 +142,17 @@ TITLE + 1-sentence body + link table or bulleted next-steps.
 
 ### 4.2 Mermaid policy
 
-- **Default: NO Mermaid.** End-user content explains OPERATIONS, not architecture. If a slide feels like it needs Mermaid, ask: "would the operator be able to do their task without this diagram?" If yes → cut it.
-- **Soft cap**: **0-2 Mermaid diagrams across the entire end-user path.** Dev deck has 15 across 107 slides (~14%). End-user is a different animal.
-- Permitted Mermaid use cases (operator pre-approval required):
-  - U1 might benefit from a tiny `graph LR: Docker → MDEMG server → You` sketch (judgment call)
-  - U6 might benefit from a tiny alert-flow sketch (operator → terminal banner → `mdemg jiminy override`)
+- **Default: minimal Mermaid.** End-user content explains OPERATIONS, not architecture — but at full-depth topic coverage, a few mental-model diagrams earn their place.
+- **Soft cap**: **4-6 Mermaid diagrams across the entire end-user path** (revised 2026-10-26 for full-depth coverage). Dev deck has 15 across 107 slides (~14%); end-user keeps similar density (~10%).
+- Operator-approved Mermaid slots (locked at E1):
+  - **U1.2** — the 5-container + mdemg server sketch (stack mental model)
+  - **U3** Memory — L0→L1→L2+ hierarchy sketch (how Hebbian consolidation flows)
+  - **U4** Jiminy — guidance → outcome → trust-signal loop
+  - **U5** RSIC — admission → cycle → outcome loop
+  - **U6** UxTS — the forcing-function diamond (spec → fixture → runner → CI gate)
+  - **U15** APIs + gRPC — surface map (operators via CLI → REST; plugins/transfer via gRPC)
+  - **U16** Alerts — override-flow sketch (block → operator → override → audit trail)
+- Any Mermaid NOT in the above list requires operator E5-review approval before shipping.
 
 ### 4.3 Screenshot policy
 
