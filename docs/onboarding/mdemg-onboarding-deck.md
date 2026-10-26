@@ -2517,44 +2517,7 @@ note:
 
 ## How Jiminy Thinks
 
-```mermaid
-flowchart TD
-    classDef actor fill:#fff5d6,stroke:#b58900,stroke-width:3px,color:#000,font-weight:bold
-    classDef service fill:#d6ecff,stroke:#1e5fa0,stroke-width:2px,color:#000
-    classDef store fill:#e8dcff,stroke:#5020a0,stroke-width:2px,color:#000
-    classDef gate fill:#ffdcdc,stroke:#a02020,stroke-width:2px,color:#000
-    classDef sink fill:#dcffdc,stroke:#206020,stroke-width:2px,color:#000
-
-    Agent1(["Agent<br/>about to act"]):::actor
-
-    subgraph Before[" 1. BEFORE: get guidance "]
-        direction TB
-        Latest["POST<br/>/v1/jiminy/latest"]:::service
-        Rules[("L1 Rules<br/>constraints<br/>corrections")]:::store
-        Synth["Synthesize<br/>directive"]:::service
-    end
-
-    Agent2(["Agent<br/>takes action"]):::actor
-
-    subgraph After[" 2. AFTER: record outcome "]
-        direction TB
-        Feedback["POST<br/>/v1/jiminy/feedback"]:::service
-        Verdict{"Classify<br/>verdict"}:::gate
-        Outcomes[("constraint_<br/>outcomes")]:::store
-    end
-
-    Agent1 --> Latest
-    Latest --> Rules
-    Rules --> Synth
-    Synth -->|directive| Agent2
-    Agent2 --> Feedback
-    Feedback --> Verdict
-    Verdict -->|"followed · ignored · partial<br/>contradicted · not-applicable"| Outcomes
-
-    Outcomes --> Trust[Trust score]:::sink
-    Outcomes --> RSIC[RSIC loop]:::sink
-    Outcomes --> Graf[Grafana panels]:::sink
-```
+![How Jiminy Thinks: two-phase loop. BEFORE action: retrieve rules + synthesize directive. AFTER action: classify verdict + feed trust, RSIC, Grafana.](./assets/svg/u4-how-jiminy-thinks.svg)
 
 Jiminy is a loop in two halves. **BEFORE** retrieves durable rules and synthesizes a directive the agent should respect. **AFTER** classifies whether the agent respected it, then feeds the outcome to trust, self-improvement, and operator visibility.
 
