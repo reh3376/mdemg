@@ -9,46 +9,83 @@
 
 ---
 
+## 1a. Opening Framing (operator directive 2026-10-26)
+
+The slideshow (both paths — end-user AND dev) opens by answering 4 strategic questions + an integrating slide, and each subsequent section is an in-depth answer to a piece of those questions:
+
+1. **What is MDEMG?**
+2. **What problem(s) does it attempt to solve?**
+3. **How does it solve those problems?**
+4. **How does it continuously get better at solving those problems?**
+5. **How does it all work together?** (the integrator — one Mermaid showing the whole loop)
+
+**Where answered**:
+- At the top of each path: U1 (end-user) / F1 (dev) — one slide per question + landing
+- Then each U-section (resp. F-section) is one or more in-depth answers mapped back to those questions
+
+**End-user U-section → question mapping**:
+
+| Question | Where deep |
+|---|---|
+| Q1 What is MDEMG? | U1 (overview); recurring throughout as the system's identity surfaces |
+| Q2 What problems does it solve? | U3 Memory (context loss) · U4 Jiminy (behavioral drift) · U16 Alerts (silent failures) |
+| Q3 How does it solve them? | U2 Stack · U3-U15 the surfaces that implement the solution |
+| Q4 How does it continuously improve? | U5 RSIC · U6 UxTS · U7 HITL · U8 Learning/Training · the trajectory language across the whole deck |
+
+Dev-path F1 is already shipped and partially aligned (opens with "What MDEMG Is Trying To Do" mission quote). **Deferred follow-up**: audit dev-path F1 against this 4-question structure in a future sprint; may require minor F1 slide additions.
+
+---
+
 ## 1. Audience
 
 **Target audience**: Operators of a running MDEMG instance.
 - Someone who ran `brew install reh3376/mdemg/mdemg` or `mdemg init --defaults && docker compose up -d`
-- Someone who wants to USE the system — not build it, not extend it, not understand its architecture
-- Technical enough to use a terminal and read SQL / JSON output
+- Someone who wants to USE the system — the operator's view
+
+The slideshow forks at the landing slide into **2 paths**: end-user (this one) and software dev / contributor (the shipped F1-F10 107-slide dev deck). Each path is comprehensive for the audience of that path (end-user path for operators, dev path for developers/contributors); viewers pick one path and stay in it.
 
 **Explicit NON-audience**:
-- Software developers extending MDEMG → they go through the dev-path 107-slide deck (shipped by MDEMG-ONBOARDING-DECK-001)
-- Non-technical users / exec summaries → not an MDEMG use case today; different artifact if ever needed
-- Beta testers specifically → they have `packaging/homebrew-mdemg/mdemg_beta_testing.md`; this walkthrough SUPPLEMENTS that doc but doesn't replace it
+- Software developers extending MDEMG → they take the dev-path at the fork
+- Non-technical users / exec summaries → not an MDEMG use case today
+- Pure architecture / "how is this built" questions → that's the dev-path's job
 
-**Posture**:
-- **Operator-first**: show what to click, type, watch — not why it works that way
-- **Terse**: operators arrive with time pressure; dense slides lose them
-- **CLI-example heavy**: show commands + expected output verbatim
+**Posture** (operator-directed 2026-10-26: "extensive and highly informative onboarding mechanism"):
+- **Comprehensive-first, terse-second**: cover every major topic in genuine depth; don't trim for brevity
+- **Operator-task shaped**: show what to click / type / watch — plus the mental model, current state, and gotchas for each topic so the operator truly OWNS the surface
+- **CLI-example heavy**: commands + output verbatim remain the backbone
 - **Honest trajectory language**: inherited from dev-path governance — no "by design" framing on sub-target metrics
 
 ---
 
-## 2. Slide-Count Envelope
+## 2. Slide-Count + Visual-Element Policy
 
-**Target**: 28-40 slides total across U1-U7.
-**Hard upper bound**: 45 slides (if the roadmap exceeds this, cut scope or split U-sections).
-**Hard lower bound**: 20 slides (below this, the walkthrough is probably skipping something load-bearing).
+**No caps** (operator directive 2026-10-26): "do not set unnecessary constraints on figures, tables, diagrams, or slides. This will take as much as necessary to provide the data required."
 
-**Rationale**: dev deck is 107 slides at ~115 min for senior engineers; end-user path targets operators who should get through the walkthrough in **~20-30 min**. Slide-density stays similar; count shrinks because scope shrinks.
+- No upper bound on total slide count.
+- No upper bound on Mermaid diagrams, tables, images, code blocks, or any other visual element per slide or per section.
+- No lower bound either — a topic that covers cleanly in 2 slides doesn't need padding to 5.
 
-**Per-section targets** (soft):
+**Rule**: each slide / figure / table / diagram EARNS its place by conveying information the viewer needs AND cannot easily get from the preceding slide. If removing an element would leave a gap the viewer can't fill from context, keep it. If it's redundant with the slide before, drop it.
 
-| § | Target slides | Rationale |
-|---|---:|---|
-| U1 Welcome + What You Have | 3-4 | Shortest; sets context, lists containers, names the 4-command happy path |
-| U2 The /ui/ Dashboard | 5-7 | 4 tabs × ~1-2 slides each; the central operator surface |
-| U3 Grafana — What To Actually Watch | 4-6 | Opinionated: don't walk 9 dashboards, name 3-5 panels |
-| U4 CLI — The ~15 Commands You'll Use | 6-8 | 4 command groups × ~2 slides each; one slide per group's rationale, one per group's command list |
-| U5 Memory — Inspect + Correct | 4-6 | observe / recall / correct are the operator-facing memory surface |
-| U6 Alerts + Enforcement Escape Hatches | 4-6 | Reading the terminal banner + jiminy mode + override |
-| U7 Where To Go Next | 2-3 | Pointers to docs/FAQ/issues; honest about which sprints are open |
-| **Total** | **28-40** | Fits envelope |
+**Depth template** (guide, not straitjacket):
+
+Each major topic (U-section) typically covers:
+1. **Section landing** — what this covers, why it matters
+2. **Mental model** — the mental model the operator should carry away (Mermaid if it genuinely helps)
+3. **Where to see it** — UI tab(s), Grafana panel(s), log patterns
+4. **How to touch it** — CLI commands, API endpoints
+5. **Current state (honest)** — today's state + arc moving the needle (trajectory language)
+6. **Gotchas** — common footguns, misconceptions
+7. **Where to go deeper** — feature doc, CLAUDE.md pin, sprint record
+
+**Topics may expand elements as needed**:
+- U3 Memory may need 2-3 Mermaid diagrams (hierarchy + Hebbian flow + consolidation lifecycle) if that's what the operator needs to carry the mental model.
+- U6 UxTS may need a full table of the 15 shipped frameworks + their forcing-function pattern per family.
+- U15 APIs may need the full route-table reference as a scroll-through slide.
+
+The current `global_roadmap.md` section breakdown is a **working estimate**, not a budget. Author authors to the information requirement; the table updates to match. Operator E5 live-review is the final arbiter of "enough / too much / missing."
+
+**Walk-time**: unmeasured. Operator can pause anytime (keyboard ESC → overview grid → resume anywhere).
 
 ---
 
@@ -117,11 +154,17 @@ TITLE + 1-sentence body + link table or bulleted next-steps.
 
 ### 4.2 Mermaid policy
 
-- **Default: NO Mermaid.** End-user content explains OPERATIONS, not architecture. If a slide feels like it needs Mermaid, ask: "would the operator be able to do their task without this diagram?" If yes → cut it.
-- **Soft cap**: **0-2 Mermaid diagrams across the entire end-user path.** Dev deck has 15 across 107 slides (~14%). End-user is a different animal.
-- Permitted Mermaid use cases (operator pre-approval required):
-  - U1 might benefit from a tiny `graph LR: Docker → MDEMG server → You` sketch (judgment call)
-  - U6 might benefit from a tiny alert-flow sketch (operator → terminal banner → `mdemg jiminy override`)
+- **No cap** (operator directive 2026-10-26). Diagrams earn their place by conveying mental models that prose can't easily carry.
+- **Minimum expected diagrams** (these are the ones the roadmap LOCKS as required; sections may add more as authoring demands):
+  - **U1.6** — the integrated system flow (memory + retrieval + Jiminy + RSIC + UxTS + HITL + retrain fitting together)
+  - **U2** — the 5-container + mdemg server stack sketch
+  - **U3 Memory** — L0→L1→L2+ hierarchy sketch; may need additional diagrams for Hebbian co-activation and consolidation lifecycle
+  - **U4 Jiminy** — guidance → outcome → trust-signal loop
+  - **U5 RSIC** — admission → cycle → outcome loop
+  - **U6 UxTS** — the forcing-function diamond (spec → fixture → runner → CI gate); likely needs a family-map table as well
+  - **U15 APIs + gRPC** — surface map (operators via CLI → REST; plugins/transfer via gRPC); may need per-service protocol diagrams
+  - **U16 Alerts** — override-flow sketch (block → operator → override → audit trail)
+- Sections that need MORE diagrams for completeness take them. Operator E5 review decides "enough / too much."
 
 ### 4.3 Screenshot policy
 

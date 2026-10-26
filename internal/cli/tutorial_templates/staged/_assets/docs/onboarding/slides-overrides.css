@@ -4,6 +4,29 @@
  * Tune heading sizes and spacing down from the night-theme defaults.
  */
 
+/*
+ * ONBOARDING-TUTORIAL-ENDUSER-001 E5 fix (2026-10-26):
+ * Reveal.js slides don't scroll in presentation mode — content taller
+ * than the 900px canvas is CLIPPED. Enabled reveal.js 5.x scroll-view
+ * mode via frontmatter `revealOptions: view: scroll` which turns the
+ * entire deck into a single scrollable document (perfect for operator
+ * review). This CSS section adds a styled scrollbar for the scroll-view
+ * container.
+ */
+.reveal-viewport::-webkit-scrollbar,
+html::-webkit-scrollbar {
+  width: 10px;
+}
+.reveal-viewport::-webkit-scrollbar-thumb,
+html::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.4);
+  border-radius: 5px;
+}
+.reveal-viewport::-webkit-scrollbar-track,
+html::-webkit-scrollbar-track {
+  background: transparent;
+}
+
 .reveal h1 {
   font-size: 2.0em;
   line-height: 1.1;

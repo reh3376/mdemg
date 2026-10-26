@@ -82,6 +82,25 @@ mkdirSync(mermaidDestDir, { recursive: true });
 copyFileSync(MERMAID_SRC, join(mermaidDestDir, 'mermaid.min.js'));
 info(`bundled mermaid.min.js (${statSync(MERMAID_SRC).size} bytes)`);
 
+// ONBOARDING-TUTORIAL-ENDUSER-001 E5 fix: reveal-md's default mermaid init
+// only renders the ".present" slide's diagrams. In reveal.js 5.x `view: scroll`
+// mode no slide is marked `.present`, so diagrams never render — operator
+// sees raw mermaid source instead of SVG. Patch the generated index.html's
+// mermaid init to render ALL diagrams on `ready`.
+const indexPath = join(STAGED_DIR, 'index.html');
+let indexHtml = readFileSync(indexPath, 'utf8');
+const presentMermaidRe = /mermaid\.init\(mermaidOptions, '\.slides > \.present:not\(\.stack\) pre code\.mermaid'\);/;
+if (presentMermaidRe.test(indexHtml)) {
+  indexHtml = indexHtml.replace(
+    presentMermaidRe,
+    "mermaid.init(mermaidOptions, '.slides pre code.mermaid');  // ENDUSER-001 E5: render all slides (scroll view compat)"
+  );
+  writeFileSync(indexPath, indexHtml);
+  info('patched mermaid init for scroll-view compatibility');
+} else {
+  info('mermaid init pattern not found — reveal-md may have updated; skipping patch');
+}
+
 // Write a SOURCE_SHA256 breadcrumb so make verify-tutorial-embed can detect
 // drift (deck source changed without re-running the sync). The verifier
 // recomputes the SHA of DECK_SRC + CSS_SRC and compares.
