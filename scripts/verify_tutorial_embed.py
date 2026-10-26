@@ -28,6 +28,7 @@ REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 BREADCRUMB = REPO_ROOT / "internal" / "cli" / "tutorial_templates" / "staged" / "SOURCE_SHA256.txt"
 DECK_SRC = REPO_ROOT / "docs" / "onboarding" / "mdemg-onboarding-deck.md"
 CSS_SRC = REPO_ROOT / "docs" / "onboarding" / "slides-overrides.css"
+SVG_VIEWER_SRC = REPO_ROOT / "docs" / "onboarding" / "svg-viewer.js"
 
 
 def sha256_of(path: pathlib.Path) -> str:
@@ -67,20 +68,27 @@ def main() -> int:
         print(f"ERROR: CSS source missing: {CSS_SRC.relative_to(REPO_ROOT)}")
         return 1
 
+    if not SVG_VIEWER_SRC.exists():
+        print(f"ERROR: SVG viewer source missing: {SVG_VIEWER_SRC.relative_to(REPO_ROOT)}")
+        return 1
+
     breadcrumb = parse_breadcrumb(BREADCRUMB)
     expected_deck = breadcrumb.get("deck_sha256", "")
     expected_css = breadcrumb.get("css_sha256", "")
+    expected_viewer = breadcrumb.get("svg_viewer_sha256", "")
 
-    if not expected_deck or not expected_css:
-        print(f"ERROR: breadcrumb malformed: missing deck_sha256 or css_sha256")
+    if not expected_deck or not expected_css or not expected_viewer:
+        print(f"ERROR: breadcrumb malformed: missing deck_sha256, css_sha256, or svg_viewer_sha256")
         print(f"  Re-run: make sync-tutorial-embed")
         return 1
 
     actual_deck = sha256_of(DECK_SRC)
     actual_css = sha256_of(CSS_SRC)
+    actual_viewer = sha256_of(SVG_VIEWER_SRC)
 
     deck_drift = actual_deck != expected_deck
     css_drift = actual_css != expected_css
+    viewer_drift = actual_viewer != expected_viewer
 
     if deck_drift:
         print(f"DRIFT: {DECK_SRC.relative_to(REPO_ROOT)}")
@@ -92,9 +100,14 @@ def main() -> int:
         print(f"  embed was built against: {expected_css}")
         print(f"  current source hash:     {actual_css}")
 
-    if deck_drift or css_drift:
+    if viewer_drift:
+        print(f"DRIFT: {SVG_VIEWER_SRC.relative_to(REPO_ROOT)}")
+        print(f"  embed was built against: {expected_viewer}")
+        print(f"  current source hash:     {actual_viewer}")
+
+    if deck_drift or css_drift or viewer_drift:
         print()
-        print("The deck source changed without re-running the embed sync.")
+        print("A tutorial source file changed without re-running the embed sync.")
         print("Fix: cd into the repo root and run:")
         print("    make sync-tutorial-embed")
         print("    git add internal/cli/tutorial_templates/staged")

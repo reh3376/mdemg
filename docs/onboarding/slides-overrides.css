@@ -104,34 +104,65 @@ html::-webkit-scrollbar-track {
 }
 
 /*
- * ONBOARDING-TUTORIAL-ENDUSER-001 (2026-10-26):
- * Responsive SVG container for hand-authored diagrams.
+ * ONBOARDING-TUTORIAL-ENDUSER-001 interactive SVG viewer (2026-10-26):
  *
- * Operator-direction: diagrams should scale to the viewer's container
- * (desktop, phone, embedded preview). A reveal.js slide is 1600×900 natural;
- * we cap diagram width at a comfortable 85% of slide width (max 1360px
- * natural, scales freely below). The SVG files declare only viewBox (no
- * fixed width/height) so this CSS controls display size exclusively.
+ * Every hand-authored diagram is wrapped in <figure class="svg-figure">
+ * which svg-viewer.js upgrades to an interactive zoom/pan container at
+ * page load. This CSS is the baseline that the JS builds on.
+ *
+ * Design intent:
+ * - Container has a BOUNDED height (fits inside one viewport-tall
+ *   reveal.js slide), so slides containing a diagram never exceed
+ *   viewport-height — sidesteps the scroll-view tall-slide clipping
+ *   class entirely.
+ * - Image inside uses object-fit: contain so it fits the container
+ *   with aspect preserved (fit-to-container is the default state).
+ * - CSS transform (controlled by svg-viewer.js) adds zoom + pan on top.
+ * - User's native image-viewer intuition applies: wheel/pinch to zoom,
+ *   drag to pan, double-click to reset, floating toolbar on hover.
+ *
+ * Works for ANY SVG viewBox or aspect ratio — operator can convert any
+ * table/flowchart/architecture-diagram without further per-slide CSS.
  */
 .reveal .svg-figure,
 .reveal figure.svg-figure {
   display: block;
-  width: 100%;
-  max-width: 85%;
+  position: relative;
+  width: 85%;
+  max-width: 1360px;
+  /* Height is tuned for reveal.js's slide coord system: reveal authors
+     slides at 1600x900 and scales to viewport, so CSS px here are
+     slide-coord px. 540px slide-coord = 60% of the authored slide height,
+     which leaves room for a heading above + a short caption below without
+     overflowing the slide tile under any typical viewport scale. */
+  height: 540px;
   margin: 0.5em auto;
   padding: 0;
+  overflow: hidden;
+  background: #ffffff;
+  border-radius: 6px;
+  user-select: none;
+  touch-action: none;
+  cursor: grab;
+}
+
+.reveal .svg-figure.svg-viewer-grabbing {
+  cursor: grabbing;
 }
 
 .reveal .svg-figure img {
   display: block;
   width: 100%;
-  max-width: 100%;
-  height: auto;
+  height: 100%;
+  object-fit: contain;
   margin: 0;
   border: 0;
   padding: 0;
   background: transparent;
   box-shadow: none;
+  transform-origin: 50% 50%;
+  will-change: transform;
+  pointer-events: none;
 }
 
 .reveal .svg-figure figcaption {
@@ -143,13 +174,97 @@ html::-webkit-scrollbar-track {
   font-style: italic;
 }
 
+/* Floating toolbar: hidden until hover/focus, so it doesn't distract from the diagram. */
+.reveal .svg-figure .svg-viewer-toolbar {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  gap: 4px;
+  background: rgba(15, 23, 42, 0.8);
+  padding: 4px;
+  border-radius: 6px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.reveal .svg-figure:hover .svg-viewer-toolbar,
+.reveal .svg-figure:focus-within .svg-viewer-toolbar,
+.reveal .svg-figure.svg-viewer-grabbing .svg-viewer-toolbar {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.reveal .svg-figure .svg-viewer-toolbar button {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  background: rgba(255, 255, 255, 0.12);
+  color: #f1f5f9;
+  font-size: 18px;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  line-height: 1;
+}
+
+.reveal .svg-figure .svg-viewer-toolbar button:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.reveal .svg-figure .svg-viewer-toolbar button:focus-visible {
+  outline: 2px solid #60a5fa;
+  outline-offset: 1px;
+}
+
+/* First-time usage hint: dismisses when user interacts. */
+.reveal .svg-figure .svg-viewer-hint {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(15, 23, 42, 0.75);
+  color: #e2e8f0;
+  font-size: 11px;
+  font-family: -apple-system, "Inter", "Segoe UI", Arial, sans-serif;
+  padding: 4px 10px;
+  border-radius: 4px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 4;
+}
+
+.reveal .svg-figure:hover .svg-viewer-hint {
+  opacity: 0.9;
+}
+
+/* Fullscreen: let the figure fill the screen, image expands within. */
+.reveal .svg-figure:fullscreen {
+  width: 100vw;
+  max-width: 100vw;
+  height: 100vh;
+  max-height: 100vh;
+  border-radius: 0;
+  margin: 0;
+  background: #ffffff;
+}
+
 /*
  * Reveal-md wraps standalone markdown images in <p><img></p>. Give those a
  * cap too for diagrams that aren't yet wrapped in .svg-figure (fallback
- * so a plain ![alt](file.svg) still scales politely).
+ * so a plain ![alt](file.svg) still scales politely without the viewer).
  */
 .reveal p > img[src$=".svg"] {
   max-width: 85%;
+  max-height: 70vh;
   height: auto;
   display: block;
   margin: 0.5em auto;
