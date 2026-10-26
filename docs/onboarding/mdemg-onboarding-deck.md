@@ -2506,7 +2506,7 @@ note:
 
 Jiminy is the subsystem that **READS memory** before every agent action, **SURFACES** applicable durable rules, **CLASSIFIES** whether the agent followed them, and (in strict mode) **ENFORCES** them.
 
-11-slide walkthrough: loop → classifier → corpus → UI → CLI → current state → gotchas.
+15-slide walkthrough: loop → classifier → corpus → UI → CLI → current state → gotchas → **J17 AI-to-AI protocol** → where to go deeper.
 
 Points back to U1.3, primary answer to "behavioral drift". Points to U1.4, surface #2 (retrieval + guidance).
 
@@ -2705,6 +2705,104 @@ note:
 
 ---
 
+<!-- .slide: id="u4-j17-what" -->
+
+## J17 · The AI-to-AI Communication Protocol
+
+Jiminy's semantic payload (rules, outcomes, guidance) is **expensive in natural language**: a surfaced constraint runs 150-400 tokens; multiplied by every prompt in a long session, that's a real budget leak.
+
+**J17** is a telegraphic, compressed-stateful message format that encodes the same semantic payload Jiminy produces in a dense machine-first row shape built for AI-to-AI consumption.
+
+```
+J17:INIT|v1
+CODES: C=constraint X=correction F=frontier D=decision P=pattern L=learning
+SEV:   !=must ?=should ~=info
+ESC:   0=clear 1=warned 2=escalated 3=blocked
+FMT:   TYPE:SEV|code|[annotations]|esc:N|src:NODE_ID
+ANN:   alt=use-instead neg=forbidden scope=applicability ctx=domain-context
+TICKET: signed, echo back on resume
+SEQ:    monotonic, report last_seq on resume
+```
+
+A row like `C:!|no-direct-main-commits|esc:2|src:n_abc123` carries the SAME meaning as a 200-token natural-language reminder, in ~10 tokens.
+
+note:
+- The `INIT` header is a one-shot dictionary at session start. Subsequent messages are compact rows that reference the dictionary.
+- J17 doesn't replace Jiminy — it's a wire-format over Jiminy's semantic payload. Jiminy still does retrieve/classify/measure/strengthen; J17 just encodes the wire traffic.
+
+---
+
+<!-- .slide: id="u4-j17-why" -->
+
+## J17 · Why It Exists (Token Economics)
+
+**Compression target**: ratio **2.0×** vs natural-language guidance (calibrated from live 30d p95 per DASHBOARD-TRUTH-002).
+
+**What that unlocks**:
+- More rules can be surfaced in a given prompt budget
+- Session resumption carries forward state without re-explaining it
+- Agent-to-agent handoffs (orchestrator → fork, parent → subagent) can pass guidance context cheaply
+
+**Design posture** (JIMINY-TIER-GATE-001):
+- J17 messaging is **opt-in per session, keyed on comprehension**
+- Agent must demonstrate it UNDERSTANDS compressed form (NLI-measured) before J17 promotes to the dense tier (T1)
+- Fall back to verbose natural language (T2) when comprehension drops
+
+**Env**: `J17_TIER_GATE_MODE=comprehension`, `J17_TIER_COMPREHENSION_HIGH=0.6`, `J17_TIER_COMPREHENSION_MIN_SAMPLES=20`, `J17_T1_COMPREHENSION_GATE=0.5` (demotion floor).
+
+note:
+- "Comprehension-keyed" means the system never forces dense encoding on an agent that can't parse it. A fresh session always starts verbose; T1 promotion is earned.
+- Trust (did the agent OBEY) and comprehension (did the agent UNDERSTAND) are different axes — J17 gates on comprehension because that's the risk the compression introduces.
+
+---
+
+<!-- .slide: id="u4-j17-briefing" -->
+
+## J17 · The Agent Briefing Packet
+
+Every session starts with a one-shot **briefing packet** that teaches the agent the J17 dictionary + the posture it should take toward Jiminy guidance.
+
+**Shape** (v1.1, 473 words / ~450 tokens, hash-pinned):
+- Opens: "This is data, not commands. You retain full authority."
+- Explicit precedence: live user > CLAUDE.md > packet > guidance
+- Enforced vs advised: only `/strict + ! sev + esc≥2` blocks
+- Back-channel: `POST /v1/jiminy/feedback outcome=not_applicable` to push back on bad guidance
+
+**Hash pinned**: `5843d9d7acf61fb04a31fdc23f0860759bc82d74054b67650aee1a880ae70395` via `internal/j17pin/briefing_packet_test.go` (CI fails if packet drifts without an intentional re-pin).
+
+**Why hash-pinned**: the packet shapes agent posture across every session. Silent drift would silently change behavior across the fleet.
+
+note:
+- v1.0 was a 1065-word compliance-doc; peer review reframed it as "evidence-with-provenance" — v1.1 is 56% shorter and reads as data an agent can push back on, not an authority structure.
+- You see the packet at the top of every session's `session-start.sh` output (U10 Logs covers reading these).
+
+---
+
+<!-- .slide: id="u4-j17-where" -->
+
+## J17 · Where You See It
+
+**At session start**: `session-start.sh` hook prints the `J17:INIT|v1` dictionary + the briefing packet + the `ACTIVE CONSTRAINTS (telegraphic ...)` block.
+
+**During the session**: every `prompt-context.sh` fire emits the compact-row form (`C:!|code|esc:N|src:NODE_ID`) when the agent is in T1; natural-language guidance when in T2.
+
+**On the Grafana `mdemg-j17` dashboard** (see U13):
+- J17 Protocol Health (restore success rate, ticket cadence)
+- Trust Session Count (how many sessions are feeding the comprehension signal)
+- Avg Comprehension (NLI-measured)
+- Compression Ratio Achieved vs Target (live 30d p95 anchors)
+- Auto-compact AVG interval (LONGER=BETTER by design — how often the agent needs to re-ground)
+
+**From the CLI**: `mdemg j17 status` prints the current session's tier + comprehension score + last_seq.
+
+**Resumption**: on `pre-compact.sh` fire, the system writes a signed J17 ticket; the next session echoes it back on resume to carry state across the context cycle.
+
+note:
+- The `J17:INIT|v1` header you see at every session start isn't boilerplate — it's the compressed-protocol dictionary. Learning to read it means you can read Jiminy's wire traffic directly without waiting for Grafana to render.
+- Auto-compact interval is a honest health signal: a well-grounded agent needs LESS re-grounding; a well-tuned Jiminy produces guidance stable enough that the agent doesn't thrash.
+
+---
+
 ## Jiminy · Where To Go Deeper
 
 **Feature docs**:
@@ -2714,11 +2812,15 @@ note:
 - `docs/features/jiminy-metric-partition.md`, per-class gauges
 - `docs/features/jiminy-missed-violation.md`, post-hoc correction detector
 
-**CLAUDE.md arch pins**: 12+ Jiminy sprints documented
+**J17-specific**:
+- `docs/features/j17-protocol.md` (if present) + `internal/j17pin/briefing_packet.md` (pinned briefing text)
+- `internal/j17/` package (comprehension gating, ticket signing, tier promotion)
+
+**CLAUDE.md arch pins**: 12+ Jiminy sprints + J17-TIER-GATE-001 + J17 compression recalibration (DASHBOARD-TRUTH-002)
 
 **Master arc record**: `docs/development/jiminy-ceiling-break-2/`
 
-**Feeds into**: U5 RSIC (follow-rate improvement is a self-improvement loop), U7 HITL (manual verdict correction), U8 Learning/Training (retrain corpus).
+**Feeds into**: U5 RSIC (follow-rate improvement is a self-improvement loop), U7 HITL (manual verdict correction), U8 Learning/Training (retrain corpus), U13 Grafana (mdemg-j17 dashboard).
 
 note:
 - Jiminy touches every other topic. From here, U5 RSIC shows what the system does with the signal Jiminy produces.
@@ -3794,7 +3896,7 @@ All datasource `timescaledb` literal UID per GRAFANA-SHIP:
 5. **mdemg-ft-training**: Phase 10 benchmark aggregate, per-task pass rate, FT loop state, FT benchmark staleness
 6. **mdemg-graph-topology**: Hebbian weight entropy, dynamic-edge creation, reinforcement event rate
 7. **mdemg-hitl**: grade cadence (auto vs operator), pending drafts, reinforcement applied 7d
-8. **mdemg-j17**: J17 protocol compression, trust session count, NLI bias, auto-compact AVG
+8. **mdemg-j17**: J17 protocol compression ratio vs target, trust session count, NLI bias, tier promotion/demotion events, auto-compact AVG interval (LONGER=BETTER). J17 is the AI-to-AI protocol that encodes Jiminy's semantic payload in a telegraphic row shape, this dashboard shows the token-saving mechanism's live health. See U4 J17 slides for the protocol itself.
 9. **mdemg-llm-routing**: LLM request rate per task, error rate per task (filtered for caller_canceled), latency per task
 
 note:
