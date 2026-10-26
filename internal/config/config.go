@@ -1403,6 +1403,11 @@ type Config struct {
 	JiminyRulesListMaxLimit          int     // JIMINY_RULES_LIST_MAX_LIMIT — max page size for GET /v1/jiminy/rules ?limit=N (default 200)
 	JiminyRulesOutcomesLookbackHours int     // JIMINY_RULES_OUTCOMES_LOOKBACK_HOURS — window for recent enforcement outcomes on GET /v1/jiminy/rules/{code} detail (default 168 = 7d)
 
+	// ONBOARDING-TUTORIAL-SERVE-001 (2026-10-24) — /ui/tutorial/ handler.
+	// Serves the embedded reveal.js onboarding deck from
+	// internal/cli/tutorial_templates/staged/ (see tutorial_templates.FS()).
+	TutorialEnabled bool // TUTORIAL_ENABLED — master flag for GET /ui/tutorial/*; default true; set false to return 503 (air-gapped operators who don't want the ~8MB embed served)
+
 	// HITL-REVIEW-001 — general-purpose human-in-the-loop review + live-reinforcement platform.
 	ReviewEnabled                    bool    // REVIEW_ENABLED — enable the /v1/review/* surface + UI tab (default: true)
 	ReviewWriterFlushIntervalSec     int     // REVIEW_WRITER_FLUSH_INTERVAL_SEC — review_grades writer flush cadence (default: 15, floor: 5)
@@ -4208,6 +4213,9 @@ func FromEnv() (Config, error) {
 		jiminyRulesOutcomesLookbackHours = 1
 	}
 
+	// ONBOARDING-TUTORIAL-SERVE-001 — /ui/tutorial/ handler flag.
+	tutorialEnabled := getBool("TUTORIAL_ENABLED", true)
+
 	// HITL-REVIEW-001 — review platform config.
 	reviewEnabled := getBool("REVIEW_ENABLED", true)
 	reviewWriterFlushIntervalSec, err := atoi("REVIEW_WRITER_FLUSH_INTERVAL_SEC", 15)
@@ -6682,6 +6690,7 @@ func FromEnv() (Config, error) {
 		JiminyRulesDedupSimThreshold:                   jiminyRulesDedupSimThreshold,
 		JiminyRulesListMaxLimit:                        jiminyRulesListMaxLimit,
 		JiminyRulesOutcomesLookbackHours:               jiminyRulesOutcomesLookbackHours,
+		TutorialEnabled:                                tutorialEnabled,
 		ReviewEnabled:                                  reviewEnabled,
 		ReviewWriterFlushIntervalSec:                   reviewWriterFlushIntervalSec,
 		ReviewWriterBufferSize:                         reviewWriterBufferSize,
