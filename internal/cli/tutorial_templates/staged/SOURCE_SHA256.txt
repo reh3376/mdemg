@@ -1,6 +1,8 @@
 # ONBOARDING-TUTORIAL-SERVE-001 drift breadcrumb
 # verified by scripts/verify_tutorial_embed.py (CI gate)
-deck_sha256=5330072b5131904aef6528b5f77452e1210177be572d4c93a67b7ac7eb12b3a1
-css_sha256=c2253a0954560ebc1ff78014b5050d4816b41bdeb75d1efa2503f690ad3e32ec
+deck_sha256=fd8fa0afb97c5b821c544016da8138705c11e5d261dee4032d1aa1af41c7bfd1
+css_sha256=76c8a445420d3176efad674f541d968d7eaf41788ab7020ae972a34f339ed1f3
+svg_viewer_sha256=a11ea333dbff84e192785ca413ec467f772a3de5cca29948951955980c486530
 deck_path=docs/onboarding/mdemg-onboarding-deck.md
 css_path=docs/onboarding/slides-overrides.css
+svg_viewer_path=docs/onboarding/svg-viewer.js

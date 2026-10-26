@@ -1,9 +1,9 @@
-# U1 — Opening (6 slides)
+# U1 · Opening (6 slides)
 
 **Intent**: Open with the 4 strategic questions + an integrating slide. Set the frame; each subsequent U-section is an in-depth answer to a piece of this.
 **Walk-time**: ~5 min
 **Target slides**: 6
-**Mermaid**: 1 (U1.6 — integrated system flow)
+**Mermaid**: 1 (U1.6, integrated system flow)
 **Natural Q&A anchor**: after U1.6
 
 **Depth template coverage**: this section IS the question-answer landing; the "depth template" (mental model / where to see / etc.) is distributed across U2-U17.
@@ -17,10 +17,10 @@
 
 ---
 
-## U1.1 — Section Landing (replaces `#end-user-path` stub)
+## U1.1 · Section Landing (replaces `#end-user-path` stub)
 
-**Title**: `U1 · Operator Onboarding — Start Here`
-**Slide ID**: `end-user-path` (**ANCHOR PRESERVED** — SERVE-001 landing fork links here)
+**Title**: `U1 · Operator Onboarding, Start Here`
+**Slide ID**: `end-user-path` (**ANCHOR PRESERVED**: SERVE-001 landing fork links here)
 
 **Body**:
 - 1-sentence intent: "The next ~85 minutes answer four questions. Each U-section drills into a piece of the answer. You'll own the operator view by the end."
@@ -37,7 +37,7 @@
 
 ---
 
-## U1.2 — What Is MDEMG?
+## U1.2 · What Is MDEMG?
 
 **Title**: `What Is MDEMG?`
 
@@ -45,8 +45,8 @@
 - The mission quote (verbatim from CLAUDE.md `project_mdemg_purpose`):
   > **Help developers create software that connects in a manner that increases the likelihood of making better decisions.**
 - One-paragraph expansion:
-  - MDEMG is a **cognitive substrate** — persistent memory + decision-informing retrieval + behavioral guidance — not a tool
-  - **Decisions are the atomic unit** — not features, not metrics
+  - MDEMG is a **cognitive substrate**: persistent memory + decision-informing retrieval + behavioral guidance, not a tool
+  - **Decisions are the atomic unit**: not features, not metrics
   - **Connections** (memory → retrieval → classification → synthesis) are what the system optimizes
 - The analogy: internal dialogue is to a conscious biological neural network as MDEMG is to an artificial neural network (an AI agent)
 - Where this expands: U3 Memory (the substrate itself), U4 Jiminy (how it guides decisions)
@@ -61,15 +61,15 @@
 
 ---
 
-## U1.3 — What Problems Does It Solve?
+## U1.3 · What Problems Does It Solve?
 
 **Title**: `What Problems Does It Solve?`
 
 **Body**:
 - Three core problem classes:
-  1. **Context loss across sessions** — the AI agent forgets everything between runs; MDEMG remembers (persistent CMS) → *expanded in U3 Memory*
-  2. **Behavioral drift** — the agent repeats mistakes; MDEMG surfaces durable guidance that reminds it before action (Jiminy + enforcement) → *expanded in U4 Jiminy, U16 Alerts/Enforcement*
-  3. **Silent failure modes** — the system degrades without anyone noticing; MDEMG observes itself continuously via alerts + Grafana + RSIC → *expanded in U13 Grafana, U16 Alerts, U5 RSIC*
+  1. **Context loss across sessions**: the AI agent forgets everything between runs; MDEMG remembers (persistent CMS) → *expanded in U3 Memory*
+  2. **Behavioral drift**: the agent repeats mistakes; MDEMG surfaces durable guidance that reminds it before action (Jiminy + enforcement) → *expanded in U4 Jiminy, U16 Alerts/Enforcement*
+  3. **Silent failure modes**: the system degrades without anyone noticing; MDEMG observes itself continuously via alerts + Grafana + RSIC → *expanded in U13 Grafana, U16 Alerts, U5 RSIC*
 - Honest note: the arcs that MOVE each needle are ongoing; U5 (RSIC) and U17 (Where to Go) carry the trajectory
 
 **Provenance**:
@@ -81,17 +81,17 @@
 
 ---
 
-## U1.4 — How Does It Solve Them?
+## U1.4 · How Does It Solve Them?
 
 **Title**: `How Does It Solve Them?`
 
 **Body**:
 - The four surfaces (each is a U-section):
-  1. **Memory substrate** — Neo4j graph of observations + consolidation into layered abstractions → *U3 Memory*
-  2. **Retrieval + guidance** — RRF 4-column retrieval + Jiminy surfaces durable rules on every prompt → *U3 Memory + U4 Jiminy*
-  3. **Enforcement** — strict mode blocks violations; override escape hatches preserve operator agency → *U16 Alerts + Enforcement*
-  4. **Observability** — Grafana + TSDB + alerts channel + /ui/ Status → *U2 Stack, U13 Grafana, U16 Alerts*
-- Mental model: "sense → store → retrieve → classify → act → observe → learn" — the full loop
+  1. **Memory substrate**: Neo4j graph of observations + consolidation into layered abstractions → *U3 Memory*
+  2. **Retrieval + guidance**: RRF 4-column retrieval + Jiminy surfaces durable rules on every prompt → *U3 Memory + U4 Jiminy*
+  3. **Enforcement**: strict mode blocks violations; override escape hatches preserve operator agency → *U16 Alerts + Enforcement*
+  4. **Observability**: Grafana + TSDB + alerts channel + /ui/ Status → *U2 Stack, U13 Grafana, U16 Alerts*
+- Mental model: "sense → store → retrieve → classify → act → observe → learn", the full loop
 - Where this expands: literally U2 through U15 are the surfaces that make this real
 
 **Provenance**:
@@ -103,16 +103,16 @@
 
 ---
 
-## U1.5 — How Does It Continuously Get Better?
+## U1.5 · How Does It Continuously Get Better?
 
 **Title**: `How Does It Continuously Improve?`
 
 **Body**:
 - Four self-improvement loops (each a U-section's deep topic):
-  1. **RSIC** — recursive self-improvement cycle: reflect → trigger → admit → outcome → learn → *U5 RSIC*
-  2. **UxTS forcing-functions** — contract-first framework family (UATS/UVTS/ULTS/…) prevents drift at merge time → *U6 UxTS*
-  3. **HITL curation** — operator grading of guidance outcomes feeds the retrain corpus → *U7 Review/HITL*
-  4. **Fine-tuning / recursive retrain** — the production LLM gets measurably better via Phase 5 SFT + the recursive-retrain loop → *U8 Learning/Training Data*
+  1. **RSIC**: recursive self-improvement cycle: reflect → trigger → admit → outcome → learn → *U5 RSIC*
+  2. **UxTS forcing-functions**: contract-first framework family (UATS/UVTS/ULTS/…) prevents drift at merge time → *U6 UxTS*
+  3. **HITL curation**: operator grading of guidance outcomes feeds the retrain corpus → *U7 Review/HITL*
+  4. **Fine-tuning / recursive retrain**: the production LLM gets measurably better via Phase 5 SFT + the recursive-retrain loop → *U8 Learning/Training Data*
 - Honest trajectory language rule (operator directive 2026-08-01):
   - WRONG: "follow rate 13% by design"
   - RIGHT: "follow rate ~13% currently; target ≥80% via the JIMINY-CEILING-BREAK-2 arc; today's trajectory is …"
@@ -120,20 +120,20 @@
 
 **Provenance**:
 - CLAUDE.md JIMINY-CEILING-BREAK-2 arc + RSIC pins + FT-RECURSIVE-{001,002,003,004} + HITL-CURATION-* sprints
-- CLAUDE.md "Testing — Live System Testing Is Required"
+- CLAUDE.md "Testing, Live System Testing Is Required"
 
 **note**:
 - Operator cue: "The system is honest about where it is. If a metric is below target, we name the arc moving it. You'll see this trajectory language everywhere from U2 onwards."
 
 ---
 
-## U1.6 — How It All Works Together
+## U1.6 · How It All Works Together
 
 **Title**: `How It All Works Together`
 
 **Body**:
-- 1-sentence context: "The four surfaces (memory, retrieval+guidance, enforcement, observability) and the four improvement loops (RSIC, UxTS, HITL, fine-tune) are not separate systems — they share one substrate and feed each other."
-- **Mermaid #8** (integrated flow — the big picture):
+- 1-sentence context: "The four surfaces (memory, retrieval+guidance, enforcement, observability) and the four improvement loops (RSIC, UxTS, HITL, fine-tune) are not separate systems, they share one substrate and feed each other."
+- **Mermaid #8** (integrated flow, the big picture):
   - Agent action → **Hook** (U-level: pre-write-check / pre-bash-check / post-tool-observe)
   - Hook → **Jiminy classify** (U4) uses **Memory recall** (U3) → surfaces durable rules + evaluates outcome
   - Agent action → **Observe** (U3) → L0 obs → consolidation → L1/L2+ nodes → fed back into recall
@@ -151,5 +151,5 @@
 
 **note**:
 - Operator cue: "This is the whole loop. Memorize this slide; everything after is a zoomed-in piece of it."
-- PM-fallback: "Think of it like a flight-test rig — the plane flies, instruments record, engineers review, next build improves. MDEMG is that for AI agents and their decisions."
-- Transition: "Four questions + how it fits together. Next up: U2 — the stack that implements all of this."
+- PM-fallback: "Think of it like a flight-test rig, the plane flies, instruments record, engineers review, next build improves. MDEMG is that for AI agents and their decisions."
+- Transition: "Four questions + how it fits together. Next up: U2, the stack that implements all of this."

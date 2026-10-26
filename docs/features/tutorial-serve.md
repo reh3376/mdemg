@@ -115,8 +115,28 @@ This mirrors the GRAFANA-SHIP (RELEASE-HYGIENE-001 E2) drift pattern.
 
 The deck's second slide is a landing fork offering two paths:
 
-- **Software Dev Onboarding** — the full 107-slide engineering walkthrough (the default; just press ↓/Space).
-- **End User** — an end-user stub (jump via anchor link); real content lands in sibling sprint `ONBOARDING-TUTORIAL-ENDUSER-001`.
+- **Software Dev Onboarding** — the full 107-slide engineering walkthrough (the default; just press ↓/Space). Reaches via `#dev-path`.
+- **End User** — the full 122-slide operator walkthrough (U1-U17, 8 Mermaid diagrams). Reaches via `#end-user-path`. Shipped by sibling sprint `ONBOARDING-TUTORIAL-ENDUSER-001` (2026-10-26).
+
+Combined deck: **231 slides** total. The reveal.js runtime uses `view: scroll` mode (reveal.js 5.x) so the whole deck reads as one scrollable document; the fork anchors + per-section IDs let the TOC jump to any slide.
+
+### End User Path (U1-U17)
+
+Operator-facing walkthrough for people who OPERATE a running MDEMG instance (not developers who modify the code). Composition:
+
+- **U1 Opening** — 4 strategic questions (what is MDEMG / what does it do for me / why should I trust it / who is this for) + integrator-view diagram at U1.6
+- **U2 Install + Start the Stack** — docker compose, healthz, first login
+- **U3 Core Data Flows** — observe / recall / correct (the three verbs operators use most)
+- **U4 Jiminy** — guidance surfaces, strict mode, override escape hatch
+- **U5-U7** — RSIC self-improvement, HITL review surfaces, autograde cadence
+- **U8-U11** — benchmarks, backup/restore, Grafana dashboards, alert triage
+- **U12-U14** — CLI reference by group, hook channel health, multi-instance
+- **U15 APIs + gRPC** — direct API consumers (operators integrating MDEMG into other tools)
+- **U16-U17** — "The Override Escape Hatch" + where-to-go-next + closing
+
+The end-user path is COMPLETE for operators by design — it does NOT send operators to the dev path for any topic. Dev-only concerns (training pipeline, RL, model distribution internals, UxTS framework authoring) are intentionally out-of-scope.
+
+Every U-section has an explicit `<!-- .slide: id="..." -->` directive so TOC fragment links resolve under reveal.js 5.x markdown plugin (which does NOT auto-generate heading anchors in scroll view).
 
 ---
 
@@ -151,5 +171,5 @@ Set `TUTORIAL_ENABLED=false` in `.env` and restart. The handler responds 503 wit
 
 - Deck source + authoring: [`docs/onboarding/README.md`](../onboarding/README.md), [`docs/onboarding/mdemg-onboarding-deck.md`](../onboarding/mdemg-onboarding-deck.md)
 - Governance of the deck itself: [`docs/features/mdemg-onboarding-deck.md`](./mdemg-onboarding-deck.md)
-- Sibling sprint (end-user path content): `ONBOARDING-TUTORIAL-ENDUSER-001` (planned)
+- Sibling sprint (end-user path content, SHIPPED 2026-10-26): [`docs/development/onboarding-tutorial-enduser-001/`](../development/onboarding-tutorial-enduser-001/)
 - GRAFANA-SHIP drift pattern (precedent for `make sync-tutorial-embed` / `make verify-tutorial-embed`): [`docs/development/release-hygiene-001/`](../development/release-hygiene-001/)

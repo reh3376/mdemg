@@ -1,4 +1,4 @@
-# E5 — Operator Live Review Notes
+# E5 · Operator Live Review Notes
 
 **Sprint**: ONBOARDING-TUTORIAL-ENDUSER-001 Epic 5
 **Status**: AWAITING OPERATOR
@@ -34,7 +34,7 @@
 ## Verdict Template
 
 ```
-### U<N>.<M> — <Title>
+### U<N>.<M> · <Title>
 - Verdict: pass | fix | comment
 - Notes: ...
 ```
@@ -47,7 +47,7 @@
 
 ---
 
-## Agent-driven plumbing + initial content audit (2026-10-26 — via claude-in-chrome)
+## Agent-driven plumbing + initial content audit (2026-10-26 · via claude-in-chrome)
 
 Agent ran a full plumbing + content audit before operator content review. Findings:
 
@@ -67,9 +67,9 @@ Agent ran a full plumbing + content audit before operator content review. Findin
 - ✅ Mermaid diagram count: 8 U-side (matches plan).
 
 ### Out-of-scope follow-ups (dev-path, surface during review but belong to a different sprint)
-- ⚠️ **Dev-path F1.4 "History — Build Trajectory" Mermaid** renders too wide (3828px natural, text unreadable). Convert LR → TD.
-- ⚠️ **Dev-path F3.1 "RRF — How It Works" Mermaid** renders too wide (2412px natural, text unreadable). Convert LR → TD.
-- ⚠️ **Server bug — gzip middleware on 404s**: mdemg HTTP compresses 404 bodies without `Content-Encoding: gzip` header. Reproducer: `curl -H 'Accept-Encoding: gzip' http://localhost:9999/ui/tutorial/foo.md`. Filed as follow-up sprint.
+- ⚠️ **Dev-path F1.4 "History, Build Trajectory" Mermaid** renders too wide (3828px natural, text unreadable). Convert LR → TD.
+- ⚠️ **Dev-path F3.1 "RRF, How It Works" Mermaid** renders too wide (2412px natural, text unreadable). Convert LR → TD.
+- ⚠️ **Server bug, gzip middleware on 404s**: mdemg HTTP compresses 404 bodies without `Content-Encoding: gzip` header. Reproducer: `curl -H 'Accept-Encoding: gzip' http://localhost:9999/ui/tutorial/foo.md`. Filed as follow-up sprint.
 
 ---
 
@@ -158,10 +158,10 @@ Until all 5 sign-off lines are filled in with dates, **E6 is BLOCKED**.
 
 If operator finds any `fix` verdicts:
 1. Operator describes the fix inline in the Verdict Notes
-2. Agent edits `draft_slides.md` (NOT the stitched deck directly — audit trail)
+2. Agent edits `draft_slides.md` (NOT the stitched deck directly, audit trail)
 3. Agent runs E4 stitch again: `python3 scripts/<re-splice-helper>` or Edit against the deck
 4. Agent runs `make sync-tutorial-embed` + `make verify-tutorial-embed`
-5. Agent commits with `fix(enduser): E5 revision — <slide>` conventional commit
+5. Agent commits with `fix(enduser): E5 revision, <slide>` conventional commit
 6. Operator re-reviews ONLY the fixed slide, updates verdict here
 7. Loop until all slides are `pass`
 

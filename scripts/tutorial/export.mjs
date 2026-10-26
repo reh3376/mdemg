@@ -26,6 +26,7 @@ const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(SCRIPT_DIR, '..', '..');
 const DECK_SRC = join(REPO_ROOT, 'docs', 'onboarding', 'mdemg-onboarding-deck.md');
 const CSS_SRC = join(REPO_ROOT, 'docs', 'onboarding', 'slides-overrides.css');
+const SVG_VIEWER_SRC = join(REPO_ROOT, 'docs', 'onboarding', 'svg-viewer.js');
 const STAGED_DIR = join(REPO_ROOT, 'internal', 'cli', 'tutorial_templates', 'staged');
 const MERMAID_SRC = join(SCRIPT_DIR, 'node_modules', 'mermaid', 'dist', 'mermaid.min.js');
 const REVEAL_MD_BIN = join(SCRIPT_DIR, 'node_modules', '.bin', 'reveal-md');
@@ -41,6 +42,7 @@ function info(msg) {
 
 if (!existsSync(DECK_SRC)) fail(`deck source not found: ${DECK_SRC}`);
 if (!existsSync(CSS_SRC)) fail(`CSS override not found: ${CSS_SRC}`);
+if (!existsSync(SVG_VIEWER_SRC)) fail(`svg-viewer.js not found: ${SVG_VIEWER_SRC}`);
 if (!existsSync(REVEAL_MD_BIN)) fail(`reveal-md not installed. Run: cd scripts/tutorial && npm ci`);
 if (!existsSync(MERMAID_SRC)) fail(`mermaid.min.js not installed. Run: cd scripts/tutorial && npm ci`);
 
@@ -95,27 +97,46 @@ if (presentMermaidRe.test(indexHtml)) {
     presentMermaidRe,
     "mermaid.init(mermaidOptions, '.slides pre code.mermaid');  // ENDUSER-001 E5: render all slides (scroll view compat)"
   );
-  writeFileSync(indexPath, indexHtml);
   info('patched mermaid init for scroll-view compatibility');
 } else {
   info('mermaid init pattern not found — reveal-md may have updated; skipping patch');
 }
+
+// ONBOARDING-TUTORIAL-ENDUSER-001 SVG viewer: copy the viewer JS into the
+// staged bundle and inject a <script> tag so every <figure class="svg-figure">
+// becomes an interactive zoom/pan container at page load.
+copyFileSync(SVG_VIEWER_SRC, join(STAGED_DIR, 'svg-viewer.js'));
+info(`bundled svg-viewer.js (${statSync(SVG_VIEWER_SRC).size} bytes)`);
+const viewerScriptTag = '  <script defer src="svg-viewer.js"></script>\n</body>';
+if (indexHtml.includes('</body>') && !indexHtml.includes('svg-viewer.js')) {
+  indexHtml = indexHtml.replace('</body>', viewerScriptTag);
+  info('injected svg-viewer.js <script> tag before </body>');
+} else if (indexHtml.includes('svg-viewer.js')) {
+  info('svg-viewer.js already referenced in index.html; skipping injection');
+} else {
+  fail('index.html has no </body> tag — cannot inject svg-viewer.js reference');
+}
+
+writeFileSync(indexPath, indexHtml);
 
 // Write a SOURCE_SHA256 breadcrumb so make verify-tutorial-embed can detect
 // drift (deck source changed without re-running the sync). The verifier
 // recomputes the SHA of DECK_SRC + CSS_SRC and compares.
 const deckSha = createHash('sha256').update(readFileSync(DECK_SRC)).digest('hex');
 const cssSha = createHash('sha256').update(readFileSync(CSS_SRC)).digest('hex');
+const viewerSha = createHash('sha256').update(readFileSync(SVG_VIEWER_SRC)).digest('hex');
 writeFileSync(
   join(STAGED_DIR, 'SOURCE_SHA256.txt'),
   `# ONBOARDING-TUTORIAL-SERVE-001 drift breadcrumb\n` +
   `# verified by scripts/verify_tutorial_embed.py (CI gate)\n` +
   `deck_sha256=${deckSha}\n` +
   `css_sha256=${cssSha}\n` +
+  `svg_viewer_sha256=${viewerSha}\n` +
   `deck_path=docs/onboarding/mdemg-onboarding-deck.md\n` +
-  `css_path=docs/onboarding/slides-overrides.css\n`
+  `css_path=docs/onboarding/slides-overrides.css\n` +
+  `svg_viewer_path=docs/onboarding/svg-viewer.js\n`
 );
-info(`wrote SOURCE_SHA256.txt (deck=${deckSha.slice(0,12)}... css=${cssSha.slice(0,12)}...)`);
+info(`wrote SOURCE_SHA256.txt (deck=${deckSha.slice(0,12)}... css=${cssSha.slice(0,12)}... viewer=${viewerSha.slice(0,12)}...)`);
 
 // Count what landed for the sprint-post metrics.
 function countFiles(dir) {
