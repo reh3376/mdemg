@@ -40,6 +40,27 @@ note:
 
 ---
 
+<!-- .slide: id="landing-fork" -->
+
+## Choose Your Path
+
+Two walkthroughs branch from here.
+
+| | **Software Dev Onboarding** | **End User** |
+|---|---|---|
+| **For** | Engineers / technical PMs building WITH MDEMG | Operators who will USE a running MDEMG |
+| **Depth** | ~115 min engineering-dense | lighter stub (expanding) |
+| **Covers** | substrate, retrieval, LoRA, Jiminy, UxTS, ops | CLI, dashboards, memory, alerts |
+| **Next** | Continue below ↓ (TOC → F1 Opening) | [Jump to End User →](#end-user-path) |
+
+note:
+- This is the landing fork — operators land here from `mdemg tutorial` CLI (Epic 5) or the Grafana overview button (Epic 5).
+- Software-dev path is the full 107-slide deck shipped by MDEMG-ONBOARDING-DECK-001; keep going.
+- End-user path currently stubbed by ONBOARDING-TUTORIAL-SERVE-001 Epic 4; content lives in the sibling sprint ONBOARDING-TUTORIAL-ENDUSER-001.
+- The default (just hit ↓/Space) is the software-dev path, because this deck's existing structure IS that path.
+
+---
+
 ## Table of Contents
 
 **[F1 Opening](#f1--opening)** → **[F2 Substrate](#f2--substrate-core)** → **[F3 Retrieval](#f3--retrieval-pipeline)** → **[F4 Jiminy + Enforcement + J17](#f4--jiminy--enforcement--j17)** → **[F5 LoRA + Qwen + Model Dist](#f5--lora--qwen--model-distribution)** → **[F6 UxTS](#f6--uxts-framework-family)** → **[F7 Ops](#f7--ops)** → **[F8 CLI + Hooks + MCP](#f8--cli-hooks-mcp-multi-instance)** → **[F9 Beta + Security + Dormant](#f9--beta-program--security--dormant-census)** → **[F10 Conclusion](#f10--conclusion)**
@@ -1966,6 +1987,41 @@ note:
 - Pause for Q&A — this is the longest Q&A anchor in the deck.
 - If a specific concern or arc wasn't covered in depth, that's deliberate — reference the feature doc + follow up offline.
 - After Q&A, return-links above let viewers re-enter the deck or move to companion material.
+
+---
+
+<!-- .slide: id="end-user-path" -->
+
+## End User Path — Coming Soon
+
+You're using MDEMG, not building it. Here's what the system looks like from the operator's chair.
+
+**This path is a stub** — the full end-user walkthrough is shipping in sibling sprint `ONBOARDING-TUTORIAL-ENDUSER-001`.
+
+**What it will cover**:
+- **Dashboards** — `localhost:9999/ui` tabs (Memory, Jiminy Rules, Review, Config)
+- **Grafana** — the observability panels operators actually watch
+- **CLI** — the ~30 commands day-to-day operators use (ingest, retrieve, review, backup, upgrade)
+- **Alerts** — what the service alerts in your terminal mean + how to triage
+- **Memory** — how MDEMG remembers across sessions + how to inspect/correct
+- **Enforcement** — `mdemg jiminy mode strict` vs `suggest`, override escape hatches
+
+**Right now, the shortest path to using MDEMG**:
+```
+mdemg init --defaults          # fresh install
+docker compose up -d           # start the 5-service stack
+mdemg healthz                  # verify
+open http://localhost:9999/ui  # dashboard
+```
+
+**Full user documentation**: [`docs/user/`](../user/) · [`README.md`](../../README.md)
+
+**Return to**: [⇤ Landing Fork](#landing-fork) · [⇤ TOC](#table-of-contents)
+
+note:
+- E4 stub for ONBOARDING-TUTORIAL-SERVE-001; real end-user path lands in ONBOARDING-TUTORIAL-ENDUSER-001.
+- Deliberately short — this is a destination for the fork, not a sales deck.
+- The 4-command "shortest path" is live-verified against the shipped CLI; keep it in sync when `init` surface changes.
 
           </textarea>
         </section>
