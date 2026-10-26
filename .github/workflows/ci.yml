@@ -1,8 +1,16 @@
 name: CI
 
 on:
+  # CI-DEDUP-001 (2026-10-26): dev-branch pushes previously triggered BOTH
+  # `push` (via `**_dev*`) AND `pull_request` (via the auto-PR workflow's
+  # open PR to main), running the identical job matrix twice per push.
+  # Fix: `push` now only fires on main (post-merge validation + release
+  # gate); every dev-branch push flows through `pull_request: synchronize`.
+  # Trade-off: a dev branch pushed before auto-PR opens its PR gets no CI
+  # until the PR lands — negligible since auto-PR.yml opens the PR on the
+  # first push to any `*_dev*` branch.
   push:
-    branches: [main, '**_dev*']
+    branches: [main]
   pull_request:
     branches: [main]
 
