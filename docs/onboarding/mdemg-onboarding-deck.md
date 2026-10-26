@@ -82,6 +82,7 @@ note:
 ---
 
 <!-- SECTION F1 — OPENING -->
+<!-- .slide: id="f1--opening" -->
 
 # F1 · Opening
 
@@ -354,6 +355,7 @@ note:
 ---
 
 <!-- SECTION F2 — SUBSTRATE CORE -->
+<!-- .slide: id="f2--substrate-core" -->
 
 # F2 · Substrate Core
 
@@ -555,6 +557,7 @@ note:
 ---
 
 <!-- SECTION F3 — RETRIEVAL PIPELINE -->
+<!-- .slide: id="f3--retrieval-pipeline" -->
 
 # F3 · Retrieval Pipeline
 
@@ -717,6 +720,7 @@ note:
 ---
 
 <!-- SECTION F4 — JIMINY + ENFORCEMENT + J17 (HEADLINE) -->
+<!-- .slide: id="f4--jiminy--enforcement--j17" -->
 
 # F4 · Jiminy + Enforcement + J17
 
@@ -1015,6 +1019,7 @@ note:
 ---
 
 <!-- SECTION F5 — LORA + QWEN + MODEL DISTRIBUTION -->
+<!-- .slide: id="f5--lora--qwen--model-distribution" -->
 
 # F5 · LoRA + Qwen + Model Distribution
 
@@ -1238,6 +1243,7 @@ note:
 ---
 
 <!-- SECTION F6 — UXTS FRAMEWORK FAMILY -->
+<!-- .slide: id="f6--uxts-framework-family" -->
 
 # F6 · UxTS Framework Family
 
@@ -1368,6 +1374,7 @@ note:
 ---
 
 <!-- SECTION F7 — OPS -->
+<!-- .slide: id="f7--ops" -->
 
 # F7 · Ops
 
@@ -1632,6 +1639,8 @@ note:
 
 <!-- SECTION F8 — CLI, HOOKS, MCP, MULTI-INSTANCE -->
 
+<!-- .slide: id="f8--cli-hooks-mcp-multi-instance" -->
+
 # F8 · CLI, Hooks, MCP, Multi-Instance
 
 **Nav**: [← F7](#f7--ops) · [⇤ TOC](#table-of-contents) · [Notes ▸ F8](https://github.com/reh3376/mdemg/blob/main/docs/onboarding/mdemg-onboarding-notes.md#f8--cli-hooks-mcp-multi-instance) · [F9 →](#f9--beta-program--security--dormant-census)
@@ -1744,6 +1753,7 @@ note:
 ---
 
 <!-- SECTION F9 — BETA + SECURITY + DORMANT CENSUS -->
+<!-- .slide: id="f9--beta-program--security--dormant-census" -->
 
 # F9 · Beta Program + Security + Dormant Census
 
@@ -1832,6 +1842,7 @@ note:
 ---
 
 <!-- SECTION F10 — CONCLUSION -->
+<!-- .slide: id="f10--conclusion" -->
 
 # F10 · Conclusion
 
@@ -2126,6 +2137,7 @@ note:
 ---
 
 <!-- SECTION U2 — THE STACK + STATUS + HEALTH -->
+<!-- .slide: id="u2--the-stack" -->
 
 ## U2 · The Stack
 
@@ -2281,6 +2293,7 @@ note:
 ---
 
 <!-- SECTION U3 — MEMORY (CMS) -->
+<!-- .slide: id="u3--memory--the-cognitive-substrate" -->
 
 ## U3 · Memory — The Cognitive Substrate
 
@@ -2463,6 +2476,7 @@ note:
 ---
 
 <!-- SECTION U4 — JIMINY -->
+<!-- .slide: id="u4--jiminy--the-inner-voice" -->
 
 ## U4 · Jiminy — The Inner Voice
 
@@ -2697,6 +2711,7 @@ note:
 ---
 
 <!-- SECTION U5 — RSIC -->
+<!-- .slide: id="u5--rsic--the-self-improvement-engine" -->
 
 ## U5 · RSIC — The Self-Improvement Engine
 
@@ -2853,6 +2868,7 @@ note:
 ---
 
 <!-- SECTION U6 — UxTS -->
+<!-- .slide: id="u6--uxts--forcing-functions-that-prevent-drift" -->
 
 ## U6 · UxTS — Forcing-Functions That Prevent Drift
 
@@ -3022,6 +3038,7 @@ note:
 ---
 
 <!-- SECTION U7 — HITL REVIEW -->
+<!-- .slide: id="u7--hitl--you-grade-what-the-system-cant" -->
 
 ## U7 · HITL — You Grade What The System Can't
 
@@ -3151,6 +3168,9 @@ note:
 ---
 
 <!-- SECTION U8 — LEARNING / TRAINING DATA -->
+<!-- .slide: id="u8--learning--training-data--how-the-model-gets-better" -->
+
+<!-- .slide: id="u8--learning--training-data--how-the-model-gets-better" -->
 
 ## U8 · Learning + Training Data — How The Model Gets Better
 
@@ -3294,6 +3314,7 @@ note:
 ---
 
 <!-- SECTION U9 — BACKUP + OPS -->
+<!-- .slide: id="u9--backup--ops" -->
 
 ## U9 · Backup + Ops
 
@@ -3414,6 +3435,7 @@ note:
 ---
 
 <!-- SECTION U10 — LOGS -->
+<!-- .slide: id="u10--logs" -->
 
 ## U10 · Logs
 
@@ -3501,6 +3523,7 @@ note:
 ---
 
 <!-- SECTION U11 — CONFIG + FEATURES -->
+<!-- .slide: id="u11--config--features--the-toggle-surface" -->
 
 ## U11 · Config + Features — The Toggle Surface
 
@@ -3635,6 +3658,7 @@ note:
 ---
 
 <!-- SECTION U12 — PLUGINS -->
+<!-- .slide: id="u12--plugins--the-extension-surface" -->
 
 ## U12 · Plugins — The Extension Surface
 
@@ -3727,6 +3751,7 @@ note:
 ---
 
 <!-- SECTION U13 — GRAFANA -->
+<!-- .slide: id="u13--grafana--the-historical-view" -->
 
 ## U13 · Grafana — The Historical View
 
@@ -3848,6 +3873,7 @@ note:
 ---
 
 <!-- SECTION U14 — CLI -->
+<!-- .slide: id="u14--cli--the-full-command-surface" -->
 
 ## U14 · CLI — The Full Command Surface
 
@@ -4015,6 +4041,7 @@ note:
 ---
 
 <!-- SECTION U15 — APIs + gRPC -->
+<!-- .slide: id="u15--apis--grpc--the-programmatic-surfaces" -->
 
 ## U15 · APIs + gRPC — The Programmatic Surfaces
 
@@ -4183,6 +4210,7 @@ note:
 ---
 
 <!-- SECTION U16 — ALERTS + ENFORCEMENT -->
+<!-- .slide: id="u16--alerts--enforcement--operator-triage" -->
 
 ## U16 · Alerts + Enforcement — Operator Triage
 
@@ -4333,6 +4361,7 @@ note:
 ---
 
 <!-- SECTION U17 — WHERE TO GO NEXT -->
+<!-- .slide: id="u17--where-to-go--documentation" -->
 
 ## U17 · Where To Go — Documentation
 
