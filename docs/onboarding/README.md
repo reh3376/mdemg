@@ -11,6 +11,7 @@
 
 | If you want to… | Open this |
 |---|---|
+| **View it in a browser** (running mdemg instance, zero setup) | `mdemg tutorial` — opens the embedded deck at `/ui/tutorial/`. See [`../features/tutorial-serve.md`](../features/tutorial-serve.md). |
 | **Present it live** (operator-driven, 115 min) | [`mdemg-onboarding-deck.md`](./mdemg-onboarding-deck.md) in Obsidian with Advanced Slides plugin → "Start Slideshow" |
 | **Read it async** (self-serve, ~45-60 min skim) | [`mdemg-onboarding-deck.md`](./mdemg-onboarding-deck.md) on GitHub — Mermaid diagrams render inline |
 | **Pre-brief yourself** before a live session | [`mdemg-onboarding-notes.md`](./mdemg-onboarding-notes.md) — flat speaker notes without Obsidian |
