@@ -4417,7 +4417,9 @@ note:
 
 ---
 
-## Thank You
+<!-- .slide: id="u17-thank-you" -->
+
+## Thank You — End User Path
 
 **MDEMG** — Cognitive Substrate for AI-Assisted Development
 
