@@ -286,6 +286,11 @@ Use "mdemg <command> --help" for more information about a command.`,
 	jiminyCmd.GroupID = "memory"
 	rootCmd.AddCommand(jiminyCmd)
 
+	// ONBOARDING-TUTORIAL-SERVE-001 E5: `mdemg tutorial`
+	tutorialCmd := newTutorialCmd()
+	tutorialCmd.GroupID = "start"
+	rootCmd.AddCommand(tutorialCmd)
+
 	// Configuration
 	configCmd := newConfigCmd()
 	configCmd.GroupID = "config"

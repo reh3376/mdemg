@@ -15,6 +15,17 @@
       ],
       "icon": "external link",
       "asDropdown": true
+    },
+    {
+      "title": "MDEMG Onboarding Tutorial",
+      "type": "link",
+      "icon": "info",
+      "tooltip": "107-slide onboarding deck for MDEMG (opens in new tab)",
+      "url": "http://localhost:9999/ui/tutorial/",
+      "targetBlank": true,
+      "includeVars": false,
+      "keepTime": false,
+      "asDropdown": false
     }
   ],
   "panels": [
