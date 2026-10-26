@@ -7,6 +7,9 @@ margin: 0.04
 minScale: 0.2
 maxScale: 2.0
 css: docs/onboarding/slides-overrides.css
+revealOptions:
+  view: scroll
+  scrollProgress: auto
 ---
 
 # MDEMG
