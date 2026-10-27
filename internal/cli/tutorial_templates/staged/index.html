@@ -8,7 +8,66 @@
   <link rel="stylesheet" href="assets/css/zenburn.min.css" />
   <link rel="stylesheet" href="assets/css/slides-overrides.css" />
 </head>
-<body>
+<body class="has-toc">
+  <nav class="deck-toc" aria-label="Contents">
+    <div class="deck-toc-head">Contents</div>
+    <ul class="deck-toc-sections">
+      <li class="deck-toc-l1"><a href="#mdemg">MDEMG</a></li>
+      <li class="deck-toc-l1"><a href="#f1--opening">F1 · Opening</a></li>
+      <li class="deck-toc-l1"><a href="#f2--substrate-core">F2 · Substrate Core</a></li>
+      <li class="deck-toc-l1"><a href="#f3--retrieval-pipeline">F3 · Retrieval Pipeline</a></li>
+      <li class="deck-toc-l1"><a href="#f4--jiminy--enforcement--j17">F4 · Jiminy + Enforcement + J17</a></li>
+      <li class="deck-toc-l1"><a href="#f5--lora--qwen--model-distribution">F5 · LoRA + Qwen + Model Distribution</a></li>
+      <li class="deck-toc-l1"><a href="#f6--uxts-framework-family">F6 · UxTS Framework Family</a></li>
+      <li class="deck-toc-l1"><a href="#f7--ops">F7 · Ops</a></li>
+      <li class="deck-toc-l1"><a href="#f8--cli-hooks-mcp-multi-instance">F8 · CLI, Hooks, MCP, Multi-Instance</a></li>
+      <li class="deck-toc-l1"><a href="#f9--beta-program--security--dormant-census">F9 · Beta Program + Security + Dormant Census</a></li>
+      <li class="deck-toc-l1"><a href="#f10--conclusion">F10 · Conclusion</a></li>
+      <li class="deck-toc-l1"><a href="#end-user-path">U1 · Operator Onboarding · Start Here</a></li>
+      <li class="deck-toc-l1"><a href="#u2--the-stack">U2 · The Stack</a></li>
+      <li class="deck-toc-l1"><a href="#u3--memory--the-cognitive-substrate">U3 · Memory · The Cognitive Substrate</a></li>
+      <li class="deck-toc-l1"><a href="#u4--jiminy--the-inner-voice">U4 · Jiminy · The Inner Voice</a></li>
+      <li class="deck-toc-l1"><a href="#u5--rsic--the-self-improvement-engine">U5 · RSIC · The Self-Improvement Engine</a></li>
+      <li class="deck-toc-l1"><a href="#u6--uxts--forcing-functions-that-prevent-drift">U6 · UxTS · Forcing-Functions That Prevent Drift</a></li>
+      <li class="deck-toc-l1"><a href="#u7-hitl-you-grade-what-the-system-can39t">U7 · HITL · You Grade What The System Can&amp;#39;t</a></li>
+      <li class="deck-toc-l1"><a href="#u8-learning-training-data-how-the-model-gets-better">U8 · Learning + Training Data · How The Model Gets Better</a></li>
+      <li class="deck-toc-l1"><a href="#u9-backup-ops">U9 · Backup + Ops</a></li>
+      <li class="deck-toc-l1"><a href="#u10-logs">U10 · Logs</a></li>
+      <li class="deck-toc-l1"><a href="#u11-config-features-the-toggle-surface">U11 · Config + Features · The Toggle Surface</a></li>
+      <li class="deck-toc-l1"><a href="#u12-plugins-the-extension-surface">U12 · Plugins · The Extension Surface</a></li>
+      <li class="deck-toc-l1"><a href="#u13-grafana-the-historical-view">U13 · Grafana · The Historical View</a></li>
+      <li class="deck-toc-l1"><a href="#u14-cli-the-full-command-surface">U14 · CLI · The Full Command Surface</a></li>
+      <li class="deck-toc-l1"><a href="#u15-apis-grpc-the-programmatic-surfaces">U15 · APIs + gRPC · The Programmatic Surfaces</a></li>
+      <li class="deck-toc-l1"><a href="#u16-alerts-enforcement-operator-triage">U16 · Alerts + Enforcement · Operator Triage</a></li>
+      <li class="deck-toc-l1"><a href="#u17-where-to-go-documentation">U17 · Where To Go · Documentation</a></li>
+    </ul>
+    <div class="deck-toc-subhead">Graphs</div>
+    <ul class="deck-toc-graphs">
+      <li class="deck-toc-graph"><a href="#diagram-01">01. History · Build Trajectory</a></li>
+      <li class="deck-toc-graph"><a href="#diagram-02">02. MDEMG · System Overview</a></li>
+      <li class="deck-toc-graph"><a href="#diagram-03">03. The 5-Layer Memory Hierarchy</a></li>
+      <li class="deck-toc-graph"><a href="#diagram-04">04. Hot Path · What Happens On a Tool Use</a></li>
+      <li class="deck-toc-graph"><a href="#diagram-05">05. The Recursive-Improvement Arc</a></li>
+      <li class="deck-toc-graph"><a href="#diagram-06">06. F2.1 How It Works · Node + Edge Schema</a></li>
+      <li class="deck-toc-graph"><a href="#diagram-07">07. F2.2 Hebbian Learning · 4 Paths</a></li>
+      <li class="deck-toc-graph"><a href="#diagram-08">08. F3.1 RRF · How It Works</a></li>
+      <li class="deck-toc-graph"><a href="#diagram-09">09. F4.1 Jiminy · Flow (Mermaid)</a></li>
+      <li class="deck-toc-graph"><a href="#diagram-10">10. F4.2 Enforcement · Deny Taxonomy</a></li>
+      <li class="deck-toc-graph"><a href="#diagram-11">11. F5.1 LoRA · Pipeline</a></li>
+      <li class="deck-toc-graph"><a href="#diagram-12">12. F5.2 Recursive-Retraining Loop</a></li>
+      <li class="deck-toc-graph"><a href="#diagram-13">13. F6.1 UxTS · How It Works (Pattern)</a></li>
+      <li class="deck-toc-graph"><a href="#diagram-14">14. F7.2 HITL · How It Works</a></li>
+      <li class="deck-toc-graph"><a href="#diagram-15">15. F10.5 Continuous Improvement · The Four Loops</a></li>
+      <li class="deck-toc-graph"><a href="#diagram-16">16. How It All Works Together</a></li>
+      <li class="deck-toc-graph"><a href="#diagram-17">17. What&amp;#39;s Running</a></li>
+      <li class="deck-toc-graph"><a href="#diagram-18">18. How Memory Is Shaped</a></li>
+      <li class="deck-toc-graph"><a href="#figure-01">19. How Jiminy Thinks</a></li>
+      <li class="deck-toc-graph"><a href="#diagram-19">20. How RSIC Thinks</a></li>
+      <li class="deck-toc-graph"><a href="#diagram-20">21. How UxTS Prevents Drift</a></li>
+      <li class="deck-toc-graph"><a href="#diagram-21">22. Who Talks To What</a></li>
+      <li class="deck-toc-graph"><a href="#diagram-22">23. The Override Escape Hatch</a></li>
+    </ul>
+  </nav>
   <main class="deck">
 <h1 id="mdemg">MDEMG</h1>
 <h2 id="cognitive-substrate-for-artificial-intelligence-ai-assisted-development">Cognitive Substrate for Artificial Intelligence (AI)-Assisted Development</h2>
@@ -211,7 +270,7 @@
 
 
 <h2 id="history-build-trajectory">History · Build Trajectory</h2>
-<figure class="svg-figure" tabindex="0" aria-label="Diagram 1"><img src="assets/svg/mermaid-01.svg" alt="Diagram 1" /></figure>
+<figure id="diagram-01" class="svg-figure" tabindex="0" aria-label="Diagram 1"><img src="assets/svg/mermaid-01.svg" alt="Diagram 1" /></figure>
 <details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
 <li>~2 years of work.</li>
@@ -290,7 +349,7 @@
 
 
 <h2 id="mdemg-system-overview">MDEMG · System Overview</h2>
-<figure class="svg-figure" tabindex="0" aria-label="Diagram 2"><img src="assets/svg/mermaid-02.svg" alt="Diagram 2" /></figure>
+<figure id="diagram-02" class="svg-figure" tabindex="0" aria-label="Diagram 2"><img src="assets/svg/mermaid-02.svg" alt="Diagram 2" /></figure>
 <details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
 <li>Spend ~1 min per cluster. Don&#39;t go deep, F2-F9 do depth.</li>
@@ -303,7 +362,7 @@
 
 
 <h2 id="the-5-layer-memory-hierarchy">The 5-Layer Memory Hierarchy</h2>
-<figure class="svg-figure" tabindex="0" aria-label="Diagram 3"><img src="assets/svg/mermaid-03.svg" alt="Diagram 3" /></figure>
+<figure id="diagram-03" class="svg-figure" tabindex="0" aria-label="Diagram 3"><img src="assets/svg/mermaid-03.svg" alt="Diagram 3" /></figure>
 <details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
 <li>Retrieval traverses this hierarchy; abstraction edges (GENERALIZES, ABSTRACTS_TO) link L0→L5.</li>
@@ -317,7 +376,7 @@
 
 
 <h2 id="hot-path-what-happens-on-a-tool-use">Hot Path · What Happens On a Tool Use</h2>
-<figure class="svg-figure" tabindex="0" aria-label="Diagram 4"><img src="assets/svg/mermaid-04.svg" alt="Diagram 4" /></figure>
+<figure id="diagram-04" class="svg-figure" tabindex="0" aria-label="Diagram 4"><img src="assets/svg/mermaid-04.svg" alt="Diagram 4" /></figure>
 <details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
 <li>This loop runs on every tool use.</li>
@@ -331,7 +390,7 @@
 
 
 <h2 id="the-recursive-improvement-arc">The Recursive-Improvement Arc</h2>
-<figure class="svg-figure" tabindex="0" aria-label="Diagram 5"><img src="assets/svg/mermaid-05.svg" alt="Diagram 5" /></figure>
+<figure id="diagram-05" class="svg-figure" tabindex="0" aria-label="Diagram 5"><img src="assets/svg/mermaid-05.svg" alt="Diagram 5" /></figure>
 <details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
 <li>4 loops at different time constants against the same substrate.</li>
@@ -438,7 +497,7 @@
 
 
 <h2 id="f21-how-it-works-node-edge-schema">F2.1 How It Works · Node + Edge Schema</h2>
-<figure class="svg-figure" tabindex="0" aria-label="Diagram 6"><img src="assets/svg/mermaid-06.svg" alt="Diagram 6" /></figure>
+<figure id="diagram-06" class="svg-figure" tabindex="0" aria-label="Diagram 6"><img src="assets/svg/mermaid-06.svg" alt="Diagram 6" /></figure>
 <details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
 <li>CUIDv2 identifiers, never Universally Unique Identifier (UUID) (feedback_cuidv2_required).</li>
@@ -498,7 +557,7 @@
 
 
 <h2 id="f22-hebbian-learning-4-paths">F2.2 Hebbian Learning · 4 Paths</h2>
-<figure class="svg-figure" tabindex="0" aria-label="Diagram 7"><img src="assets/svg/mermaid-07.svg" alt="Diagram 7" /></figure>
+<figure id="diagram-07" class="svg-figure" tabindex="0" aria-label="Diagram 7"><img src="assets/svg/mermaid-07.svg" alt="Diagram 7" /></figure>
 <details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
 <li>All 4 federated via EVENTGRAPH-001..004 to <code>reinforcement_events</code>.</li>
@@ -677,7 +736,7 @@
 
 
 <h2 id="f31-rrf-how-it-works">F3.1 RRF · How It Works</h2>
-<figure class="svg-figure" tabindex="0" aria-label="Diagram 8"><img src="assets/svg/mermaid-08.svg" alt="Diagram 8" /></figure>
+<figure id="diagram-08" class="svg-figure" tabindex="0" aria-label="Diagram 8"><img src="assets/svg/mermaid-08.svg" alt="Diagram 8" /></figure>
 <details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
 <li>Rerank is default via cross-encoder (openai). Neural alternative shipped but same mean quality 20× slower.</li>
@@ -850,7 +909,7 @@
 
 
 <h2 id="f41-jiminy-flow-mermaid">F4.1 Jiminy · Flow (Mermaid)</h2>
-<figure class="svg-figure" tabindex="0" aria-label="Diagram 9"><img src="assets/svg/mermaid-09.svg" alt="Diagram 9" /></figure>
+<figure id="diagram-09" class="svg-figure" tabindex="0" aria-label="Diagram 9"><img src="assets/svg/mermaid-09.svg" alt="Diagram 9" /></figure>
 <details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
 <li>3 Levers compose on the surface pool: A quota, B effectiveness prior, C actionable direct-fetch, D concept bias.</li>
@@ -1026,7 +1085,7 @@
 
 
 <h2 id="f42-enforcement-deny-taxonomy">F4.2 Enforcement · Deny Taxonomy</h2>
-<figure class="svg-figure" tabindex="0" aria-label="Diagram 10"><img src="assets/svg/mermaid-10.svg" alt="Diagram 10" /></figure>
+<figure id="diagram-10" class="svg-figure" tabindex="0" aria-label="Diagram 10"><img src="assets/svg/mermaid-10.svg" alt="Diagram 10" /></figure>
 <details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
 <li>3 distinct outcome types, each has a distinct alert rule.</li>
@@ -1218,7 +1277,7 @@ SEQ:    monotonic, report last_seq on resume
 
 
 <h2 id="f51-lora-pipeline">F5.1 LoRA · Pipeline</h2>
-<figure class="svg-figure" tabindex="0" aria-label="Diagram 11"><img src="assets/svg/mermaid-11.svg" alt="Diagram 11" /></figure>
+<figure id="diagram-11" class="svg-figure" tabindex="0" aria-label="Diagram 11"><img src="assets/svg/mermaid-11.svg" alt="Diagram 11" /></figure>
 <p><strong>Conversion time</strong>: ~5 min on M5 Max.</p>
 <details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
@@ -1284,7 +1343,7 @@ SEQ:    monotonic, report last_seq on resume
 
 
 <h2 id="f52-recursive-retraining-loop">F5.2 Recursive-Retraining Loop</h2>
-<figure class="svg-figure" tabindex="0" aria-label="Diagram 12"><img src="assets/svg/mermaid-12.svg" alt="Diagram 12" /></figure>
+<figure id="diagram-12" class="svg-figure" tabindex="0" aria-label="Diagram 12"><img src="assets/svg/mermaid-12.svg" alt="Diagram 12" /></figure>
 <p><strong>Default-off</strong>: <code>FT_LOOP_ENABLED=false</code>. 4-phase arc complete (Phases 6a / 6b / 7 / 9).</p>
 <details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
@@ -1482,7 +1541,7 @@ UAMS     Agent memory specs
 
 
 <h2 id="f61-uxts-how-it-works-pattern">F6.1 UxTS · How It Works (Pattern)</h2>
-<figure class="svg-figure" tabindex="0" aria-label="Diagram 13"><img src="assets/svg/mermaid-13.svg" alt="Diagram 13" /></figure>
+<figure id="diagram-13" class="svg-figure" tabindex="0" aria-label="Diagram 13"><img src="assets/svg/mermaid-13.svg" alt="Diagram 13" /></figure>
 <p><strong>Pattern invariants</strong>:</p>
 <ul>
 <li>Every spec validates against the schema</li>
@@ -1749,7 +1808,7 @@ UAMS     Agent memory specs
 
 
 <h2 id="f72-hitl-how-it-works">F7.2 HITL · How It Works</h2>
-<figure class="svg-figure" tabindex="0" aria-label="Diagram 14"><img src="assets/svg/mermaid-14.svg" alt="Diagram 14" /></figure>
+<figure id="diagram-14" class="svg-figure" tabindex="0" aria-label="Diagram 14"><img src="assets/svg/mermaid-14.svg" alt="Diagram 14" /></figure>
 <details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
 <li>Reinforcement is OPT-IN per submission (<code>REVIEW_REINFORCE_DEFAULT=false</code>).</li>
@@ -2300,7 +2359,7 @@ mdemg beta-janitor sweep     # 30-day sweep
 
 
 <h2 id="f105-continuous-improvement-the-four-loops">F10.5 Continuous Improvement · The Four Loops</h2>
-<figure class="svg-figure" tabindex="0" aria-label="Diagram 15"><img src="assets/svg/mermaid-15.svg" alt="Diagram 15" /></figure>
+<figure id="diagram-15" class="svg-figure" tabindex="0" aria-label="Diagram 15"><img src="assets/svg/mermaid-15.svg" alt="Diagram 15" /></figure>
 <p><strong>Four loops at four time constants against the same substrate</strong> = continuous improvement.</p>
 <details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
@@ -2365,7 +2424,7 @@ mdemg beta-janitor sweep     # 30-day sweep
 
 <!-- SECTION U1, OPENING -->
 
-<h2 id="end-user-path">U1 · Operator Onboarding · Start Here</h2>
+<h1 id="end-user-path">U1 · Operator Onboarding · Start Here</h1>
 <p>The next ~99 minutes answer four questions. Each U-section drills into a piece of the answer. You&#39;ll own the operator view by the end.</p>
 <ol>
 <li><strong>What is MDEMG?</strong></li>
@@ -2560,7 +2619,7 @@ mdemg beta-janitor sweep     # 30-day sweep
 
 
 <h2 id="how-it-all-works-together">How It All Works Together</h2>
-<figure class="svg-figure" tabindex="0" aria-label="Diagram 16"><img src="assets/svg/mermaid-16.svg" alt="Diagram 16" /></figure>
+<figure id="diagram-16" class="svg-figure" tabindex="0" aria-label="Diagram 16"><img src="assets/svg/mermaid-16.svg" alt="Diagram 16" /></figure>
 <p><strong>One sentence</strong>: you observe, MDEMG remembers, classifies, acts, measures, learns, fine-tunes, and you see all of it on the dashboards.</p>
 <p>The HITL → Retrain arc is the newest piece, actively iterating.</p>
 <details class="speaker-notes"><summary>Speaker notes</summary>
@@ -2575,7 +2634,7 @@ mdemg beta-janitor sweep     # 30-day sweep
 
 
 <!-- SECTION U2, THE STACK + STATUS + HEALTH -->
-<h2 id="u2--the-stack">U2 · The Stack</h2>
+<h1 id="u2--the-stack">U2 · The Stack</h1>
 <p>Everything in U3-U17 lives inside the 5-container stack. This section is the foundation, the stack picture, how to confirm it&#39;s up, how to probe its health, and what the watchdog + breakers protect against.</p>
 <p>Preview: stack diagram → <code>docker compose ps</code> → 4-command path → <code>healthz</code> → watchdog → breakers → gotchas.</p>
 <p>Points back to U1.4, this is the implementation of surface #1 (observability + substrate it runs on).</p>
@@ -2590,7 +2649,7 @@ mdemg beta-janitor sweep     # 30-day sweep
 
 
 <h2 id="what39s-running">What&#39;s Running</h2>
-<figure class="svg-figure" tabindex="0" aria-label="Diagram 17"><img src="assets/svg/mermaid-17.svg" alt="Diagram 17" /></figure>
+<figure id="diagram-17" class="svg-figure" tabindex="0" aria-label="Diagram 17"><img src="assets/svg/mermaid-17.svg" alt="Diagram 17" /></figure>
 <p><strong>Roles</strong>:</p>
 <ul>
 <li><strong>mdemg</strong>: HTTP API + CLI backend (ghcr.io/reh3376/mdemg)</li>
@@ -2728,7 +2787,7 @@ circuit_breakers: {open: 1, names: [neural-sidecar]}
 
 
 <!-- SECTION U3, MEMORY (CMS) -->
-<h2 id="u3--memory--the-cognitive-substrate">U3 · Memory · The Cognitive Substrate</h2>
+<h1 id="u3--memory--the-cognitive-substrate">U3 · Memory · The Cognitive Substrate</h1>
 <p>MDEMG remembers. Not in RAM, not in logs, in a Neo4j graph that grows, consolidates, and forgets honestly.</p>
 <p>Preview: hierarchy mental model → UI → observe/recall/correct → honest state.</p>
 <p>Natural question this answers: &quot;What does MDEMG actually store, and how do I inspect or change it?&quot;</p>
@@ -2743,7 +2802,7 @@ circuit_breakers: {open: 1, names: [neural-sidecar]}
 
 
 <h2 id="how-memory-is-shaped">How Memory Is Shaped</h2>
-<figure class="svg-figure" tabindex="0" aria-label="Diagram 18"><img src="assets/svg/mermaid-18.svg" alt="Diagram 18" /></figure>
+<figure id="diagram-18" class="svg-figure" tabindex="0" aria-label="Diagram 18"><img src="assets/svg/mermaid-18.svg" alt="Diagram 18" /></figure>
 <ul>
 <li><strong>L0</strong> (raw observations), operator/agent utterances; most volume</li>
 <li><strong>L1</strong> (constraint / correction), promoted rules extracted from L0 patterns</li>
@@ -2951,7 +3010,7 @@ obs_id: ...
 
 
 <!-- SECTION U4, JIMINY -->
-<h2 id="u4--jiminy--the-inner-voice">U4 · Jiminy · The Inner Voice</h2>
+<h1 id="u4--jiminy--the-inner-voice">U4 · Jiminy · The Inner Voice</h1>
 <p>Jiminy is the subsystem that <strong>READS memory</strong> before every agent action, <strong>SURFACES</strong> applicable durable rules, <strong>CLASSIFIES</strong> whether the agent followed them, and (in strict mode) <strong>ENFORCES</strong> them.</p>
 <p>15-slide walkthrough: loop → classifier → corpus → UI → CLI → current state → gotchas → <strong>J17 AI-to-AI protocol</strong> → where to go deeper.</p>
 <p>Points back to U1.3, primary answer to &quot;behavioral drift&quot;. Points to U1.4, surface #2 (retrieval + guidance).</p>
@@ -2966,7 +3025,7 @@ obs_id: ...
 
 
 <h2 id="how-jiminy-thinks">How Jiminy Thinks</h2>
-<figure class="svg-figure">
+<figure id="figure-01" class="svg-figure">
   <img src="assets/svg/u4-how-jiminy-thinks.svg" alt="How Jiminy Thinks: two-phase loop. BEFORE action: retrieve rules + synthesize directive. AFTER action: classify verdict + feed trust, RSIC, Grafana." />
 </figure>
 
@@ -3322,7 +3381,7 @@ SEQ:    monotonic, report last_seq on resume
 
 
 <!-- SECTION U5, RSIC -->
-<h2 id="u5--rsic--the-self-improvement-engine">U5 · RSIC · The Self-Improvement Engine</h2>
+<h1 id="u5--rsic--the-self-improvement-engine">U5 · RSIC · The Self-Improvement Engine</h1>
 <p>RSIC asks &quot;how well is MDEMG working?&quot; every few minutes. When it finds a problem WITH a known action, it triggers improvement, sometimes a diagnostic alert, sometimes a real substrate mutation.</p>
 <p>Preview: cycle → admission → insight → action → UI → trajectory → gotchas.</p>
 <p>Points back to U1.5, this is loop #1 (the top-level improvement orchestrator).</p>
@@ -3337,7 +3396,7 @@ SEQ:    monotonic, report last_seq on resume
 
 
 <h2 id="how-rsic-thinks">How RSIC Thinks</h2>
-<figure class="svg-figure" tabindex="0" aria-label="Diagram 19"><img src="assets/svg/mermaid-19.svg" alt="Diagram 19" /></figure>
+<figure id="diagram-19" class="svg-figure" tabindex="0" aria-label="Diagram 19"><img src="assets/svg/mermaid-19.svg" alt="Diagram 19" /></figure>
 <p><strong>The 6 steps</strong>:</p>
 <ol>
 <li><strong>Assess</strong>: 7-dim health read → <code>SelfAssessmentReport</code></li>
@@ -3486,7 +3545,7 @@ SEQ:    monotonic, report last_seq on resume
 
 
 <!-- SECTION U6, UxTS -->
-<h2 id="u6--uxts--forcing-functions-that-prevent-drift">U6 · UxTS · Forcing-Functions That Prevent Drift</h2>
+<h1 id="u6--uxts--forcing-functions-that-prevent-drift">U6 · UxTS · Forcing-Functions That Prevent Drift</h1>
 <p>A UxTS framework is a contract-first way to make a piece of system behavior impossible to drift without CI noticing: <strong>spec → fixture → runner → CI gate</strong>.</p>
 <p><strong>16 shipped families</strong> covering APIs, parsers, retrieval quality, LLM tasks, observability, security, benchmarks, training data, auth.</p>
 <p>Preview: forcing-function diamond → full family inventory → how operators invoke → drift-gate principle → trajectory.</p>
@@ -3502,7 +3561,7 @@ SEQ:    monotonic, report last_seq on resume
 
 
 <h2 id="how-uxts-prevents-drift">How UxTS Prevents Drift</h2>
-<figure class="svg-figure" tabindex="0" aria-label="Diagram 20"><img src="assets/svg/mermaid-20.svg" alt="Diagram 20" /></figure>
+<figure id="diagram-20" class="svg-figure" tabindex="0" aria-label="Diagram 20"><img src="assets/svg/mermaid-20.svg" alt="Diagram 20" /></figure>
 <p><strong>Flow is uni-directional</strong>:</p>
 <ul>
 <li>Code change breaks a contract → CI fails</li>
@@ -3765,7 +3824,7 @@ $ python3 docs/api/api-spec/upts/runners/upts_runner.py # UPTS parser
 
 
 <!-- SECTION U7, HITL REVIEW -->
-<h2 id="u7-hitl-you-grade-what-the-system-can39t">U7 · HITL · You Grade What The System Can&#39;t</h2>
+<h1 id="u7-hitl-you-grade-what-the-system-can39t">U7 · HITL · You Grade What The System Can&#39;t</h1>
 <p>The classifier can&#39;t tell if a <code>partial_compliance</code> verdict was actually <code>followed</code> with reasonable judgment. The retrain corpus needs human verdicts. HITL is the UI + CLI that makes operator grading fast enough to be sustainable.</p>
 <p>Preview: dataset registry → /ui/ Review → keyboard grading → auto-grader + schedule → sink invariant → trajectory.</p>
 <p>Points back to U1.5, this is loop #3 (operator-fed training signal).</p>
@@ -3907,7 +3966,7 @@ $ python3 docs/api/api-spec/upts/runners/upts_runner.py # UPTS parser
 
 
 <!-- SECTION U8, LEARNING / TRAINING DATA -->
-<h2 id="u8-learning-training-data-how-the-model-gets-better">U8 · Learning + Training Data · How The Model Gets Better</h2>
+<h1 id="u8-learning-training-data-how-the-model-gets-better">U8 · Learning + Training Data · How The Model Gets Better</h1>
 <p>MDEMG&#39;s production LLM is <code>mdemg-llm-v1</code> (Qwen3-14B-4bit + Phase 5 SFT), aggregate 0.9188 on the honest 16-task eval. The retrain pipeline (Phase 6b actuator SHIPPED default-off) can produce the next generation when triggered.</p>
 <p>Preview: FT line state → Learning tab → Training Data tab → recursive-retrain loop → UBENCH freshness → gotchas.</p>
 <p>Points back to U1.5, this is loop #4 (model-level improvement; the slowest and most expensive loop).</p>
@@ -4064,7 +4123,7 @@ $ python3 docs/api/api-spec/upts/runners/upts_runner.py # UPTS parser
 
 
 <!-- SECTION U9, BACKUP + OPS -->
-<h2 id="u9-backup-ops">U9 · Backup + Ops</h2>
+<h1 id="u9-backup-ops">U9 · Backup + Ops</h1>
 <p>Backups + scheduled maintenance (decay + prune) are the operator&#39;s safety net. BACKUP-RESTORE-VERIFY-001 made the restore path provably correct; NOSILENT-001 ensures silent failures ALARM.</p>
 <p>Preview: schedulers → UI → CLI → retention → gotchas → where deeper.</p>
 <details class="speaker-notes"><summary>Speaker notes</summary>
@@ -4196,7 +4255,7 @@ prune: archived 56 nodes with reason=&#39;scheduled_maintenance&#39;
 
 
 <!-- SECTION U10, LOGS -->
-<h2 id="u10-logs">U10 · Logs</h2>
+<h1 id="u10-logs">U10 · Logs</h1>
 <p><code>healthz</code> is now, alerts are history, logs are DETAIL. When a request latency spike happens but nothing&#39;s fired, logs are where you look.</p>
 <p>Preview: UI → filter → CLI tail → interpretation → gotchas.</p>
 <details class="speaker-notes"><summary>Speaker notes</summary>
@@ -4292,7 +4351,7 @@ $ docker compose logs -f mdemg --since=10m | jq -c &#39;select(.level==&quot;ERR
 
 
 <!-- SECTION U11, CONFIG + FEATURES -->
-<h2 id="u11-config-features-the-toggle-surface">U11 · Config + Features · The Toggle Surface</h2>
+<h1 id="u11-config-features-the-toggle-surface">U11 · Config + Features · The Toggle Surface</h1>
 <p>~400 config knobs ship with MDEMG. Most defaults are correct. This section covers the ones operators flip + how to tell which can be flipped live vs needing a restart.</p>
 <p>Preview: /ui/ Config → /ui/ Features → ENV-FROM-ENV priority chain → sensitive-value redaction → gotchas.</p>
 <details class="speaker-notes"><summary>Speaker notes</summary>
@@ -4374,7 +4433,7 @@ $ docker compose logs -f mdemg --since=10m | jq -c &#39;select(.level==&quot;ERR
 <p><code>internal/config/yaml_config.go::isSensitive</code> masks these in <code>mdemg config show</code>:</p>
 <ul>
 <li><code>AUTH_API_KEYS</code>, admin API-key list</li>
-<li><code>AUTH_JWT_SECRET</code>, JWT signing key</li>
+<li><code>AUTH_JWT_SECRET</code>, JSON Web Token (JWT) signing key</li>
 <li><code>TSDB_PASSWORD</code>, TSDB connect password</li>
 <li><code>LINEAR_WEBHOOK_SECRET</code>, Linear webhook signing</li>
 <li><code>RERANK_JINA_API_KEY</code>, if using Jina rerank</li>
@@ -4442,7 +4501,7 @@ $ docker compose logs -f mdemg --since=10m | jq -c &#39;select(.level==&quot;ERR
 
 
 <!-- SECTION U12, PLUGINS -->
-<h2 id="u12-plugins-the-extension-surface">U12 · Plugins · The Extension Surface</h2>
+<h1 id="u12-plugins-the-extension-surface">U12 · Plugins · The Extension Surface</h1>
 <p>Plugins are gRPC services the mdemg server talks to over the <code>mdemg-module</code> protocol. Four shipped: docs-scraper, uxts-module, linear-module, obsidian-module.</p>
 <p>Operators inspect state; developers build + ship.</p>
 <details class="speaker-notes"><summary>Speaker notes</summary>
@@ -4546,7 +4605,7 @@ $ docker compose logs -f mdemg --since=10m | jq -c &#39;select(.level==&quot;ERR
 
 
 <!-- SECTION U13, GRAFANA -->
-<h2 id="u13-grafana-the-historical-view">U13 · Grafana · The Historical View</h2>
+<h1 id="u13-grafana-the-historical-view">U13 · Grafana · The Historical View</h1>
 <p>Grafana is the time-series companion to /ui/. /ui/ answers &quot;right now&quot;; Grafana answers &quot;the last 24 hours / 7 days / 30 days.&quot;</p>
 <p><strong>Nine dashboards</strong> covering ~70 panels, but 5 panels carry most operator attention.</p>
 <p>Preview: 9 dashboards → the daily 5 → honest reading patterns → alert panel links → dashboard provenance → gotchas.</p>
@@ -4684,7 +4743,7 @@ $ docker compose logs -f mdemg --since=10m | jq -c &#39;select(.level==&quot;ERR
 
 
 <!-- SECTION U14, CLI -->
-<h2 id="u14-cli-the-full-command-surface">U14 · CLI · The Full Command Surface</h2>
+<h1 id="u14-cli-the-full-command-surface">U14 · CLI · The Full Command Surface</h1>
 <p><code>mdemg --help</code> lists 90+ commands. Operators regularly use ~15, grouped into 5 clusters.</p>
 <p>Preview: Lifecycle → Memory → Introspection → Ops → Specialized → inline help → MCP alternative → tutorial-command → gotchas.</p>
 <details class="speaker-notes"><summary>Speaker notes</summary>
@@ -4877,7 +4936,7 @@ $ mdemg data observe --help          # leaf command flags + examples
 
 
 <!-- SECTION U15, APIs + gRPC -->
-<h2 id="u15-apis-grpc-the-programmatic-surfaces">U15 · APIs + gRPC · The Programmatic Surfaces</h2>
+<h1 id="u15-apis-grpc-the-programmatic-surfaces">U15 · APIs + gRPC · The Programmatic Surfaces</h1>
 <p>/ui/ and CLI are user-facing; APIs + gRPC are what EVERYTHING hits internally. <strong>199 shipped HTTP routes + 4 gRPC services.</strong></p>
 <p>Operators mostly OBSERVE these surfaces; developers extend them.</p>
 <p>Points back to U1.4, implementation of surfaces #3 and #4.</p>
@@ -4892,7 +4951,7 @@ $ mdemg data observe --help          # leaf command flags + examples
 
 
 <h2 id="who-talks-to-what">Who Talks To What</h2>
-<figure class="svg-figure" tabindex="0" aria-label="Diagram 21"><img src="assets/svg/mermaid-21.svg" alt="Diagram 21" /></figure>
+<figure id="diagram-21" class="svg-figure" tabindex="0" aria-label="Diagram 21"><img src="assets/svg/mermaid-21.svg" alt="Diagram 21" /></figure>
 <details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
 <li>The HTTP API is the central nervous system. Everything else is specialized protocols for performance or boundary reasons.</li>
@@ -5035,7 +5094,7 @@ $ grpcurl -plaintext unix:///path/to/plugin.sock describe mdemg.Module
 <h2 id="what39s-reachable-what39s-not">What&#39;s Reachable, What&#39;s Not</h2>
 <ul>
 <li><strong>Default bind</strong>: <code>127.0.0.1:9999</code> (localhost only); <code>MDEMG_BIND_ADDR=0.0.0.0</code> to expose on LAN</li>
-<li><strong>Admin endpoints</strong> (<code>/v1/admin/*</code>): require <code>AUTH_API_KEYS</code> header; <code>AUTH_JWT_SECRET</code> for JWT</li>
+<li><strong>Admin endpoints</strong> (<code>/v1/admin/*</code>): require <code>AUTH_API_KEYS</code> header; <code>AUTH_JWT_SECRET</code> for JSON Web Token (JWT)</li>
 <li><strong>Path-safe guards</strong> on filesystem-touching routes (SEC-TRANCHE-2): all HTTP handlers route through <code>pathsafe.SafeJoinUnderDir</code></li>
 <li><strong>Dormant-census routes</strong> stay BOUND but return 503 when disposition is <code>DORMANT</code>; shipped routes return normal responses</li>
 <li><strong>gRPC services</strong> bound to Unix sockets with 0600 perms (operator-only)<details class="speaker-notes"><summary>Speaker notes</summary>
@@ -5097,7 +5156,7 @@ $ grpcurl -plaintext unix:///path/to/plugin.sock describe mdemg.Module
 
 
 <!-- SECTION U16, ALERTS + ENFORCEMENT -->
-<h2 id="u16-alerts-enforcement-operator-triage">U16 · Alerts + Enforcement · Operator Triage</h2>
+<h1 id="u16-alerts-enforcement-operator-triage">U16 · Alerts + Enforcement · Operator Triage</h1>
 <p>This is where you RESPOND. Alerts tell you what&#39;s wrong (historical, hours-scale). Enforcement is Jiminy preventing a durable constraint violation (right-now).</p>
 <p>Both ship <strong>escape hatches</strong> that preserve operator agency.</p>
 <p>Preview: alerts channel → terminal banner → severity map → clearing → enforcement in-session → override flow → audit trail.</p>
@@ -5185,7 +5244,7 @@ $ grpcurl -plaintext unix:///path/to/plugin.sock describe mdemg.Module
 
 
 <h2 id="the-override-escape-hatch">The Override Escape Hatch</h2>
-<figure class="svg-figure" tabindex="0" aria-label="Diagram 22"><img src="assets/svg/mermaid-22.svg" alt="Diagram 22" /></figure>
+<figure id="diagram-22" class="svg-figure" tabindex="0" aria-label="Diagram 22"><img src="assets/svg/mermaid-22.svg" alt="Diagram 22" /></figure>
 <p><strong>Invariants</strong>:</p>
 <ul>
 <li>Reason REQUIRED</li>
@@ -5255,7 +5314,7 @@ $ grpcurl -plaintext unix:///path/to/plugin.sock describe mdemg.Module
 
 
 <!-- SECTION U17, WHERE TO GO NEXT -->
-<h2 id="u17-where-to-go-documentation">U17 · Where To Go · Documentation</h2>
+<h1 id="u17-where-to-go-documentation">U17 · Where To Go · Documentation</h1>
 <ul>
 <li><code>docs/features/*.md</code>, <strong>41+ feature docs</strong> (one per major shipped feature)</li>
 <li><code>docs/user/*</code>, user-facing operational docs</li>
@@ -5339,8 +5398,41 @@ $ grpcurl -plaintext unix:///path/to/plugin.sock describe mdemg.Module
 </details>
 
   </main>
-  <!-- Mermaid is pre-rendered to SVG at build time (see render_mermaid.mjs); -->
-  <!-- the runtime viewer handles pan/zoom/fullscreen for every diagram. -->
+  <!-- Mermaid is pre-rendered to SVG at build time; the viewer handles -->
+  <!-- pan/zoom/fullscreen for every diagram.                            -->
   <script defer src="assets/js/svg-viewer.js"></script>
+  <script>
+    (function () {
+      const links = document.querySelectorAll('.deck-toc a[href^="#"]');
+      if (!links.length) return;
+      const map = new Map();
+      for (const a of links) map.set(a.getAttribute('href').slice(1), a);
+      const targets = Array.from(map.keys())
+        .map((id) => document.getElementById(id))
+        .filter(Boolean);
+      if (!targets.length) return;
+      let active = null;
+      function setActive(id) {
+        const a = map.get(id);
+        if (!a || a === active) return;
+        if (active) active.classList.remove('deck-toc-active');
+        a.classList.add('deck-toc-active');
+        active = a;
+        a.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      }
+      const observer = new IntersectionObserver(
+        (entries) => {
+          const visible = entries.filter((e) => e.isIntersecting);
+          if (!visible.length) return;
+          const top = visible.reduce((a, b) =>
+            a.boundingClientRect.top < b.boundingClientRect.top ? a : b,
+          );
+          setActive(top.target.id);
+        },
+        { rootMargin: '0px 0px -70% 0px', threshold: 0 },
+      );
+      for (const t of targets) observer.observe(t);
+    })();
+  </script>
 </body>
 </html>

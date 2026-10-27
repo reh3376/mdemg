@@ -1,0 +1,35 @@
+{
+  "_comment": "tutorial-forge config for the mdemg onboarding deck. Run `make sync-tutorial-embed` (or `node scripts/tutorial-forge/cli.mjs build --config tutorial.config.json`) to render.",
+  "deck": "docs/onboarding/mdemg-onboarding-deck.md",
+  "output": "internal/cli/tutorial_templates/staged",
+  "title": "MDEMG Tutorial",
+  "cssPath": "docs/onboarding/slides-overrides.css",
+  "svgViewerPath": "docs/onboarding/svg-viewer.js",
+  "assetsDir": "docs/onboarding/assets",
+  "acronyms": {
+    "expandCount": 2,
+    "extra": {
+      "CMS": "Cognitive Memory Substrate",
+      "UATS": "Universal API Test Specification",
+      "UVTS": "Universal Validation Test Specification",
+      "UBENCH": "Universal Benchmark",
+      "ULTS": "Universal LLM Test Specification",
+      "UAITS": "Universal AI Training Specification",
+      "UXTS": "Universal eXtensible Test Specification"
+    },
+    "disabled": ["MDEMG", "JIMINY", "RSIC", "J17", "MLX"]
+  },
+  "mermaid": {
+    "theme": "default"
+  },
+  "toc": {
+    "enabled": true,
+    "minLevel": 1,
+    "maxLevel": 1,
+    "label": "Contents",
+    "graphs": {
+      "enabled": true,
+      "label": "Graphs"
+    }
+  }
+}

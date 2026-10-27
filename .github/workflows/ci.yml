@@ -502,14 +502,17 @@ jobs:
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@v0.36.0
         env:
-          # ONBOARDING-TUTORIAL-SERVE-001: scripts/tutorial/ carries build-time
-          # dev-tool npm deps (reveal-md + mermaid) only — never shipped to
-          # operator runtime, never processes untrusted input (just the deck
-          # markdown we control). Transitive CVEs in these deps (basic-ftp,
-          # body-parser, extract-zip, etc. via reveal-md's bundler chain)
-          # are false-positives at the shipped-code risk tier. Scanning them
+          # scripts/tutorial-forge/ carries build-time dev-tool npm deps
+          # (marked + mermaid + puppeteer + highlight.js + reveal-md's
+          # favicon) only — never shipped to operator runtime, never
+          # processes untrusted input (just the deck markdown we control).
+          # Transitive CVEs in these deps (basic-ftp, body-parser,
+          # extract-zip, etc. via reveal-md's bundler chain) are
+          # false-positives at the shipped-code risk tier. Scanning them
           # as if they were production surfaces breaks every PR.
-          TRIVY_SKIP_DIRS: 'scripts/tutorial'
+          # Renamed from scripts/tutorial on 2026-10-27 as part of the
+          # tutorial-forge framework extraction.
+          TRIVY_SKIP_DIRS: 'scripts/tutorial-forge'
         with:
           scan-type: 'fs'
           scan-ref: '.'
