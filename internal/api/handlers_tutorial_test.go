@@ -47,8 +47,11 @@ func TestTutorialHandler_EnabledServesIndex(t *testing.T) {
 		t.Fatalf("expected 200 on root, got %d (body: %s)", rec.Code, rec.Body.String())
 	}
 	body := rec.Body.String()
-	if !strings.Contains(body, "reveal") {
-		t.Errorf("expected reveal.js markup in response body, got first 200 chars: %q", body[:min(200, len(body))])
+	// Pivoted 2026-10-26 to a plain HTML/CSS long-form document: the deck is
+	// now wrapped in <main class="deck">; this marker catches a regression
+	// to the reveal.js shell as cleanly as the old `reveal` substring check.
+	if !strings.Contains(body, `<main class="deck">`) {
+		t.Errorf("expected <main class=\"deck\"> marker in response body, got first 200 chars: %q", body[:min(200, len(body))])
 	}
 }
 
@@ -56,8 +59,8 @@ func TestTutorialHandler_ServesAsset(t *testing.T) {
 	s := newTutorialTestServer()
 	h := http.StripPrefix("/ui/tutorial/", s.tutorialHandler(true))
 
-	// Serve the slides-overrides.css asset at its embedded path.
-	req := httptest.NewRequest(http.MethodGet, "/ui/tutorial/_assets/docs/onboarding/slides-overrides.css", nil)
+	// Serve the slides-overrides.css asset at its new embedded path.
+	req := httptest.NewRequest(http.MethodGet, "/ui/tutorial/assets/css/slides-overrides.css", nil)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 
@@ -65,8 +68,10 @@ func TestTutorialHandler_ServesAsset(t *testing.T) {
 		t.Fatalf("expected 200 for slides-overrides.css, got %d", rec.Code)
 	}
 	body := rec.Body.String()
-	if !strings.Contains(body, ".reveal") {
-		t.Errorf("expected CSS content with .reveal selector, got first 200 chars: %q", body[:min(200, len(body))])
+	// Post-pivot CSS targets `.deck` and `.svg-figure`, no `.reveal` selectors.
+	// Catch the pivot regression by looking for a stable new-pipeline selector.
+	if !strings.Contains(body, ".svg-figure") {
+		t.Errorf("expected .svg-figure selector in CSS, got first 200 chars: %q", body[:min(200, len(body))])
 	}
 }
 
