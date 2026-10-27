@@ -1,193 +1,289 @@
 /*
- * MDEMG onboarding deck — reveal.js overrides for the night theme.
- * Goal: fit engineering-dense slides on 16:9 without bottom-clipping.
- * Tune heading sizes and spacing down from the night-theme defaults.
+ * ONBOARDING-TUTORIAL-ENDUSER-001 (2026-10-26 pivot):
+ * Plain HTML/CSS long-form tutorial document.
+ *
+ * Replaces the earlier reveal.js slide-deck CSS. The old file had ~250 lines
+ * of selectors against `.reveal`, `.scroll-page*`, `section.present` etc.;
+ * none of that is relevant now — this page is a vanilla <main class="deck">
+ * served as one continuous HTML document. Everything below is the real
+ * document theme.
  */
 
-/*
- * ONBOARDING-TUTORIAL-ENDUSER-001 E5 fix (2026-10-26):
- * Reveal.js slides don't scroll in presentation mode — content taller
- * than the 900px canvas is CLIPPED. Enabled reveal.js 5.x scroll-view
- * mode via frontmatter `revealOptions: view: scroll` which turns the
- * entire deck into a single scrollable document (perfect for operator
- * review). This CSS section adds a styled scrollbar for the scroll-view
- * container.
+/* ---------------------------------------------------------------- *
+ * Design tokens
+ * ---------------------------------------------------------------- */
+:root {
+  --bg: #0f1419;
+  --bg-elevated: #181d24;
+  --bg-code: #0a0d12;
+  --fg: #e6e9ef;
+  --fg-muted: #94a3b8;
+  --fg-subtle: #64748b;
+  --accent: #60a5fa;
+  --accent-strong: #3b82f6;
+  --rule: #1f2937;
+  --rule-soft: #2a3340;
+  --warn: #f59e0b;
+  --slide-break: #1f2937;
+
+  --font-sans: -apple-system, "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Menlo", "Monaco", "Cascadia Code", monospace;
+
+  --page-max: 920px;
+  --page-pad: 24px;
+  --content-max: 820px;
+
+  --radius: 8px;
+  --radius-small: 4px;
+}
+
+/* ---------------------------------------------------------------- *
+ * Reset + base
+ * ---------------------------------------------------------------- */
+*, *::before, *::after { box-sizing: border-box; }
+
+html {
+  background: var(--bg);
+  color-scheme: dark;
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-size: 18px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Breathing room above anchor targets so headings never land flush against
+ * browser chrome when a TOC link jumps to them.
  */
-.reveal-viewport::-webkit-scrollbar,
-html::-webkit-scrollbar {
-  width: 10px;
-}
-.reveal-viewport::-webkit-scrollbar-thumb,
-html::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.4);
-  border-radius: 5px;
-}
-.reveal-viewport::-webkit-scrollbar-track,
-html::-webkit-scrollbar-track {
-  background: transparent;
+:target,
+[id] {
+  scroll-margin-top: 32px;
 }
 
-.reveal h1 {
-  font-size: 2.0em;
-  line-height: 1.1;
-  margin-bottom: 0.4em;
+/* ---------------------------------------------------------------- *
+ * Page layout
+ * ---------------------------------------------------------------- */
+.deck {
+  max-width: var(--page-max);
+  margin: 0 auto;
+  padding: 48px var(--page-pad) 96px;
 }
 
-.reveal h2 {
-  font-size: 1.3em;
-  line-height: 1.15;
-  margin-bottom: 0.35em;
+@media (max-width: 720px) {
+  body { font-size: 16px; }
+  .deck { padding: 24px 16px 64px; }
 }
 
-.reveal h3 {
-  font-size: 1.05em;
+/* ---------------------------------------------------------------- *
+ * Typography
+ * ---------------------------------------------------------------- */
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 700;
   line-height: 1.2;
-  margin-bottom: 0.3em;
+  margin: 1.6em 0 0.5em;
+  color: var(--fg);
+  letter-spacing: -0.01em;
+}
+h1:first-child, h2:first-child, h3:first-child { margin-top: 0; }
+
+h1 { font-size: 2.4em; margin-top: 0.6em; }
+h2 { font-size: 1.8em; }
+h3 { font-size: 1.35em; }
+h4 { font-size: 1.1em; color: var(--fg-muted); }
+h5, h6 { font-size: 1em; color: var(--fg-muted); font-weight: 600; }
+
+p { margin: 0 0 1em; }
+
+strong, b { color: var(--fg); font-weight: 700; }
+em, i { font-style: italic; color: var(--fg); }
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.1s ease, color 0.1s ease;
+}
+a:hover,
+a:focus-visible {
+  color: var(--accent-strong);
+  border-bottom-color: var(--accent-strong);
 }
 
-.reveal p,
-.reveal li {
-  font-size: 0.75em;
-  line-height: 1.35;
+/* ---------------------------------------------------------------- *
+ * Lists
+ * ---------------------------------------------------------------- */
+ul, ol {
+  margin: 0 0 1em;
+  padding-left: 1.8em;
 }
+li { margin: 0.2em 0; }
+li > ul, li > ol { margin: 0.3em 0 0.4em; }
 
-.reveal blockquote {
-  font-size: 0.8em;
-  line-height: 1.3;
-  padding: 0.5em 1em;
-  margin: 0.4em auto;
-  width: 85%;
+/* ---------------------------------------------------------------- *
+ * Blockquote
+ * ---------------------------------------------------------------- */
+blockquote {
+  margin: 1em 0;
+  padding: 0.5em 1.2em;
+  border-left: 3px solid var(--accent);
+  background: var(--bg-elevated);
+  color: var(--fg-muted);
+  border-radius: 0 var(--radius-small) var(--radius-small) 0;
 }
+blockquote p:last-child { margin-bottom: 0; }
 
-.reveal ul,
-.reveal ol {
-  margin-bottom: 0.4em;
-}
-
-.reveal li + li {
-  margin-top: 0.25em;
-}
-
-.reveal table {
-  font-size: 0.65em;
-  line-height: 1.3;
-}
-
-.reveal table th,
-.reveal table td {
-  padding: 0.3em 0.6em;
-}
-
-.reveal pre {
-  font-size: 0.55em;
-  line-height: 1.3;
-  margin: 0.4em auto;
-}
-
-.reveal code {
+/* ---------------------------------------------------------------- *
+ * Code
+ * ---------------------------------------------------------------- */
+code {
+  font-family: var(--font-mono);
   font-size: 0.9em;
+  background: var(--bg-code);
+  color: var(--fg);
+  padding: 0.12em 0.4em;
+  border-radius: var(--radius-small);
+  border: 1px solid var(--rule);
 }
 
-.reveal .mermaid {
-  font-size: 0.7em;
+pre {
+  margin: 1em 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+}
+pre > code {
+  display: block;
+  padding: 1em 1.2em;
+  border-radius: var(--radius);
+  border: 1px solid var(--rule);
+  background: var(--bg-code);
+  overflow-x: auto;
+  font-size: 0.88em;
+  line-height: 1.5;
+  white-space: pre;
 }
 
-.reveal section > * + * {
-  margin-top: 0.35em;
+/* ---------------------------------------------------------------- *
+ * Tables
+ * ---------------------------------------------------------------- */
+table {
+  width: 100%;
+  margin: 1em 0;
+  border-collapse: collapse;
+  font-size: 0.95em;
+}
+th, td {
+  padding: 0.5em 0.85em;
+  text-align: left;
+  border-bottom: 1px solid var(--rule);
+  vertical-align: top;
+}
+th {
+  color: var(--fg);
+  font-weight: 700;
+  border-bottom: 2px solid var(--rule-soft);
+  background: var(--bg-elevated);
+}
+tbody tr:hover { background: color-mix(in srgb, var(--bg-elevated) 60%, transparent); }
+
+/* ---------------------------------------------------------------- *
+ * Horizontal rules
+ * ---------------------------------------------------------------- */
+hr {
+  border: 0;
+  border-top: 1px solid var(--rule);
+  margin: 2.4em 0;
 }
 
-/* Keep the top-of-slide title tight so bullets have room. */
-.reveal section > h1:first-child,
-.reveal section > h2:first-child,
-.reveal section > h3:first-child {
-  margin-top: 0;
+/* Slide-break separator between source slides — subtle, non-distracting. */
+hr.slide-break {
+  border-top: 1px dashed var(--slide-break);
+  margin: 3em 0;
+  opacity: 0.6;
 }
 
-/*
- * ONBOARDING-TUTORIAL-ENDUSER-001 (2026-10-26): fragment-navigation safety.
- * When a TOC anchor jumps to a slide (e.g. #how-jiminy-thinks), the browser
- * aligns the target to viewport-top. Reveal-md's `<!-- .slide: id="..." -->`
- * directive attaches the id to the HEADING element inside the section (not
- * the section itself), so we target any element carrying an id — this
- * leaves comfortable breathing room above any anchored heading, button,
- * figure, or other element, independent of what tag reveal-md picks.
- */
-.reveal section[id],
-.reveal section [id] {
-  scroll-margin-top: 64px;
+/* ---------------------------------------------------------------- *
+ * Speaker notes (collapsible)
+ * ---------------------------------------------------------------- */
+details.speaker-notes {
+  margin: 1em 0;
+  padding: 0.4em 0.9em;
+  background: var(--bg-elevated);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  font-size: 0.95em;
+  color: var(--fg-muted);
 }
-
-/*
- * ONBOARDING-TUTORIAL-ENDUSER-001 (2026-10-26) scroll-view clip fix:
- *
- * Reveal.js scroll-view wraps every slide in `.scroll-page-content` with
- * `overflow: hidden` and the inner `<section>` is `position: absolute`
- * with a top offset. For most slides this works, but when a slide's
- * target heading (via `<!-- .slide: id -->`) is at a y-coordinate ABOVE
- * the scroll-page-content's own box top, the heading gets clipped by the
- * overflow:hidden even though it's logically inside the section's layout.
- *
- * The clip is invisible to debugging — getBoundingClientRect returns a
- * valid rect for the heading, but the pixels never render because the
- * parent's overflow clip-zone excludes them.
- *
- * Fix: let scroll-page-content show overflow. The slide content stays
- * laid out by reveal's absolute positioning; this just stops the clip.
- * Applies to every slide (works for any current and future heading,
- * figure, table, or deep-linked target).
- */
-.reveal .scroll-page-content {
-  overflow: visible !important;
+details.speaker-notes > summary {
+  cursor: pointer;
+  color: var(--fg-subtle);
+  font-size: 0.85em;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+  user-select: none;
+  padding: 0.3em 0;
+  list-style: none;
 }
+details.speaker-notes > summary::marker { display: none; }
+details.speaker-notes > summary::before {
+  content: "▸ ";
+  display: inline-block;
+  transition: transform 0.15s;
+  margin-right: 0.3em;
+}
+details.speaker-notes[open] > summary::before { transform: rotate(90deg); }
+details.speaker-notes > summary:hover { color: var(--fg); }
+details.speaker-notes > *:not(summary) { margin-top: 0.5em; }
+details.speaker-notes ul { padding-left: 1.4em; }
 
-/*
- * ONBOARDING-TUTORIAL-ENDUSER-001 interactive SVG viewer (2026-10-26):
+/* ---------------------------------------------------------------- *
+ * Mermaid diagrams
+ * ---------------------------------------------------------------- */
+.mermaid {
+  margin: 1em 0;
+  text-align: center;
+  background: #ffffff;
+  border-radius: var(--radius);
+  padding: 1em;
+  overflow-x: auto;
+}
+.mermaid svg { max-width: 100%; height: auto; }
+
+/* ---------------------------------------------------------------- *
+ * Interactive SVG viewer (upgraded at runtime by assets/js/svg-viewer.js)
  *
- * Every hand-authored diagram is wrapped in <figure class="svg-figure">
- * which svg-viewer.js upgrades to an interactive zoom/pan container at
- * page load. This CSS is the baseline that the JS builds on.
- *
- * Design intent:
- * - Container has a BOUNDED height (fits inside one viewport-tall
- *   reveal.js slide), so slides containing a diagram never exceed
- *   viewport-height — sidesteps the scroll-view tall-slide clipping
- *   class entirely.
- * - Image inside uses object-fit: contain so it fits the container
- *   with aspect preserved (fit-to-container is the default state).
- * - CSS transform (controlled by svg-viewer.js) adds zoom + pan on top.
- * - User's native image-viewer intuition applies: wheel/pinch to zoom,
- *   drag to pan, double-click to reset, floating toolbar on hover.
- *
- * Works for ANY SVG viewBox or aspect ratio — operator can convert any
- * table/flowchart/architecture-diagram without further per-slide CSS.
- */
-.reveal .svg-figure,
-.reveal figure.svg-figure {
+ * Each <figure class="svg-figure"> becomes a bounded, zoom/pan-able frame.
+ * svg-viewer.js attaches toolbar + wheel/drag handlers; CSS owns baseline
+ * layout + styling.
+ * ---------------------------------------------------------------- */
+.svg-figure,
+figure.svg-figure {
   display: block;
   position: relative;
-  width: 85%;
-  max-width: 1360px;
-  /* Height is tuned for reveal.js's slide coord system: reveal authors
-     slides at 1600x900 and scales to viewport, so CSS px here are
-     slide-coord px. 540px slide-coord = 60% of the authored slide height,
-     which leaves room for a heading above + a short caption below without
-     overflowing the slide tile under any typical viewport scale. */
-  height: 540px;
-  margin: 0.5em auto;
+  width: 100%;
+  max-width: 100%;
+  height: min(70vh, 820px);
+  margin: 1.2em auto;
   padding: 0;
   overflow: hidden;
   background: #ffffff;
-  border-radius: 6px;
+  border-radius: var(--radius);
   user-select: none;
   touch-action: none;
   cursor: grab;
 }
+.svg-figure.svg-viewer-grabbing { cursor: grabbing; }
 
-.reveal .svg-figure.svg-viewer-grabbing {
-  cursor: grabbing;
-}
-
-.reveal .svg-figure img {
+.svg-figure img {
   display: block;
   width: 100%;
   height: 100%;
@@ -201,18 +297,15 @@ html::-webkit-scrollbar-track {
   will-change: transform;
   pointer-events: none;
 }
-
-.reveal .svg-figure figcaption {
-  font-size: 0.6em;
-  line-height: 1.3;
-  color: #94a3b8;
+.svg-figure figcaption {
+  font-size: 0.85em;
+  color: var(--fg-muted);
   text-align: center;
-  margin-top: 0.3em;
+  margin-top: 0.4em;
   font-style: italic;
 }
 
-/* Floating toolbar: hidden until hover/focus, so it doesn't distract from the diagram. */
-.reveal .svg-figure .svg-viewer-toolbar {
+.svg-figure .svg-viewer-toolbar {
   position: absolute;
   top: 8px;
   right: 8px;
@@ -220,21 +313,19 @@ html::-webkit-scrollbar-track {
   gap: 4px;
   background: rgba(15, 23, 42, 0.8);
   padding: 4px;
-  border-radius: 6px;
+  border-radius: var(--radius);
   opacity: 0;
   transition: opacity 0.15s ease;
   z-index: 5;
   pointer-events: none;
 }
-
-.reveal .svg-figure:hover .svg-viewer-toolbar,
-.reveal .svg-figure:focus-within .svg-viewer-toolbar,
-.reveal .svg-figure.svg-viewer-grabbing .svg-viewer-toolbar {
+.svg-figure:hover .svg-viewer-toolbar,
+.svg-figure:focus-within .svg-viewer-toolbar,
+.svg-figure.svg-viewer-grabbing .svg-viewer-toolbar {
   opacity: 1;
   pointer-events: auto;
 }
-
-.reveal .svg-figure .svg-viewer-toolbar button {
+.svg-figure .svg-viewer-toolbar button {
   width: 32px;
   height: 32px;
   border: 0;
@@ -243,25 +334,19 @@ html::-webkit-scrollbar-track {
   font-size: 18px;
   font-weight: 600;
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: var(--radius-small);
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 0;
   line-height: 1;
 }
-
-.reveal .svg-figure .svg-viewer-toolbar button:hover {
-  background: rgba(255, 255, 255, 0.28);
-}
-
-.reveal .svg-figure .svg-viewer-toolbar button:focus-visible {
-  outline: 2px solid #60a5fa;
+.svg-figure .svg-viewer-toolbar button:hover { background: rgba(255, 255, 255, 0.28); }
+.svg-figure .svg-viewer-toolbar button:focus-visible {
+  outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
-
-/* First-time usage hint: dismisses when user interacts. */
-.reveal .svg-figure .svg-viewer-hint {
+.svg-figure .svg-viewer-hint {
   position: absolute;
   bottom: 8px;
   left: 50%;
@@ -269,22 +354,17 @@ html::-webkit-scrollbar-track {
   background: rgba(15, 23, 42, 0.75);
   color: #e2e8f0;
   font-size: 11px;
-  font-family: -apple-system, "Inter", "Segoe UI", Arial, sans-serif;
+  font-family: var(--font-sans);
   padding: 4px 10px;
-  border-radius: 4px;
+  border-radius: var(--radius-small);
   opacity: 0;
   transition: opacity 0.2s ease;
   pointer-events: none;
   white-space: nowrap;
   z-index: 4;
 }
-
-.reveal .svg-figure:hover .svg-viewer-hint {
-  opacity: 0.9;
-}
-
-/* Fullscreen: let the figure fill the screen, image expands within. */
-.reveal .svg-figure:fullscreen {
+.svg-figure:hover .svg-viewer-hint { opacity: 0.9; }
+.svg-figure:fullscreen {
   width: 100vw;
   max-width: 100vw;
   height: 100vh;
@@ -294,15 +374,23 @@ html::-webkit-scrollbar-track {
   background: #ffffff;
 }
 
-/*
- * Reveal-md wraps standalone markdown images in <p><img></p>. Give those a
- * cap too for diagrams that aren't yet wrapped in .svg-figure (fallback
- * so a plain ![alt](file.svg) still scales politely without the viewer).
- */
-.reveal p > img[src$=".svg"] {
-  max-width: 85%;
+/* Fallback for standalone SVG <img> that didn't get wrapped in .svg-figure. */
+.deck p > img[src$=".svg"] {
+  max-width: 100%;
   max-height: 70vh;
   height: auto;
   display: block;
-  margin: 0.5em auto;
+  margin: 1em auto;
+  border-radius: var(--radius);
+  background: #ffffff;
+  padding: 0.5em;
+}
+
+/* ---------------------------------------------------------------- *
+ * Keyboard focus
+ * ---------------------------------------------------------------- */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-small);
 }

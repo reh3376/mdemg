@@ -1,20 +1,8 @@
 ---
-theme: night
-transition: slide
-width: 1600
-height: 900
-margin: 0.04
-minScale: 0.2
-maxScale: 2.0
-css: docs/onboarding/slides-overrides.css
-revealOptions:
-  view: scroll
-  scrollProgress: auto
-  # Continuous scroll (operator UX directive 2026-10-26): the default
-  # scrollSnap: 'mandatory' snaps to tile boundaries during scroll, which
-  # feels awkward on a deck meant to be read continuously. `false` lets
-  # the browser scroll naturally like a long document.
-  scrollSnap: false
+title: MDEMG Tutorial
+# The deck is served as a plain HTML/CSS long-form document (ONBOARDING-TUTORIAL-ENDUSER-001 pivot 2026-10-26).
+# Reveal.js-era frontmatter (theme, transition, width/height, revealOptions, ...) is intentionally removed.
+# `scripts/tutorial/export.mjs` consumes this frontmatter minimally — only `title` is used.
 ---
 
 # MDEMG
