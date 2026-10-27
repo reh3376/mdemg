@@ -43,6 +43,7 @@ import {
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { marked } from 'marked';
+import { renderMermaidSources } from './render_mermaid.mjs';
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(SCRIPT_DIR, '..', '..');
@@ -110,6 +111,15 @@ info(`parsed ${slideChunks.length} slide chunks from deck`);
 // block and refuse to parse the following markdown paragraph.)
 const explicitPins = []; // [{ id, headingText }]
 
+// Mermaid pre-rendering: each ```mermaid block gets pulled out, replaced with
+// a unique placeholder token, rendered to SVG at build time, written to the
+// staged assets dir, and the placeholder is swapped for a <figure class="svg-figure">
+// wrapper. This gives every diagram the same interactive zoom/pan treatment as
+// the hand-authored u4-how-jiminy-thinks.svg instead of client-rendered inline
+// Mermaid.
+const mermaidSources = []; // index → source text
+const MERMAID_PLACEHOLDER = (n) => `@@MERMAID_PLACEHOLDER_${n}@@`;
+
 const processedChunks = slideChunks.map((chunk) => {
   const idMatch = chunk.match(/<!--\s*\.slide:\s*id="([^"]+)"\s*-->/);
   const slideId = idMatch ? idMatch[1] : null;
@@ -133,12 +143,14 @@ const processedChunks = slideChunks.map((chunk) => {
     noteHtml = `\n<details class="speaker-notes"><summary>Speaker notes</summary>\n${noteBodyHtml}</details>\n`;
   }
 
-  // Turn ```mermaid fences into native `<div class="mermaid">` so mermaid.js
-  // auto-renders them. Marked would otherwise wrap in <pre><code>.
-  body = body.replace(
-    /```mermaid\s*\n([\s\S]*?)\n```/g,
-    (_m, code) => `<div class="mermaid">\n${code}\n</div>`,
-  );
+  // Collect ```mermaid fences, replace each with a unique placeholder token.
+  // After marked.parse we'll swap the tokens for <figure class="svg-figure">
+  // wrappers pointing at the pre-rendered SVG files.
+  body = body.replace(/```mermaid\s*\n([\s\S]*?)\n```/g, (_m, code) => {
+    const idx = mermaidSources.length;
+    mermaidSources.push(code);
+    return MERMAID_PLACEHOLDER(idx);
+  });
 
   return body + noteHtml;
 });
@@ -150,6 +162,34 @@ const combinedMd = processedChunks.join('\n\n<hr class="slide-break" />\n\n');
 marked.setOptions({ gfm: true, breaks: false });
 let bodyHtml = marked.parse(combinedMd);
 info(`markdown → HTML conversion complete (${bodyHtml.length} bytes)`);
+
+// ---------- Pre-render mermaid diagrams to SVG ----------
+// Each ```mermaid block in the source got pushed into `mermaidSources` and
+// replaced by @@MERMAID_PLACEHOLDER_N@@. We now render each to SVG via headless
+// mermaid, write it to the staged assets dir, and swap the placeholder for a
+// <figure class="svg-figure"><img ...></figure> wrapper so each diagram gets
+// the same interactive zoom/pan treatment as hand-authored u4-how-jiminy-thinks.
+let mermaidSvgCount = 0;
+if (mermaidSources.length > 0) {
+  info(`rendering ${mermaidSources.length} mermaid diagrams via puppeteer...`);
+  const svgs = await renderMermaidSources(mermaidSources);
+  // Write to staged dir up front so the output lives beside hand-authored SVGs.
+  mkdirSync(join(STAGED_DIR, 'assets', 'svg'), { recursive: true });
+  for (let i = 0; i < svgs.length; i += 1) {
+    const fileName = `mermaid-${String(i + 1).padStart(2, '0')}.svg`;
+    writeFileSync(join(STAGED_DIR, 'assets', 'svg', fileName), svgs[i]);
+    const figure =
+      `<figure class="svg-figure" tabindex="0" aria-label="Diagram ${i + 1}">` +
+      `<img src="assets/svg/${fileName}" alt="Diagram ${i + 1}" />` +
+      `</figure>`;
+    bodyHtml = bodyHtml.replace(
+      new RegExp(`(?:<p>\\s*)?@@MERMAID_PLACEHOLDER_${i}@@(?:\\s*</p>)?`),
+      figure,
+    );
+    mermaidSvgCount += 1;
+  }
+  info(`pre-rendered ${mermaidSvgCount} diagrams into assets/svg/mermaid-*.svg`);
+}
 
 // ---------- Post-process: auto-slug every <hN> + apply explicit pins ----------
 // Any heading without an id gets a slug derived from its text content. Explicit
@@ -236,15 +276,8 @@ const indexHtml = `<!doctype html>
   <main class="deck">
 ${bodyHtml}
   </main>
-  <script src="assets/js/mermaid.min.js"></script>
-  <script>
-    mermaid.initialize({
-      startOnLoad: true,
-      theme: 'dark',
-      securityLevel: 'loose',
-      flowchart: { useMaxWidth: true, htmlLabels: true },
-    });
-  </script>
+  <!-- Mermaid is pre-rendered to SVG at build time (see render_mermaid.mjs); -->
+  <!-- the runtime viewer handles pan/zoom/fullscreen for every diagram. -->
   <script defer src="assets/js/svg-viewer.js"></script>
 </body>
 </html>
@@ -263,12 +296,15 @@ info('bundled assets/css/slides-overrides.css');
 cpSync(HLJS_STYLE_SRC, join(STAGED_DIR, 'assets', 'css', 'zenburn.min.css'));
 info('bundled assets/css/zenburn.min.css');
 
-cpSync(MERMAID_SRC, join(STAGED_DIR, 'assets', 'js', 'mermaid.min.js'));
-info(`bundled assets/js/mermaid.min.js (${statSync(MERMAID_SRC).size} bytes)`);
+// Mermaid runtime is NOT shipped — diagrams are pre-rendered to SVG above
+// (saves ~2.5 MB on the shipped embed).
 
 cpSync(SVG_VIEWER_SRC, join(STAGED_DIR, 'assets', 'js', 'svg-viewer.js'));
 info(`bundled assets/js/svg-viewer.js (${statSync(SVG_VIEWER_SRC).size} bytes)`);
 
+// Hand-authored SVGs land beside the pre-rendered mermaid-*.svg files written
+// during the mermaid-render step above. The staged dir already has the
+// mermaid-*.svg entries; cpSync below merges hand-authored on top (same path).
 cpSync(SVG_DIR_SRC, join(STAGED_DIR, 'assets', 'svg'), { recursive: true });
 info('bundled assets/svg/ (hand-authored diagrams)');
 

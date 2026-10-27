@@ -11,7 +11,7 @@
 <body>
   <main class="deck">
 <h1 id="mdemg">MDEMG</h1>
-<h2 id="cognitive-substrate-for-ai-assisted-development">Cognitive Substrate for AI-Assisted Development</h2>
+<h2 id="cognitive-substrate-for-artificial-intelligence-ai-assisted-development">Cognitive Substrate for Artificial Intelligence (AI)-Assisted Development</h2>
 <p>Onboarding deck · engineering-dense · ~115 min walkthrough</p>
 <p><code>Last verified: 2026-10-22</code></p>
 <p><strong>Entry point</strong>: <a href="https://github.com/reh3376/mdemg/blob/main/docs/onboarding/README.md"><code>README.md</code></a> · <strong>Speaker notes</strong>: <a href="https://github.com/reh3376/mdemg/blob/main/docs/onboarding/mdemg-onboarding-notes.md"><code>mdemg-onboarding-notes.md</code></a></p>
@@ -53,7 +53,7 @@
 <tr>
 <td><strong>Covers</strong></td>
 <td>substrate, retrieval, LoRA, Jiminy, UxTS, ops</td>
-<td>CLI, dashboards, memory, alerts</td>
+<td>Command-Line Interface (CLI), dashboards, memory, alerts</td>
 </tr>
 <tr>
 <td><strong>Next</strong></td>
@@ -63,7 +63,7 @@
 </tbody></table>
 <details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
-<li>This is the landing fork, operators land here from <code>mdemg tutorial</code> CLI (Epic 5) or the Grafana overview button (Epic 5).</li>
+<li>This is the landing fork, operators land here from <code>mdemg tutorial</code> Command-Line Interface (CLI) (Epic 5) or the Grafana overview button (Epic 5).</li>
 <li>Software-dev path is the full 107-slide deck shipped by MDEMG-ONBOARDING-DECK-001; keep going.</li>
 <li>End-user path currently stubbed by ONBOARDING-TUTORIAL-SERVE-001 Epic 4; content lives in the sibling sprint ONBOARDING-TUTORIAL-ENDUSER-001.</li>
 <li>The default (just hit ↓/Space) is the software-dev path, because this deck&#39;s existing structure IS that path.</li>
@@ -75,8 +75,8 @@
 
 
 <h2 id="table-of-contents">Table of Contents</h2>
-<p><strong><a href="#f1--opening">F1 Opening</a></strong> → <strong><a href="#f2--substrate-core">F2 Substrate</a></strong> → <strong><a href="#f3--retrieval-pipeline">F3 Retrieval</a></strong> → <strong><a href="#f4--jiminy--enforcement--j17">F4 Jiminy + Enforcement + J17</a></strong> → <strong><a href="#f5--lora--qwen--model-distribution">F5 LoRA + Qwen + Model Dist</a></strong> → <strong><a href="#f6--uxts-framework-family">F6 UxTS</a></strong> → <strong><a href="#f7--ops">F7 Ops</a></strong> → <strong><a href="#f8--cli-hooks-mcp-multi-instance">F8 CLI + Hooks + MCP</a></strong> → <strong><a href="#f9--beta-program--security--dormant-census">F9 Beta + Security + Dormant</a></strong> → <strong><a href="#f10--conclusion">F10 Conclusion</a></strong></p>
-<p><strong>End User Path</strong>: <strong><a href="#end-user-path">U1 Opening</a></strong> → <strong><a href="#u2--the-stack">U2 Stack</a></strong> → <strong><a href="#u3--memory--the-cognitive-substrate">U3 Memory</a></strong> → <strong><a href="#u4--jiminy--the-inner-voice">U4 Jiminy</a></strong> → <strong><a href="#u5--rsic--the-self-improvement-engine">U5 RSIC</a></strong> → <strong><a href="#u6--uxts--forcing-functions-that-prevent-drift">U6 UxTS</a></strong> → <strong><a href="#u7--hitl--you-grade-what-the-system-cant">U7 HITL</a></strong> → <strong><a href="#u8--learning--training-data--how-the-model-gets-better">U8 Learning</a></strong> → <strong><a href="#u9--backup--ops">U9 Backup</a></strong> → <strong><a href="#u10--logs">U10 Logs</a></strong> → <strong><a href="#u11--config--features--the-toggle-surface">U11 Config</a></strong> → <strong><a href="#u12--plugins--the-extension-surface">U12 Plugins</a></strong> → <strong><a href="#u13--grafana--the-historical-view">U13 Grafana</a></strong> → <strong><a href="#u14--cli--the-full-command-surface">U14 CLI</a></strong> → <strong><a href="#u15--apis--grpc--the-programmatic-surfaces">U15 APIs+gRPC</a></strong> → <strong><a href="#u16--alerts--enforcement--operator-triage">U16 Alerts</a></strong> → <strong><a href="#u17--where-to-go--documentation">U17 Next</a></strong></p>
+<p><strong><a href="#f1--opening">F1 Opening</a></strong> → <strong><a href="#f2--substrate-core">F2 Substrate</a></strong> → <strong><a href="#f3--retrieval-pipeline">F3 Retrieval</a></strong> → <strong><a href="#f4--jiminy--enforcement--j17">F4 Jiminy + Enforcement + J17</a></strong> → <strong><a href="#f5--lora--qwen--model-distribution">F5 LoRA + Qwen + Model Dist</a></strong> → <strong><a href="#f6--uxts-framework-family">F6 UxTS</a></strong> → <strong><a href="#f7--ops">F7 Ops</a></strong> → <strong><a href="#f8--cli-hooks-mcp-multi-instance">F8 CLI + Hooks + Model Context Protocol (MCP)</a></strong> → <strong><a href="#f9--beta-program--security--dormant-census">F9 Beta + Security + Dormant</a></strong> → <strong><a href="#f10--conclusion">F10 Conclusion</a></strong></p>
+<p><strong>End User Path</strong>: <strong><a href="#end-user-path">U1 Opening</a></strong> → <strong><a href="#u2--the-stack">U2 Stack</a></strong> → <strong><a href="#u3--memory--the-cognitive-substrate">U3 Memory</a></strong> → <strong><a href="#u4--jiminy--the-inner-voice">U4 Jiminy</a></strong> → <strong><a href="#u5--rsic--the-self-improvement-engine">U5 RSIC</a></strong> → <strong><a href="#u6--uxts--forcing-functions-that-prevent-drift">U6 UxTS</a></strong> → <strong><a href="#u7--hitl--you-grade-what-the-system-cant">U7 Human-In-The-Loop (HITL)</a></strong> → <strong><a href="#u8--learning--training-data--how-the-model-gets-better">U8 Learning</a></strong> → <strong><a href="#u9--backup--ops">U9 Backup</a></strong> → <strong><a href="#u10--logs">U10 Logs</a></strong> → <strong><a href="#u11--config--features--the-toggle-surface">U11 Config</a></strong> → <strong><a href="#u12--plugins--the-extension-surface">U12 Plugins</a></strong> → <strong><a href="#u13--grafana--the-historical-view">U13 Grafana</a></strong> → <strong><a href="#u14--cli--the-full-command-surface">U14 CLI</a></strong> → <strong><a href="#u15--apis--grpc--the-programmatic-surfaces">U15 APIs+gRPC</a></strong> → <strong><a href="#u16--alerts--enforcement--operator-triage">U16 Alerts</a></strong> → <strong><a href="#u17--where-to-go--documentation">U17 Next</a></strong></p>
 <table>
 <thead>
 <tr>
@@ -94,13 +94,13 @@
 </tr>
 <tr>
 <td><a href="#f2--substrate-core">F2</a></td>
-<td>Substrate Core, Neo4j CMS, Hebbian, consolidation, TSDB</td>
+<td>Substrate Core, Neo4j Cognitive Memory Substrate (CMS), Hebbian, consolidation, Time-Series Database (TSDB)</td>
 <td align="right">~15 min</td>
 <td>,</td>
 </tr>
 <tr>
 <td><a href="#f3--retrieval-pipeline">F3</a></td>
-<td>Retrieval Pipeline, RRF 4-column + fingerprinting + rerank</td>
+<td>Retrieval Pipeline, Reciprocal Rank Fusion (RRF) 4-column + fingerprinting + rerank</td>
 <td align="right">~12 min</td>
 <td>,</td>
 </tr>
@@ -124,13 +124,13 @@
 </tr>
 <tr>
 <td><a href="#f7--ops">F7</a></td>
-<td>Ops, RSIC, HITL, backup/restore, Grafana</td>
+<td>Ops, RSIC, Human-In-The-Loop (HITL), backup/restore, Grafana</td>
 <td align="right">~16 min</td>
 <td>,</td>
 </tr>
 <tr>
 <td><a href="#f8--cli-hooks-mcp-multi-instance">F8</a></td>
-<td>CLI + Hooks + MCP + Multi-Instance</td>
+<td>CLI + Hooks + Model Context Protocol (MCP) + Multi-Instance</td>
 <td align="right">~7 min</td>
 <td>,</td>
 </tr>
@@ -162,7 +162,7 @@
 
 <!-- SECTION F1, OPENING -->
 <h1 id="f1--opening">F1 · Opening</h1>
-<p><strong>Nav</strong>: <a href="#table-of-contents">⇤ TOC</a> · <a href="https://github.com/reh3376/mdemg/blob/main/docs/onboarding/mdemg-onboarding-notes.md#f1--opening">Notes ▸ F1</a> · <a href="#f2--substrate-core">F2 →</a></p>
+<p><strong>Nav</strong>: <a href="#table-of-contents">⇤ Table of Contents (TOC)</a> · <a href="https://github.com/reh3376/mdemg/blob/main/docs/onboarding/mdemg-onboarding-notes.md#f1--opening">Notes ▸ F1</a> · <a href="#f2--substrate-core">F2 →</a></p>
 <details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
 <li>Target: 12 slides, ~10 min.</li>
@@ -195,7 +195,7 @@
 
 <h2 id="mdemg-artificial-nn-internal-dialogue-biological-nn">MDEMG : artificial NN :: internal dialogue : biological NN</h2>
 <blockquote>
-<p>MDEMG is the LLM&#39;s persistent memory and cognitive substrate. Markdown files are <strong>REMINDERS AND KEYS only</strong>: real memory lives in CMS (Neo4j, <code>mdemg-dev</code> space).</p>
+<p>MDEMG is the Large Language Model (LLM)&#39;s persistent memory and cognitive substrate. Markdown files are <strong>REMINDERS AND KEYS only</strong>: real memory lives in Cognitive Memory Substrate (CMS) (Neo4j, <code>mdemg-dev</code> space).</p>
 </blockquote>
 <ul>
 <li>CMS disconnected ⇒ <strong>cognitive outage</strong>, not graceful degradation</li>
@@ -211,19 +211,7 @@
 
 
 <h2 id="history-build-trajectory">History · Build Trajectory</h2>
-<div class="mermaid">
-flowchart LR
-  A[Concept origin] --> B[Phases 1-105<br/>Substrate + Retrieval + Hebbian]
-  B --> C[Sidecar phases<br/>101-105 cognitive gaps]
-  C --> D[RSIC<br/>self-improvement]
-  D --> E[Jiminy inner-voice<br/>+/strict enforcement]
-  E --> F[J17 protocol<br/>compressed messaging]
-  F --> G[LoRA on Qwen3-14B<br/>mdemg-llm-v1]
-  G --> H[Recursive retraining<br/>FT-RECURSIVE-001..004]
-  H --> I[UxTS framework family<br/>16 drift gates]
-  I --> J[Enforcement outcome<br/>JIMINY-ENFORCE-001..005]
-  J --> K[JIMINY-CEILING-BREAK-2<br/>follow rate ≥80% arc]
-</div>
+<figure class="svg-figure" tabindex="0" aria-label="Diagram 1"><img src="assets/svg/mermaid-01.svg" alt="Diagram 1" /></figure>
 <details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
 <li>~2 years of work.</li>
@@ -239,9 +227,9 @@ flowchart LR
 <h2 id="honest-pivots">Honest Pivots</h2>
 <ul>
 <li><strong>2026-04-22, MoE → dense pivot.</strong> Metal 499K MTLResource ceiling blocked MoE LoRA backward pass. Qwen3-14B-4bit dense replaced Qwen3.6-35B-A3B.</li>
-<li><strong>2026-05-03, mlx_lm.server → llama.cpp cutover.</strong> mlx_lm.server crashed every ~14 min via Metal OOM; llama-server bounds KV architecturally.</li>
-<li><strong>2026-06-26, Intent translation disabled.</strong> UVTS A/B OFF 0.4170 vs ON 0.4070 (net-negative); was 70% of all LLM errors.</li>
-<li><strong>2026-04-22, FT-OAI-003 dropped.</strong> All FT targets local MLX LoRA; OpenAI API only as teacher.</li>
+<li><strong>2026-05-03, mlx_lm.server → llama.cpp cutover.</strong> mlx_lm.server crashed every ~14 min via Metal Out-Of-Memory (OOM); llama-server bounds Key-Value (KV) architecturally.</li>
+<li><strong>2026-06-26, Intent translation disabled.</strong> Universal Validation Test Specification (UVTS) A/B OFF 0.4170 vs ON 0.4070 (net-negative); was 70% of all Large Language Model (LLM) errors.</li>
+<li><strong>2026-04-22, Fine-Tuning (FT)-OAI-003 dropped.</strong> All Fine-Tuning (FT) targets local MLX LoRA; OpenAI Application Programming Interface (API) only as teacher.</li>
 <li><strong>2026-08-01, Jiminy is an ENFORCER.</strong> Prior framing as opt-in advisor superseded.<details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
 <li>Each decision was &quot;the data decided,&quot; not an opinion.</li>
@@ -271,7 +259,7 @@ flowchart LR
 </tr>
 <tr>
 <td>UxTS frameworks</td>
-<td>16 (all CI-gated)</td>
+<td>16 (all Continuous Integration (CI)-gated)</td>
 </tr>
 <tr>
 <td>Ingested languages</td>
@@ -279,7 +267,7 @@ flowchart LR
 </tr>
 <tr>
 <td>Production model</td>
-<td><code>mdemg-llm-v1.Q5_K_M</code> (Qwen3-14B base + Phase 5 SFT LoRA)</td>
+<td><code>mdemg-llm-v1.Q5_K_M</code> (Qwen3-14B base + Phase 5 Supervised Fine-Tuning (SFT) LoRA)</td>
 </tr>
 <tr>
 <td>Benchmark aggregate</td>
@@ -302,44 +290,7 @@ flowchart LR
 
 
 <h2 id="mdemg-system-overview">MDEMG · System Overview</h2>
-<div class="mermaid">
-flowchart TB
-  subgraph Agent[Claude Code Agent]
-    H[Hooks]
-    M[MCP]
-  end
-  subgraph Core[MDEMG Core]
-    A[HTTP API :9999]
-    R[Retrieval RRF 4-col]
-    J[Jiminy Classifier]
-    S[J17 Protocol]
-    L[llama-server :8102]
-  end
-  subgraph Substrate[Substrate]
-    N[Neo4j CMS<br/>mdemg-dev]
-    T[TSDB telemetry<br/>+ corpora]
-  end
-  subgraph Learning[Learning]
-    HE[Hebbian]
-    RS[RSIC assessor]
-    HI[HITL review]
-    FT[FT recursive loop]
-  end
-  subgraph Obs[Observability]
-    G[Grafana 8 dashboards]
-    AL[Alert evaluator<br/>35+ rules]
-  end
-  H & M --> A
-  A --> R --> N
-  A --> J --> L
-  J --> T
-  N <--> HE
-  T --> RS --> A
-  HI --> N
-  FT --> L
-  Core & Learning --> T
-  T --> G & AL
-</div>
+<figure class="svg-figure" tabindex="0" aria-label="Diagram 2"><img src="assets/svg/mermaid-02.svg" alt="Diagram 2" /></figure>
 <details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
 <li>Spend ~1 min per cluster. Don&#39;t go deep, F2-F9 do depth.</li>
@@ -352,20 +303,7 @@ flowchart TB
 
 
 <h2 id="the-5-layer-memory-hierarchy">The 5-Layer Memory Hierarchy</h2>
-<div class="mermaid">
-flowchart BT
-  L0["L0, Raw observations<br/>obs_type ∈ {constraint, correction, decision, error, progress, ...}"]
-  L1["L1, Promoted durable rules<br/>role_type ∈ {constraint, correction}<br/>via consolidation gates"]
-  L2["L2, Themes<br/>clusters by centroid cosine"]
-  L3["L3, Emergent concepts<br/>abstracted patterns"]
-  L4["L4, Higher-order concepts"]
-  L5["L5, Meta / global patterns"]
-  L0 -->|CreateConstraintNodes<br/>CreateCorrectionNodes| L1
-  L1 -->|ClusterConversations<br/>phase 20| L2
-  L2 -->|CreateHiddenNodes<br/>phase 21| L3
-  L3 -->|BackwardPass<br/>phase 22| L4
-  L4 -->|ABSTRACTS_TO| L5
-</div>
+<figure class="svg-figure" tabindex="0" aria-label="Diagram 3"><img src="assets/svg/mermaid-03.svg" alt="Diagram 3" /></figure>
 <details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
 <li>Retrieval traverses this hierarchy; abstraction edges (GENERALIZES, ABSTRACTS_TO) link L0→L5.</li>
@@ -379,26 +317,7 @@ flowchart BT
 
 
 <h2 id="hot-path-what-happens-on-a-tool-use">Hot Path · What Happens On a Tool Use</h2>
-<div class="mermaid">
-sequenceDiagram
-  participant Agent as Claude Code
-  participant Hook as .claude/hooks
-  participant API as HTTP API :9999
-  participant J as Jiminy
-  participant CMS as Neo4j CMS
-  Agent->>Hook: PostToolUse (Write/Edit/Bash)
-  Hook->>API: POST /v1/conversation/observe
-  Hook->>API: POST /v1/jiminy/classify (if write-shape)
-  API->>J: evaluate
-  J-->>Hook: verdict (deny/pass)
-  Note over Hook: /strict + deny → BLOCK + HIGH alert
-  Hook->>API: POST /v1/jiminy/warm (background)
-  API->>CMS: embed + retrieve + guide
-  Note over Agent: next prompt
-  Hook->>API: GET /v1/jiminy/latest
-  API-->>Hook: guidance narrative
-  Note over Agent: guidance appended as system-reminder
-</div>
+<figure class="svg-figure" tabindex="0" aria-label="Diagram 4"><img src="assets/svg/mermaid-04.svg" alt="Diagram 4" /></figure>
 <details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
 <li>This loop runs on every tool use.</li>
@@ -412,32 +331,7 @@ sequenceDiagram
 
 
 <h2 id="the-recursive-improvement-arc">The Recursive-Improvement Arc</h2>
-<div class="mermaid">
-flowchart LR
-  subgraph Hebb[Hebbian, sub-second]
-    H1[ApplyCoactivation]
-    H2[CoactivateSession]
-    H3[ApplySymbolCoactivation]
-    H4[ApplyNegativeFeedback]
-  end
-  subgraph Jim[Jiminy outcomes, per tool use]
-    JX[surface] --> JA[agent acts] --> JF[feedback classify]
-    JF --> JO[constraint_outcomes + trust EMA]
-  end
-  subgraph RSIC[RSIC, per 30 min]
-    RA[assess 7-dim] --> RR[reflect LLM]
-    RR --> RI[insights] --> RD[dispatcher]
-  end
-  subgraph FT[FT-RECURSIVE, per week]
-    FD[drift] --> FE[export] --> FC[curate] --> FTR[train]
-    FTR --> FCV[convert] --> FG[gate] --> FP[promote]
-  end
-  HITL[HITL review] --> Jim
-  Hebb --> CMS[(CMS substrate)]
-  Jim --> CMS
-  RSIC --> CMS
-  FT --> CMS
-</div>
+<figure class="svg-figure" tabindex="0" aria-label="Diagram 5"><img src="assets/svg/mermaid-05.svg" alt="Diagram 5" /></figure>
 <details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
 <li>4 loops at different time constants against the same substrate.</li>
@@ -454,7 +348,7 @@ flowchart LR
 <p><strong>Metrics</strong></p>
 <ul>
 <li>Live: <code>GET /v1/metrics/snapshot</code> (JSON)</li>
-<li>Historical: TSDB <code>metric_samples</code></li>
+<li>Historical: Time-Series Database (TSDB) <code>metric_samples</code></li>
 <li>No <code>/metrics</code> endpoint, 404 by design (PROMETHEUS-SCRAPE-INVESTIGATION-001)</li>
 </ul>
 <p><strong>Dashboards (8)</strong></p>
@@ -497,7 +391,7 @@ flowchart LR
 
 <!-- SECTION F2, SUBSTRATE CORE -->
 <h1 id="f2--substrate-core">F2 · Substrate Core</h1>
-<p><strong>Nav</strong>: <a href="#f1--opening">← F1</a> · <a href="#table-of-contents">⇤ TOC</a> · <a href="https://github.com/reh3376/mdemg/blob/main/docs/onboarding/mdemg-onboarding-notes.md#f2--substrate-core">Notes ▸ F2</a> · <a href="#f3--retrieval-pipeline">F3 →</a></p>
+<p><strong>Nav</strong>: <a href="#f1--opening">← F1</a> · <a href="#table-of-contents">⇤ Table of Contents (TOC)</a> · <a href="https://github.com/reh3376/mdemg/blob/main/docs/onboarding/mdemg-onboarding-notes.md#f2--substrate-core">Notes ▸ F2</a> · <a href="#f3--retrieval-pipeline">F3 →</a></p>
 <details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
 <li>Target: 12-16 slides. 1 full (Neo4j CMS + Hebbian + consolidation) + 1 mini (TSDB).</li>
@@ -534,7 +428,7 @@ flowchart LR
 <p>The &quot;better decisions through better connections&quot; vision requires edges as first-class citizens, not metadata on docs.</p>
 <details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
-<li>Vector similarity is one signal. Edge traversal is a different signal. RRF (F3) fuses them.</li>
+<li>Vector similarity is one signal. Edge traversal is a different signal. Reciprocal Rank Fusion (RRF) (F3) fuses them.</li>
 <li>A pure vector DB forces every &quot;related to&quot; relationship into similarity space; graph edges preserve typed semantics.</li>
 </ul>
 </details>
@@ -544,29 +438,10 @@ flowchart LR
 
 
 <h2 id="f21-how-it-works-node-edge-schema">F2.1 How It Works · Node + Edge Schema</h2>
-<div class="mermaid">
-erDiagram
-  MemoryNode {
-    string node_id PK
-    string space_id
-    string role_type
-    int layer
-    bool is_archived
-    float activation_confidence
-    datetime created_at
-    datetime last_accessed
-    array embedding
-  }
-  MemoryNode ||--o{ CO_ACTIVATED_WITH : "weight + evidence_count"
-  MemoryNode ||--o{ GENERALIZES : "parent → child abstraction"
-  MemoryNode ||--o{ ABSTRACTS_TO : "cosine-weighted"
-  MemoryNode ||--o{ IMPLEMENTS_CORRECTION : "L0 obs → L1 correction"
-  MemoryNode ||--o{ CONTRADICTS : "weaken-path"
-  MemoryNode ||--o{ GUIDANCE_OUTCOME : "self-loop audit"
-</div>
+<figure class="svg-figure" tabindex="0" aria-label="Diagram 6"><img src="assets/svg/mermaid-06.svg" alt="Diagram 6" /></figure>
 <details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
-<li>CUIDv2 identifiers, never UUID (feedback_cuidv2_required).</li>
+<li>CUIDv2 identifiers, never Universally Unique Identifier (UUID) (feedback_cuidv2_required).</li>
 <li><code>embedding</code> dimension matches configured provider; vector-index backs cosine queries.</li>
 <li><code>GUIDANCE_OUTCOME</code> is a self-loop pattern (edge on the target node), the sink the Jiminy outcomes write to.</li>
 </ul>
@@ -600,7 +475,7 @@ erDiagram
 <li><strong>Vector index + Cypher</strong>: hybrid queries (role-filtered cosine, layer-scoped traversal) are 1 statement<details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
 <li>Backup/restore (F7) is the second line of defense; the primary line is the never-delete invariant.</li>
-<li>The space-isolation contract is tested via UATS specs.</li>
+<li>The space-isolation contract is tested via Universal API Test Specification (UATS) specs.</li>
 </ul>
 </details></li>
 </ul>
@@ -623,24 +498,7 @@ erDiagram
 
 
 <h2 id="f22-hebbian-learning-4-paths">F2.2 Hebbian Learning · 4 Paths</h2>
-<div class="mermaid">
-flowchart LR
-  subgraph On retrieve
-    AC[ApplyCoactivation]
-  end
-  subgraph On conversation
-    CS[CoactivateSession]
-    AS[ApplySymbolCoactivation]
-  end
-  subgraph On feedback
-    ANF[ApplyNegativeFeedback]
-  end
-  AC --> E1[CO_ACTIVATED_WITH<br/>weight update]
-  CS --> E1
-  AS --> E1
-  ANF --> E2[CONTRADICTS edge<br/>OR weaken existing]
-  E1 & E2 --> EV[reinforcement_events<br/>TSDB V0022]
-</div>
+<figure class="svg-figure" tabindex="0" aria-label="Diagram 7"><img src="assets/svg/mermaid-07.svg" alt="Diagram 7" /></figure>
 <details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
 <li>All 4 federated via EVENTGRAPH-001..004 to <code>reinforcement_events</code>.</li>
@@ -716,11 +574,11 @@ flowchart LR
 </tr>
 <tr>
 <td>Reader</td>
-<td>Direct SQL via <code>pgxpool</code></td>
+<td>Direct Structured Query Language (SQL) via <code>pgxpool</code></td>
 </tr>
 <tr>
 <td>Alert rules</td>
-<td>TSDB-query-SQL (idle-safe COALESCE+aggregate)</td>
+<td>TSDB-query-Structured Query Language (SQL) (idle-safe COALESCE+aggregate)</td>
 </tr>
 <tr>
 <td>Hypertables</td>
@@ -772,7 +630,7 @@ flowchart LR
 <td>Cosine over vector-index</td>
 </tr>
 <tr>
-<td>BM25</td>
+<td>Best Matching 25 (BM25)</td>
 <td>0.20</td>
 <td>Lexical sparse</td>
 </tr>
@@ -803,7 +661,7 @@ flowchart LR
 <p>Single-signal retrieval misses different classes:</p>
 <ul>
 <li><strong>Embedding alone</strong>: topic-adjacent but mechanism-wrong (e.g., &quot;commit docs&quot; retrieves &quot;no-direct-main-commits&quot;)</li>
-<li><strong>BM25 alone</strong>: exact-token good, semantic-weak</li>
+<li><strong>Best Matching 25 (BM25) alone</strong>: exact-token good, semantic-weak</li>
 <li><strong>Graph alone</strong>: well-connected nodes dominate, isolated nodes starve</li>
 <li><strong>Structural alone</strong>: typed edges rich on mature graphs, zero on fresh</li>
 </ul>
@@ -819,21 +677,7 @@ flowchart LR
 
 
 <h2 id="f31-rrf-how-it-works">F3.1 RRF · How It Works</h2>
-<div class="mermaid">
-flowchart LR
-  Q[Query] --> E[Embed]
-  Q --> KW[BM25 keywords]
-  E --> VI[Vector-index<br/>top-K]
-  KW --> BM[BM25 fetch]
-  VI & BM --> GC[Graph column<br/>activation spread]
-  VI & BM --> SC[Structural column<br/>typed-edge walk]
-  VI --> F[RRF fusion<br/>1/(k+rank)]
-  BM --> F
-  GC --> F
-  SC --> F
-  F --> RK[Optional LLM rerank<br/>cross-encoder]
-  RK --> TK[topK]
-</div>
+<figure class="svg-figure" tabindex="0" aria-label="Diagram 8"><img src="assets/svg/mermaid-08.svg" alt="Diagram 8" /></figure>
 <details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
 <li>Rerank is default via cross-encoder (openai). Neural alternative shipped but same mean quality 20× slower.</li>
@@ -870,11 +714,11 @@ flowchart LR
 <li><strong>Every memory recall</strong> = this pipeline</li>
 <li><strong>Every Jiminy guide</strong> = this pipeline</li>
 <li><strong>Every HITL candidate query</strong> = this pipeline</li>
-<li><strong>Latency SLO</strong>: p95 &lt; 120s (ALERT_RETRIEVE_P95_MS = 120000)</li>
+<li><strong>Latency Service Level Objective (SLO)</strong>: p95 &lt; 120s (ALERT_RETRIEVE_P95_MS = 120000)</li>
 <li>Live-measured 7d p95 = 61.6s (comfortably under)<details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
 <li>One pipeline, many consumers. Changes propagate everywhere.</li>
-<li>The SLO was recalibrated post-ALERT-TRUTH-001 to match honest p95 (was clamped at 10s pre-fix).</li>
+<li>The Service Level Objective (SLO) was recalibrated post-ALERT-TRUTH-001 to match honest p95 (was clamped at 10s pre-fix).</li>
 </ul>
 </details></li>
 </ul>
@@ -882,7 +726,7 @@ flowchart LR
 
 
 <h2 id="f31-rrf-how-it-will-improve">F3.1 RRF · How It Will Improve</h2>
-<p><strong>Shipped default-off</strong> (opt-in via URL param or <code>.env</code> flag):</p>
+<p><strong>Shipped default-off</strong> (opt-in via Uniform Resource Locator (URL) param or <code>.env</code> flag):</p>
 <ul>
 <li>RETRIEVAL-LAYER-BALANCE-001, concrete-recall quota (post-rerank injection to counter abstract crowding)</li>
 <li>RETRIEVAL-REVERSE-LOOKUP-001, filesystem-grep for reverse-lookup-shape queries (&quot;who consumes X?&quot;)</li>
@@ -928,7 +772,7 @@ flowchart LR
 <li>~<strong>25% rerank-input reduction</strong> on most calls, full-passthrough on data_flow_integration</li>
 <li>Per-request override: <code>?sparse=true|false&amp;sparse_percentile=N</code><details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
-<li>120q UVTS A/B: mean +0.003, 0 regressions, 10 improvements → safe default-on.</li>
+<li>120q Universal Validation Test Specification (UVTS) A/B: mean +0.003, 0 regressions, 10 improvements → safe default-on.</li>
 <li><code>V0019 sparse_gate_metrics</code> hypertable persists per-call rows.</li>
 </ul>
 </details></li>
@@ -993,7 +837,7 @@ flowchart LR
 <li>Classifier verdicts were unweighted (every surfaced rule equally urgent)</li>
 <li>No signal fed back to substrate (rule effectiveness unmeasurable)</li>
 </ul>
-<p>Post-Jiminy: outcomes flow back → trust EMA → surface weighting → feedback-driven corpus curation.</p>
+<p>Post-Jiminy: outcomes flow back → trust Exponential Moving Average (EMA) → surface weighting → feedback-driven corpus curation.</p>
 <details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
 <li>Rejected: inline &quot;assistant memory&quot; via prompt stuffing (agent attention is finite, dilution problem).</li>
@@ -1006,24 +850,7 @@ flowchart LR
 
 
 <h2 id="f41-jiminy-flow-mermaid">F4.1 Jiminy · Flow (Mermaid)</h2>
-<div class="mermaid">
-flowchart LR
-  H[PostToolUse hook] --> C{Write/Edit/Bash?}
-  C -->|yes + /strict| CL[classify]
-  CL --> V{verdict}
-  V -->|deny| B[BLOCK<br/>+ HIGH alert<br/>+ pre-write-check]
-  V -->|pass| OK[allow]
-  H -->|UserPromptSubmit| W[warm /v1/jiminy/warm]
-  W --> R[retrieve]
-  R --> LC[Lever C actionable fetch]
-  LC --> LD[Lever D concept bias]
-  LD --> LA[Lever A quota]
-  LA --> LB[Lever B effectiveness prior]
-  LB --> N[narrative synthesis]
-  N --> S[warm store]
-  PP[prompt-context hook] --> GL[GET /v1/jiminy/latest]
-  GL --> SR[prepend to next prompt]
-</div>
+<figure class="svg-figure" tabindex="0" aria-label="Diagram 9"><img src="assets/svg/mermaid-09.svg" alt="Diagram 9" /></figure>
 <details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
 <li>3 Levers compose on the surface pool: A quota, B effectiveness prior, C actionable direct-fetch, D concept bias.</li>
@@ -1103,7 +930,7 @@ flowchart LR
 <td>JIMINY_MECHANISM_SCOPE_CREDIT_ENABLED</td>
 </tr>
 </tbody></table>
-<p><strong>All default-off in code (preserves ULTS prompt hash pin); default-on in <code>.env</code> after live smoke.</strong></p>
+<p><strong>All default-off in code (preserves Universal LLM Test Specification (ULTS) prompt hash pin); default-on in <code>.env</code> after live smoke.</strong></p>
 <details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
 <li>Each clause splices after its predecessor; recency-weighted LLM attention gives strongest-gate-last.</li>
@@ -1141,7 +968,7 @@ flowchart LR
 <li><strong>Phase 1, Corpus purge (shipped JIMINY-CORPUS-003)</strong>: 64 → 33 constraint nodes; audit kept quality rules, tombstoned noise</li>
 <li><strong>Phase 2, Retrieval precision (LEVER-C-TIGHTEN-002)</strong>: scope-gate for over-surfacing</li>
 <li><strong>Phase 3, Classifier semantics (CLASSIFIER-CONTEXT-002)</strong>: mechanism-scope hard-precedence gate</li>
-<li><strong>Phase 4a, HITL velocity (shipped)</strong>: keyboard-driven bulk-grade UI (0..4 keys, auto-advance)</li>
+<li><strong>Phase 4a, HITL velocity (shipped)</strong>: keyboard-driven bulk-grade User Interface (UI) (0..4 keys, auto-advance)</li>
 <li><strong>Phase 4b, Retrain</strong>: blocked on classifier follow-rate honest ≥20% + N=500+ gold corpus</li>
 <li><strong>Phase 5, Model swap</strong>: future (post-beta)</li>
 </ol>
@@ -1190,7 +1017,7 @@ flowchart LR
 <details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
 <li>Shipped as a sequential arc: each sprint lives against the next scoping, informed by live smoke of the predecessor.</li>
-<li>Three arc-adjacent follow-ups shipped: ENFORCE-OVERRIDES-TSDB + ENFORCE-UI-OVERRIDES + ENFORCE-AUTO-EXECUTE.</li>
+<li>Three arc-adjacent follow-ups shipped: ENFORCE-OVERRIDES-TSDB + ENFORCE-User Interface (UI)-OVERRIDES + ENFORCE-AUTO-EXECUTE.</li>
 </ul>
 </details>
 
@@ -1199,17 +1026,7 @@ flowchart LR
 
 
 <h2 id="f42-enforcement-deny-taxonomy">F4.2 Enforcement · Deny Taxonomy</h2>
-<div class="mermaid">
-flowchart LR
-  A[Action attempted] --> C[Jiminy classify]
-  C --> V{verdict}
-  V -->|pass| OK[allow]
-  V -->|deny no-override| DN[blocked_true_positive<br/>enforcement worked]
-  V -->|deny + operator override| DO[blocked_false_positive<br/>classifier wrong]
-  Later[Later: correction observed] --> M[missed_violation<br/>classifier missed]
-  DN & DO & M --> O[constraint_outcomes TSDB]
-  O --> R[RSIC reader<br/>→ archive_ineffective_constraints<br/>→ adjust_guidance_confidence]
-</div>
+<figure class="svg-figure" tabindex="0" aria-label="Diagram 10"><img src="assets/svg/mermaid-10.svg" alt="Diagram 10" /></figure>
 <details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
 <li>3 distinct outcome types, each has a distinct alert rule.</li>
@@ -1308,14 +1125,14 @@ SEQ:    monotonic, report last_seq on resume
 
 
 <h2 id="f43-j17-tier-promotion-keyed-on-comprehension">F4.3 J17 · Tier Promotion Keyed on Comprehension</h2>
-<p><strong>J17-TIER-GATE-001</strong> flipped the T1-promotion gate from compliance-trust to NLI-measured comprehension.</p>
+<p><strong>J17-TIER-GATE-001</strong> flipped the T1-promotion gate from compliance-trust to Natural Language Inference (NLI)-measured comprehension.</p>
 <ul>
 <li><code>J17_TIER_GATE_MODE=comprehension</code> (live in <code>.env</code>)</li>
 <li><code>J17_TIER_COMPREHENSION_HIGH=0.6</code></li>
 <li><code>J17_TIER_COMPREHENSION_MIN_SAMPLES=20</code></li>
 <li>T1→T2 demotion gate (<code>J17_T1_COMPREHENSION_GATE=0.5</code>) stays active in both modes</li>
 </ul>
-<p><strong>Why</strong>: dense encoding&#39;s risk is incomprehension; trust (followed→1.0/ignored→0.2 EMA ~0.23) conflates &quot;understood&quot; with &quot;obeyed&quot;, the DASHBOARD-TRUTH-001 E2 axis distinction.</p>
+<p><strong>Why</strong>: dense encoding&#39;s risk is incomprehension; trust (followed→1.0/ignored→0.2 Exponential Moving Average (EMA) ~0.23) conflates &quot;understood&quot; with &quot;obeyed&quot;, the DASHBOARD-TRUTH-001 E2 axis distinction.</p>
 <details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
 <li>First T1 messaging ever produced on substrate after this flip (6 pipe-coded <code>C:!|code</code> lines).</li>
@@ -1366,9 +1183,9 @@ SEQ:    monotonic, report last_seq on resume
 <ul>
 <li>Rank 32 / α 64</li>
 <li>7 dense target modules</li>
-<li>Phase 5 SFT (dense, not MoE)</li>
+<li>Phase 5 Supervised Fine-Tuning (SFT) (dense, not MoE)</li>
 </ul>
-<p><strong>Served as</strong>: GGUF Q5_K_M via <code>llama-server :8102</code></p>
+<p><strong>Served as</strong>: GPT-Generated Unified Format (GGUF) Q5_K_M via <code>llama-server :8102</code></p>
 <p><strong>Baseline aggregate</strong>: 0.9188 on 16-task augmented eval
 <strong>Beats</strong>: gpt-5.4-mini (0.8317)</p>
 <details class="speaker-notes"><summary>Speaker notes</summary>
@@ -1387,7 +1204,7 @@ SEQ:    monotonic, report last_seq on resume
 <ul>
 <li>16 LLM call sites, each has its own prompt shape + output contract (all single-shot structured outputs)</li>
 <li>Fine-tuned on MDEMG&#39;s own corpora + call-site traces</li>
-<li>Per-site better than generic gpt-mini (verified via UBENCH)</li>
+<li>Per-site better than generic gpt-mini (verified via Universal Benchmark (UBENCH))</li>
 </ul>
 <p><strong>Rejected alternative</strong>: OpenAI fine-tuning (FT-OAI-003 dropped 2026-04-22), all FT now local MLX LoRA, teacher-only for OpenAI.</p>
 <details class="speaker-notes"><summary>Speaker notes</summary>
@@ -1401,20 +1218,12 @@ SEQ:    monotonic, report last_seq on resume
 
 
 <h2 id="f51-lora-pipeline">F5.1 LoRA · Pipeline</h2>
-<div class="mermaid">
-flowchart LR
-  SF[MLX safetensors<br/>Phase 5 SFT training] --> F[mlx_lm.fuse --dequantize<br/>→ 28 GB bf16 HF safetensors]
-  F --> CV[convert_hf_to_gguf.py --outtype f16<br/>→ 29.5 GB f16 GGUF]
-  CV --> Q[llama-quantize Q5_K_M<br/>→ 10.5 GB Q5_K_M GGUF]
-  Q --> LS[llama-server<br/>--ctx-size 32768 --parallel 4<br/>--cont-batching --jinja<br/>:8102]
-  LS --> CS[16 LLM call sites<br/>via llmclient]
-</div>
-
+<figure class="svg-figure" tabindex="0" aria-label="Diagram 11"><img src="assets/svg/mermaid-11.svg" alt="Diagram 11" /></figure>
 <p><strong>Conversion time</strong>: ~5 min on M5 Max.</p>
 <details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
-<li>The MLX form stays as research/training canonical; GGUF is the production serving form.</li>
-<li>Phase 13.5 cutover 2026-05-03: replaced mlx_lm.server with llama-server (14-min Metal OOM → bounded KV).</li>
+<li>The MLX form stays as research/training canonical; GPT-Generated Unified Format (GGUF) is the production serving form.</li>
+<li>Phase 13.5 cutover 2026-05-03: replaced mlx_lm.server with llama-server (14-min Metal Out-Of-Memory (OOM) → bounded Key-Value (KV)).</li>
 </ul>
 </details>
 
@@ -1435,7 +1244,7 @@ flowchart LR
 <li>Early-stop on <code>val_loss &gt; best × 1.05</code> (SFT) / <code>val_reward &lt; best × 0.95</code> (RL)</li>
 <li><code>n_epochs=auto</code> DISALLOWED<details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
-<li>Both policies are grep-auditable + CI-gated.</li>
+<li>Both policies are grep-auditable + Continuous Integration (CI)-gated.</li>
 <li>The 2-epoch overfit incident is the forcing function that pins the 3-epoch cap.</li>
 </ul>
 </details></li>
@@ -1463,7 +1272,7 @@ flowchart LR
 <li><strong>E1 shipped</strong>: Corpus audit (81% substrate-covered; 2203 rows strip-eligible)</li>
 <li><strong>E2 shipped</strong>: Phase E2 strip (claude_code_knowledge_v3_stripped, 503 rows)</li>
 <li><strong>E3 target</strong>: 7503 rows (503 stripped + 7000 task-behavior)</li>
-<li><strong>E4 blocked</strong>: Homebrew installer update required for the new Qwen model (HOMEBREW-INSTALLER-QWEN-UPDATE-001 Phase B shipped operator-runbook + ModelName-guarded SHA verify)</li>
+<li><strong>E4 blocked</strong>: Homebrew installer update required for the new Qwen model (HOMEBREW-INSTALLER-QWEN-UPDATE-001 Phase B shipped operator-runbook + ModelName-guarded Secure Hash Algorithm (SHA) verify)</li>
 <li><strong>Future</strong>: Qwen3.8-27B base swap (MODEL-SWAP-QWEN27B-EVAL #91 winner, +0.11 lift)<details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
 <li>E4 promote unblocked once Phase A+C ship (operator-authored external work).</li>
@@ -1475,19 +1284,7 @@ flowchart LR
 
 
 <h2 id="f52-recursive-retraining-loop">F5.2 Recursive-Retraining Loop</h2>
-<div class="mermaid">
-flowchart LR
-  PD[Production drift<br/>ft_production_drift alert] --> EX[Export<br/>mdemg data export]
-  EX --> CU[Curate<br/>paradigm_router]
-  CU --> TR[Train<br/>MLX LoRA]
-  TR --> CV[Convert<br/>fuse → f16 → Q5_K_M GGUF]
-  CV --> GT[Gate<br/>benchmark vs threshold]
-  GT --> PR{PASS?}
-  PR -->|yes| PROM[Promote<br/>defense-in-depth swap]
-  PR -->|no| HALT[promote_pending halt<br/>operator confirms]
-  PROM --> TW[Post-swap tripwire<br/>auto-rollback on failure]
-</div>
-
+<figure class="svg-figure" tabindex="0" aria-label="Diagram 12"><img src="assets/svg/mermaid-12.svg" alt="Diagram 12" /></figure>
 <p><strong>Default-off</strong>: <code>FT_LOOP_ENABLED=false</code>. 4-phase arc complete (Phases 6a / 6b / 7 / 9).</p>
 <details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
@@ -1565,9 +1362,9 @@ mdemg model where
 <li>Locate GGUF via Ollama manifest layout (<code>&lt;OLLAMA_MODELS&gt;/manifests/&lt;OLLAMA_HOST&gt;/&lt;ns&gt;/&lt;name&gt;/&lt;tag&gt;</code>)</li>
 <li>Follow layer with <code>mediaType: application/vnd.ollama.image.model</code></li>
 <li>Symlink blob to <code>&lt;MDEMG_MODEL_DIR&gt;/&lt;name&gt;.&lt;quant&gt;.gguf</code></li>
-<li>SHA-verify against embedded <code>internal/cli/quant_manifest.json</code></li>
+<li>Secure Hash Algorithm (SHA)-verify against embedded <code>internal/cli/quant_manifest.json</code></li>
 </ol>
-<p>RAM auto-detection via <code>sysctl hw.memsize</code> (darwin) or <code>/proc/meminfo</code> (linux); dispatch via <code>MDEMG_MODEL_RAM_TIERS</code> JSON.</p>
+<p>RAM auto-detection via <code>sysctl hw.memsize</code> (darwin) or <code>/proc/meminfo</code> (linux); dispatch via <code>MDEMG_MODEL_RAM_TIERS</code> JavaScript Object Notation (JSON).</p>
 <details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
 <li>All 11 operator-visible values are dynamic (no-hardcoding rule).</li>
@@ -1606,7 +1403,7 @@ mdemg model where
 </tr>
 <tr>
 <td><strong>llama.cpp llama-server (chosen)</strong></td>
-<td>Architecturally-bounded KV (<code>--ctx-size × --parallel</code>); graceful HTTP 500 on OOM</td>
+<td>Architecturally-bounded KV (<code>--ctx-size × --parallel</code>); graceful Hypertext Transfer Protocol (HTTP) 500 on OOM</td>
 </tr>
 </tbody></table>
 <p><strong>Bake-off result</strong>: 0 crashes / 160 min / 301 calls; p50 latency 17s → 3.0s (5.6× faster); UVTS parity (0.396 = 0.396).</p>
@@ -1671,9 +1468,9 @@ UAMS     Agent memory specs
 <p><strong>Prevents regression by making the drift class itself impossible.</strong></p>
 <p>Examples caught by UxTS gates:</p>
 <ul>
-<li><strong>UATS</strong> caught pre-bash-check reformulate 500 defect</li>
-<li><strong>ULTS</strong> catches prompt drift (<code>system_prompt_hash</code> pin)</li>
-<li><strong>UBENCH</strong> catches benchmark freshness drift (FT-BENCH-REFRESH-001)</li>
+<li><strong>Universal API Test Specification (UATS)</strong> caught pre-bash-check reformulate 500 defect</li>
+<li><strong>Universal LLM Test Specification (ULTS)</strong> catches prompt drift (<code>system_prompt_hash</code> pin)</li>
+<li><strong>Universal Benchmark (UBENCH)</strong> catches benchmark freshness drift (FT-BENCH-REFRESH-001)</li>
 <li><strong>UOBS</strong> catches metric-emission drift<details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
 <li>&quot;Measure, lock, repeat&quot;, the deck&#39;s governing engineering value lives here.</li>
@@ -1685,16 +1482,7 @@ UAMS     Agent memory specs
 
 
 <h2 id="f61-uxts-how-it-works-pattern">F6.1 UxTS · How It Works (Pattern)</h2>
-<div class="mermaid">
-flowchart LR
-  D[Drift class discovered] --> S[Schema<br/>docs/tests/x/schema.json]
-  S --> SP[Specs<br/>docs/tests/x/specs/*.x.json]
-  SP --> R[Runner<br/>docs/tests/x/runners/]
-  R --> CI[CI job<br/>make test-x-lint + run]
-  CI --> M[Matrix adjudication<br/>UXTS_FRAMEWORK_MATRIX.md]
-  M --> P[PR merge gate]
-</div>
-
+<figure class="svg-figure" tabindex="0" aria-label="Diagram 13"><img src="assets/svg/mermaid-13.svg" alt="Diagram 13" /></figure>
 <p><strong>Pattern invariants</strong>:</p>
 <ul>
 <li>Every spec validates against the schema</li>
@@ -1721,7 +1509,7 @@ flowchart LR
 </thead>
 <tbody><tr>
 <td>UATS</td>
-<td>API contract</td>
+<td>Application Programming Interface (API) contract</td>
 <td><code>make test-api</code></td>
 <td>UATS-GAP-001 (reformulate 500)</td>
 </tr>
@@ -1948,11 +1736,11 @@ flowchart LR
 <li><code>gold_fraction</code> in manifest = future-FT-trigger when ≥N</li>
 <li>Phase 4b retrain blocked on classifier follow-rate honest ≥20% + N=500+ gold corpus</li>
 </ul>
-<p>The <code>suggested_guidance</code> column on <code>review_grades</code> carries SME-authored &quot;what would have been better guidance&quot;, the highest-value retrain signal.</p>
+<p>The <code>suggested_guidance</code> column on <code>review_grades</code> carries Subject Matter Expert (SME)-authored &quot;what would have been better guidance&quot;, the highest-value retrain signal.</p>
 <details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
 <li>REVIEW-SUGGESTED-GUIDANCE-CONSUME-001 shipped the consumer: <code>scripts/curate_guidance_corpus.py</code> LEFT JOINs with length-gate.</li>
-<li>SME writes propagate to the retrain corpus.</li>
+<li>Subject Matter Expert (SME) writes propagate to the retrain corpus.</li>
 </ul>
 </details>
 
@@ -1961,17 +1749,7 @@ flowchart LR
 
 
 <h2 id="f72-hitl-how-it-works">F7.2 HITL · How It Works</h2>
-<div class="mermaid">
-flowchart LR
-  CQ[Candidate queue] --> OP[Operator grades]
-  OP --> SN{Sink}
-  SN -->|reinforce=true| SUB[Substrate mutation<br/>conversation.Correct]
-  SN -->|reinforce=false, auto-dismiss| DQ[Status update only]
-  SN -->|reinforce=true, approve correction| L0[New L0 correction obs]
-  L0 --> C21[Phase 20 consolidation] --> L1[L1 correction node]
-  SUB --> JT[Jiminy trust EMA]
-  OP -.-> SUG[suggested_guidance → retrain corpus]
-</div>
+<figure class="svg-figure" tabindex="0" aria-label="Diagram 14"><img src="assets/svg/mermaid-14.svg" alt="Diagram 14" /></figure>
 <details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
 <li>Reinforcement is OPT-IN per submission (<code>REVIEW_REINFORCE_DEFAULT=false</code>).</li>
@@ -2339,8 +2117,8 @@ mdemg beta-janitor sweep     # 30-day sweep
 
 
 <h2 id="f92-security-hardening-shipped-tranches">F9.2 Security Hardening · Shipped Tranches</h2>
-<p><strong>SEC-TRANCHE-2 (path injection)</strong>: <code>pathsafe.SafeJoinUnderDir</code> CodeQL-recognized sanitizer. 8 HTTP-reachable sites wired. 13 alerts dismissed via <code>gh api</code> with rationale.</p>
-<p><strong>SEC-TRANCHE-3 (33 alerts closed)</strong>: regex-anchor <code>\b</code> prefixes, URL-scheme deny-list widening (<code>data:</code> + <code>vbscript:</code>), defensive 10000-element allocation caps, int32 bounds-checks, Python <code>urlparse().hostname</code> fixes, XSS-DOM fix with CUIDv2 validation.</p>
+<p><strong>SEC-TRANCHE-2 (path injection)</strong>: <code>pathsafe.SafeJoinUnderDir</code> CodeQL-recognized sanitizer. 8 Hypertext Transfer Protocol (HTTP)-reachable sites wired. 13 alerts dismissed via <code>gh api</code> with rationale.</p>
+<p><strong>SEC-TRANCHE-3 (33 alerts closed)</strong>: regex-anchor <code>\b</code> prefixes, Uniform Resource Locator (URL)-scheme deny-list widening (<code>data:</code> + <code>vbscript:</code>), defensive 10000-element allocation caps, int32 bounds-checks, Python <code>urlparse().hostname</code> fixes, XSS-Document Object Model (DOM) fix with CUIDv2 validation.</p>
 <p><strong>Latest (today)</strong>:</p>
 <ul>
 <li>MDEMG-ALERT-NOISE-REDUCTION-001, 2 chronic false-fire classes</li>
@@ -2522,19 +2300,7 @@ mdemg beta-janitor sweep     # 30-day sweep
 
 
 <h2 id="f105-continuous-improvement-the-four-loops">F10.5 Continuous Improvement · The Four Loops</h2>
-<div class="mermaid">
-flowchart LR
-  Hebb[Hebbian<br/>per-tool-use] --> CMS[(Substrate)]
-  Jim[Jiminy outcomes<br/>per-tool-use] --> CMS
-  RSIC[RSIC<br/>per-30-min] --> CMS
-  FT[FT recursive<br/>per-week] --> CMS
-  CMS --> Metrics[Grafana + Alerts]
-  CMS --> HITL[Operator review]
-  HITL --> CMS
-  Metrics -.-> Operator((Operator))
-  Operator -.->|intervenes| CMS
-</div>
-
+<figure class="svg-figure" tabindex="0" aria-label="Diagram 15"><img src="assets/svg/mermaid-15.svg" alt="Diagram 15" /></figure>
 <p><strong>Four loops at four time constants against the same substrate</strong> = continuous improvement.</p>
 <details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
@@ -2576,7 +2342,7 @@ flowchart LR
 
 
 <h2 id="thank-you">Thank You</h2>
-<p><strong>MDEMG</strong>: Cognitive Substrate for AI-Assisted Development</p>
+<p><strong>MDEMG</strong>: Cognitive Substrate for Artificial Intelligence (AI)-Assisted Development</p>
 <p>Questions welcome. Everything here is traceable.</p>
 <p><code>Deck owner</code>: reh3376
 <code>Last verified</code>: 2026-10-22
@@ -2794,51 +2560,7 @@ flowchart LR
 
 
 <h2 id="how-it-all-works-together">How It All Works Together</h2>
-<div class="mermaid">
-flowchart TD
-    classDef actor fill:#fff5d6,stroke:#b58900,stroke-width:3px,color:#000,font-weight:bold
-    classDef service fill:#d6ecff,stroke:#1e5fa0,stroke-width:2px,color:#000
-    classDef store fill:#e8dcff,stroke:#5020a0,stroke-width:2px,color:#000
-    classDef sink fill:#dcffdc,stroke:#206020,stroke-width:2px,color:#000
-    classDef gate fill:#ffdcdc,stroke:#a02020,stroke-width:2px,color:#000
-
-<pre><code>Agent([&quot;Agent&quot;]):::actor
-
-subgraph Memory[&quot; MEMORY (U3) &quot;]
-    direction LR
-    L0[(L0 observations)]:::store --&gt;|consolidate| L1[(L1 rules&lt;br/&gt;L2+ concepts)]:::store
-end
-
-Jiminy[&quot;Jiminy&lt;br/&gt;classify + synthesize (U4)&quot;]:::service
-
-subgraph Improve[&quot; SELF-IMPROVE (U5 + U7 + U8) &quot;]
-    direction LR
-    RSIC[RSIC loop]:::service --&gt; HITL[HITL review]:::service --&gt; Retrain[Retrain pipeline]:::service
-end
-
-subgraph Visibility[&quot; VISIBILITY (U13 + U16) &quot;]
-    direction LR
-    TSDB[(TSDB)]:::store --&gt; Grafana[Grafana panels]:::sink
-    TSDB --&gt; Alerts[Alert triage]:::sink
-end
-
-UxTS[/&quot;UxTS gates (U6)&quot;/]:::gate
-
-Agent --&gt;|observe| L0
-Agent --&gt;|about to act| Jiminy
-L1 --&gt;|retrieve| Jiminy
-Jiminy --&gt;|directive| Agent
-Jiminy --&gt;|outcome| Improve
-Retrain --&gt;|next model gen| Agent
-
-L0 --&gt; TSDB
-Jiminy --&gt; TSDB
-RSIC --&gt; TSDB
-
-UxTS -.-&gt;|gates merges| Agent
-</code></pre>
-</div>
-
+<figure class="svg-figure" tabindex="0" aria-label="Diagram 16"><img src="assets/svg/mermaid-16.svg" alt="Diagram 16" /></figure>
 <p><strong>One sentence</strong>: you observe, MDEMG remembers, classifies, acts, measures, learns, fine-tunes, and you see all of it on the dashboards.</p>
 <p>The HITL → Retrain arc is the newest piece, actively iterating.</p>
 <details class="speaker-notes"><summary>Speaker notes</summary>
@@ -2868,28 +2590,13 @@ UxTS -.-&gt;|gates merges| Agent
 
 
 <h2 id="what39s-running">What&#39;s Running</h2>
-<div class="mermaid">
-graph LR
-  Op[Operator] --> MDEMG[mdemg server :9999]
-  MDEMG --> Neo4j[(neo4j :7687)]
-  MDEMG --> TSDB[(timescaledb :5433)]
-  MDEMG --> Sidecar[(neural-sidecar :8100)]
-  MDEMG --> Grafana[grafana :3030]
-  subgraph DockerCompose
-    MDEMG
-    Neo4j
-    TSDB
-    Sidecar
-    Grafana
-  end
-</div>
-
+<figure class="svg-figure" tabindex="0" aria-label="Diagram 17"><img src="assets/svg/mermaid-17.svg" alt="Diagram 17" /></figure>
 <p><strong>Roles</strong>:</p>
 <ul>
 <li><strong>mdemg</strong>: HTTP API + CLI backend (ghcr.io/reh3376/mdemg)</li>
 <li><strong>neo4j</strong>: graph substrate (CMS; the &quot;cognitive&quot; layer, U3 Memory)</li>
 <li><strong>timescaledb</strong>: telemetry hypertables (TSDB; the &quot;measurement&quot; layer, U13 Grafana)</li>
-<li><strong>neural-sidecar</strong>: rerank + NLI model inference (U15 APIs)</li>
+<li><strong>neural-sidecar</strong>: rerank + Natural Language Inference (NLI) model inference (U15 APIs)</li>
 <li><strong>grafana</strong>: read-only observability panels (U13)<details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
 <li>This is the whole stack. Nothing else is required to run MDEMG. Everything in the next 100 slides lives inside this picture.</li>
@@ -3036,19 +2743,7 @@ circuit_breakers: {open: 1, names: [neural-sidecar]}
 
 
 <h2 id="how-memory-is-shaped">How Memory Is Shaped</h2>
-<div class="mermaid">
-graph TD
-  L0[L0: conversation_observation] -->|promotion| L1_C[L1: constraint]
-  L0 -->|promotion| L1_R[L1: correction]
-  L0 -->|CO_ACTIVATED_WITH| L0
-  L1_C -->|IMPLEMENTS_CONSTRAINT| L0
-  L1_R -->|IMPLEMENTS_CORRECTION| L0
-  L0 -->|clusters into| L2[L2: hidden_pattern]
-  L1_C --> L3[L3+: emergent_concept]
-  L1_R --> L3
-  L2 --> L3
-</div>
-
+<figure class="svg-figure" tabindex="0" aria-label="Diagram 18"><img src="assets/svg/mermaid-18.svg" alt="Diagram 18" /></figure>
 <ul>
 <li><strong>L0</strong> (raw observations), operator/agent utterances; most volume</li>
 <li><strong>L1</strong> (constraint / correction), promoted rules extracted from L0 patterns</li>
@@ -3642,16 +3337,7 @@ SEQ:    monotonic, report last_seq on resume
 
 
 <h2 id="how-rsic-thinks">How RSIC Thinks</h2>
-<div class="mermaid">
-graph LR
-  Assess[Assess<br/>7 dimensions] --> Reflect[Reflect<br/>32+ patterns + LLM]
-  Reflect --> Admit{Admit?<br/>Gate check}
-  Admit -->|yes| Act[Act<br/>alert / HITL / mutate]
-  Admit -->|no| Cooldown[Cooldown]
-  Act --> Record[Record cycle<br/>→ TSDB]
-  Record --> Assess
-</div>
-
+<figure class="svg-figure" tabindex="0" aria-label="Diagram 19"><img src="assets/svg/mermaid-19.svg" alt="Diagram 19" /></figure>
 <p><strong>The 6 steps</strong>:</p>
 <ol>
 <li><strong>Assess</strong>: 7-dim health read → <code>SelfAssessmentReport</code></li>
@@ -3694,7 +3380,7 @@ graph LR
 <li>Enforcement outcome patterns: <code>enforcement_false_positive_high</code>, <code>enforcement_missed_violation_high</code></li>
 <li>Production drift (<code>ft_production_drift</code> → <code>trigger_training_pipeline</code>)</li>
 </ul>
-<p><strong>1 LLM reflector</strong>: novel-pattern discovery via GPT-5.4-mini on the assessment JSON. Deterministic alert emission REMOVED per RSIC-LLM-ALERT-GUARD-001 (LLM reflector can&#39;t mint hallucinated deterministic alerts).</p>
+<p><strong>1 LLM reflector</strong>: novel-pattern discovery via GPT-5.4-mini on the assessment JavaScript Object Notation (JSON). Deterministic alert emission REMOVED per RSIC-LLM-ALERT-GUARD-001 (LLM reflector can&#39;t mint hallucinated deterministic alerts).</p>
 <p><strong>AllowedLLMActions whitelist</strong>: ~18 actions; new actions require explicit addition.</p>
 <details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
@@ -3816,16 +3502,7 @@ graph LR
 
 
 <h2 id="how-uxts-prevents-drift">How UxTS Prevents Drift</h2>
-<div class="mermaid">
-graph TD
-  Spec[JSON Schema] -->|validates| Fixtures[Spec Instances]
-  Fixtures -->|input| Runner[Runner]
-  Runner -->|execute against| System[Live System]
-  System -->|pass/fail| Runner
-  Runner -->|verdict| CI[CI Gate]
-  CI -->|block merge on fail| PR[Pull Request]
-</div>
-
+<figure class="svg-figure" tabindex="0" aria-label="Diagram 20"><img src="assets/svg/mermaid-20.svg" alt="Diagram 20" /></figure>
 <p><strong>Flow is uni-directional</strong>:</p>
 <ul>
 <li>Code change breaks a contract → CI fails</li>
@@ -3953,7 +3630,7 @@ graph TD
 <td align="right">3</td>
 </tr>
 <tr>
-<td>UAITS</td>
+<td>Universal AI Training Specification (UAITS)</td>
 <td>AI Training</td>
 <td>Curation governance</td>
 <td>active</td>
@@ -4005,7 +3682,7 @@ $ python3 docs/api/api-spec/upts/runners/upts_runner.py # UPTS parser
 <li><strong>Spec drift</strong>: UATS runs 215 real HTTP endpoints; response-shape change breaking a documented contract fails merge</li>
 <li><strong>Framework drift</strong>: UxTS drift checker enforces adding a NEW family/spec updates <code>UXTS_FRAMEWORK_MATRIX.md</code> in the same PR</li>
 </ol>
-<p><strong>UXTS-CI-001 (2026-06-11)</strong> un-zombied the gates. ALL merge-blocking today: UATS, UNTS hash-verify, USTS, UOTS, ULTS <code>--verify-hashes</code>, UBENCH contract, neural pytest+ruff, UxTS matrix drift.</p>
+<p><strong>Universal eXtensible Test Specification (UXTS)-CI-001 (2026-06-11)</strong> un-zombied the gates. ALL merge-blocking today: UATS, UNTS hash-verify, USTS, UOTS, ULTS <code>--verify-hashes</code>, UBENCH contract, neural pytest+ruff, UxTS matrix drift.</p>
 <p><strong>Forcing-function invariant</strong>: don&#39;t add <code>continue-on-error</code> to a UxTS CI step; every zombie this project un-zombied was hiding real rot.</p>
 <details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
@@ -4019,7 +3696,7 @@ $ python3 docs/api/api-spec/upts/runners/upts_runner.py # UPTS parser
 
 <h2 id="uxts-in-ui">UxTS In /ui/</h2>
 <ul>
-<li><code>/ui/</code> → <strong>Training Data</strong> shows UAITS curated datasets (U8)</li>
+<li><code>/ui/</code> → <strong>Training Data</strong> shows Universal AI Training Specification (UAITS) curated datasets (U8)</li>
 <li><code>/ui/</code> → <strong>Config</strong> surfaces UxTS-related env vars (<code>RETRIEVAL_AUDIT_ENABLED</code>, <code>UVTS_*</code>)</li>
 <li><code>/ui/</code> → <strong>Logs</strong> filters by <code>uats:*</code>, <code>uvts:*</code>, etc.</li>
 <li>Grafana <code>mdemg-overview</code>: <code>UVTS Mean Grade</code> panel (operator-authored UVTS verdicts over time)</li>
@@ -4074,7 +3751,7 @@ $ python3 docs/api/api-spec/upts/runners/upts_runner.py # UPTS parser
 <li>Schemas: <code>docs/api/api-spec/&lt;family&gt;/schema/</code> + <code>docs/tests/&lt;family&gt;/schema/</code></li>
 <li>Specs: <code>docs/api/api-spec/&lt;family&gt;/specs/</code> + <code>docs/tests/&lt;family&gt;/specs/</code></li>
 </ul>
-<p><strong>CLAUDE.md UxTS pins</strong>: UATS-GAP-001, UXTS-CI-001, DORMANT-CENSUS-* family.</p>
+<p><strong>CLAUDE.md UxTS pins</strong>: UATS-GAP-001, Universal eXtensible Test Specification (UXTS)-CI-001, DORMANT-CENSUS-* family.</p>
 <p><strong>Feeds into</strong>: U7 Review (HITL grades feed UAITS datasets), U8 Learning/Training (UBENCH + ULTS gate the retrain), U13 Grafana (UVTS/UBENCH panels).</p>
 <details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
@@ -4290,7 +3967,7 @@ $ python3 docs/api/api-spec/upts/runners/upts_runner.py # UPTS parser
 <p><strong>Where</strong>: <code>/ui/</code> → <strong>Training Data</strong></p>
 <p><strong>Shows</strong>:</p>
 <ul>
-<li>UAITS-curated datasets (SFT/DPO/RAFT/curriculum paradigms)</li>
+<li>UAITS-curated datasets (SFT/Direct Preference Optimization (DPO)/Retrieval-Augmented Fine-Tuning (RAFT)/curriculum paradigms)</li>
 <li>Export job state</li>
 <li>Retention schedule</li>
 <li>Scrub status</li>
@@ -5179,7 +4856,7 @@ $ mdemg data observe --help          # leaf command flags + examples
 <li>CLI reads <code>.env</code> via <code>godotenv.Load()</code> at command init, but ONLY from CWD; export shell env vars for cross-cwd invocations</li>
 <li>Destructive CLIs require explicit <code>--force</code> or <code>--dry-run=false</code>; dry-run default is a safety net</li>
 <li><code>--admin</code> flag presence: NEVER pass without explicit user authorization (CLAUDE.md governance pin)</li>
-<li>CUIDv2 for ALL identifiers: <code>--run-id</code>, <code>--row-id</code>, <code>--grade-id</code> accept CUIDv2 only; UUID is TECH DEBT</li>
+<li>CUIDv2 for ALL identifiers: <code>--run-id</code>, <code>--row-id</code>, <code>--grade-id</code> accept CUIDv2 only; Universally Unique Identifier (UUID) is TECH DEBT</li>
 <li>CLI uses <code>golangci-lint v2.11.2</code> locally; new commands lint-clean on the shipped <code>.golangci.yml</code></li>
 </ul>
 <p><strong>Feature docs</strong>:</p>
@@ -5215,18 +4892,7 @@ $ mdemg data observe --help          # leaf command flags + examples
 
 
 <h2 id="who-talks-to-what">Who Talks To What</h2>
-<div class="mermaid">
-graph TD
-  Op[Operator] -->|CLI/UI| MDEMG_HTTP[mdemg HTTP :9999]
-  Agent[Claude Code Hooks] -->|HTTP| MDEMG_HTTP
-  MCP[MCP Clients] -->|Unix socket| MCP_SRV[mdemg mcp subprocess]
-  MCP_SRV -->|HTTP| MDEMG_HTTP
-  MDEMG_HTTP -->|gRPC Unix| Plugins[mdemg-module plugins]
-  MDEMG_HTTP -->|gRPC Unix| UNTS[unts.proto]
-  MDEMG_HTTP -->|gRPC Unix| DevSpace[devspace.proto]
-  MDEMG_HTTP -->|gRPC Unix| Transfer[space-transfer.proto]
-  Grafana[Grafana] -->|SQL| TSDB[(TimescaleDB)]
-</div>
+<figure class="svg-figure" tabindex="0" aria-label="Diagram 21"><img src="assets/svg/mermaid-21.svg" alt="Diagram 21" /></figure>
 <details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
 <li>The HTTP API is the central nervous system. Everything else is specialized protocols for performance or boundary reasons.</li>
@@ -5519,39 +5185,7 @@ $ grpcurl -plaintext unix:///path/to/plugin.sock describe mdemg.Module
 
 
 <h2 id="the-override-escape-hatch">The Override Escape Hatch</h2>
-<div class="mermaid">
-flowchart TD
-    classDef actor fill:#fff5d6,stroke:#b58900,stroke-width:3px,color:#000,font-weight:bold
-    classDef service fill:#d6ecff,stroke:#1e5fa0,stroke-width:2px,color:#000
-    classDef store fill:#e8dcff,stroke:#5020a0,stroke-width:2px,color:#000
-    classDef gate fill:#ffdcdc,stroke:#a02020,stroke-width:2px,color:#000
-    classDef pass fill:#dcffdc,stroke:#206020,stroke-width:2px,color:#000
-    classDef deny fill:#ffd6d6,stroke:#801010,stroke-width:3px,color:#000,font-weight:bold
-
-<pre><code>Agent([&quot;Agent action&quot;]):::actor
-Classify[&quot;POST&lt;br/&gt;/v1/jiminy/classify&quot;]:::service
-Verdict{&quot;Verdict&quot;}:::gate
-
-Agent --&gt; Classify --&gt; Verdict
-Verdict --&gt;|pass| Allow([&quot;Action allowed&quot;]):::pass
-Verdict --&gt;|deny| Block[&quot;Block with reason&lt;br/&gt;+ override command&quot;]:::deny
-
-Block --&gt; Op([&quot;Operator decides&quot;]):::actor
-Op --&gt;|&quot;override apply&lt;br/&gt;(reason + duration required)&quot;| Override[&quot;POST&lt;br/&gt;/v1/jiminy/override&quot;]:::service
-
-Override -.-&gt;|next classify call&lt;br/&gt;respects override| Classify
-
-subgraph Audit[&quot; Audit trail (permanent) &quot;]
-    direction LR
-    JSONL[(&quot;jiminy-overrides&lt;br/&gt;.jsonl&quot;)]:::store
-    TSDB[(&quot;constraint_&lt;br/&gt;overrides&quot;)]:::store
-end
-
-Override --&gt; JSONL
-Override --&gt; TSDB
-</code></pre>
-</div>
-
+<figure class="svg-figure" tabindex="0" aria-label="Diagram 22"><img src="assets/svg/mermaid-22.svg" alt="Diagram 22" /></figure>
 <p><strong>Invariants</strong>:</p>
 <ul>
 <li>Reason REQUIRED</li>
@@ -5705,15 +5339,8 @@ Override --&gt; TSDB
 </details>
 
   </main>
-  <script src="assets/js/mermaid.min.js"></script>
-  <script>
-    mermaid.initialize({
-      startOnLoad: true,
-      theme: 'dark',
-      securityLevel: 'loose',
-      flowchart: { useMaxWidth: true, htmlLabels: true },
-    });
-  </script>
+  <!-- Mermaid is pre-rendered to SVG at build time (see render_mermaid.mjs); -->
+  <!-- the runtime viewer handles pan/zoom/fullscreen for every diagram. -->
   <script defer src="assets/js/svg-viewer.js"></script>
 </body>
 </html>

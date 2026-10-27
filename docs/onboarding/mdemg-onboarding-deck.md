@@ -7,7 +7,7 @@ title: MDEMG Tutorial
 
 # MDEMG
 
-## Cognitive Substrate for AI-Assisted Development
+## Cognitive Substrate for Artificial Intelligence (AI)-Assisted Development
 
 Onboarding deck · engineering-dense · ~115 min walkthrough
 
@@ -35,11 +35,11 @@ Two walkthroughs branch from here.
 |---|---|---|
 | **For** | Engineers / technical PMs building WITH MDEMG | Operators who will USE a running MDEMG |
 | **Depth** | ~115 min engineering-dense | lighter stub (expanding) |
-| **Covers** | substrate, retrieval, LoRA, Jiminy, UxTS, ops | CLI, dashboards, memory, alerts |
+| **Covers** | substrate, retrieval, LoRA, Jiminy, UxTS, ops | Command-Line Interface (CLI), dashboards, memory, alerts |
 | **Next** | Continue below ↓ (TOC → F1 Opening) | [Jump to End User →](#end-user-path) |
 
 note:
-- This is the landing fork, operators land here from `mdemg tutorial` CLI (Epic 5) or the Grafana overview button (Epic 5).
+- This is the landing fork, operators land here from `mdemg tutorial` Command-Line Interface (CLI) (Epic 5) or the Grafana overview button (Epic 5).
 - Software-dev path is the full 107-slide deck shipped by MDEMG-ONBOARDING-DECK-001; keep going.
 - End-user path currently stubbed by ONBOARDING-TUTORIAL-SERVE-001 Epic 4; content lives in the sibling sprint ONBOARDING-TUTORIAL-ENDUSER-001.
 - The default (just hit ↓/Space) is the software-dev path, because this deck's existing structure IS that path.
@@ -48,20 +48,20 @@ note:
 
 ## Table of Contents
 
-**[F1 Opening](#f1--opening)** → **[F2 Substrate](#f2--substrate-core)** → **[F3 Retrieval](#f3--retrieval-pipeline)** → **[F4 Jiminy + Enforcement + J17](#f4--jiminy--enforcement--j17)** → **[F5 LoRA + Qwen + Model Dist](#f5--lora--qwen--model-distribution)** → **[F6 UxTS](#f6--uxts-framework-family)** → **[F7 Ops](#f7--ops)** → **[F8 CLI + Hooks + MCP](#f8--cli-hooks-mcp-multi-instance)** → **[F9 Beta + Security + Dormant](#f9--beta-program--security--dormant-census)** → **[F10 Conclusion](#f10--conclusion)**
+**[F1 Opening](#f1--opening)** → **[F2 Substrate](#f2--substrate-core)** → **[F3 Retrieval](#f3--retrieval-pipeline)** → **[F4 Jiminy + Enforcement + J17](#f4--jiminy--enforcement--j17)** → **[F5 LoRA + Qwen + Model Dist](#f5--lora--qwen--model-distribution)** → **[F6 UxTS](#f6--uxts-framework-family)** → **[F7 Ops](#f7--ops)** → **[F8 CLI + Hooks + Model Context Protocol (MCP)](#f8--cli-hooks-mcp-multi-instance)** → **[F9 Beta + Security + Dormant](#f9--beta-program--security--dormant-census)** → **[F10 Conclusion](#f10--conclusion)**
 
-**End User Path**: **[U1 Opening](#end-user-path)** → **[U2 Stack](#u2--the-stack)** → **[U3 Memory](#u3--memory--the-cognitive-substrate)** → **[U4 Jiminy](#u4--jiminy--the-inner-voice)** → **[U5 RSIC](#u5--rsic--the-self-improvement-engine)** → **[U6 UxTS](#u6--uxts--forcing-functions-that-prevent-drift)** → **[U7 HITL](#u7--hitl--you-grade-what-the-system-cant)** → **[U8 Learning](#u8--learning--training-data--how-the-model-gets-better)** → **[U9 Backup](#u9--backup--ops)** → **[U10 Logs](#u10--logs)** → **[U11 Config](#u11--config--features--the-toggle-surface)** → **[U12 Plugins](#u12--plugins--the-extension-surface)** → **[U13 Grafana](#u13--grafana--the-historical-view)** → **[U14 CLI](#u14--cli--the-full-command-surface)** → **[U15 APIs+gRPC](#u15--apis--grpc--the-programmatic-surfaces)** → **[U16 Alerts](#u16--alerts--enforcement--operator-triage)** → **[U17 Next](#u17--where-to-go--documentation)**
+**End User Path**: **[U1 Opening](#end-user-path)** → **[U2 Stack](#u2--the-stack)** → **[U3 Memory](#u3--memory--the-cognitive-substrate)** → **[U4 Jiminy](#u4--jiminy--the-inner-voice)** → **[U5 RSIC](#u5--rsic--the-self-improvement-engine)** → **[U6 UxTS](#u6--uxts--forcing-functions-that-prevent-drift)** → **[U7 Human-In-The-Loop (HITL)](#u7--hitl--you-grade-what-the-system-cant)** → **[U8 Learning](#u8--learning--training-data--how-the-model-gets-better)** → **[U9 Backup](#u9--backup--ops)** → **[U10 Logs](#u10--logs)** → **[U11 Config](#u11--config--features--the-toggle-surface)** → **[U12 Plugins](#u12--plugins--the-extension-surface)** → **[U13 Grafana](#u13--grafana--the-historical-view)** → **[U14 CLI](#u14--cli--the-full-command-surface)** → **[U15 APIs+gRPC](#u15--apis--grpc--the-programmatic-surfaces)** → **[U16 Alerts](#u16--alerts--enforcement--operator-triage)** → **[U17 Next](#u17--where-to-go--documentation)**
 
 | § | Section | Target | Natural Q&A anchor |
 |---|---|---:|---|
 | [F1](#f1--opening) | Opening, mission + analogy + history + 10k-ft | ~10 min | after F1.5 recap |
-| [F2](#f2--substrate-core) | Substrate Core, Neo4j CMS, Hebbian, consolidation, TSDB | ~15 min |, |
-| [F3](#f3--retrieval-pipeline) | Retrieval Pipeline, RRF 4-column + fingerprinting + rerank | ~12 min |, |
+| [F2](#f2--substrate-core) | Substrate Core, Neo4j Cognitive Memory Substrate (CMS), Hebbian, consolidation, Time-Series Database (TSDB) | ~15 min |, |
+| [F3](#f3--retrieval-pipeline) | Retrieval Pipeline, Reciprocal Rank Fusion (RRF) 4-column + fingerprinting + rerank | ~12 min |, |
 | [F4](#f4--jiminy--enforcement--j17) | **Jiminy + Enforcement + J17** (headline) | ~25 min | after F4.1 "why" |
 | [F5](#f5--lora--qwen--model-distribution) | LoRA + Qwen + Model Distribution | ~14 min |, |
 | [F6](#f6--uxts-framework-family) | UxTS Framework Family, the forcing-function matrix | ~8 min |, |
-| [F7](#f7--ops) | Ops, RSIC, HITL, backup/restore, Grafana | ~16 min |, |
-| [F8](#f8--cli-hooks-mcp-multi-instance) | CLI + Hooks + MCP + Multi-Instance | ~7 min |, |
+| [F7](#f7--ops) | Ops, RSIC, Human-In-The-Loop (HITL), backup/restore, Grafana | ~16 min |, |
+| [F8](#f8--cli-hooks-mcp-multi-instance) | CLI + Hooks + Model Context Protocol (MCP) + Multi-Instance | ~7 min |, |
 | [F9](#f9--beta-program--security--dormant-census) | Beta + Security + Dormant Census | ~5 min |, |
 | [F10](#f10--conclusion) | Conclusion, honest state + vision + Q&A | ~8 min | final (longest) |
 
@@ -79,7 +79,7 @@ note:
 
 # F1 · Opening
 
-**Nav**: [⇤ TOC](#table-of-contents) · [Notes ▸ F1](https://github.com/reh3376/mdemg/blob/main/docs/onboarding/mdemg-onboarding-notes.md#f1--opening) · [F2 →](#f2--substrate-core)
+**Nav**: [⇤ Table of Contents (TOC)](#table-of-contents) · [Notes ▸ F1](https://github.com/reh3376/mdemg/blob/main/docs/onboarding/mdemg-onboarding-notes.md#f1--opening) · [F2 →](#f2--substrate-core)
 
 note:
 - Target: 12 slides, ~10 min.
@@ -105,7 +105,7 @@ note:
 
 ## MDEMG : artificial NN :: internal dialogue : biological NN
 
-> MDEMG is the LLM's persistent memory and cognitive substrate. Markdown files are **REMINDERS AND KEYS only**: real memory lives in CMS (Neo4j, `mdemg-dev` space).
+> MDEMG is the Large Language Model (LLM)'s persistent memory and cognitive substrate. Markdown files are **REMINDERS AND KEYS only**: real memory lives in Cognitive Memory Substrate (CMS) (Neo4j, `mdemg-dev` space).
 
 - CMS disconnected ⇒ **cognitive outage**, not graceful degradation
 - Hooks + MCP are the dialogue's sensory + motor channels
@@ -120,7 +120,7 @@ note:
 ## History · Build Trajectory
 
 ```mermaid
-flowchart LR
+flowchart TD
   A[Concept origin] --> B[Phases 1-105<br/>Substrate + Retrieval + Hebbian]
   B --> C[Sidecar phases<br/>101-105 cognitive gaps]
   C --> D[RSIC<br/>self-improvement]
@@ -143,9 +143,9 @@ note:
 ## Honest Pivots
 
 - **2026-04-22, MoE → dense pivot.** Metal 499K MTLResource ceiling blocked MoE LoRA backward pass. Qwen3-14B-4bit dense replaced Qwen3.6-35B-A3B.
-- **2026-05-03, mlx_lm.server → llama.cpp cutover.** mlx_lm.server crashed every ~14 min via Metal OOM; llama-server bounds KV architecturally.
-- **2026-06-26, Intent translation disabled.** UVTS A/B OFF 0.4170 vs ON 0.4070 (net-negative); was 70% of all LLM errors.
-- **2026-04-22, FT-OAI-003 dropped.** All FT targets local MLX LoRA; OpenAI API only as teacher.
+- **2026-05-03, mlx_lm.server → llama.cpp cutover.** mlx_lm.server crashed every ~14 min via Metal Out-Of-Memory (OOM); llama-server bounds Key-Value (KV) architecturally.
+- **2026-06-26, Intent translation disabled.** Universal Validation Test Specification (UVTS) A/B OFF 0.4170 vs ON 0.4070 (net-negative); was 70% of all Large Language Model (LLM) errors.
+- **2026-04-22, Fine-Tuning (FT)-OAI-003 dropped.** All Fine-Tuning (FT) targets local MLX LoRA; OpenAI Application Programming Interface (API) only as teacher.
 - **2026-08-01, Jiminy is an ENFORCER.** Prior framing as opt-in advisor superseded.
 
 note:
@@ -161,9 +161,9 @@ note:
 |---|---|
 | Architecture pins | ~105 in CLAUDE.md |
 | LLM call sites | 16 (all single-shot, no-tool-calling) |
-| UxTS frameworks | 16 (all CI-gated) |
+| UxTS frameworks | 16 (all Continuous Integration (CI)-gated) |
 | Ingested languages | 28 (verified via UPTS specs) |
-| Production model | `mdemg-llm-v1.Q5_K_M` (Qwen3-14B base + Phase 5 SFT LoRA) |
+| Production model | `mdemg-llm-v1.Q5_K_M` (Qwen3-14B base + Phase 5 Supervised Fine-Tuning (SFT) LoRA) |
 | Benchmark aggregate | 0.9188 on 16-task augmented eval |
 | Open arc | JIMINY-CEILING-BREAK-2 (follow rate ~13% → target ≥80%) |
 
@@ -314,7 +314,7 @@ note:
 
 **Metrics**
 - Live: `GET /v1/metrics/snapshot` (JSON)
-- Historical: TSDB `metric_samples`
+- Historical: Time-Series Database (TSDB) `metric_samples`
 - No `/metrics` endpoint, 404 by design (PROMETHEUS-SCRAPE-INVESTIGATION-001)
 
 **Dashboards (8)**
@@ -352,7 +352,7 @@ note:
 
 # F2 · Substrate Core
 
-**Nav**: [← F1](#f1--opening) · [⇤ TOC](#table-of-contents) · [Notes ▸ F2](https://github.com/reh3376/mdemg/blob/main/docs/onboarding/mdemg-onboarding-notes.md#f2--substrate-core) · [F3 →](#f3--retrieval-pipeline)
+**Nav**: [← F1](#f1--opening) · [⇤ Table of Contents (TOC)](#table-of-contents) · [Notes ▸ F2](https://github.com/reh3376/mdemg/blob/main/docs/onboarding/mdemg-onboarding-notes.md#f2--substrate-core) · [F3 →](#f3--retrieval-pipeline)
 
 note:
 - Target: 12-16 slides. 1 full (Neo4j CMS + Hebbian + consolidation) + 1 mini (TSDB).
@@ -384,7 +384,7 @@ Connections ARE the deliverable (vs. doc chunks).
 The "better decisions through better connections" vision requires edges as first-class citizens, not metadata on docs.
 
 note:
-- Vector similarity is one signal. Edge traversal is a different signal. RRF (F3) fuses them.
+- Vector similarity is one signal. Edge traversal is a different signal. Reciprocal Rank Fusion (RRF) (F3) fuses them.
 - A pure vector DB forces every "related to" relationship into similarity space; graph edges preserve typed semantics.
 
 ---
@@ -413,7 +413,7 @@ erDiagram
 ```
 
 note:
-- CUIDv2 identifiers, never UUID (feedback_cuidv2_required).
+- CUIDv2 identifiers, never Universally Unique Identifier (UUID) (feedback_cuidv2_required).
 - `embedding` dimension matches configured provider; vector-index backs cosine queries.
 - `GUIDANCE_OUTCOME` is a self-loop pattern (edge on the target node), the sink the Jiminy outcomes write to.
 
@@ -443,7 +443,7 @@ note:
 
 note:
 - Backup/restore (F7) is the second line of defense; the primary line is the never-delete invariant.
-- The space-isolation contract is tested via UATS specs.
+- The space-isolation contract is tested via Universal API Test Specification (UATS) specs.
 
 ---
 
@@ -536,8 +536,8 @@ note:
 | | |
 |---|---|
 | Writer | Buffered → periodic flush → CopyFrom |
-| Reader | Direct SQL via `pgxpool` |
-| Alert rules | TSDB-query-SQL (idle-safe COALESCE+aggregate) |
+| Reader | Direct Structured Query Language (SQL) via `pgxpool` |
+| Alert rules | TSDB-query-Structured Query Language (SQL) (idle-safe COALESCE+aggregate) |
 | Hypertables | 7d chunks default (match telemetry family), 180d retention |
 | Compression | After 7d, segmentby + orderby policy |
 
@@ -568,7 +568,7 @@ note:
 | Column | Weight (default) | Signal |
 |---|---|---|
 | Embedding | 0.50 | Cosine over vector-index |
-| BM25 | 0.20 | Lexical sparse |
+| Best Matching 25 (BM25) | 0.20 | Lexical sparse |
 | Graph | 0.15 | CO_ACTIVATED_WITH spreading |
 | Structural | 0.15 | Typed-edge walk (via RETRIEVAL-TYPED-EDGES-002) |
 
@@ -585,7 +585,7 @@ note:
 Single-signal retrieval misses different classes:
 
 - **Embedding alone**: topic-adjacent but mechanism-wrong (e.g., "commit docs" retrieves "no-direct-main-commits")
-- **BM25 alone**: exact-token good, semantic-weak
+- **Best Matching 25 (BM25) alone**: exact-token good, semantic-weak
 - **Graph alone**: well-connected nodes dominate, isolated nodes starve
 - **Structural alone**: typed edges rich on mature graphs, zero on fresh
 
@@ -599,7 +599,7 @@ note:
 ## F3.1 RRF · How It Works
 
 ```mermaid
-flowchart LR
+flowchart TD
   Q[Query] --> E[Embed]
   Q --> KW[BM25 keywords]
   E --> VI[Vector-index<br/>top-K]
@@ -643,18 +643,18 @@ note:
 - **Every memory recall** = this pipeline
 - **Every Jiminy guide** = this pipeline
 - **Every HITL candidate query** = this pipeline
-- **Latency SLO**: p95 < 120s (ALERT_RETRIEVE_P95_MS = 120000)
+- **Latency Service Level Objective (SLO)**: p95 < 120s (ALERT_RETRIEVE_P95_MS = 120000)
 - Live-measured 7d p95 = 61.6s (comfortably under)
 
 note:
 - One pipeline, many consumers. Changes propagate everywhere.
-- The SLO was recalibrated post-ALERT-TRUTH-001 to match honest p95 (was clamped at 10s pre-fix).
+- The Service Level Objective (SLO) was recalibrated post-ALERT-TRUTH-001 to match honest p95 (was clamped at 10s pre-fix).
 
 ---
 
 ## F3.1 RRF · How It Will Improve
 
-**Shipped default-off** (opt-in via URL param or `.env` flag):
+**Shipped default-off** (opt-in via Uniform Resource Locator (URL) param or `.env` flag):
 - RETRIEVAL-LAYER-BALANCE-001, concrete-recall quota (post-rerank injection to counter abstract crowding)
 - RETRIEVAL-REVERSE-LOOKUP-001, filesystem-grep for reverse-lookup-shape queries ("who consumes X?")
 - LEVER-D-CONCEPT-BIAS-001, L2+ concept-only cosine column
@@ -693,7 +693,7 @@ note:
 - Per-request override: `?sparse=true|false&sparse_percentile=N`
 
 note:
-- 120q UVTS A/B: mean +0.003, 0 regressions, 10 improvements → safe default-on.
+- 120q Universal Validation Test Specification (UVTS) A/B: mean +0.003, 0 regressions, 10 improvements → safe default-on.
 - `V0019 sparse_gate_metrics` hypertable persists per-call rows.
 
 ---
@@ -752,7 +752,7 @@ note:
 - Classifier verdicts were unweighted (every surfaced rule equally urgent)
 - No signal fed back to substrate (rule effectiveness unmeasurable)
 
-Post-Jiminy: outcomes flow back → trust EMA → surface weighting → feedback-driven corpus curation.
+Post-Jiminy: outcomes flow back → trust Exponential Moving Average (EMA) → surface weighting → feedback-driven corpus curation.
 
 note:
 - Rejected: inline "assistant memory" via prompt stuffing (agent attention is finite, dilution problem).
@@ -763,7 +763,7 @@ note:
 ## F4.1 Jiminy · Flow (Mermaid)
 
 ```mermaid
-flowchart LR
+flowchart TD
   H[PostToolUse hook] --> C{Write/Edit/Bash?}
   C -->|yes + /strict| CL[classify]
   CL --> V{verdict}
@@ -814,7 +814,7 @@ Classifier = tier1 (embedding) + tier2 (LLM) with 3 credit clauses:
 | Context-mismatch credit | Durable rule + wrong context → not_applicable | JIMINY_CONTEXT_MISMATCH_CREDIT_ENABLED |
 | Mechanism-scope gate | Mechanism-verb absent from action → not_applicable | JIMINY_MECHANISM_SCOPE_CREDIT_ENABLED |
 
-**All default-off in code (preserves ULTS prompt hash pin); default-on in `.env` after live smoke.**
+**All default-off in code (preserves Universal LLM Test Specification (ULTS) prompt hash pin); default-on in `.env` after live smoke.**
 
 note:
 - Each clause splices after its predecessor; recency-weighted LLM attention gives strongest-gate-last.
@@ -846,7 +846,7 @@ note:
 1. **Phase 1, Corpus purge (shipped JIMINY-CORPUS-003)**: 64 → 33 constraint nodes; audit kept quality rules, tombstoned noise
 2. **Phase 2, Retrieval precision (LEVER-C-TIGHTEN-002)**: scope-gate for over-surfacing
 3. **Phase 3, Classifier semantics (CLASSIFIER-CONTEXT-002)**: mechanism-scope hard-precedence gate
-4. **Phase 4a, HITL velocity (shipped)**: keyboard-driven bulk-grade UI (0..4 keys, auto-advance)
+4. **Phase 4a, HITL velocity (shipped)**: keyboard-driven bulk-grade User Interface (UI) (0..4 keys, auto-advance)
 5. **Phase 4b, Retrain**: blocked on classifier follow-rate honest ≥20% + N=500+ gold corpus
 6. **Phase 5, Model swap**: future (post-beta)
 
@@ -872,14 +872,14 @@ note:
 
 note:
 - Shipped as a sequential arc: each sprint lives against the next scoping, informed by live smoke of the predecessor.
-- Three arc-adjacent follow-ups shipped: ENFORCE-OVERRIDES-TSDB + ENFORCE-UI-OVERRIDES + ENFORCE-AUTO-EXECUTE.
+- Three arc-adjacent follow-ups shipped: ENFORCE-OVERRIDES-TSDB + ENFORCE-User Interface (UI)-OVERRIDES + ENFORCE-AUTO-EXECUTE.
 
 ---
 
 ## F4.2 Enforcement · Deny Taxonomy
 
 ```mermaid
-flowchart LR
+flowchart TD
   A[Action attempted] --> C[Jiminy classify]
   C --> V{verdict}
   V -->|pass| OK[allow]
@@ -978,14 +978,14 @@ note:
 
 ## F4.3 J17 · Tier Promotion Keyed on Comprehension
 
-**J17-TIER-GATE-001** flipped the T1-promotion gate from compliance-trust to NLI-measured comprehension.
+**J17-TIER-GATE-001** flipped the T1-promotion gate from compliance-trust to Natural Language Inference (NLI)-measured comprehension.
 
 - `J17_TIER_GATE_MODE=comprehension` (live in `.env`)
 - `J17_TIER_COMPREHENSION_HIGH=0.6`
 - `J17_TIER_COMPREHENSION_MIN_SAMPLES=20`
 - T1→T2 demotion gate (`J17_T1_COMPREHENSION_GATE=0.5`) stays active in both modes
 
-**Why**: dense encoding's risk is incomprehension; trust (followed→1.0/ignored→0.2 EMA ~0.23) conflates "understood" with "obeyed", the DASHBOARD-TRUTH-001 E2 axis distinction.
+**Why**: dense encoding's risk is incomprehension; trust (followed→1.0/ignored→0.2 Exponential Moving Average (EMA) ~0.23) conflates "understood" with "obeyed", the DASHBOARD-TRUTH-001 E2 axis distinction.
 
 note:
 - First T1 messaging ever produced on substrate after this flip (6 pipe-coded `C:!|code` lines).
@@ -1028,9 +1028,9 @@ note:
 **Production**: single-tier LoRA on `mlx-community/Qwen3-14B-4bit`
 - Rank 32 / α 64
 - 7 dense target modules
-- Phase 5 SFT (dense, not MoE)
+- Phase 5 Supervised Fine-Tuning (SFT) (dense, not MoE)
 
-**Served as**: GGUF Q5_K_M via `llama-server :8102`
+**Served as**: GPT-Generated Unified Format (GGUF) Q5_K_M via `llama-server :8102`
 
 **Baseline aggregate**: 0.9188 on 16-task augmented eval
 **Beats**: gpt-5.4-mini (0.8317)
@@ -1047,7 +1047,7 @@ note:
 
 - 16 LLM call sites, each has its own prompt shape + output contract (all single-shot structured outputs)
 - Fine-tuned on MDEMG's own corpora + call-site traces
-- Per-site better than generic gpt-mini (verified via UBENCH)
+- Per-site better than generic gpt-mini (verified via Universal Benchmark (UBENCH))
 
 **Rejected alternative**: OpenAI fine-tuning (FT-OAI-003 dropped 2026-04-22), all FT now local MLX LoRA, teacher-only for OpenAI.
 
@@ -1059,7 +1059,7 @@ note:
 ## F5.1 LoRA · Pipeline
 
 ```mermaid
-flowchart LR
+flowchart TD
   SF[MLX safetensors<br/>Phase 5 SFT training] --> F[mlx_lm.fuse --dequantize<br/>→ 28 GB bf16 HF safetensors]
   F --> CV[convert_hf_to_gguf.py --outtype f16<br/>→ 29.5 GB f16 GGUF]
   CV --> Q[llama-quantize Q5_K_M<br/>→ 10.5 GB Q5_K_M GGUF]
@@ -1070,8 +1070,8 @@ flowchart LR
 **Conversion time**: ~5 min on M5 Max.
 
 note:
-- The MLX form stays as research/training canonical; GGUF is the production serving form.
-- Phase 13.5 cutover 2026-05-03: replaced mlx_lm.server with llama-server (14-min Metal OOM → bounded KV).
+- The MLX form stays as research/training canonical; GPT-Generated Unified Format (GGUF) is the production serving form.
+- Phase 13.5 cutover 2026-05-03: replaced mlx_lm.server with llama-server (14-min Metal Out-Of-Memory (OOM) → bounded Key-Value (KV)).
 
 ---
 
@@ -1088,7 +1088,7 @@ note:
 - `n_epochs=auto` DISALLOWED
 
 note:
-- Both policies are grep-auditable + CI-gated.
+- Both policies are grep-auditable + Continuous Integration (CI)-gated.
 - The 2-epoch overfit incident is the forcing function that pins the 3-epoch cap.
 
 ---
@@ -1111,7 +1111,7 @@ note:
 - **E1 shipped**: Corpus audit (81% substrate-covered; 2203 rows strip-eligible)
 - **E2 shipped**: Phase E2 strip (claude_code_knowledge_v3_stripped, 503 rows)
 - **E3 target**: 7503 rows (503 stripped + 7000 task-behavior)
-- **E4 blocked**: Homebrew installer update required for the new Qwen model (HOMEBREW-INSTALLER-QWEN-UPDATE-001 Phase B shipped operator-runbook + ModelName-guarded SHA verify)
+- **E4 blocked**: Homebrew installer update required for the new Qwen model (HOMEBREW-INSTALLER-QWEN-UPDATE-001 Phase B shipped operator-runbook + ModelName-guarded Secure Hash Algorithm (SHA) verify)
 - **Future**: Qwen3.8-27B base swap (MODEL-SWAP-QWEN27B-EVAL #91 winner, +0.11 lift)
 
 note:
@@ -1123,7 +1123,7 @@ note:
 ## F5.2 Recursive-Retraining Loop
 
 ```mermaid
-flowchart LR
+flowchart TD
   PD[Production drift<br/>ft_production_drift alert] --> EX[Export<br/>mdemg data export]
   EX --> CU[Curate<br/>paradigm_router]
   CU --> TR[Train<br/>MLX LoRA]
@@ -1205,9 +1205,9 @@ Steps per `mdemg model pull`:
 2. Locate GGUF via Ollama manifest layout (`<OLLAMA_MODELS>/manifests/<OLLAMA_HOST>/<ns>/<name>/<tag>`)
 3. Follow layer with `mediaType: application/vnd.ollama.image.model`
 4. Symlink blob to `<MDEMG_MODEL_DIR>/<name>.<quant>.gguf`
-5. SHA-verify against embedded `internal/cli/quant_manifest.json`
+5. Secure Hash Algorithm (SHA)-verify against embedded `internal/cli/quant_manifest.json`
 
-RAM auto-detection via `sysctl hw.memsize` (darwin) or `/proc/meminfo` (linux); dispatch via `MDEMG_MODEL_RAM_TIERS` JSON.
+RAM auto-detection via `sysctl hw.memsize` (darwin) or `/proc/meminfo` (linux); dispatch via `MDEMG_MODEL_RAM_TIERS` JavaScript Object Notation (JSON).
 
 note:
 - All 11 operator-visible values are dynamic (no-hardcoding rule).
@@ -1225,7 +1225,7 @@ Decision table from 2026-05-03 bake-off (`phase_13_5_bakeoff_results.md`):
 | LM Studio | Closed-source operability risk for a cognitive-substrate framework |
 | MLC-LLM | 1.6× slower every percentile; smaller community; hardware-target-locked TVM .dylib |
 | mlx_lm.server (incumbent) | Officially "not recommended for production"; crashed every ~14 min Metal OOM |
-| **llama.cpp llama-server (chosen)** | Architecturally-bounded KV (`--ctx-size × --parallel`); graceful HTTP 500 on OOM |
+| **llama.cpp llama-server (chosen)** | Architecturally-bounded KV (`--ctx-size × --parallel`); graceful Hypertext Transfer Protocol (HTTP) 500 on OOM |
 
 **Bake-off result**: 0 crashes / 160 min / 301 calls; p50 latency 17s → 3.0s (5.6× faster); UVTS parity (0.396 = 0.396).
 
@@ -1286,9 +1286,9 @@ note:
 **Prevents regression by making the drift class itself impossible.**
 
 Examples caught by UxTS gates:
-- **UATS** caught pre-bash-check reformulate 500 defect
-- **ULTS** catches prompt drift (`system_prompt_hash` pin)
-- **UBENCH** catches benchmark freshness drift (FT-BENCH-REFRESH-001)
+- **Universal API Test Specification (UATS)** caught pre-bash-check reformulate 500 defect
+- **Universal LLM Test Specification (ULTS)** catches prompt drift (`system_prompt_hash` pin)
+- **Universal Benchmark (UBENCH)** catches benchmark freshness drift (FT-BENCH-REFRESH-001)
 - **UOBS** catches metric-emission drift
 
 note:
@@ -1300,7 +1300,7 @@ note:
 ## F6.1 UxTS · How It Works (Pattern)
 
 ```mermaid
-flowchart LR
+flowchart TD
   D[Drift class discovered] --> S[Schema<br/>docs/tests/x/schema.json]
   S --> SP[Specs<br/>docs/tests/x/specs/*.x.json]
   SP --> R[Runner<br/>docs/tests/x/runners/]
@@ -1324,7 +1324,7 @@ note:
 
 | Framework | Purpose | CI gate | Last drift caught |
 |---|---|---|---|
-| UATS | API contract | `make test-api` | UATS-GAP-001 (reformulate 500) |
+| UATS | Application Programming Interface (API) contract | `make test-api` | UATS-GAP-001 (reformulate 500) |
 | UVTS | Retrieval quality | `make test-uvts-quick` | Phase 13.1 column weights |
 | ULTS | LLM prompts | `make test-ults --verify-hashes` | APE-PROMPT-BUDGET-001 |
 | UBTS | Backup tests | `make test-ubts` | BACKUP-RESTORE-VERIFY-001 |
@@ -1480,18 +1480,18 @@ Operator-authored gold is the retrain-trigger signal (JIMINY-RELEVANCE-001 arc):
 - `gold_fraction` in manifest = future-FT-trigger when ≥N
 - Phase 4b retrain blocked on classifier follow-rate honest ≥20% + N=500+ gold corpus
 
-The `suggested_guidance` column on `review_grades` carries SME-authored "what would have been better guidance", the highest-value retrain signal.
+The `suggested_guidance` column on `review_grades` carries Subject Matter Expert (SME)-authored "what would have been better guidance", the highest-value retrain signal.
 
 note:
 - REVIEW-SUGGESTED-GUIDANCE-CONSUME-001 shipped the consumer: `scripts/curate_guidance_corpus.py` LEFT JOINs with length-gate.
-- SME writes propagate to the retrain corpus.
+- Subject Matter Expert (SME) writes propagate to the retrain corpus.
 
 ---
 
 ## F7.2 HITL · How It Works
 
 ```mermaid
-flowchart LR
+flowchart TD
   CQ[Candidate queue] --> OP[Operator grades]
   OP --> SN{Sink}
   SN -->|reinforce=true| SUB[Substrate mutation<br/>conversation.Correct]
@@ -1800,9 +1800,9 @@ note:
 
 ## F9.2 Security Hardening · Shipped Tranches
 
-**SEC-TRANCHE-2 (path injection)**: `pathsafe.SafeJoinUnderDir` CodeQL-recognized sanitizer. 8 HTTP-reachable sites wired. 13 alerts dismissed via `gh api` with rationale.
+**SEC-TRANCHE-2 (path injection)**: `pathsafe.SafeJoinUnderDir` CodeQL-recognized sanitizer. 8 Hypertext Transfer Protocol (HTTP)-reachable sites wired. 13 alerts dismissed via `gh api` with rationale.
 
-**SEC-TRANCHE-3 (33 alerts closed)**: regex-anchor `\b` prefixes, URL-scheme deny-list widening (`data:` + `vbscript:`), defensive 10000-element allocation caps, int32 bounds-checks, Python `urlparse().hostname` fixes, XSS-DOM fix with CUIDv2 validation.
+**SEC-TRANCHE-3 (33 alerts closed)**: regex-anchor `\b` prefixes, Uniform Resource Locator (URL)-scheme deny-list widening (`data:` + `vbscript:`), defensive 10000-element allocation caps, int32 bounds-checks, Python `urlparse().hostname` fixes, XSS-Document Object Model (DOM) fix with CUIDv2 validation.
 
 **Latest (today)**:
 - MDEMG-ALERT-NOISE-REDUCTION-001, 2 chronic false-fire classes
@@ -1969,7 +1969,7 @@ note:
 
 ## Thank You
 
-**MDEMG**: Cognitive Substrate for AI-Assisted Development
+**MDEMG**: Cognitive Substrate for Artificial Intelligence (AI)-Assisted Development
 
 Questions welcome. Everything here is traceable.
 
@@ -2191,7 +2191,7 @@ graph LR
 - **mdemg**: HTTP API + CLI backend (ghcr.io/reh3376/mdemg)
 - **neo4j**: graph substrate (CMS; the "cognitive" layer, U3 Memory)
 - **timescaledb**: telemetry hypertables (TSDB; the "measurement" layer, U13 Grafana)
-- **neural-sidecar**: rerank + NLI model inference (U15 APIs)
+- **neural-sidecar**: rerank + Natural Language Inference (NLI) model inference (U15 APIs)
 - **grafana**: read-only observability panels (U13)
 
 note:
@@ -2839,7 +2839,7 @@ note:
 ## How RSIC Thinks
 
 ```mermaid
-graph LR
+graph TD
   Assess[Assess<br/>7 dimensions] --> Reflect[Reflect<br/>32+ patterns + LLM]
   Reflect --> Admit{Admit?<br/>Gate check}
   Admit -->|yes| Act[Act<br/>alert / HITL / mutate]
@@ -2888,7 +2888,7 @@ note:
 - Enforcement outcome patterns: `enforcement_false_positive_high`, `enforcement_missed_violation_high`
 - Production drift (`ft_production_drift` → `trigger_training_pipeline`)
 
-**1 LLM reflector**: novel-pattern discovery via GPT-5.4-mini on the assessment JSON. Deterministic alert emission REMOVED per RSIC-LLM-ALERT-GUARD-001 (LLM reflector can't mint hallucinated deterministic alerts).
+**1 LLM reflector**: novel-pattern discovery via GPT-5.4-mini on the assessment JavaScript Object Notation (JSON). Deterministic alert emission REMOVED per RSIC-LLM-ALERT-GUARD-001 (LLM reflector can't mint hallucinated deterministic alerts).
 
 **AllowedLLMActions whitelist**: ~18 actions; new actions require explicit addition.
 
@@ -3037,7 +3037,7 @@ note:
 | UETS | Emergence | Concept-naming | active | 8 |
 | UITS | Iterative Improvement | T1 comprehension | active | 11 |
 | UTDS | Training Data | Export manifest | active | 3 |
-| UAITS | AI Training | Curation governance | active | 1 (4 datasets) |
+| Universal AI Training Specification (UAITS) | AI Training | Curation governance | active | 1 (4 datasets) |
 | UNTS | Hash Registry | Hash integrity | active | N/A |
 
 **Totals**: **16 families · 15 active · 1 spec-only (UAMS)**
@@ -3075,7 +3075,7 @@ note:
 2. **Spec drift**: UATS runs 215 real HTTP endpoints; response-shape change breaking a documented contract fails merge
 3. **Framework drift**: UxTS drift checker enforces adding a NEW family/spec updates `UXTS_FRAMEWORK_MATRIX.md` in the same PR
 
-**UXTS-CI-001 (2026-06-11)** un-zombied the gates. ALL merge-blocking today: UATS, UNTS hash-verify, USTS, UOTS, ULTS `--verify-hashes`, UBENCH contract, neural pytest+ruff, UxTS matrix drift.
+**Universal eXtensible Test Specification (UXTS)-CI-001 (2026-06-11)** un-zombied the gates. ALL merge-blocking today: UATS, UNTS hash-verify, USTS, UOTS, ULTS `--verify-hashes`, UBENCH contract, neural pytest+ruff, UxTS matrix drift.
 
 **Forcing-function invariant**: don't add `continue-on-error` to a UxTS CI step; every zombie this project un-zombied was hiding real rot.
 
@@ -3086,7 +3086,7 @@ note:
 
 ## UxTS In /ui/
 
-- `/ui/` → **Training Data** shows UAITS curated datasets (U8)
+- `/ui/` → **Training Data** shows Universal AI Training Specification (UAITS) curated datasets (U8)
 - `/ui/` → **Config** surfaces UxTS-related env vars (`RETRIEVAL_AUDIT_ENABLED`, `UVTS_*`)
 - `/ui/` → **Logs** filters by `uats:*`, `uvts:*`, etc.
 - Grafana `mdemg-overview`: `UVTS Mean Grade` panel (operator-authored UVTS verdicts over time)
@@ -3137,7 +3137,7 @@ note:
 - Schemas: `docs/api/api-spec/<family>/schema/` + `docs/tests/<family>/schema/`
 - Specs: `docs/api/api-spec/<family>/specs/` + `docs/tests/<family>/specs/`
 
-**CLAUDE.md UxTS pins**: UATS-GAP-001, UXTS-CI-001, DORMANT-CENSUS-* family.
+**CLAUDE.md UxTS pins**: UATS-GAP-001, Universal eXtensible Test Specification (UXTS)-CI-001, DORMANT-CENSUS-* family.
 
 **Feeds into**: U7 Review (HITL grades feed UAITS datasets), U8 Learning/Training (UBENCH + ULTS gate the retrain), U13 Grafana (UVTS/UBENCH panels).
 
@@ -3337,7 +3337,7 @@ note:
 **Where**: `/ui/` → **Training Data**
 
 **Shows**:
-- UAITS-curated datasets (SFT/DPO/RAFT/curriculum paradigms)
+- UAITS-curated datasets (SFT/Direct Preference Optimization (DPO)/Retrieval-Augmented Fine-Tuning (RAFT)/curriculum paradigms)
 - Export job state
 - Retention schedule
 - Scrub status
@@ -4135,7 +4135,7 @@ note:
 - CLI reads `.env` via `godotenv.Load()` at command init, but ONLY from CWD; export shell env vars for cross-cwd invocations
 - Destructive CLIs require explicit `--force` or `--dry-run=false`; dry-run default is a safety net
 - `--admin` flag presence: NEVER pass without explicit user authorization (CLAUDE.md governance pin)
-- CUIDv2 for ALL identifiers: `--run-id`, `--row-id`, `--grade-id` accept CUIDv2 only; UUID is TECH DEBT
+- CUIDv2 for ALL identifiers: `--run-id`, `--row-id`, `--grade-id` accept CUIDv2 only; Universally Unique Identifier (UUID) is TECH DEBT
 - CLI uses `golangci-lint v2.11.2` locally; new commands lint-clean on the shipped `.golangci.yml`
 
 **Feature docs**:
