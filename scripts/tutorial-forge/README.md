@@ -69,6 +69,25 @@ The output directory is a self-contained static site — serve it from any
 static host (GitHub Pages, Netlify, nginx, `python -m http.server`, embedded
 in a binary via `//go:embed`, etc.).
 
+### See it work in 60 seconds
+
+A ready-to-run demo lives at [`example/`](./example/) — a tiny 5-section
+deck with 2 Mermaid diagrams and the minimum config (just `deck`, `output`,
+`title`; no overrides). It exercises every default: TOC + Graphs sidebar,
+scroll-sync, pre-rendered Mermaid, acronym expansion, the interactive SVG
+viewer. From the forge directory:
+
+```bash
+cd example
+node ../cli.mjs build --config tutorial.config.json
+cd dist && python3 -m http.server 8000
+# open http://localhost:8000/
+```
+
+If the demo produces a left-margin TOC with 5 Sections + 2 Graphs and
+every acronym expands on first use, your `scripts/tutorial-forge/`
+install is healthy.
+
 ## Full config schema
 
 Every path in the config is resolved relative to the config file's directory

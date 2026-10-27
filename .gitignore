@@ -216,3 +216,4 @@ parser-spec/
 # export pipeline. Only needed when regenerating the embed via
 # `make sync-tutorial-embed`; not shipped at operator runtime.
 scripts/tutorial-forge/node_modules/
+scripts/tutorial-forge/example/dist/

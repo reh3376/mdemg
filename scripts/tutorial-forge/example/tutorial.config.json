@@ -1,0 +1,6 @@
+{
+  "_comment": "Minimal tutorial-forge config using ZERO overrides. The framework's shipped CSS, SVG viewer, favicon, and acronym dictionary all apply. Run: node ../cli.mjs build --config tutorial.config.json",
+  "deck": "deck.md",
+  "output": "dist",
+  "title": "tutorial-forge example"
+}
