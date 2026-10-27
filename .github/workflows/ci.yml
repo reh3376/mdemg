@@ -14,6 +14,18 @@ on:
   pull_request:
     branches: [main]
 
+# CI-CONCURRENCY-001 (2026-10-27): without this, a new push to a PR branch
+# queues a fresh CI run but does NOT cancel the superseded run — leaving the
+# stale run occupying runner slots while the new run sits in the queue.
+# Pattern was: push, see queued runs, the previous commit's CI blocks the
+# new commit's CI for 8+ minutes until the stale run finishes. Setting
+# cancel-in-progress at the (workflow, ref) grain makes each new push kill
+# its own predecessor on the same branch. Group key includes head_ref so
+# cross-branch runs don't fight; falls back to github.ref for push events.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
 # Minimum GITHUB_TOKEN scope: `contents: read` covers actions/checkout;
 # CI runs tests + lints + does not write to the repo. Per-job overrides
 # can widen this if a specific job needs more (none do today).
