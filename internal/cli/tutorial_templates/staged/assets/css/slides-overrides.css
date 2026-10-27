@@ -29,8 +29,8 @@
   --font-sans: -apple-system, "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --font-mono: ui-monospace, "SF Mono", "Menlo", "Monaco", "Cascadia Code", monospace;
 
-  --page-max: 1200px;
-  --page-pad: 32px;
+  --page-max: 1400px;
+  --page-pad: 24px;
 
   --radius: 8px;
   --radius-small: 4px;

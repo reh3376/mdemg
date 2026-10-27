@@ -1,8 +1,12 @@
 // ONBOARDING-TUTORIAL-SERVE-001 — pin tests for the tutorial embed.
 //
 // Pivoted 2026-10-26 to a plain HTML/CSS long-form document (no reveal.js).
+// Then 2026-10-27 pre-rendered all mermaid diagrams to SVG at build time so
+// each flows through the shared interactive .svg-figure viewer, dropping the
+// client-side mermaid runtime from the bundle (~2.5 MB saved).
+//
 // Verifies the embed is well-formed + exposes the invariants the handler
-// and CI drift gate depend on against the new package layout:
+// and CI drift gate depend on against the current package layout:
 //
 //   staged/
 //     index.html
@@ -10,9 +14,8 @@
 //     SOURCE_SHA256.txt
 //     assets/css/slides-overrides.css
 //     assets/css/zenburn.min.css
-//     assets/js/mermaid.min.js
 //     assets/js/svg-viewer.js
-//     assets/svg/<hand-authored diagrams>
+//     assets/svg/<pre-rendered mermaid-*.svg + hand-authored diagrams>
 package tutorial_templates
 
 import (
@@ -55,7 +58,6 @@ func TestFS_IndexHTMLShape(t *testing.T) {
 	// New-pipeline markers.
 	for _, needle := range []string{
 		`<main class="deck">`,
-		`assets/js/mermaid.min.js`,
 		`assets/js/svg-viewer.js`,
 		`assets/css/slides-overrides.css`,
 	} {
@@ -68,27 +70,50 @@ func TestFS_IndexHTMLShape(t *testing.T) {
 		`<div class="reveal">`,
 		`dist/reveal.js`,
 		`revealOptions`,
+		// Pre-rendered-SVG era: the client-side mermaid runtime is gone.
+		`assets/js/mermaid.min.js`,
+		`mermaid.initialize`,
 	} {
 		if strings.Contains(body, forbidden) {
-			t.Errorf("index.html contains reveal.js-era marker %q — pivot regressed", forbidden)
+			t.Errorf("index.html contains forbidden marker %q — pipeline regressed", forbidden)
 		}
 	}
 }
 
-// TestFS_BundlesMermaid verifies the mermaid.min.js shim the export script
-// adds for offline inline rendering.
-func TestFS_BundlesMermaid(t *testing.T) {
+// TestFS_MermaidPreRenderedAsSVG verifies the build-time Mermaid pipeline
+// landed its SVG artifacts in the embed (one file per source ``` mermaid block,
+// numbered mermaid-01.svg..mermaid-NN.svg). Catches a regression where the
+// renderer silently emits zero files but the build still succeeds.
+func TestFS_MermaidPreRenderedAsSVG(t *testing.T) {
 	f, err := FS()
 	if err != nil {
 		t.Fatalf("FS() error: %v", err)
 	}
-	info, err := fs.Stat(f, "assets/js/mermaid.min.js")
+	entries, err := fs.ReadDir(f, "assets/svg")
 	if err != nil {
-		t.Fatalf("mermaid.min.js not bundled at assets/js/mermaid.min.js: %v", err)
+		t.Fatalf("read assets/svg: %v", err)
 	}
-	// Mermaid 11.4.x is ~2.5 MB. Sanity floor at 1 MB catches a stub.
-	if info.Size() < 1024*1024 {
-		t.Fatalf("mermaid.min.js suspiciously small (%d bytes) — expected ~2.5 MB", info.Size())
+	var mermaidCount int
+	for _, e := range entries {
+		if strings.HasPrefix(e.Name(), "mermaid-") && strings.HasSuffix(e.Name(), ".svg") {
+			info, err := fs.Stat(f, "assets/svg/"+e.Name())
+			if err != nil {
+				t.Fatalf("stat %s: %v", e.Name(), err)
+			}
+			// A rendered mermaid SVG is at least a few hundred bytes.
+			if info.Size() < 500 {
+				t.Errorf("mermaid svg %s suspiciously small (%d bytes) — likely empty render", e.Name(), info.Size())
+			}
+			mermaidCount++
+		}
+	}
+	// The deck has 22 mermaid blocks as of ONBOARDING-TUTORIAL-ENDUSER-001;
+	// floor at 10 to catch a stub, ceiling at 100 to catch runaway duplication.
+	if mermaidCount < 10 {
+		t.Errorf("expected ≥10 pre-rendered mermaid SVGs in assets/svg/, got %d", mermaidCount)
+	}
+	if mermaidCount > 100 {
+		t.Errorf("expected ≤100 pre-rendered mermaid SVGs in assets/svg/, got %d", mermaidCount)
 	}
 }
 
@@ -173,16 +198,18 @@ func TestSourceSHA_Present(t *testing.T) {
 	}
 }
 
-// TestEmbedSize_Sane: new-pipeline bundle is ~2.7 MB (deck HTML + mermaid.min.js
-// + CSS + highlight style + svg-viewer.js + hand-authored SVGs). The floor at
-// 1.5 MB catches a stub emission; ceiling at 15 MB catches a regression that
-// resurrects the reveal.js runtime (~7 MB) or over-copies node_modules.
+// TestEmbedSize_Sane: with mermaid pre-rendered to SVG at build time (2026-10-27),
+// the bundle is ~400 KB — deck HTML (~260 KB) + CSS (~10 KB) + highlight style
+// (~2 KB) + svg-viewer.js (~9 KB) + ~22 rendered mermaid SVGs (~5-50 KB each) +
+// hand-authored SVGs. The floor at 250 KB catches a stub emission; ceiling at
+// 15 MB catches a regression that resurrects the mermaid.min.js runtime
+// (~2.5 MB) or over-copies node_modules.
 func TestEmbedSize_Sane(t *testing.T) {
 	total, err := EmbedSize()
 	if err != nil {
 		t.Fatalf("EmbedSize() error: %v", err)
 	}
-	if total < 1_500_000 || total > 15*1024*1024 {
-		t.Errorf("embed size %d bytes outside expected 1.5-15 MB range — investigate", total)
+	if total < 250_000 || total > 15*1024*1024 {
+		t.Errorf("embed size %d bytes outside expected 250 KB-15 MB range — investigate", total)
 	}
 }
