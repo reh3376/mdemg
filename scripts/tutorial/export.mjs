@@ -173,6 +173,22 @@ function slugify(text) {
 // Prime the slug table with the explicit-pin ids so auto-slug can't collide.
 for (const pin of explicitPins) seenSlugs.set(pin.id, 1);
 
+// Strip HTML tags from a string. Loops until stable because a single-pass
+// regex can be defeated by overlapping tag sequences like `<<script>script>`
+// (CodeQL js/incomplete-multi-character-sanitization). The output of this
+// helper only feeds the slugify() pipeline which restricts to [a-z0-9-], so
+// there's no XSS surface — but the idempotent loop matches CodeQL's expected
+// sanitization pattern.
+function stripTags(s) {
+  let prev;
+  let out = String(s);
+  do {
+    prev = out;
+    out = out.replace(/<[^>]*>/g, '');
+  } while (out !== prev);
+  return out;
+}
+
 // First pass: attach explicit pin ids to matching headings. We walk the pin
 // queue and attach each in-order to the FIRST unlocked heading that matches
 // its plain text (preserving source order).
@@ -180,8 +196,7 @@ let pinCursor = 0;
 bodyHtml = bodyHtml.replace(
   /<(h[1-6])(?![^>]*\sid=)>([\s\S]*?)<\/\1>/g,
   (match, tag, inner) => {
-    // Strip HTML tags inside the heading to get plain text for comparison.
-    const plain = inner.replace(/<[^>]+>/g, '').trim();
+    const plain = stripTags(inner).trim();
     while (pinCursor < explicitPins.length) {
       const pin = explicitPins[pinCursor];
       if (pin.headingText === plain) {
@@ -200,7 +215,7 @@ bodyHtml = bodyHtml.replace(
 bodyHtml = bodyHtml.replace(
   /<(h[1-6])(?![^>]*\sid=)>([\s\S]*?)<\/\1>/g,
   (match, tag, inner) => {
-    const plain = inner.replace(/<[^>]+>/g, '').trim();
+    const plain = stripTags(inner).trim();
     const id = slugify(plain);
     return id ? `<${tag} id="${id}">${inner}</${tag}>` : match;
   },

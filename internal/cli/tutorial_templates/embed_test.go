@@ -1,6 +1,18 @@
 // ONBOARDING-TUTORIAL-SERVE-001 — pin tests for the tutorial embed.
+//
+// Pivoted 2026-10-26 to a plain HTML/CSS long-form document (no reveal.js).
 // Verifies the embed is well-formed + exposes the invariants the handler
-// and CI drift gate depend on.
+// and CI drift gate depend on against the new package layout:
+//
+//   staged/
+//     index.html
+//     favicon.ico
+//     SOURCE_SHA256.txt
+//     assets/css/slides-overrides.css
+//     assets/css/zenburn.min.css
+//     assets/js/mermaid.min.js
+//     assets/js/svg-viewer.js
+//     assets/svg/<hand-authored diagrams>
 package tutorial_templates
 
 import (
@@ -26,42 +38,53 @@ func TestFS_IndexHTMLPresent(t *testing.T) {
 	}
 }
 
-// TestFS_ServesRevealJS verifies the reveal.js runtime assets came along.
-// Without these, the embedded index.html renders a blank page.
-func TestFS_ServesRevealJS(t *testing.T) {
+// TestFS_IndexHTMLShape verifies the index.html came out of the new
+// marked-based pipeline. The old reveal-md output had `<div class="reveal">`;
+// the new output has `<main class="deck">`. Pinning this catches a build
+// regression that silently reverted to the reveal.js shell.
+func TestFS_IndexHTMLShape(t *testing.T) {
 	f, err := FS()
 	if err != nil {
 		t.Fatalf("FS() error: %v", err)
 	}
-	required := []string{
-		"dist/reveal.css",
-		"dist/reveal.js",
-		"dist/theme/night.css",
+	data, err := fs.ReadFile(f, "index.html")
+	if err != nil {
+		t.Fatalf("read index.html: %v", err)
 	}
-	for _, path := range required {
-		info, sErr := fs.Stat(f, path)
-		if sErr != nil {
-			t.Errorf("required asset missing: %s (err=%v)", path, sErr)
-			continue
+	body := string(data)
+	// New-pipeline markers.
+	for _, needle := range []string{
+		`<main class="deck">`,
+		`assets/js/mermaid.min.js`,
+		`assets/js/svg-viewer.js`,
+		`assets/css/slides-overrides.css`,
+	} {
+		if !strings.Contains(body, needle) {
+			t.Errorf("index.html missing expected marker %q — new HTML pipeline likely regressed", needle)
 		}
-		if info.Size() == 0 {
-			t.Errorf("required asset empty: %s", path)
+	}
+	// Old-pipeline markers that MUST NOT reappear.
+	for _, forbidden := range []string{
+		`<div class="reveal">`,
+		`dist/reveal.js`,
+		`revealOptions`,
+	} {
+		if strings.Contains(body, forbidden) {
+			t.Errorf("index.html contains reveal.js-era marker %q — pivot regressed", forbidden)
 		}
 	}
 }
 
 // TestFS_BundlesMermaid verifies the mermaid.min.js shim the export script
-// adds for offline rendering (reveal-md --static references
-// ./mermaid/dist/mermaid.min.js but doesn't bundle it; the export script
-// copies it from scripts/tutorial/node_modules/mermaid/dist/).
+// adds for offline inline rendering.
 func TestFS_BundlesMermaid(t *testing.T) {
 	f, err := FS()
 	if err != nil {
 		t.Fatalf("FS() error: %v", err)
 	}
-	info, err := fs.Stat(f, "mermaid/dist/mermaid.min.js")
+	info, err := fs.Stat(f, "assets/js/mermaid.min.js")
 	if err != nil {
-		t.Fatalf("mermaid.min.js not bundled — the export script's manual copy step didn't run: %v", err)
+		t.Fatalf("mermaid.min.js not bundled at assets/js/mermaid.min.js: %v", err)
 	}
 	// Mermaid 11.4.x is ~2.5 MB. Sanity floor at 1 MB catches a stub.
 	if info.Size() < 1024*1024 {
@@ -69,15 +92,14 @@ func TestFS_BundlesMermaid(t *testing.T) {
 	}
 }
 
-// TestFS_SlideOverrideCSSPresent verifies the bottom-clipping fix CSS
-// traveled. Without it, the exported HTML inherits reveal.js night-theme
-// defaults and clips the F1.2 slide's third bullet.
+// TestFS_SlideOverrideCSSPresent verifies the deck's CSS override lands at
+// the new package path (`assets/css/slides-overrides.css`).
 func TestFS_SlideOverrideCSSPresent(t *testing.T) {
 	f, err := FS()
 	if err != nil {
 		t.Fatalf("FS() error: %v", err)
 	}
-	path := "_assets/docs/onboarding/slides-overrides.css"
+	path := "assets/css/slides-overrides.css"
 	info, err := fs.Stat(f, path)
 	if err != nil {
 		t.Fatalf("slides-overrides.css not in embed at %s: %v", path, err)
@@ -87,10 +109,25 @@ func TestFS_SlideOverrideCSSPresent(t *testing.T) {
 	}
 }
 
-// TestFS_NoAbsolutePathLeaks defends the reproducibility invariant from the
-// E1 build pipeline: reveal-md bakes argv paths into index.html verbatim, so
-// absolute paths would make the embed byte-differ across machines. The export
-// script passes relative paths from REPO_ROOT; this test regression-locks that.
+// TestFS_SVGViewerPresent verifies the interactive SVG viewer JS lands in
+// the embed. Without it, the figure containers lose their zoom/pan controls.
+func TestFS_SVGViewerPresent(t *testing.T) {
+	f, err := FS()
+	if err != nil {
+		t.Fatalf("FS() error: %v", err)
+	}
+	info, err := fs.Stat(f, "assets/js/svg-viewer.js")
+	if err != nil {
+		t.Fatalf("svg-viewer.js not in embed: %v", err)
+	}
+	if info.Size() < 500 {
+		t.Fatalf("svg-viewer.js suspiciously small (%d bytes) — stub emission", info.Size())
+	}
+}
+
+// TestFS_NoAbsolutePathLeaks defends the reproducibility invariant: absolute
+// paths in index.html would make the embed byte-differ across machines.
+// Pivot kept the "relative paths only" contract.
 func TestFS_NoAbsolutePathLeaks(t *testing.T) {
 	f, err := FS()
 	if err != nil {
@@ -100,25 +137,27 @@ func TestFS_NoAbsolutePathLeaks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read index.html: %v", err)
 	}
-	// Any absolute path reference breaks reproducibility across machines.
-	// Catches /Users/, /home/, C:\, and GitHub Actions' /home/runner/.
 	for _, needle := range []string{"/Users/", "/home/", "/private/tmp/", `C:\`} {
 		if strings.Contains(string(data), needle) {
-			t.Errorf("index.html contains absolute-path leak %q — export script must use relative paths from REPO_ROOT", needle)
+			t.Errorf("index.html contains absolute-path leak %q — export script must use relative paths", needle)
 		}
 	}
 }
 
-// TestManifest_FilesPresent asserts the embed has enough files to be a
-// real reveal.js bundle (reveal.js alone ships ~40 files; mermaid + CSS
-// + highlight.js + the index add more).
+// TestManifest_FilesPresent asserts the embed has the small, well-defined
+// set of files the new HTML pipeline emits. Floor at 6 to catch a stub
+// emission; ceiling at 200 to catch an accidental over-copy that would
+// drag the bundle size back up.
 func TestManifest_FilesPresent(t *testing.T) {
 	files, err := Manifest()
 	if err != nil {
 		t.Fatalf("Manifest() error: %v", err)
 	}
-	if len(files) < 30 {
-		t.Fatalf("embed suspiciously small (%d files) — expected a full reveal.js bundle (~60-80)", len(files))
+	if len(files) < 6 {
+		t.Fatalf("embed suspiciously small (%d files) — expected index.html + favicon.ico + SOURCE_SHA256.txt + 4+ asset files", len(files))
+	}
+	if len(files) > 200 {
+		t.Fatalf("embed suspiciously large (%d files) — pivot regression; the new pipeline should emit ~8-30 files total", len(files))
 	}
 }
 
@@ -134,15 +173,16 @@ func TestSourceSHA_Present(t *testing.T) {
 	}
 }
 
-// TestEmbedSize_Sane: 7-10 MB total is the known-good range (reveal.js
-// dist + plugins + mermaid.min.js + 15 Mermaid diagrams + the deck).
-// Catches a build regression that silently stripped half the embed.
+// TestEmbedSize_Sane: new-pipeline bundle is ~2.7 MB (deck HTML + mermaid.min.js
+// + CSS + highlight style + svg-viewer.js + hand-authored SVGs). The floor at
+// 1.5 MB catches a stub emission; ceiling at 15 MB catches a regression that
+// resurrects the reveal.js runtime (~7 MB) or over-copies node_modules.
 func TestEmbedSize_Sane(t *testing.T) {
 	total, err := EmbedSize()
 	if err != nil {
 		t.Fatalf("EmbedSize() error: %v", err)
 	}
-	if total < 5*1024*1024 || total > 15*1024*1024 {
-		t.Errorf("embed size %d bytes outside expected 5-15 MB range — investigate", total)
+	if total < 1_500_000 || total > 15*1024*1024 {
+		t.Errorf("embed size %d bytes outside expected 1.5-15 MB range — investigate", total)
 	}
 }
