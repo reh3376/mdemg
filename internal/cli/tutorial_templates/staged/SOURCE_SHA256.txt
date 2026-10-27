@@ -1,7 +1,7 @@
 # tutorial-forge drift breadcrumb
 # consumer CI gate can hash the configured input files and compare.
-deck_sha256=2be16ced0b9b89b7e3d9449fe5d5b149a625813629606f05f6c2f20e48c522f2
-css_sha256=b954a5ce92ace7b1dfcff7adc4ae57c80215f2485df77875272c975d4c89b260
+deck_sha256=f43849da1f6af5fb7746cb6c14745c9de3acbafc0a301a14416f334413ef5d2f
+css_sha256=b283f3146695430d77b1777a851f44004598dc7c2561eb9f2430080ba5e90768
 svg_viewer_sha256=a11ea333dbff84e192785ca413ec467f772a3de5cca29948951955980c486530
 deck_path=docs/onboarding/mdemg-onboarding-deck.md
 css_path=docs/onboarding/slides-overrides.css

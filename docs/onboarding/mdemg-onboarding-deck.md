@@ -1992,7 +1992,7 @@ note:
 
 <!-- .slide: id="end-user-path" -->
 
-## U1 · Operator Onboarding · Start Here
+# U1 · Operator Onboarding · Start Here
 
 The next ~99 minutes answer four questions. Each U-section drills into a piece of the answer. You'll own the operator view by the end.
 
@@ -2156,7 +2156,7 @@ note:
 <!-- SECTION U2, THE STACK + STATUS + HEALTH -->
 <!-- .slide: id="u2--the-stack" -->
 
-## U2 · The Stack
+# U2 · The Stack
 
 Everything in U3-U17 lives inside the 5-container stack. This section is the foundation, the stack picture, how to confirm it's up, how to probe its health, and what the watchdog + breakers protect against.
 
@@ -2312,7 +2312,7 @@ note:
 <!-- SECTION U3, MEMORY (CMS) -->
 <!-- .slide: id="u3--memory--the-cognitive-substrate" -->
 
-## U3 · Memory · The Cognitive Substrate
+# U3 · Memory · The Cognitive Substrate
 
 MDEMG remembers. Not in RAM, not in logs, in a Neo4j graph that grows, consolidates, and forgets honestly.
 
@@ -2495,7 +2495,7 @@ note:
 <!-- SECTION U4, JIMINY -->
 <!-- .slide: id="u4--jiminy--the-inner-voice" -->
 
-## U4 · Jiminy · The Inner Voice
+# U4 · Jiminy · The Inner Voice
 
 Jiminy is the subsystem that **READS memory** before every agent action, **SURFACES** applicable durable rules, **CLASSIFIES** whether the agent followed them, and (in strict mode) **ENFORCES** them.
 
@@ -2823,7 +2823,7 @@ note:
 <!-- SECTION U5, RSIC -->
 <!-- .slide: id="u5--rsic--the-self-improvement-engine" -->
 
-## U5 · RSIC · The Self-Improvement Engine
+# U5 · RSIC · The Self-Improvement Engine
 
 RSIC asks "how well is MDEMG working?" every few minutes. When it finds a problem WITH a known action, it triggers improvement, sometimes a diagnostic alert, sometimes a real substrate mutation.
 
@@ -2980,7 +2980,7 @@ note:
 <!-- SECTION U6, UxTS -->
 <!-- .slide: id="u6--uxts--forcing-functions-that-prevent-drift" -->
 
-## U6 · UxTS · Forcing-Functions That Prevent Drift
+# U6 · UxTS · Forcing-Functions That Prevent Drift
 
 A UxTS framework is a contract-first way to make a piece of system behavior impossible to drift without CI noticing: **spec → fixture → runner → CI gate**.
 
@@ -3150,7 +3150,7 @@ note:
 <!-- SECTION U7, HITL REVIEW -->
 <!-- .slide: id="u7--hitl--you-grade-what-the-system-cant" -->
 
-## U7 · HITL · You Grade What The System Can't
+# U7 · HITL · You Grade What The System Can't
 
 The classifier can't tell if a `partial_compliance` verdict was actually `followed` with reasonable judgment. The retrain corpus needs human verdicts. HITL is the UI + CLI that makes operator grading fast enough to be sustainable.
 
@@ -3282,7 +3282,7 @@ note:
 
 <!-- .slide: id="u8--learning--training-data--how-the-model-gets-better" -->
 
-## U8 · Learning + Training Data · How The Model Gets Better
+# U8 · Learning + Training Data · How The Model Gets Better
 
 MDEMG's production LLM is `mdemg-llm-v1` (Qwen3-14B-4bit + Phase 5 SFT), aggregate 0.9188 on the honest 16-task eval. The retrain pipeline (Phase 6b actuator SHIPPED default-off) can produce the next generation when triggered.
 
@@ -3426,7 +3426,7 @@ note:
 <!-- SECTION U9, BACKUP + OPS -->
 <!-- .slide: id="u9--backup--ops" -->
 
-## U9 · Backup + Ops
+# U9 · Backup + Ops
 
 Backups + scheduled maintenance (decay + prune) are the operator's safety net. BACKUP-RESTORE-VERIFY-001 made the restore path provably correct; NOSILENT-001 ensures silent failures ALARM.
 
@@ -3547,7 +3547,7 @@ note:
 <!-- SECTION U10, LOGS -->
 <!-- .slide: id="u10--logs" -->
 
-## U10 · Logs
+# U10 · Logs
 
 `healthz` is now, alerts are history, logs are DETAIL. When a request latency spike happens but nothing's fired, logs are where you look.
 
@@ -3635,7 +3635,7 @@ note:
 <!-- SECTION U11, CONFIG + FEATURES -->
 <!-- .slide: id="u11--config--features--the-toggle-surface" -->
 
-## U11 · Config + Features · The Toggle Surface
+# U11 · Config + Features · The Toggle Surface
 
 ~400 config knobs ship with MDEMG. Most defaults are correct. This section covers the ones operators flip + how to tell which can be flipped live vs needing a restart.
 
@@ -3770,7 +3770,7 @@ note:
 <!-- SECTION U12, PLUGINS -->
 <!-- .slide: id="u12--plugins--the-extension-surface" -->
 
-## U12 · Plugins · The Extension Surface
+# U12 · Plugins · The Extension Surface
 
 Plugins are gRPC services the mdemg server talks to over the `mdemg-module` protocol. Four shipped: docs-scraper, uxts-module, linear-module, obsidian-module.
 
@@ -3863,7 +3863,7 @@ note:
 <!-- SECTION U13, GRAFANA -->
 <!-- .slide: id="u13--grafana--the-historical-view" -->
 
-## U13 · Grafana · The Historical View
+# U13 · Grafana · The Historical View
 
 Grafana is the time-series companion to /ui/. /ui/ answers "right now"; Grafana answers "the last 24 hours / 7 days / 30 days."
 
@@ -3985,7 +3985,7 @@ note:
 <!-- SECTION U14, CLI -->
 <!-- .slide: id="u14--cli--the-full-command-surface" -->
 
-## U14 · CLI · The Full Command Surface
+# U14 · CLI · The Full Command Surface
 
 `mdemg --help` lists 90+ commands. Operators regularly use ~15, grouped into 5 clusters.
 
@@ -4153,7 +4153,7 @@ note:
 <!-- SECTION U15, APIs + gRPC -->
 <!-- .slide: id="u15--apis--grpc--the-programmatic-surfaces" -->
 
-## U15 · APIs + gRPC · The Programmatic Surfaces
+# U15 · APIs + gRPC · The Programmatic Surfaces
 
 /ui/ and CLI are user-facing; APIs + gRPC are what EVERYTHING hits internally. **199 shipped HTTP routes + 4 gRPC services.**
 
@@ -4322,7 +4322,7 @@ note:
 <!-- SECTION U16, ALERTS + ENFORCEMENT -->
 <!-- .slide: id="u16--alerts--enforcement--operator-triage" -->
 
-## U16 · Alerts + Enforcement · Operator Triage
+# U16 · Alerts + Enforcement · Operator Triage
 
 This is where you RESPOND. Alerts tell you what's wrong (historical, hours-scale). Enforcement is Jiminy preventing a durable constraint violation (right-now).
 
@@ -4493,7 +4493,7 @@ note:
 <!-- SECTION U17, WHERE TO GO NEXT -->
 <!-- .slide: id="u17--where-to-go--documentation" -->
 
-## U17 · Where To Go · Documentation
+# U17 · Where To Go · Documentation
 
 - `docs/features/*.md`, **41+ feature docs** (one per major shipped feature)
 - `docs/user/*`, user-facing operational docs

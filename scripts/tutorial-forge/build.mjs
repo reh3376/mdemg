@@ -181,6 +181,8 @@ export async function build(config, configDir) {
   logInfo(`markdown → HTML conversion complete (${bodyHtml.length} bytes)`);
 
   // Pre-render mermaid, write SVGs, swap placeholders for .svg-figure wrappers.
+  // Each .svg-figure gets a stable id="diagram-NN" so the Graphs TOC can link
+  // directly to it.
   let mermaidCount = 0;
   if (mermaidSources.length > 0 && !mermaidOpts.skipRender) {
     logInfo(`rendering ${mermaidSources.length} mermaid diagrams via headless puppeteer...`);
@@ -188,9 +190,10 @@ export async function build(config, configDir) {
     mkdirSync(join(OUTPUT_DIR, 'assets', 'svg'), { recursive: true });
     for (let i = 0; i < svgs.length; i += 1) {
       const fileName = `mermaid-${String(i + 1).padStart(2, '0')}.svg`;
+      const diagramId = `diagram-${String(i + 1).padStart(2, '0')}`;
       writeFileSync(join(OUTPUT_DIR, 'assets', 'svg', fileName), svgs[i]);
       const figure =
-        `<figure class="svg-figure" tabindex="0" aria-label="Diagram ${i + 1}">` +
+        `<figure id="${diagramId}" class="svg-figure" tabindex="0" aria-label="Diagram ${i + 1}">` +
         `<img src="assets/svg/${fileName}" alt="Diagram ${i + 1}" />` +
         `</figure>`;
       bodyHtml = bodyHtml.replace(
@@ -221,6 +224,15 @@ export async function build(config, configDir) {
   }
   // Prime slug table with explicit pins so auto-slugging can't collide with them.
   for (const pin of explicitPins) seenSlugs.set(pin.id, 1);
+
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
 
   // Idempotent HTML tag-strip (CodeQL js/incomplete-multi-character-sanitization
   // safe — loops until stable).
@@ -259,25 +271,174 @@ export async function build(config, configDir) {
     },
   );
 
+  // Build the Table of Contents from headings in bodyHtml. The sidebar is
+  // persistent (CSS-fixed at the left margin) so a reader can jump to any
+  // section without scrolling. Default: H1+H2; configurable per repo.
+  const tocOpts = config.toc ?? {};
+  const tocEnabled = tocOpts.enabled !== false;
+  const tocMinLevel = tocOpts.minLevel ?? 1;
+  const tocMaxLevel = tocOpts.maxLevel ?? 2;
+  const tocLabel = tocOpts.label ?? 'Contents';
+
+  let tocHtml = '';
+  let tocEntryCount = 0;
+  let graphsEntryCount = 0;
+  if (tocEnabled) {
+    // Pass A: collect (level, id, text, pos) for every heading. We keep the
+    // byte-position so we can later associate each .svg-figure with the
+    // nearest preceding heading as its human-readable label.
+    const allHeadings = [];
+    const headingRe = /<(h([1-6]))[^>]*\sid="([^"]+)"[^>]*>([\s\S]*?)<\/h\2>/g;
+    for (const m of bodyHtml.matchAll(headingRe)) {
+      allHeadings.push({
+        level: Number(m[2]),
+        id: m[3],
+        text: stripTags(m[4]).replace(/\s+/g, ' ').trim(),
+        pos: m.index,
+      });
+    }
+
+    // Sections entries: headings whose level is in config range.
+    const sectionEntries = allHeadings.filter(
+      (h) => h.level >= tocMinLevel && h.level <= tocMaxLevel && h.text,
+    );
+    tocEntryCount = sectionEntries.length;
+
+    // Graphs entries: every <figure class="svg-figure">, whether it already has
+    // an id (pre-rendered mermaid gets diagram-NN) or not (hand-authored HTML
+    // that didn't set an id — the build auto-assigns one). Each entry is
+    // labeled with its nearest preceding heading for human readability.
+    const graphsEnabled = (tocOpts.graphs ?? {}).enabled !== false;
+    const graphEntries = [];
+    if (graphsEnabled) {
+      // Inject an id onto any .svg-figure that lacks one. Pre-rendered mermaid
+      // diagrams already have id="diagram-NN"; hand-authored HTML without an
+      // id gets figure-NN appended in document order.
+      let synth = 0;
+      bodyHtml = bodyHtml.replace(
+        /<figure\b([^>]*)>/g,
+        (full, attrs) => {
+          if (!/class="svg-figure"/.test(attrs)) return full;
+          if (/\sid="/.test(attrs)) return full;
+          synth += 1;
+          const id = `figure-${String(synth).padStart(2, '0')}`;
+          return `<figure id="${id}"${attrs}>`;
+        },
+      );
+      // Enumerate every .svg-figure (now all have ids) in document order.
+      const figureRe = /<figure\s+id="([^"]+)"[^>]*class="svg-figure"[^>]*>/g;
+      const headingsByPos = allHeadings.slice().sort((a, b) => a.pos - b.pos);
+      for (const m of bodyHtml.matchAll(figureRe)) {
+        const figId = m[1];
+        const figPos = m.index;
+        let nearest = null;
+        for (const h of headingsByPos) {
+          if (h.pos < figPos) nearest = h;
+          else break;
+        }
+        const label = nearest ? nearest.text : `Figure ${graphEntries.length + 1}`;
+        graphEntries.push({ id: figId, label });
+      }
+      graphsEntryCount = graphEntries.length;
+    }
+
+    if (sectionEntries.length > 0 || graphEntries.length > 0) {
+      let sectionsHtml = '';
+      if (sectionEntries.length > 0) {
+        const items = sectionEntries
+          .map(
+            (e) =>
+              `      <li class="deck-toc-l${e.level}"><a href="#${e.id}">${escapeHtml(e.text)}</a></li>`,
+          )
+          .join('\n');
+        sectionsHtml = `    <ul class="deck-toc-sections">
+${items}
+    </ul>
+`;
+      }
+      let graphsHtml = '';
+      if (graphEntries.length > 0) {
+        const graphsLabel = (tocOpts.graphs ?? {}).label ?? 'Graphs';
+        const items = graphEntries
+          .map(
+            (e, i) =>
+              `      <li class="deck-toc-graph"><a href="#${e.id}">${String(i + 1).padStart(2, '0')}. ${escapeHtml(e.label)}</a></li>`,
+          )
+          .join('\n');
+        graphsHtml = `    <div class="deck-toc-subhead">${escapeHtml(graphsLabel)}</div>
+    <ul class="deck-toc-graphs">
+${items}
+    </ul>
+`;
+      }
+      tocHtml = `  <nav class="deck-toc" aria-label="${escapeHtml(tocLabel)}">
+    <div class="deck-toc-head">${escapeHtml(tocLabel)}</div>
+${sectionsHtml}${graphsHtml}  </nav>
+`;
+      logInfo(
+        `built TOC with ${sectionEntries.length} section entries (H${tocMinLevel}–H${tocMaxLevel}) + ${graphEntries.length} graph entries`,
+      );
+    }
+  }
+
+  // Scroll-sync IIFE: observe heading intersection and highlight the matching
+  // TOC entry as the user scrolls. Zero deps; graceful no-op when no TOC.
+  const scrollSyncScript = tocHtml
+    ? `  <script>
+    (function () {
+      const links = document.querySelectorAll('.deck-toc a[href^="#"]');
+      if (!links.length) return;
+      const map = new Map();
+      for (const a of links) map.set(a.getAttribute('href').slice(1), a);
+      const targets = Array.from(map.keys())
+        .map((id) => document.getElementById(id))
+        .filter(Boolean);
+      if (!targets.length) return;
+      let active = null;
+      function setActive(id) {
+        const a = map.get(id);
+        if (!a || a === active) return;
+        if (active) active.classList.remove('deck-toc-active');
+        a.classList.add('deck-toc-active');
+        active = a;
+        a.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      }
+      const observer = new IntersectionObserver(
+        (entries) => {
+          const visible = entries.filter((e) => e.isIntersecting);
+          if (!visible.length) return;
+          const top = visible.reduce((a, b) =>
+            a.boundingClientRect.top < b.boundingClientRect.top ? a : b,
+          );
+          setActive(top.target.id);
+        },
+        { rootMargin: '0px 0px -70% 0px', threshold: 0 },
+      );
+      for (const t of targets) observer.observe(t);
+    })();
+  </script>
+`
+    : '';
+
   // Assemble index.html shell.
   const indexHtml = `<!doctype html>
 <html lang="en" data-theme="dark">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>${title}</title>
+  <title>${escapeHtml(title)}</title>
   <link rel="icon" href="favicon.ico" />
   <link rel="stylesheet" href="assets/css/zenburn.min.css" />
   <link rel="stylesheet" href="assets/css/slides-overrides.css" />
 </head>
-<body>
-  <main class="deck">
+<body${tocHtml ? ' class="has-toc"' : ''}>
+${tocHtml}  <main class="deck">
 ${bodyHtml}
   </main>
   <!-- Mermaid is pre-rendered to SVG at build time; the viewer handles -->
   <!-- pan/zoom/fullscreen for every diagram.                            -->
   <script defer src="assets/js/svg-viewer.js"></script>
-</body>
+${scrollSyncScript}</body>
 </html>
 `;
 
@@ -340,6 +501,8 @@ ${bodyHtml}
     files: fileCount,
     bytes: totalBytes,
     mermaidCount,
+    tocEntryCount,
+    graphsEntryCount,
     acronymsApplied,
     deckSha,
     cssSha,

@@ -21,5 +21,15 @@
   },
   "mermaid": {
     "theme": "default"
+  },
+  "toc": {
+    "enabled": true,
+    "minLevel": 1,
+    "maxLevel": 1,
+    "label": "Contents",
+    "graphs": {
+      "enabled": true,
+      "label": "Graphs"
+    }
   }
 }

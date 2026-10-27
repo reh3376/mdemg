@@ -11,6 +11,10 @@ static HTML tutorial package.
 Any repo can point it at its own deck + config and get the same professional
 presentation layer:
 
+- **Persistent left-margin TOC + Graphs sidebar** (REQUIRED feature; see
+  FSD §15). Fixed-position sidebar listing section headings AND every
+  diagram, with scroll-sync highlighting the current section. Readers can
+  jump anywhere in a long tutorial without scrolling.
 - **Pre-rendered Mermaid diagrams** — every ```mermaid``` fence is rendered to
   SVG at build time via headless Puppeteer, wrapped in an interactive viewer
   (toolbar + wheel-zoom + drag-pan + fullscreen). No client-side Mermaid
@@ -107,6 +111,18 @@ Every path in the config is resolved relative to the config file's directory
     "theme": "default",               // "default" (light) or "dark"
     "skipRender": false               // if true, keep ```mermaid blocks as
                                       // code fences (no SVG pre-rendering)
+  },
+
+  // Persistent TOC + Graphs sidebar (REQUIRED; opt-out at your own risk)
+  "toc": {
+    "enabled": true,                  // default: true; sidebar always on
+    "minLevel": 1,                    // headings H{min}..H{max} go in TOC
+    "maxLevel": 2,
+    "label": "Contents",              // sidebar heading
+    "graphs": {
+      "enabled": true,                // list every .svg-figure as a jump link
+      "label": "Graphs"
+    }
   },
 
   // Frontmatter (optional)

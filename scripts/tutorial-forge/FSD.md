@@ -21,7 +21,7 @@ file** into **one self-contained static HTML package** suitable for:
 - Embedding in a Go binary via `//go:embed`.
 - Attaching to a release artifact.
 
-The pipeline applies four non-trivial transforms during the build:
+The pipeline applies five non-trivial transforms during the build:
 
 | # | Transform | Why |
 | --- | --- | --- |
@@ -29,6 +29,7 @@ The pipeline applies four non-trivial transforms during the build:
 | 2 | First-N acronym expansion (`"LLM"` → `"Large Language Model (LLM)"`) | Defines each term on first use; idempotent across builds. |
 | 3 | Heading-ID resolution (explicit pins first, then auto-slug with dedup) | Stable TOC anchors even when heading text changes. |
 | 4 | Speaker-note extraction (`note: …` → collapsible `<details>`) | Separates presenter notes from reader content in-source. |
+| 5 | **Persistent TOC + Graphs sidebar (REQUIRED)** | Fixed-position left-column navigation. Section links auto-collected from headings; Graphs sub-section auto-collected from `.svg-figure` wrappers with nearest-heading labels. Scroll-sync highlights the current section. |
 
 Everything else is passthrough: GFM markdown via `marked`, zenburn
 highlighting for fenced code, standard markdown tables/lists/blockquotes.
@@ -300,6 +301,18 @@ interface TutorialConfig {
   mermaid?: {
     theme?: 'default' | 'dark'; // default: 'default' (light); .svg-figure has white BG
     skipRender?: boolean;       // default: false; see §4.4 warning
+  };
+
+  // Table of Contents sidebar (REQUIRED feature; see §15)
+  toc?: {
+    enabled?: boolean;          // default: true — DISABLING IT VIOLATES THE FSD CONTRACT
+    minLevel?: number;          // default: 1 (H1); range 1..6
+    maxLevel?: number;          // default: 2 (H2); range 1..6
+    label?: string;             // default: 'Contents' — sidebar heading
+    graphs?: {
+      enabled?: boolean;        // default: true — list every .svg-figure
+      label?: string;           // default: 'Graphs' — sub-section heading
+    };
   };
 
   // Markdown preprocessing
@@ -659,7 +672,115 @@ no npm registry publish yet. Agents upgrading should:
 Breaking changes are indicated by MINOR bumps in `package.json`'s `version`
 field (currently `0.1.0`). The framework is pre-1.0; any change may break.
 
-## 15. What this document is NOT
+## 15. Persistent TOC sidebar (REQUIRED)
+
+The TOC sidebar is a **load-bearing framework contract**. Every tutorial
+rendered by tutorial-forge ships with it unless `config.toc.enabled` is
+explicitly set to `false` — which agents should treat as a deliberate
+operator opt-out, not a default. New repos adopting the framework inherit
+the TOC with zero configuration.
+
+### 15.1 Layout contract
+
+- Fixed-position left column on viewports ≥ 980px wide.
+- Width: `--toc-width` (default 260px).
+- `position: sticky; top: 0; height: 100vh; overflow-y: auto` — the TOC
+  stays in place as the main content scrolls, with internal scrolling if
+  the TOC's own list exceeds viewport height.
+- `body` becomes a CSS grid with 2 columns (`<toc-width>` and `1fr`); the
+  deck occupies column 2.
+- Below 980px the TOC is hidden via media query. (Collapsible mobile
+  variant is a reasonable future enhancement; not shipped v0.1.)
+
+The `body` gets `class="has-toc"` whenever a TOC is emitted; CSS keys all
+layout rules off that class, so a theme override can turn off the grid
+by targeting `body:not(.has-toc)`.
+
+### 15.2 Sections sub-section
+
+- Collected from every `<hN id="…">` where `tocMinLevel ≤ N ≤ tocMaxLevel`.
+- Rendered as a flat `<ul class="deck-toc-sections">` of `<li class="deck-toc-l{N}">`
+  wrappers; each item is one `<a href="#id">`.
+- Author-authored `<!-- .slide: id="X" -->` pins propagate correctly
+  because the TOC reads the final resolved id from the body HTML.
+
+### 15.3 Graphs sub-section
+
+- Collected from every `<figure class="svg-figure">` element in document order.
+- `.svg-figure` elements without an `id` attribute get `id="figure-NN"`
+  injected at build time. Pre-rendered Mermaid diagrams keep their
+  `id="diagram-NN"` (two naming conventions: `diagram-*` for mermaid,
+  `figure-*` for hand-authored HTML).
+- Each entry is labeled with the plain text of its **nearest preceding
+  heading** (any level — more context beats consistency with the Sections
+  list), prefixed by a 2-digit position number.
+- Example rendered item:
+  `19. How Jiminy Thinks → #figure-01`.
+- The sub-section is skipped when `config.toc.graphs.enabled === false`
+  OR when the document contains no `.svg-figure` elements.
+
+### 15.4 Scroll-sync
+
+- An inline IIFE at end-of-body uses `IntersectionObserver` to track which
+  heading is currently near the top of the viewport.
+- The matching TOC entry gets `class="deck-toc-active"` applied; previous
+  active entry has it removed.
+- Observer config: `rootMargin: '0px 0px -70% 0px', threshold: 0`.
+  Meaning: a heading becomes "active" when it enters the top 30% of the
+  viewport.
+- Active-link `scrollIntoView({block:'nearest', inline:'nearest'})` keeps
+  the current entry visible in a long sidebar list.
+- Zero external deps; renders no-op in browsers without IntersectionObserver.
+
+### 15.5 CSS tokens the TOC depends on
+
+The framework-shipped CSS (`templates/default.css`) ships these tokens
+inside `:root`. A consumer-provided `cssPath` override MUST retain them
+or override every TOC rule explicitly:
+
+- `--toc-width` — default 260px, drives both the sidebar width and the
+  deck grid column.
+- `--bg-elevated` — TOC background.
+- `--rule`, `--rule-soft` — border separators.
+- `--accent` — active entry accent color.
+- `--fg`, `--fg-muted`, `--fg-subtle` — text hierarchy.
+- `--radius-small` — subtle rounded corners on item hover.
+
+### 15.6 Verification invariants (TOC-specific)
+
+An agent that successfully built a tutorial with the TOC enabled can
+verify shape with these invariants (in addition to §8):
+
+```javascript
+const h = readIndexHtml();
+assert h.includes('<body class="has-toc">');
+assert h.match(/<nav class="deck-toc"/);
+assert h.match(/<div class="deck-toc-head">\w+<\/div>/);
+assert h.includes('IntersectionObserver');          // scroll-sync IIFE present
+assert h.match(/class="deck-toc-l\d"/);             // at least one Section entry
+// If the deck has mermaid or hand-authored .svg-figure:
+assert h.match(/class="deck-toc-graph"/);           // at least one Graphs entry
+assert svgFigureCount >= graphsEntryCount;          // every graph entry maps to a figure
+```
+
+### 15.7 Why the TOC is REQUIRED (design rationale)
+
+Preserving the "quick-navigate without excessive scrolling" invariant is
+the point of a tutorial package. A reader (human or AI agent) landing on
+a 230-slide deck without a sidebar nav has no mental model of the
+document shape and must scroll to discover structure. The sidebar makes
+section hierarchy explicit, exposes every diagram as a jump target,
+and keeps the current location visible. These properties are so central
+to the UX contract that tutorial-forge is opinionated here: shipping a
+tutorial package WITHOUT the TOC is a UX regression.
+
+Agents extending the framework (new TOC source types, nested-group
+rendering, collapsible mobile variant) should preserve the invariants
+in §15.1–§15.4.
+
+---
+
+## 16. What this document is NOT
 
 - Not a tutorial on how to USE the shipped MDEMG tutorial. For that, run
   mdemg and visit `/ui/tutorial/`.
