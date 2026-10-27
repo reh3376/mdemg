@@ -29,9 +29,8 @@
   --font-sans: -apple-system, "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --font-mono: ui-monospace, "SF Mono", "Menlo", "Monaco", "Cascadia Code", monospace;
 
-  --page-max: 920px;
-  --page-pad: 24px;
-  --content-max: 820px;
+  --page-max: 1200px;
+  --page-pad: 32px;
 
   --radius: 8px;
   --radius-small: 4px;
@@ -77,7 +76,7 @@ body {
   padding: 48px var(--page-pad) 96px;
 }
 
-@media (max-width: 720px) {
+@media (max-width: 880px) {
   body { font-size: 16px; }
   .deck { padding: 24px 16px 64px; }
 }
