@@ -1,0 +1,80 @@
+name: Deploy Tutorial
+
+# Builds the mdemg onboarding tutorial via tutorial-forge and publishes the
+# static output to GitHub Pages. Lets the operator share one URL
+# (https://reh3376.github.io/mdemg/) with anyone considering mdemg — no
+# install required to see the full onboarding walkthrough.
+#
+# ONE-TIME SETUP (operator / repo-admin UI action, cannot be scripted):
+#   1. Repo → Settings → Pages → Source: "GitHub Actions"
+#   2. Approve the Pages environment on first run.
+#
+# After that, every push to main re-publishes. The sync-dev-after-merge
+# workflow handles the PR merge → main → this workflow chain.
+
+on:
+  push:
+    branches: [main]
+    # Only re-run when the tutorial source actually changed. Saves Pages
+    # deploys on commits that don't touch the deck.
+    paths:
+      - 'docs/onboarding/**'
+      - 'scripts/tutorial-forge/**'
+      - 'tutorial.config.json'
+      - '.github/workflows/deploy-tutorial.yml'
+  # Manual trigger for ad-hoc republish (useful after Pages setup).
+  workflow_dispatch:
+
+# Only one deploy at a time; cancel in-progress on new push.
+concurrency:
+  group: deploy-tutorial-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: 'scripts/tutorial-forge/package-lock.json'
+
+      - name: Install tutorial-forge dependencies
+        working-directory: scripts/tutorial-forge
+        run: npm ci
+
+      - name: Build tutorial
+        env:
+          # Puppeteer downloads Chromium on first install; cache keys the
+          # above setup-node step don't cover ~/.cache/puppeteer. Explicit
+          # install here ensures Chromium is present for mermaid render.
+          PUPPETEER_SKIP_DOWNLOAD: 'false'
+        run: |
+          node scripts/tutorial-forge/cli.mjs build --config tutorial.config.json
+          ls -la internal/cli/tutorial_templates/staged/
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: internal/cli/tutorial_templates/staged
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4

@@ -65,7 +65,7 @@ note:
 | [F9](#f9--beta-program--security--dormant-census) | Beta + Security + Dormant Census | ~5 min |, |
 | [F10](#f10--conclusion) | Conclusion, honest state + vision + Q&A | ~8 min | final (longest) |
 
-In Obsidian Advanced Slides: **ESC** → overview grid → click any section → Enter to resume.
+Use the left-margin sidebar for section + Graphs navigation. Clicking any acronym jumps to its glossary entry; a floating **← Return to Previous** button appears at the top-right to jump back.
 
 note:
 - 107 slides total · 15 Mermaid diagrams · ~115 min including Q&A.
@@ -125,7 +125,7 @@ flowchart TD
   B --> C[Sidecar phases<br/>101-105 cognitive gaps]
   C --> D[RSIC<br/>self-improvement]
   D --> E[Jiminy inner-voice<br/>+/strict enforcement]
-  E --> F[J17 protocol<br/>compressed messaging]
+  E --> F[J17 protocol<br/>compressed AI-2-AI messaging]
   F --> G[LoRA on Qwen3-14B<br/>mdemg-llm-v1]
   G --> H[Recursive retraining<br/>FT-RECURSIVE-001..004]
   H --> I[UxTS framework family<br/>16 drift gates]
@@ -224,12 +224,16 @@ note:
 
 ```mermaid
 flowchart BT
-  L0["L0, Raw observations<br/>obs_type ∈ {constraint, correction, decision, error, progress, ...}"]
+  Ingest["ingest() entry points<br/>codebase scan · file watcher · git hooks · webhooks · observe API · scraper · Linear · MCP"]
+  Embed["embedder.Embed()<br/>text → vector (1536-dim)"]
+  L0["L0, Raw observations<br/>obs_type ∈ {constraint, correction, decision, error, progress, ...}<br/>+ embedding vector stored on node"]
   L1["L1, Promoted durable rules<br/>role_type ∈ {constraint, correction}<br/>via consolidation gates"]
   L2["L2, Themes<br/>clusters by centroid cosine"]
   L3["L3, Emergent concepts<br/>abstracted patterns"]
   L4["L4, Higher-order concepts"]
   L5["L5, Meta / global patterns"]
+  Ingest --> Embed
+  Embed --> L0
   L0 -->|CreateConstraintNodes<br/>CreateCorrectionNodes| L1
   L1 -->|ClusterConversations<br/>phase 20| L2
   L2 -->|CreateHiddenNodes<br/>phase 21| L3
@@ -263,7 +267,7 @@ sequenceDiagram
   API->>CMS: embed + retrieve + guide
   Note over Agent: next prompt
   Hook->>API: GET /v1/jiminy/latest
-  API-->>Hook: guidance narrative
+  API-->>Hook: Jiminy guidance narrative
   Note over Agent: guidance appended as system-reminder
 ```
 
@@ -546,6 +550,70 @@ note:
 note:
 - V0025 migration added retention + compression to EVERY previously-unbounded hypertable (`embedding_events` was 2.7 GB).
 - Rule: never alert on lifetime-cumulative percentile synthetics, latency `_p95/_p99` gauges are WINDOWED now.
+
+---
+
+## F2.4 Ingest · 8 Entry Points Into The Substrate
+
+Everything that lands as an L0 observation flows through one of these 8 surfaces. Each writes to Neo4j via `conversation.Service.Observe` after calling `embedder.Embed`.
+
+| # | Function / Surface | Transport | Shape | Typical caller |
+|---|---|---|---|---|
+| 1 | `IngestCodebase` | `mdemg ingest --path .` | Recursive tree-walk + tree-sitter symbol extraction | Human + CI |
+| 2 | `IngestFileWatcher` | `fsnotify` daemon | Debounced file-change events | `mdemg watch` |
+| 3 | `IngestGitHook` | `.claude/hooks/` post-commit | Diff-driven incremental | `mdemg hooks install` |
+| 4 | `IngestClaudeMemory` | MCP tool call | Markdown + structured_data | Claude Code |
+| 5 | `IngestLinear` | REST / webhook | Issue / comment payload | Linear integration |
+| 6 | `IngestWebScrape` | Plugin (INGESTION type) | URL → markdown → chunks | `mdemg plugin` |
+| 7 | `IngestWebhook` | `POST /v1/ingest/webhook` | Arbitrary JSON | Third-party CI |
+| 8 | `IngestObserveAPI` | `POST /v1/conversation/observe` | Single-observation primitive | Direct API callers |
+
+**Shared pipeline** (all 8 surfaces): detect obs_type → embed → surprise-score → write L0 node → fire reinforcement edges → trigger consolidation (if gates pass).
+
+**Code pointer**: `internal/ingest/` for file-walk and watchers; `internal/plugins/scraper/` for the web scraper plugin; `internal/api/handlers_conversation.go` for the observe API.
+
+note:
+- Every ingest surface MUST attach `embeddings.WithEmbeddingMeta(ctx, {CallSite, SpaceID})` before embedding — the `call_site` column is the EMBED-CALLSITE-001 zero-tolerance contract.
+- Incremental ingest uses content hashing — unchanged files skip re-embedding.
+- Plugins add new ingest surfaces without touching core; see F8 for the plugin SDK.
+
+---
+
+## F2.5 UPTS · 28 Language Parsers + Parser SDK
+
+**UPTS = Universal Parser Test Specification**. Each spec is a JSON contract pinning a language's parser output against golden fixtures — change the parser, the UPTS test fails, no silent drift.
+
+| | | | |
+|---|---|---|---|
+| C | C++ | C# | CUDA |
+| Cypher | Dockerfile | Go | GraphQL |
+| INI | Java | JSON | Kotlin |
+| Lua | Makefile | Markdown | OpenAPI |
+| PHP | Protobuf | Python | Rust |
+| SQL | Shell | Terraform | TOML |
+| TypeScript | XML | YAML | *scraper_markdown* |
+
+**Purpose**: tree-sitter extracts symbols (functions, classes, imports, declarations) for every indexed file. The symbol graph fuels F3's structural retrieval column + the IMPLEMENTS edges Jiminy uses for architectural guidance.
+
+**What a UPTS spec declares**: query file path, fixture file path, expected symbol count, expected per-type counts, expected names. The CI gate `make test-upts` validates every spec against its fixture.
+
+### Building a new parser
+
+The parser pipeline is **plugin-based** — add a language without touching core:
+
+1. Author the tree-sitter query at `internal/symbols/queries/{lang}/` (one `.scm` file per node class).
+2. Add a UPTS spec at `docs/lang-parser/lang-parse-spec/upts/specs/{lang}.upts.json` + a fixture file at `fixtures/{lang}/`.
+3. Register the language in `internal/symbols/registry.go` (one map entry).
+4. CI gate `make test-upts` picks it up automatically; new specs land in the drift matrix.
+
+**Parser sidecar system**: Go-based tree-sitter is the primary path. For languages without official Go bindings (ex: GraphQL), a sidecar binary pattern exists at `internal/symbols/sidecar/` — invoked over a stable JSON protocol so the plugin stays language-agnostic.
+
+**Code pointer**: `internal/symbols/` for registry + ingest; `internal/symbols/queries/` for per-language tree-sitter queries.
+
+note:
+- The Go IMPLEMENTS edge producer (GO-IMPLEMENTS-001) uses `go/types` to compute implicit interface satisfaction — tree-sitter CAN'T detect this; see `internal/symbols/go_types.go`.
+- Parser additions MUST update `UXTS_FRAMEWORK_MATRIX.md` counts in the same PR (CI gate enforces).
+- Every UPTS spec file matches `*.upts.json`; the file count IS the authoritative language count.
 
 ---
 

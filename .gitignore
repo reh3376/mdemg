@@ -217,3 +217,4 @@ parser-spec/
 # `make sync-tutorial-embed`; not shipped at operator runtime.
 scripts/tutorial-forge/node_modules/
 scripts/tutorial-forge/example/dist/
+mdemg-tutorial.zip

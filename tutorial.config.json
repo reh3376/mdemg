@@ -12,12 +12,15 @@
       "MDEMG": "Multi-Dimensional Emergent Memory Graph",
       "CMS": "Cognitive Memory Substrate",
       "RSIC": "Recursive Self-Improvement Cycle",
+      "LoRA": "Low-Rank Adaptation",
+      "NN": "Neural Network",
       "UATS": "Universal API Test Specification",
       "UVTS": "Universal Validation Test Specification",
       "UBENCH": "Universal Benchmark",
       "ULTS": "Universal LLM Test Specification",
       "UAITS": "Universal AI Training Specification",
-      "UXTS": "Universal eXtensible Test Specification"
+      "UXTS": "Universal eXtensible Test Specification",
+      "UPTS": "Universal Parser Test Specification"
     },
     "disabled": ["JIMINY", "J17", "MLX"],
     "glossary": {

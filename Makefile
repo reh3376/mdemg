@@ -560,3 +560,18 @@ verify-tutorial-embed:
 	@python3 scripts/verify_tutorial_embed.py \
 		|| (echo ""; echo "DRIFT: run 'make sync-tutorial-embed' and commit the result."; exit 1)
 	@echo "  OK — no drift"
+
+# Produces mdemg-tutorial.zip — a self-contained archive that works by
+# unzipping and double-clicking index.html. Useful when GH Pages isn't
+# the right distribution channel (air-gapped review, email attachment,
+# included in a release artifact, etc.).
+.PHONY: tutorial-zip
+tutorial-zip: sync-tutorial-embed
+	@echo "Packaging tutorial for standalone download..."
+	@tmp=$$(mktemp -d) && \
+		cp -R internal/cli/tutorial_templates/staged "$$tmp/mdemg-tutorial" && \
+		(cd "$$tmp" && zip -qr "$$OLDPWD/mdemg-tutorial.zip" mdemg-tutorial) && \
+		rm -rf "$$tmp"
+	@size=$$(du -h mdemg-tutorial.zip | cut -f1) && \
+		echo "  Wrote mdemg-tutorial.zip ($$size)" && \
+		echo "  To view: unzip mdemg-tutorial.zip && open mdemg-tutorial/index.html"
