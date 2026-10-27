@@ -94,6 +94,19 @@ Once the stack is running, open the built-in browser dashboard. Find your port i
 http://localhost:${MDEMG_PORT}/ui/
 ```
 
+### Open the Onboarding Tutorial
+
+A 231-slide operator-facing walkthrough ships with the server. Three ways in:
+
+```
+http://localhost:${MDEMG_PORT}/ui/tutorial/    # direct URL
+mdemg tutorial                                 # CLI opens the URL in your browser
+```
+
+Or from Grafana: open `http://localhost:3000/d/mdemg-overview/` (login `admin` / `admin` on a fresh install, or your `GRAFANA_PASSWORD` override) and click the **"MDEMG Onboarding Tutorial"** header link — it opens the deck in a new tab.
+
+Covers the F-track (dev onboarding: substrate core, retrieval pipeline, Jiminy, LoRA/Qwen, UxTS, Ops, CLI, Beta, Conclusion) and the U-track (end-user onboarding: Stack, Memory, Jiminy, RSIC, UxTS, HITL, Learning, Backup, Logs, Config, Plugins, Grafana, CLI, APIs, Alerts, Documentation). See [`docs/features/tutorial-serve.md`](docs/features/tutorial-serve.md) for the full feature doc.
+
 ### Step 3: Write your first observation
 
 The smallest possible success signal — works in disabled mode, no embedder required:
@@ -125,7 +138,7 @@ Skip this step if you're using OpenAI for inference or running in disabled mode.
 
 </details>
 
-The dashboard has 11 tabs: Status (health + Grafana links + restart), Memory (layer breakdown + export/import), Learning (Hebbian stats + freeze/prune), Config (editable with Save All), Logs (searchable viewer), RSIC (service controls + trigger), Plugins (lifecycle management), Features (service status), Backup (backup + restore), Training Data (fine-tuning data pipeline), and Review (HITL dataset grading). Links to 8 Grafana dashboards for detailed metrics.
+The dashboard has 13 tabs: Status (health + Grafana links + restart), Memory (layer breakdown + export/import), Learning (Hebbian stats + freeze/prune), Config (editable with Save All), Logs (searchable viewer), RSIC (service controls + trigger), Plugins (lifecycle management), Features (service status), Backup (backup + restore), Training Data (fine-tuning data pipeline), Review (HITL dataset grading), Jiminy (strict/suggest mode toggle + override timeline), and Rules (constraint corpus view + edit + tombstone). Links to 8 Grafana dashboards for detailed metrics.
 
 ### Step 3: Ingest Your Codebase
 
@@ -184,7 +197,7 @@ cp .env.example .env  # Add your embedding provider credentials
 
 # 2. Build and start services
 go build -o bin/mdemg ./cmd/mdemg
-./bin/mdemg db start              # Launch Neo4j container
+docker compose up -d neo4j        # Launch Neo4j container (NEVER use `mdemg db start`)
 ./bin/mdemg start --auto-migrate  # Start server daemon with migrations
 
 # 3. Ingest test codebase (or use your own)

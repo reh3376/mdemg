@@ -7,9 +7,11 @@
   "svgViewerPath": "docs/onboarding/svg-viewer.js",
   "assetsDir": "docs/onboarding/assets",
   "acronyms": {
-    "expandCount": 2,
+    "expandCount": 1,
     "extra": {
+      "MDEMG": "Multi-Dimensional Emergent Memory Graph",
       "CMS": "Cognitive Memory Substrate",
+      "RSIC": "Recursive Self-Improvement Cycle",
       "UATS": "Universal API Test Specification",
       "UVTS": "Universal Validation Test Specification",
       "UBENCH": "Universal Benchmark",
@@ -17,7 +19,11 @@
       "UAITS": "Universal AI Training Specification",
       "UXTS": "Universal eXtensible Test Specification"
     },
-    "disabled": ["MDEMG", "JIMINY", "RSIC", "J17", "MLX"]
+    "disabled": ["JIMINY", "J17", "MLX"],
+    "glossary": {
+      "enabled": true,
+      "label": "Glossary"
+    }
   },
   "mermaid": {
     "theme": "default"

@@ -19,6 +19,13 @@ on:
   schedule:
     - cron: '41 7 * * 3'
 
+# CI-CONCURRENCY-001 (2026-10-27): see .github/workflows/ci.yml for rationale.
+# A new push to a PR branch cancels its predecessor so queued runs can start
+# instead of waiting behind a stale run on the superseded HEAD.
+concurrency:
+  group: codeql-${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   analyze:
     name: Analyze (${{ matrix.language }})

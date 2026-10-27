@@ -115,14 +115,24 @@ Every path in the config is resolved relative to the config file's directory
 
   // Acronyms (optional)
   "acronyms": {
-    "expandCount": 2,                 // first-N occurrences expanded
+    "expandCount": 1,                 // first-N occurrences → "Expansion (ACRONYM)"
+                                      // every subsequent occurrence becomes a
+                                      // link to the auto-generated glossary
     "extra": {                        // per-repo additions (merged into defaults)
       "FOO": "Full Of Options",
       "BAR": "Baz And Related"
     },
-    "disabled": ["API", "CLI"]        // drop these from the dict entirely
+    "disabled": ["API", "CLI"],       // drop these from the dict entirely
                                       // (useful for project-internal names
                                       // you don't want auto-expanded)
+    "glossary": {
+      "enabled": true,                // auto-emit a Glossary section at the
+                                      // end of the deck listing every used
+                                      // acronym. A floating "← Return to
+                                      // Previous" button lets readers jump
+                                      // back from a glossary entry.
+      "label": "Glossary"
+    }
   },
 
   // Mermaid (optional)

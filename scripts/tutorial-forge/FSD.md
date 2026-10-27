@@ -26,7 +26,7 @@ The pipeline applies five non-trivial transforms during the build:
 | # | Transform | Why |
 | --- | --- | --- |
 | 1 | ```` ```mermaid ```` → SVG (headless Puppeteer + mermaid.min.js) | Ship no runtime; every diagram gets the interactive viewer uniformly. |
-| 2 | First-N acronym expansion (`"LLM"` → `"Large Language Model (LLM)"`) | Defines each term on first use; idempotent across builds. |
+| 2 | First-N acronym expansion → auto-link to glossary | First N occurrences become `"Expansion (ACRONYM)"`; every subsequent occurrence becomes `<a class="acronym-link" href="#glossary-acr">ACRONYM</a>`. The glossary section is auto-generated at the end of the deck with one `<dt id="glossary-acr">` per acronym. Idempotent across builds, including the `"ACRONYM: Expansion"` title-form. A floating "← Return to Previous" button appears when the current hash points at a glossary entry; clicking fires `history.back()`. |
 | 3 | Heading-ID resolution (explicit pins first, then auto-slug with dedup) | Stable TOC anchors even when heading text changes. |
 | 4 | Speaker-note extraction (`note: …` → collapsible `<details>`) | Separates presenter notes from reader content in-source. |
 | 5 | **Persistent TOC + Graphs sidebar (REQUIRED)** | Fixed-position left-column navigation. Section links auto-collected from headings; Graphs sub-section auto-collected from `.svg-figure` wrappers with nearest-heading labels. Scroll-sync highlights the current section. |
@@ -292,9 +292,13 @@ interface TutorialConfig {
 
   // Acronym transform
   acronyms?: {
-    expandCount?: number;       // default: 2
+    expandCount?: number;       // default: 1 — first N occurrences get "Expansion (ACRONYM)"
     extra?: Record<string, string>;  // merged over defaults/acronyms.json
     disabled?: string[];        // acronyms dropped from merged dict
+    glossary?: {
+      enabled?: boolean;        // default: true — auto-emit glossary section at end of deck
+      label?: string;           // default: 'Glossary' — section heading
+    };
   };
 
   // Mermaid

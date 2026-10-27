@@ -5,7 +5,7 @@ title: MDEMG Tutorial
 # `scripts/tutorial/export.mjs` consumes this frontmatter minimally — only `title` is used.
 ---
 
-# MDEMG
+# MDEMG: Multi-Dimensional Emergent Memory Graph
 
 ## Cognitive Substrate for Artificial Intelligence (AI)-Assisted Development
 

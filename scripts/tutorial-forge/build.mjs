@@ -128,13 +128,29 @@ export async function build(config, configDir) {
   // index.html so references like `./assets/svg/foo.svg` need to drop the `./`.
   md = md.replace(/\.\/assets\//g, 'assets/');
 
-  // Acronym expansion (first N occurrences per acronym).
+  // Acronym transform:
+  //   * First N occurrences get rewritten "Expansion (ACRONYM)" (idempotent).
+  //   * Every subsequent occurrence becomes a link to the glossary entry.
+  //   * Glossary is generated below from acronyms that actually appeared.
   const acronyms = loadAcronyms(acronymsOpts);
-  const { text: afterAcronyms, applied: acronymsApplied } = expandAcronyms(md, acronyms, expandCount);
+  const glossaryEnabled = (acronymsOpts.glossary ?? {}).enabled !== false;
+  const glossaryIdFor = (acr) => `glossary-${acr.toLowerCase()}`;
+  const linkGenerator = glossaryEnabled
+    ? (acr) => `<a class="acronym-link" href="#${glossaryIdFor(acr)}">${acr}</a>`
+    : null;
+  const {
+    text: afterAcronyms,
+    applied: acronymsApplied,
+    linked: acronymsLinked,
+    used: usedAcronyms,
+  } = expandAcronyms(md, acronyms, expandCount, { linkGenerator });
   md = afterAcronyms;
   const appliedCount = Object.values(acronymsApplied).reduce((a, b) => a + b, 0);
-  if (appliedCount > 0) {
-    logInfo(`expanded ${appliedCount} acronym occurrences across ${Object.keys(acronymsApplied).length} distinct terms`);
+  const linkedCount = Object.values(acronymsLinked).reduce((a, b) => a + b, 0);
+  if (appliedCount > 0 || linkedCount > 0) {
+    logInfo(
+      `acronyms: expanded ${appliedCount}, linked ${linkedCount}, used ${usedAcronyms.length} distinct terms`,
+    );
   }
 
   // Chunk-wise preprocessing (slide directives, speaker notes, mermaid fences).
@@ -179,6 +195,30 @@ export async function build(config, configDir) {
   marked.setOptions({ gfm: true, breaks: false });
   let bodyHtml = marked.parse(combinedMd);
   logInfo(`markdown → HTML conversion complete (${bodyHtml.length} bytes)`);
+
+  // Build the glossary section from acronyms that appear in the deck. We emit
+  // raw HTML directly (not markdown) so the acronym transform never sees it
+  // and can't try to re-link acronyms inside their own definitions.
+  if (glossaryEnabled && usedAcronyms.length > 0) {
+    const glossaryLabel = (acronymsOpts.glossary ?? {}).label ?? 'Glossary';
+    const items = usedAcronyms
+      .map((acr) => {
+        const id = glossaryIdFor(acr);
+        const expansion = acronyms[acr];
+        return `  <div class="glossary-entry">\n    <dt id="${id}">${escapeHtml(acr)}</dt>\n    <dd>${escapeHtml(expansion)}</dd>\n  </div>`;
+      })
+      .join('\n');
+    bodyHtml += `
+<section class="glossary" id="glossary">
+  <h1 id="glossary-top">${escapeHtml(glossaryLabel)}</h1>
+  <p class="glossary-intro">Every acronym used in this tutorial, with its expansion. Each acronym occurrence after the first in the body text is a link to its entry here. Use the floating <strong>← Return to Previous</strong> button at the top-right of the viewport to jump back to where you were reading.</p>
+  <dl class="glossary-list">
+${items}
+  </dl>
+</section>
+`;
+    logInfo(`built glossary section with ${usedAcronyms.length} entries`);
+  }
 
   // Pre-render mermaid, write SVGs, swap placeholders for .svg-figure wrappers.
   // Each .svg-figure gets a stable id="diagram-NN" so the Graphs TOC can link
@@ -435,9 +475,50 @@ ${sectionsHtml}${graphsHtml}  </nav>
 ${tocHtml}  <main class="deck">
 ${bodyHtml}
   </main>
+  <!-- Floating "Return to Previous" button. Visible only when the current -->
+  <!-- hash points at a glossary entry; clicking fires history.back().     -->
+  <button
+    id="glossary-back-btn"
+    class="glossary-back-btn"
+    type="button"
+    aria-label="Return to Previous location"
+    hidden
+  >← Return to Previous</button>
   <!-- Mermaid is pre-rendered to SVG at build time; the viewer handles -->
   <!-- pan/zoom/fullscreen for every diagram.                            -->
   <script defer src="assets/js/svg-viewer.js"></script>
+  <script>
+    // Floating "Return to Previous" button logic.
+    //
+    // Shows the button whenever the current URL hash points at a glossary
+    // entry (e.g. #glossary-llm, #glossary-top). Clicking the button fires
+    // window.history.back(), returning the reader to the location they
+    // clicked the acronym from. If the reader scrolled to the glossary
+    // manually (no history to go back to) the button stays hidden.
+    (function () {
+      var btn = document.getElementById('glossary-back-btn');
+      if (!btn) return;
+      function atGlossary() {
+        var h = window.location.hash || '';
+        return h.indexOf('#glossary') === 0;
+      }
+      function updateBtn() {
+        if (atGlossary() && window.history.length > 1) {
+          btn.hidden = false;
+        } else {
+          btn.hidden = true;
+        }
+      }
+      btn.addEventListener('click', function () {
+        window.history.back();
+      });
+      window.addEventListener('hashchange', updateBtn);
+      // Delay the initial check briefly so hashchange events during page
+      // load (reveal.js-era deep-links, scroll-anchor normalization) don't
+      // flash the button before the reader is ready.
+      setTimeout(updateBtn, 50);
+    })();
+  </script>
 ${scrollSyncScript}</body>
 </html>
 `;
