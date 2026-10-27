@@ -1,0 +1,395 @@
+/*
+ * ONBOARDING-TUTORIAL-ENDUSER-001 (2026-10-26 pivot):
+ * Plain HTML/CSS long-form tutorial document.
+ *
+ * Replaces the earlier reveal.js slide-deck CSS. The old file had ~250 lines
+ * of selectors against `.reveal`, `.scroll-page*`, `section.present` etc.;
+ * none of that is relevant now — this page is a vanilla <main class="deck">
+ * served as one continuous HTML document. Everything below is the real
+ * document theme.
+ */
+
+/* ---------------------------------------------------------------- *
+ * Design tokens
+ * ---------------------------------------------------------------- */
+:root {
+  --bg: #0f1419;
+  --bg-elevated: #181d24;
+  --bg-code: #0a0d12;
+  --fg: #e6e9ef;
+  --fg-muted: #94a3b8;
+  --fg-subtle: #64748b;
+  --accent: #60a5fa;
+  --accent-strong: #3b82f6;
+  --rule: #1f2937;
+  --rule-soft: #2a3340;
+  --warn: #f59e0b;
+  --slide-break: #1f2937;
+
+  --font-sans: -apple-system, "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Menlo", "Monaco", "Cascadia Code", monospace;
+
+  --page-max: 1400px;
+  --page-pad: 24px;
+
+  --radius: 8px;
+  --radius-small: 4px;
+}
+
+/* ---------------------------------------------------------------- *
+ * Reset + base
+ * ---------------------------------------------------------------- */
+*, *::before, *::after { box-sizing: border-box; }
+
+html {
+  background: var(--bg);
+  color-scheme: dark;
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-size: 18px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Breathing room above anchor targets so headings never land flush against
+ * browser chrome when a TOC link jumps to them.
+ */
+:target,
+[id] {
+  scroll-margin-top: 32px;
+}
+
+/* ---------------------------------------------------------------- *
+ * Page layout
+ * ---------------------------------------------------------------- */
+.deck {
+  max-width: var(--page-max);
+  margin: 0 auto;
+  padding: 48px var(--page-pad) 96px;
+}
+
+@media (max-width: 880px) {
+  body { font-size: 16px; }
+  .deck { padding: 24px 16px 64px; }
+}
+
+/* ---------------------------------------------------------------- *
+ * Typography
+ * ---------------------------------------------------------------- */
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 700;
+  line-height: 1.2;
+  margin: 1.6em 0 0.5em;
+  color: var(--fg);
+  letter-spacing: -0.01em;
+}
+h1:first-child, h2:first-child, h3:first-child { margin-top: 0; }
+
+h1 { font-size: 2.4em; margin-top: 0.6em; }
+h2 { font-size: 1.8em; }
+h3 { font-size: 1.35em; }
+h4 { font-size: 1.1em; color: var(--fg-muted); }
+h5, h6 { font-size: 1em; color: var(--fg-muted); font-weight: 600; }
+
+p { margin: 0 0 1em; }
+
+strong, b { color: var(--fg); font-weight: 700; }
+em, i { font-style: italic; color: var(--fg); }
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.1s ease, color 0.1s ease;
+}
+a:hover,
+a:focus-visible {
+  color: var(--accent-strong);
+  border-bottom-color: var(--accent-strong);
+}
+
+/* ---------------------------------------------------------------- *
+ * Lists
+ * ---------------------------------------------------------------- */
+ul, ol {
+  margin: 0 0 1em;
+  padding-left: 1.8em;
+}
+li { margin: 0.2em 0; }
+li > ul, li > ol { margin: 0.3em 0 0.4em; }
+
+/* ---------------------------------------------------------------- *
+ * Blockquote
+ * ---------------------------------------------------------------- */
+blockquote {
+  margin: 1em 0;
+  padding: 0.5em 1.2em;
+  border-left: 3px solid var(--accent);
+  background: var(--bg-elevated);
+  color: var(--fg-muted);
+  border-radius: 0 var(--radius-small) var(--radius-small) 0;
+}
+blockquote p:last-child { margin-bottom: 0; }
+
+/* ---------------------------------------------------------------- *
+ * Code
+ * ---------------------------------------------------------------- */
+code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  background: var(--bg-code);
+  color: var(--fg);
+  padding: 0.12em 0.4em;
+  border-radius: var(--radius-small);
+  border: 1px solid var(--rule);
+}
+
+pre {
+  margin: 1em 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+}
+pre > code {
+  display: block;
+  padding: 1em 1.2em;
+  border-radius: var(--radius);
+  border: 1px solid var(--rule);
+  background: var(--bg-code);
+  overflow-x: auto;
+  font-size: 0.88em;
+  line-height: 1.5;
+  white-space: pre;
+}
+
+/* ---------------------------------------------------------------- *
+ * Tables
+ * ---------------------------------------------------------------- */
+table {
+  width: 100%;
+  margin: 1em 0;
+  border-collapse: collapse;
+  font-size: 0.95em;
+}
+th, td {
+  padding: 0.5em 0.85em;
+  text-align: left;
+  border-bottom: 1px solid var(--rule);
+  vertical-align: top;
+}
+th {
+  color: var(--fg);
+  font-weight: 700;
+  border-bottom: 2px solid var(--rule-soft);
+  background: var(--bg-elevated);
+}
+tbody tr:hover { background: color-mix(in srgb, var(--bg-elevated) 60%, transparent); }
+
+/* ---------------------------------------------------------------- *
+ * Horizontal rules
+ * ---------------------------------------------------------------- */
+hr {
+  border: 0;
+  border-top: 1px solid var(--rule);
+  margin: 2.4em 0;
+}
+
+/* Slide-break separator between source slides — subtle, non-distracting. */
+hr.slide-break {
+  border-top: 1px dashed var(--slide-break);
+  margin: 3em 0;
+  opacity: 0.6;
+}
+
+/* ---------------------------------------------------------------- *
+ * Speaker notes (collapsible)
+ * ---------------------------------------------------------------- */
+details.speaker-notes {
+  margin: 1em 0;
+  padding: 0.4em 0.9em;
+  background: var(--bg-elevated);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  font-size: 0.95em;
+  color: var(--fg-muted);
+}
+details.speaker-notes > summary {
+  cursor: pointer;
+  color: var(--fg-subtle);
+  font-size: 0.85em;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+  user-select: none;
+  padding: 0.3em 0;
+  list-style: none;
+}
+details.speaker-notes > summary::marker { display: none; }
+details.speaker-notes > summary::before {
+  content: "▸ ";
+  display: inline-block;
+  transition: transform 0.15s;
+  margin-right: 0.3em;
+}
+details.speaker-notes[open] > summary::before { transform: rotate(90deg); }
+details.speaker-notes > summary:hover { color: var(--fg); }
+details.speaker-notes > *:not(summary) { margin-top: 0.5em; }
+details.speaker-notes ul { padding-left: 1.4em; }
+
+/* ---------------------------------------------------------------- *
+ * Mermaid diagrams
+ * ---------------------------------------------------------------- */
+.mermaid {
+  margin: 1em 0;
+  text-align: center;
+  background: #ffffff;
+  border-radius: var(--radius);
+  padding: 1em;
+  overflow-x: auto;
+}
+.mermaid svg { max-width: 100%; height: auto; }
+
+/* ---------------------------------------------------------------- *
+ * Interactive SVG viewer (upgraded at runtime by assets/js/svg-viewer.js)
+ *
+ * Each <figure class="svg-figure"> becomes a bounded, zoom/pan-able frame.
+ * svg-viewer.js attaches toolbar + wheel/drag handlers; CSS owns baseline
+ * layout + styling.
+ * ---------------------------------------------------------------- */
+.svg-figure,
+figure.svg-figure {
+  display: block;
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  height: min(70vh, 820px);
+  margin: 1.2em auto;
+  padding: 0;
+  overflow: hidden;
+  background: #ffffff;
+  border-radius: var(--radius);
+  user-select: none;
+  touch-action: none;
+  cursor: grab;
+}
+.svg-figure.svg-viewer-grabbing { cursor: grabbing; }
+
+.svg-figure img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  margin: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+  transform-origin: 50% 50%;
+  will-change: transform;
+  pointer-events: none;
+}
+.svg-figure figcaption {
+  font-size: 0.85em;
+  color: var(--fg-muted);
+  text-align: center;
+  margin-top: 0.4em;
+  font-style: italic;
+}
+
+.svg-figure .svg-viewer-toolbar {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  gap: 4px;
+  background: rgba(15, 23, 42, 0.8);
+  padding: 4px;
+  border-radius: var(--radius);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  z-index: 5;
+  pointer-events: none;
+}
+.svg-figure:hover .svg-viewer-toolbar,
+.svg-figure:focus-within .svg-viewer-toolbar,
+.svg-figure.svg-viewer-grabbing .svg-viewer-toolbar {
+  opacity: 1;
+  pointer-events: auto;
+}
+.svg-figure .svg-viewer-toolbar button {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  background: rgba(255, 255, 255, 0.12);
+  color: #f1f5f9;
+  font-size: 18px;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: var(--radius-small);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  line-height: 1;
+}
+.svg-figure .svg-viewer-toolbar button:hover { background: rgba(255, 255, 255, 0.28); }
+.svg-figure .svg-viewer-toolbar button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.svg-figure .svg-viewer-hint {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(15, 23, 42, 0.75);
+  color: #e2e8f0;
+  font-size: 11px;
+  font-family: var(--font-sans);
+  padding: 4px 10px;
+  border-radius: var(--radius-small);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 4;
+}
+.svg-figure:hover .svg-viewer-hint { opacity: 0.9; }
+.svg-figure:fullscreen {
+  width: 100vw;
+  max-width: 100vw;
+  height: 100vh;
+  max-height: 100vh;
+  border-radius: 0;
+  margin: 0;
+  background: #ffffff;
+}
+
+/* Fallback for standalone SVG <img> that didn't get wrapped in .svg-figure. */
+.deck p > img[src$=".svg"] {
+  max-width: 100%;
+  max-height: 70vh;
+  height: auto;
+  display: block;
+  margin: 1em auto;
+  border-radius: var(--radius);
+  background: #ffffff;
+  padding: 0.5em;
+}
+
+/* ---------------------------------------------------------------- *
+ * Keyboard focus
+ * ---------------------------------------------------------------- */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-small);
+}

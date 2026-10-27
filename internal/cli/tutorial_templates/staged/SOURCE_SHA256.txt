@@ -1,5 +1,5 @@
-# ONBOARDING-TUTORIAL-SERVE-001 drift breadcrumb
-# verified by scripts/verify_tutorial_embed.py (CI gate)
+# tutorial-forge drift breadcrumb
+# consumer CI gate can hash the configured input files and compare.
 deck_sha256=2be16ced0b9b89b7e3d9449fe5d5b149a625813629606f05f6c2f20e48c522f2
 css_sha256=b954a5ce92ace7b1dfcff7adc4ae57c80215f2485df77875272c975d4c89b260
 svg_viewer_sha256=a11ea333dbff84e192785ca413ec467f772a3de5cca29948951955980c486530

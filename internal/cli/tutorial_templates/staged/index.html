@@ -4374,7 +4374,7 @@ $ docker compose logs -f mdemg --since=10m | jq -c &#39;select(.level==&quot;ERR
 <p><code>internal/config/yaml_config.go::isSensitive</code> masks these in <code>mdemg config show</code>:</p>
 <ul>
 <li><code>AUTH_API_KEYS</code>, admin API-key list</li>
-<li><code>AUTH_JWT_SECRET</code>, JWT signing key</li>
+<li><code>AUTH_JWT_SECRET</code>, JSON Web Token (JWT) signing key</li>
 <li><code>TSDB_PASSWORD</code>, TSDB connect password</li>
 <li><code>LINEAR_WEBHOOK_SECRET</code>, Linear webhook signing</li>
 <li><code>RERANK_JINA_API_KEY</code>, if using Jina rerank</li>
@@ -5035,7 +5035,7 @@ $ grpcurl -plaintext unix:///path/to/plugin.sock describe mdemg.Module
 <h2 id="what39s-reachable-what39s-not">What&#39;s Reachable, What&#39;s Not</h2>
 <ul>
 <li><strong>Default bind</strong>: <code>127.0.0.1:9999</code> (localhost only); <code>MDEMG_BIND_ADDR=0.0.0.0</code> to expose on LAN</li>
-<li><strong>Admin endpoints</strong> (<code>/v1/admin/*</code>): require <code>AUTH_API_KEYS</code> header; <code>AUTH_JWT_SECRET</code> for JWT</li>
+<li><strong>Admin endpoints</strong> (<code>/v1/admin/*</code>): require <code>AUTH_API_KEYS</code> header; <code>AUTH_JWT_SECRET</code> for JSON Web Token (JWT)</li>
 <li><strong>Path-safe guards</strong> on filesystem-touching routes (SEC-TRANCHE-2): all HTTP handlers route through <code>pathsafe.SafeJoinUnderDir</code></li>
 <li><strong>Dormant-census routes</strong> stay BOUND but return 503 when disposition is <code>DORMANT</code>; shipped routes return normal responses</li>
 <li><strong>gRPC services</strong> bound to Unix sockets with 0600 perms (operator-only)<details class="speaker-notes"><summary>Speaker notes</summary>
@@ -5339,8 +5339,8 @@ $ grpcurl -plaintext unix:///path/to/plugin.sock describe mdemg.Module
 </details>
 
   </main>
-  <!-- Mermaid is pre-rendered to SVG at build time (see render_mermaid.mjs); -->
-  <!-- the runtime viewer handles pan/zoom/fullscreen for every diagram. -->
+  <!-- Mermaid is pre-rendered to SVG at build time; the viewer handles -->
+  <!-- pan/zoom/fullscreen for every diagram.                            -->
   <script defer src="assets/js/svg-viewer.js"></script>
 </body>
 </html>
