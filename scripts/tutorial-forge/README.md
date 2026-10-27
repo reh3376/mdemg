@@ -1,5 +1,9 @@
 # tutorial-forge
 
+**Status**: v1.0 — stable, repo-agnostic, ready to reuse.
+**Canonical source**: [`github.com/reh3376/mdemg` → `scripts/tutorial-forge/`](https://github.com/reh3376/mdemg/tree/main/scripts/tutorial-forge)
+**Reference consumer**: the MDEMG onboarding tutorial at [`https://reh3376.github.io/mdemg/`](https://reh3376.github.io/mdemg/) (live demo of every feature below).
+
 Config-driven, repo-agnostic framework that renders a markdown deck into a
 static HTML tutorial package.
 
@@ -313,20 +317,55 @@ If you don't provide an override, the framework uses:
 
 ## Reusing across repos
 
-The simplest cross-repo workflow:
+### Quick install (recommended)
 
-1. Copy the `scripts/tutorial-forge/` directory into your target repo.
+From inside the TARGET repo (the one that wants a tutorial):
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/reh3376/mdemg/main/scripts/tutorial-forge/install-into.sh)
+```
+
+The installer:
+- Clones a shallow copy of mdemg (framework code only, not the mdemg deck).
+- Copies `scripts/tutorial-forge/` into your repo verbatim.
+- Scaffolds `tutorial.config.json` at your repo root if missing.
+- Scaffolds `docs/tutorial.md` as a starter deck if missing.
+- Appends sensible `.gitignore` entries.
+- Prints the exact next-steps.
+
+Then from your repo root:
+
+```bash
+cd scripts/tutorial-forge && npm install   # one-time (~150 MB Chromium)
+# edit docs/tutorial.md with your content
+node scripts/tutorial-forge/cli.mjs build --config tutorial.config.json
+# serve build/tutorial-static/ with any static host
+```
+
+### Share-with-a-teammate one-liner
+
+Just paste this at the end of a message:
+
+```
+Install tutorial-forge into any repo:
+  bash <(curl -fsSL https://raw.githubusercontent.com/reh3376/mdemg/main/scripts/tutorial-forge/install-into.sh)
+Live demo: https://reh3376.github.io/mdemg/
+```
+
+### Manual install (if the installer isn't a fit)
+
+1. Copy `scripts/tutorial-forge/` from mdemg into your target repo.
 2. Run `cd scripts/tutorial-forge && npm install` once.
 3. Create `tutorial.config.json` at your repo root pointing at your deck
    and output locations.
-4. Add the two Makefile targets (`sync-tutorial-embed`, `verify-tutorial-embed`)
+4. Add Makefile targets (`sync-tutorial-embed`, `verify-tutorial-embed`)
    or equivalent in your build system.
 5. Author your deck in markdown with standard conventions (headings, lists,
    tables, ```mermaid``` blocks, `note:` speaker-notes).
 
-Future: this will be extractable as its own repo via `git subtree split
---prefix=scripts/tutorial-forge` + published to npm; for now it ships as a
-drop-in directory.
+Future: the forge may land as its own repo via `git subtree split
+--prefix=scripts/tutorial-forge` + published to npm; for v1.0 it ships as a
+drop-in directory under mdemg.
 
 ## License
 

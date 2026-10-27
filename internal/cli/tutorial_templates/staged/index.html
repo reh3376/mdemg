@@ -17,9 +17,9 @@
       <li class="deck-toc-l1"><a href="#f2--substrate-core">F2 · Substrate Core</a></li>
       <li class="deck-toc-l1"><a href="#f3--retrieval-pipeline">F3 · Retrieval Pipeline</a></li>
       <li class="deck-toc-l1"><a href="#f4--jiminy--enforcement--j17">F4 · Jiminy + Enforcement + J17</a></li>
-      <li class="deck-toc-l1"><a href="#f5--lora--qwen--model-distribution">F5 · LoRA + Qwen + Model Distribution</a></li>
-      <li class="deck-toc-l1"><a href="#f6--uxts-framework-family">F6 · UxTS Framework Family</a></li>
-      <li class="deck-toc-l1"><a href="#f7--ops">F7 · Ops</a></li>
+      <li class="deck-toc-l1"><a href="#f5-lora-qwen-model-distribution">F5 · LoRA + Qwen + Model Distribution</a></li>
+      <li class="deck-toc-l1"><a href="#f6-uxts-framework-family">F6 · UxTS Framework Family</a></li>
+      <li class="deck-toc-l1"><a href="#f7-ops">F7 · Ops</a></li>
       <li class="deck-toc-l1"><a href="#f8-cli-hooks-mcp-multi-instance">F8 · CLI, Hooks, MCP, Multi-Instance</a></li>
       <li class="deck-toc-l1"><a href="#f9-beta-program-security-dormant-census">F9 · Beta Program + Security + Dormant Census</a></li>
       <li class="deck-toc-l1"><a href="#f10-conclusion">F10 · Conclusion</a></li>
@@ -112,7 +112,7 @@
 </tr>
 <tr>
 <td><strong>Covers</strong></td>
-<td>substrate, retrieval, LoRA, Jiminy, UxTS, ops</td>
+<td>substrate, retrieval, Low-Rank Adaptation (LoRA), Jiminy, UxTS, ops</td>
 <td>Command-Line Interface (CLI), dashboards, memory, alerts</td>
 </tr>
 <tr>
@@ -135,7 +135,7 @@
 
 
 <h2 id="table-of-contents">Table of Contents</h2>
-<p><strong><a href="#f1--opening">F1 Opening</a></strong> → <strong><a href="#f2--substrate-core">F2 Substrate</a></strong> → <strong><a href="#f3--retrieval-pipeline">F3 Retrieval</a></strong> → <strong><a href="#f4--jiminy--enforcement--j17">F4 Jiminy + Enforcement + J17</a></strong> → <strong><a href="#f5--lora--qwen--model-distribution">F5 LoRA + Qwen + Model Dist</a></strong> → <strong><a href="#f6--uxts-framework-family">F6 UxTS</a></strong> → <strong><a href="#f7--ops">F7 Ops</a></strong> → <strong><a href="#f8--cli-hooks-mcp-multi-instance">F8 <a class="acronym-link" href="#glossary-cli">CLI</a> + Hooks + Model Context Protocol (MCP)</a></strong> → <strong><a href="#f9--beta-program--security--dormant-census">F9 Beta + Security + Dormant</a></strong> → <strong><a href="#f10--conclusion">F10 Conclusion</a></strong></p>
+<p><strong><a href="#f1--opening">F1 Opening</a></strong> → <strong><a href="#f2--substrate-core">F2 Substrate</a></strong> → <strong><a href="#f3--retrieval-pipeline">F3 Retrieval</a></strong> → <strong><a href="#f4--jiminy--enforcement--j17">F4 Jiminy + Enforcement + J17</a></strong> → <strong><a href="#f5--lora--qwen--model-distribution">F5 <a class="acronym-link" href="#glossary-lora">LoRA</a> + Qwen + Model Dist</a></strong> → <strong><a href="#f6--uxts-framework-family">F6 UxTS</a></strong> → <strong><a href="#f7--ops">F7 Ops</a></strong> → <strong><a href="#f8--cli-hooks-mcp-multi-instance">F8 <a class="acronym-link" href="#glossary-cli">CLI</a> + Hooks + Model Context Protocol (MCP)</a></strong> → <strong><a href="#f9--beta-program--security--dormant-census">F9 Beta + Security + Dormant</a></strong> → <strong><a href="#f10--conclusion">F10 Conclusion</a></strong></p>
 <p><strong>End User Path</strong>: <strong><a href="#end-user-path">U1 Opening</a></strong> → <strong><a href="#u2--the-stack">U2 Stack</a></strong> → <strong><a href="#u3--memory--the-cognitive-substrate">U3 Memory</a></strong> → <strong><a href="#u4--jiminy--the-inner-voice">U4 Jiminy</a></strong> → <strong><a href="#u5--rsic--the-self-improvement-engine">U5 Recursive Self-Improvement Cycle (RSIC)</a></strong> → <strong><a href="#u6--uxts--forcing-functions-that-prevent-drift">U6 UxTS</a></strong> → <strong><a href="#u7--hitl--you-grade-what-the-system-cant">U7 Human-In-The-Loop (HITL)</a></strong> → <strong><a href="#u8--learning--training-data--how-the-model-gets-better">U8 Learning</a></strong> → <strong><a href="#u9--backup--ops">U9 Backup</a></strong> → <strong><a href="#u10--logs">U10 Logs</a></strong> → <strong><a href="#u11--config--features--the-toggle-surface">U11 Config</a></strong> → <strong><a href="#u12--plugins--the-extension-surface">U12 Plugins</a></strong> → <strong><a href="#u13--grafana--the-historical-view">U13 Grafana</a></strong> → <strong><a href="#u14--cli--the-full-command-surface">U14 <a class="acronym-link" href="#glossary-cli">CLI</a></a></strong> → <strong><a href="#u15--apis--grpc--the-programmatic-surfaces">U15 APIs+gRPC</a></strong> → <strong><a href="#u16--alerts--enforcement--operator-triage">U16 Alerts</a></strong> → <strong><a href="#u17--where-to-go--documentation">U17 Next</a></strong></p>
 <table>
 <thead>
@@ -172,7 +172,7 @@
 </tr>
 <tr>
 <td><a href="#f5--lora--qwen--model-distribution">F5</a></td>
-<td>LoRA + Qwen + Model Distribution</td>
+<td><a class="acronym-link" href="#glossary-lora">LoRA</a> + Qwen + Model Distribution</td>
 <td align="right">~14 min</td>
 <td>,</td>
 </tr>
@@ -207,7 +207,7 @@
 <td>final (longest)</td>
 </tr>
 </tbody></table>
-<p>In Obsidian Advanced Slides: <strong>ESC</strong> → overview grid → click any section → Enter to resume.</p>
+<p>Use the left-margin sidebar for section + Graphs navigation. Clicking any acronym jumps to its glossary entry; a floating <strong>← Return to Previous</strong> button appears at the top-right to jump back.</p>
 <details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
 <li>107 slides total · 15 Mermaid diagrams · ~115 min including Q&amp;A.</li>
@@ -246,14 +246,14 @@
 <ul>
 <li>This verbatim sentence is from CLAUDE.md&#39;s <code>project_mdemg_purpose</code> memory. Quote it.</li>
 <li>Rank future design options against the purpose, not against aggregate scores.</li>
-<li>Everything downstream, Jiminy, J17, LoRA, UxTS, moves one of those connection qualities.</li>
+<li>Everything downstream, Jiminy, J17, <a class="acronym-link" href="#glossary-lora">LoRA</a>, UxTS, moves one of those connection qualities.</li>
 </ul>
 </details></li>
 </ul>
 <hr class="slide-break" />
 
 
-<h2 id="mdemg-artificial-nn-internal-dialogue-biological-nn"><a class="acronym-link" href="#glossary-mdemg">MDEMG</a> : artificial NN :: internal dialogue : biological NN</h2>
+<h2 id="mdemg-artificial-neural-network-nn-internal-dialogue-biological-nn"><a class="acronym-link" href="#glossary-mdemg">MDEMG</a> : artificial Neural Network (NN) :: internal dialogue : biological <a class="acronym-link" href="#glossary-nn">NN</a></h2>
 <blockquote>
 <p><a class="acronym-link" href="#glossary-mdemg">MDEMG</a> is the Large Language Model (LLM)&#39;s persistent memory and cognitive substrate. Markdown files are <strong>REMINDERS AND KEYS only</strong>: real memory lives in Cognitive Memory Substrate (CMS) (Neo4j, <code>mdemg-dev</code> space).</p>
 </blockquote>
@@ -286,10 +286,10 @@
 
 <h2 id="honest-pivots">Honest Pivots</h2>
 <ul>
-<li><strong>2026-04-22, MoE → dense pivot.</strong> Metal 499K MTLResource ceiling blocked MoE LoRA backward pass. Qwen3-14B-4bit dense replaced Qwen3.6-35B-A3B.</li>
+<li><strong>2026-04-22, MoE → dense pivot.</strong> Metal 499K MTLResource ceiling blocked MoE <a class="acronym-link" href="#glossary-lora">LoRA</a> backward pass. Qwen3-14B-4bit dense replaced Qwen3.6-35B-A3B.</li>
 <li><strong>2026-05-03, mlx_lm.server → llama.cpp cutover.</strong> mlx_lm.server crashed every ~14 min via Metal Out-Of-Memory (OOM); llama-server bounds Key-Value (KV) architecturally.</li>
 <li><strong>2026-06-26, Intent translation disabled.</strong> Universal Validation Test Specification (UVTS) A/B OFF 0.4170 vs ON 0.4070 (net-negative); was 70% of all Large Language Model (LLM) errors.</li>
-<li><strong>2026-04-22, Fine-Tuning (FT)-OAI-003 dropped.</strong> All Fine-Tuning (FT) targets local MLX LoRA; OpenAI Application Programming Interface (API) only as teacher.</li>
+<li><strong>2026-04-22, Fine-Tuning (FT)-OAI-003 dropped.</strong> All Fine-Tuning (FT) targets local MLX <a class="acronym-link" href="#glossary-lora">LoRA</a>; OpenAI Application Programming Interface (API) only as teacher.</li>
 <li><strong>2026-08-01, Jiminy is an ENFORCER.</strong> Prior framing as opt-in advisor superseded.<details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
 <li>Each decision was &quot;the data decided,&quot; not an opinion.</li>
@@ -323,11 +323,11 @@
 </tr>
 <tr>
 <td>Ingested languages</td>
-<td>28 (verified via UPTS specs)</td>
+<td>28 (verified via Universal Parser Test Specification (UPTS) specs)</td>
 </tr>
 <tr>
 <td>Production model</td>
-<td><code>mdemg-llm-v1.Q5_K_M</code> (Qwen3-14B base + Phase 5 Supervised Fine-Tuning (SFT) LoRA)</td>
+<td><code>mdemg-llm-v1.Q5_K_M</code> (Qwen3-14B base + Phase 5 Supervised Fine-Tuning (SFT) <a class="acronym-link" href="#glossary-lora">LoRA</a>)</td>
 </tr>
 <tr>
 <td>Benchmark aggregate</td>
@@ -654,6 +654,167 @@
 <ul>
 <li>V0025 migration added retention + compression to EVERY previously-unbounded hypertable (<code>embedding_events</code> was 2.7 GB).</li>
 <li>Rule: never alert on lifetime-cumulative percentile synthetics, latency <code>_p95/_p99</code> gauges are WINDOWED now.</li>
+</ul>
+</details>
+
+
+<hr class="slide-break" />
+
+
+<h2 id="f24-ingest-8-entry-points-into-the-substrate">F2.4 Ingest · 8 Entry Points Into The Substrate</h2>
+<p>Everything that lands as an L0 observation flows through one of these 8 surfaces. Each writes to Neo4j via <code>conversation.Service.Observe</code> after calling <code>embedder.Embed</code>.</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Function / Surface</th>
+<th>Transport</th>
+<th>Shape</th>
+<th>Typical caller</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td><code>IngestCodebase</code></td>
+<td><code>mdemg ingest --path .</code></td>
+<td>Recursive tree-walk + tree-sitter symbol extraction</td>
+<td>Human + <a class="acronym-link" href="#glossary-ci">CI</a></td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>IngestFileWatcher</code></td>
+<td><code>fsnotify</code> daemon</td>
+<td>Debounced file-change events</td>
+<td><code>mdemg watch</code></td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>IngestGitHook</code></td>
+<td><code>.claude/hooks/</code> post-commit</td>
+<td>Diff-driven incremental</td>
+<td><code>mdemg hooks install</code></td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>IngestClaudeMemory</code></td>
+<td><a class="acronym-link" href="#glossary-mcp">MCP</a> tool call</td>
+<td>Markdown + structured_data</td>
+<td>Claude Code</td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>IngestLinear</code></td>
+<td>REST / webhook</td>
+<td>Issue / comment payload</td>
+<td>Linear integration</td>
+</tr>
+<tr>
+<td>6</td>
+<td><code>IngestWebScrape</code></td>
+<td>Plugin (INGESTION type)</td>
+<td><a class="acronym-link" href="#glossary-url">URL</a> → markdown → chunks</td>
+<td><code>mdemg plugin</code></td>
+</tr>
+<tr>
+<td>7</td>
+<td><code>IngestWebhook</code></td>
+<td><code>POST /v1/ingest/webhook</code></td>
+<td>Arbitrary <a class="acronym-link" href="#glossary-json">JSON</a></td>
+<td>Third-party <a class="acronym-link" href="#glossary-ci">CI</a></td>
+</tr>
+<tr>
+<td>8</td>
+<td><code>IngestObserveAPI</code></td>
+<td><code>POST /v1/conversation/observe</code></td>
+<td>Single-observation primitive</td>
+<td>Direct <a class="acronym-link" href="#glossary-api">API</a> callers</td>
+</tr>
+</tbody></table>
+<p><strong>Shared pipeline</strong> (all 8 surfaces): detect obs_type → embed → surprise-score → write L0 node → fire reinforcement edges → trigger consolidation (if gates pass).</p>
+<p><strong>Code pointer</strong>: <code>internal/ingest/</code> for file-walk and watchers; <code>internal/plugins/scraper/</code> for the web scraper plugin; <code>internal/api/handlers_conversation.go</code> for the observe <a class="acronym-link" href="#glossary-api">API</a>.</p>
+<details class="speaker-notes"><summary>Speaker notes</summary>
+<ul>
+<li>Every ingest surface MUST attach <code>embeddings.WithEmbeddingMeta(ctx, {CallSite, SpaceID})</code> before embedding — the <code>call_site</code> column is the EMBED-CALLSITE-001 zero-tolerance contract.</li>
+<li>Incremental ingest uses content hashing — unchanged files skip re-embedding.</li>
+<li>Plugins add new ingest surfaces without touching core; see F8 for the plugin Software Development Kit (SDK).</li>
+</ul>
+</details>
+
+
+<hr class="slide-break" />
+
+
+<h2 id="f25-upts-28-language-parsers-parser-sdk">F2.5 <a class="acronym-link" href="#glossary-upts">UPTS</a> · 28 Language Parsers + Parser <a class="acronym-link" href="#glossary-sdk">SDK</a></h2>
+<p><strong><a class="acronym-link" href="#glossary-upts">UPTS</a> = Universal Parser Test Specification</strong>. Each spec is a <a class="acronym-link" href="#glossary-json">JSON</a> contract pinning a language&#39;s parser output against golden fixtures — change the parser, the <a class="acronym-link" href="#glossary-upts">UPTS</a> test fails, no silent drift.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody><tr>
+<td>C</td>
+<td>C++</td>
+<td>C#</td>
+<td>CUDA</td>
+</tr>
+<tr>
+<td>Cypher</td>
+<td>Dockerfile</td>
+<td>Go</td>
+<td>GraphQL</td>
+</tr>
+<tr>
+<td>INI</td>
+<td>Java</td>
+<td><a class="acronym-link" href="#glossary-json">JSON</a></td>
+<td>Kotlin</td>
+</tr>
+<tr>
+<td>Lua</td>
+<td>Makefile</td>
+<td>Markdown</td>
+<td>OpenAPI</td>
+</tr>
+<tr>
+<td>PHP</td>
+<td>Protobuf</td>
+<td>Python</td>
+<td>Rust</td>
+</tr>
+<tr>
+<td><a class="acronym-link" href="#glossary-sql">SQL</a></td>
+<td>Shell</td>
+<td>Terraform</td>
+<td>TOML</td>
+</tr>
+<tr>
+<td>TypeScript</td>
+<td>Extensible Markup Language (XML)</td>
+<td>YAML Ain&#39;t Markup Language (YAML)</td>
+<td><em>scraper_markdown</em></td>
+</tr>
+</tbody></table>
+<p><strong>Purpose</strong>: tree-sitter extracts symbols (functions, classes, imports, declarations) for every indexed file. The symbol graph fuels F3&#39;s structural retrieval column + the IMPLEMENTS edges Jiminy uses for architectural guidance.</p>
+<p><strong>What a <a class="acronym-link" href="#glossary-upts">UPTS</a> spec declares</strong>: query file path, fixture file path, expected symbol count, expected per-type counts, expected names. The <a class="acronym-link" href="#glossary-ci">CI</a> gate <code>make test-upts</code> validates every spec against its fixture.</p>
+<h3 id="building-a-new-parser">Building a new parser</h3>
+<p>The parser pipeline is <strong>plugin-based</strong> — add a language without touching core:</p>
+<ol>
+<li>Author the tree-sitter query at <code>internal/symbols/queries/{lang}/</code> (one <code>.scm</code> file per node class).</li>
+<li>Add a <a class="acronym-link" href="#glossary-upts">UPTS</a> spec at <code>docs/lang-parser/lang-parse-spec/upts/specs/{lang}.upts.json</code> + a fixture file at <code>fixtures/{lang}/</code>.</li>
+<li>Register the language in <code>internal/symbols/registry.go</code> (one map entry).</li>
+<li><a class="acronym-link" href="#glossary-ci">CI</a> gate <code>make test-upts</code> picks it up automatically; new specs land in the drift matrix.</li>
+</ol>
+<p><strong>Parser sidecar system</strong>: Go-based tree-sitter is the primary path. For languages without official Go bindings (ex: GraphQL), a sidecar binary pattern exists at <code>internal/symbols/sidecar/</code> — invoked over a stable <a class="acronym-link" href="#glossary-json">JSON</a> protocol so the plugin stays language-agnostic.</p>
+<p><strong>Code pointer</strong>: <code>internal/symbols/</code> for registry + ingest; <code>internal/symbols/queries/</code> for per-language tree-sitter queries.</p>
+<details class="speaker-notes"><summary>Speaker notes</summary>
+<ul>
+<li>The Go IMPLEMENTS edge producer (GO-IMPLEMENTS-001) uses <code>go/types</code> to compute implicit interface satisfaction — tree-sitter CAN&#39;T detect this; see <code>internal/symbols/go_types.go</code>.</li>
+<li>Parser additions MUST update <code>UXTS_FRAMEWORK_MATRIX.md</code> counts in the same PR (CI gate enforces).</li>
+<li>Every <a class="acronym-link" href="#glossary-upts">UPTS</a> spec file matches <code>*.upts.json</code>; the file count IS the authoritative language count.</li>
 </ul>
 </details>
 
@@ -1226,7 +1387,7 @@ SEQ:    monotonic, report last_seq on resume
 
 
 <!-- SECTION F5, LORA + QWEN + MODEL DISTRIBUTION -->
-<h1 id="f5--lora--qwen--model-distribution">F5 · LoRA + Qwen + Model Distribution</h1>
+<h1 id="f5-lora-qwen-model-distribution">F5 · <a class="acronym-link" href="#glossary-lora">LoRA</a> + Qwen + Model Distribution</h1>
 <p><strong>Nav</strong>: <a href="#f4--jiminy--enforcement--j17">← F4</a> · <a href="#table-of-contents">⇤ <a class="acronym-link" href="#glossary-toc">TOC</a></a> · <a href="https://github.com/reh3376/mdemg/blob/main/docs/onboarding/mdemg-onboarding-notes.md#f5--lora--qwen--model-distribution">Notes ▸ F5</a> · <a href="#f6--uxts-framework-family">F6 →</a></p>
 <details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
@@ -1238,8 +1399,8 @@ SEQ:    monotonic, report last_seq on resume
 <hr class="slide-break" />
 
 
-<h2 id="f51-lora-on-qwen3-14b-mdemg-llm-v1-what">F5.1 LoRA on Qwen3-14B · mdemg-llm-v1 (What)</h2>
-<p><strong>Production</strong>: single-tier LoRA on <code>mlx-community/Qwen3-14B-4bit</code></p>
+<h2 id="f51-lora-on-qwen3-14b-mdemg-llm-v1-what">F5.1 <a class="acronym-link" href="#glossary-lora">LoRA</a> on Qwen3-14B · mdemg-llm-v1 (What)</h2>
+<p><strong>Production</strong>: single-tier <a class="acronym-link" href="#glossary-lora">LoRA</a> on <code>mlx-community/Qwen3-14B-4bit</code></p>
 <ul>
 <li>Rank 32 / α 64</li>
 <li>7 dense target modules</li>
@@ -1259,14 +1420,14 @@ SEQ:    monotonic, report last_seq on resume
 <hr class="slide-break" />
 
 
-<h2 id="f51-lora-why-fine-tune-our-own">F5.1 LoRA · Why Fine-Tune Our Own</h2>
+<h2 id="f51-lora-why-fine-tune-our-own">F5.1 <a class="acronym-link" href="#glossary-lora">LoRA</a> · Why Fine-Tune Our Own</h2>
 <p><strong>The connection-layer bet applied to the <a class="acronym-link" href="#glossary-llm">LLM</a> itself.</strong></p>
 <ul>
 <li>16 <a class="acronym-link" href="#glossary-llm">LLM</a> call sites, each has its own prompt shape + output contract (all single-shot structured outputs)</li>
 <li>Fine-tuned on <a class="acronym-link" href="#glossary-mdemg">MDEMG</a>&#39;s own corpora + call-site traces</li>
 <li>Per-site better than generic gpt-mini (verified via Universal Benchmark (UBENCH))</li>
 </ul>
-<p><strong>Rejected alternative</strong>: OpenAI fine-tuning (FT-OAI-003 dropped 2026-04-22), all <a class="acronym-link" href="#glossary-ft">FT</a> now local MLX LoRA, teacher-only for OpenAI.</p>
+<p><strong>Rejected alternative</strong>: OpenAI fine-tuning (FT-OAI-003 dropped 2026-04-22), all <a class="acronym-link" href="#glossary-ft">FT</a> now local MLX <a class="acronym-link" href="#glossary-lora">LoRA</a>, teacher-only for OpenAI.</p>
 <details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
 <li>The 16 call sites: ape.reflect, jiminy.classify, jiminy.synthesize, consulting.classify, retrieval.rerank_cross, retrieval.intent_translate, guardrail.evaluate, hidden.summarize, hidden.reclassify, emergence.name, context_cooler.stability, retrieval.consensus, j17.synthesize, j17.classify, agent.pre_write_check, data.curate.</li>
@@ -1277,7 +1438,7 @@ SEQ:    monotonic, report last_seq on resume
 <hr class="slide-break" />
 
 
-<h2 id="f51-lora-pipeline">F5.1 LoRA · Pipeline</h2>
+<h2 id="f51-lora-pipeline">F5.1 <a class="acronym-link" href="#glossary-lora">LoRA</a> · Pipeline</h2>
 <figure id="diagram-11" class="svg-figure" tabindex="0" aria-label="Diagram 11"><img src="assets/svg/mermaid-11.svg" alt="Diagram 11" /></figure>
 <p><strong>Conversion time</strong>: ~5 min on M5 Max.</p>
 <details class="speaker-notes"><summary>Speaker notes</summary>
@@ -1291,7 +1452,7 @@ SEQ:    monotonic, report last_seq on resume
 <hr class="slide-break" />
 
 
-<h2 id="f51-lora-standing-policies">F5.1 LoRA · Standing Policies</h2>
+<h2 id="f51-lora-standing-policies">F5.1 <a class="acronym-link" href="#glossary-lora">LoRA</a> · Standing Policies</h2>
 <p><strong>No tool-calling architectural policy</strong>:</p>
 <ul>
 <li>All 16 call sites single-shot structured output / reasoning</li>
@@ -1300,7 +1461,7 @@ SEQ:    monotonic, report last_seq on resume
 </ul>
 <p><strong>Overfitting prevention</strong> (forcing function: <a class="acronym-link" href="#glossary-ft">FT</a>-OAI-001 step-1200 overfit):</p>
 <ul>
-<li>Epoch cap = 3 on all LoRA runs</li>
+<li>Epoch cap = 3 on all <a class="acronym-link" href="#glossary-lora">LoRA</a> runs</li>
 <li>Early-stop on <code>val_loss &gt; best × 1.05</code> (SFT) / <code>val_reward &lt; best × 0.95</code> (RL)</li>
 <li><code>n_epochs=auto</code> DISALLOWED<details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
@@ -1312,7 +1473,7 @@ SEQ:    monotonic, report last_seq on resume
 <hr class="slide-break" />
 
 
-<h2 id="f51-lora-why-it39s-important">F5.1 LoRA · Why It&#39;s Important</h2>
+<h2 id="f51-lora-why-it39s-important">F5.1 <a class="acronym-link" href="#glossary-lora">LoRA</a> · Why It&#39;s Important</h2>
 <ul>
 <li><strong>Honest aggregate 0.9188</strong> (16-task augmented eval, run <code>ed062ea8</code>, 2026-07-21)</li>
 <li>Beats gpt-mini on every retrain-gated task</li>
@@ -1327,7 +1488,7 @@ SEQ:    monotonic, report last_seq on resume
 <hr class="slide-break" />
 
 
-<h2 id="f51-lora-how-it-will-improve">F5.1 LoRA · How It Will Improve</h2>
+<h2 id="f51-lora-how-it-will-improve">F5.1 <a class="acronym-link" href="#glossary-lora">LoRA</a> · How It Will Improve</h2>
 <ul>
 <li><strong>E1 shipped</strong>: Corpus audit (81% substrate-covered; 2203 rows strip-eligible)</li>
 <li><strong>E2 shipped</strong>: Phase E2 strip (claude_code_knowledge_v3_stripped, 503 rows)</li>
@@ -1408,7 +1569,7 @@ mdemg model where
 <li><code>reh3376/mdemg-llm-v1:Q8_0</code>, 16 GB (20 GB RAM min)<details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
 <li>Ollama is DISTRIBUTION only. Runtime stays llama-server (Phase 13.5).</li>
-<li>Adapter-only path (MODEL-DIST-002): 257 MB <a class="acronym-link" href="#glossary-gguf">GGUF</a> LoRA, <code>--adapter</code> flag.</li>
+<li>Adapter-only path (MODEL-DIST-002): 257 MB <a class="acronym-link" href="#glossary-gguf">GGUF</a> <a class="acronym-link" href="#glossary-lora">LoRA</a>, <code>--adapter</code> flag.</li>
 </ul>
 </details></li>
 </ul>
@@ -1479,7 +1640,7 @@ mdemg model where
 
 
 <!-- SECTION F6, UXTS FRAMEWORK FAMILY -->
-<h1 id="f6--uxts-framework-family">F6 · UxTS Framework Family</h1>
+<h1 id="f6-uxts-framework-family">F6 · UxTS Framework Family</h1>
 <p><strong>Nav</strong>: <a href="#f5--lora--qwen--model-distribution">← F5</a> · <a href="#table-of-contents">⇤ <a class="acronym-link" href="#glossary-toc">TOC</a></a> · <a href="https://github.com/reh3376/mdemg/blob/main/docs/onboarding/mdemg-onboarding-notes.md#f6--uxts-framework-family">Notes ▸ F6</a> · <a href="#f7--ops">F7 →</a></p>
 <details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
@@ -1652,7 +1813,7 @@ UAMS     Agent memory specs
 
 
 <!-- SECTION F7, OPS -->
-<h1 id="f7--ops">F7 · Ops</h1>
+<h1 id="f7-ops">F7 · Ops</h1>
 <p><strong>Nav</strong>: <a href="#f6--uxts-framework-family">← F6</a> · <a href="#table-of-contents">⇤ <a class="acronym-link" href="#glossary-toc">TOC</a></a> · <a href="https://github.com/reh3376/mdemg/blob/main/docs/onboarding/mdemg-onboarding-notes.md#f7--ops">Notes ▸ F7</a> · <a href="#f8--cli-hooks-mcp-multi-instance">F8 →</a></p>
 <details class="speaker-notes"><summary>Speaker notes</summary>
 <ul>
@@ -2287,7 +2448,7 @@ mdemg beta-janitor sweep     # 30-day sweep
 <td>Qwen3.8-27B base swap (post-beta)</td>
 </tr>
 <tr>
-<td>Phase 5 <a class="acronym-link" href="#glossary-sft">SFT</a> LoRA → <a class="acronym-link" href="#glossary-gguf">GGUF</a> Q5_K_M</td>
+<td>Phase 5 <a class="acronym-link" href="#glossary-sft">SFT</a> <a class="acronym-link" href="#glossary-lora">LoRA</a> → <a class="acronym-link" href="#glossary-gguf">GGUF</a> Q5_K_M</td>
 <td>HEBB-ETA-001 precision-weighted η wiring</td>
 </tr>
 <tr>
@@ -3599,7 +3760,7 @@ SEQ:    monotonic, report last_seq on resume
 <td align="right">215</td>
 </tr>
 <tr>
-<td>UPTS</td>
+<td><a class="acronym-link" href="#glossary-upts">UPTS</a></td>
 <td>Parser</td>
 <td>Language parser conformance</td>
 <td><a class="acronym-link" href="#glossary-ci">CI</a>-gated</td>
@@ -3788,10 +3949,10 @@ $ python3 docs/api/api-spec/upts/runners/upts_runner.py # UPTS parser
 <h2 id="uxts-today-honest">UxTS Today · Honest</h2>
 <ul>
 <li>16 families · 15 active · ~300+ specs total</li>
-<li><strong><a class="acronym-link" href="#glossary-ci">CI</a> merge-blocking</strong>: <a class="acronym-link" href="#glossary-uats">UATS</a>, UPTS, UOTS, <a class="acronym-link" href="#glossary-ults">ULTS</a> hash-verify, USTS, <a class="acronym-link" href="#glossary-ubench">UBENCH</a>, UxTS matrix drift</li>
+<li><strong><a class="acronym-link" href="#glossary-ci">CI</a> merge-blocking</strong>: <a class="acronym-link" href="#glossary-uats">UATS</a>, <a class="acronym-link" href="#glossary-upts">UPTS</a>, UOTS, <a class="acronym-link" href="#glossary-ults">ULTS</a> hash-verify, USTS, <a class="acronym-link" href="#glossary-ubench">UBENCH</a>, UxTS matrix drift</li>
 <li><strong>Soft-fail</strong> (warnings, not blockers): UBTS, UOBS, UETS, UITS</li>
 <li><strong>No <a class="acronym-link" href="#glossary-ci">CI</a> gate</strong> (operator opt-in): <a class="acronym-link" href="#glossary-uvts">UVTS</a>, UTDS, <a class="acronym-link" href="#glossary-uaits">UAITS</a>, UDTS (gRPC), UNTS, UAMS (spec-only)</li>
-<li>Specs count steadily increasing (28 UPTS, 215 <a class="acronym-link" href="#glossary-uats">UATS</a>, 18 <a class="acronym-link" href="#glossary-ults">ULTS</a> …)</li>
+<li>Specs count steadily increasing (28 <a class="acronym-link" href="#glossary-upts">UPTS</a>, 215 <a class="acronym-link" href="#glossary-uats">UATS</a>, 18 <a class="acronym-link" href="#glossary-ults">ULTS</a> …)</li>
 </ul>
 <p><strong>Known gap</strong>: UDTS doesn&#39;t have <code>uxts-canonical-specs.yml</code> wiring yet (deferred, DORMANT-CENSUS-002 captured).</p>
 <details class="speaker-notes"><summary>Speaker notes</summary>
@@ -3985,7 +4146,7 @@ $ python3 docs/api/api-spec/upts/runners/upts_runner.py # UPTS parser
 <ul>
 <li><strong>Production model</strong>: <code>mdemg-llm-v1</code></li>
 <li><strong>Base</strong>: <code>mlx-community/Qwen3-14B-4bit</code> (dense, after 2026-04-22 MoE→dense pivot)</li>
-<li><strong>Training</strong>: Phase 5 <a class="acronym-link" href="#glossary-sft">SFT</a> single-tier LoRA (rank=32 α=64, 7 dense target modules)</li>
+<li><strong>Training</strong>: Phase 5 <a class="acronym-link" href="#glossary-sft">SFT</a> single-tier <a class="acronym-link" href="#glossary-lora">LoRA</a> (rank=32 α=64, 7 dense target modules)</li>
 <li><strong>Serving</strong>: <a class="acronym-link" href="#glossary-gguf">GGUF</a> Q5_K_M via llama-server at <code>:8102</code> (Phase 13.5 cutover from mlx_lm.server)</li>
 <li><strong>Honest aggregate</strong>: <strong>0.9188</strong> on augmented eval (16 tasks; APE-REFLECT-EVAL-REFRESH-001 refreshed truncation-poisoned rows 2026-07-21)</li>
 </ul>
@@ -5471,6 +5632,10 @@ $ grpcurl -plaintext unix:///path/to/plugin.sock describe mdemg.Module
     <dd>Large Language Model</dd>
   </div>
   <div class="glossary-entry">
+    <dt id="glossary-lora">LoRA</dt>
+    <dd>Low-Rank Adaptation</dd>
+  </div>
+  <div class="glossary-entry">
     <dt id="glossary-mcp">MCP</dt>
     <dd>Model Context Protocol</dd>
   </div>
@@ -5481,6 +5646,10 @@ $ grpcurl -plaintext unix:///path/to/plugin.sock describe mdemg.Module
   <div class="glossary-entry">
     <dt id="glossary-nli">NLI</dt>
     <dd>Natural Language Inference</dd>
+  </div>
+  <div class="glossary-entry">
+    <dt id="glossary-nn">NN</dt>
+    <dd>Neural Network</dd>
   </div>
   <div class="glossary-entry">
     <dt id="glossary-oom">OOM</dt>
@@ -5497,6 +5666,10 @@ $ grpcurl -plaintext unix:///path/to/plugin.sock describe mdemg.Module
   <div class="glossary-entry">
     <dt id="glossary-rsic">RSIC</dt>
     <dd>Recursive Self-Improvement Cycle</dd>
+  </div>
+  <div class="glossary-entry">
+    <dt id="glossary-sdk">SDK</dt>
+    <dd>Software Development Kit</dd>
   </div>
   <div class="glossary-entry">
     <dt id="glossary-sft">SFT</dt>
@@ -5547,6 +5720,10 @@ $ grpcurl -plaintext unix:///path/to/plugin.sock describe mdemg.Module
     <dd>Universal LLM Test Specification</dd>
   </div>
   <div class="glossary-entry">
+    <dt id="glossary-upts">UPTS</dt>
+    <dd>Universal Parser Test Specification</dd>
+  </div>
+  <div class="glossary-entry">
     <dt id="glossary-url">URL</dt>
     <dd>Uniform Resource Locator</dd>
   </div>
@@ -5561,6 +5738,14 @@ $ grpcurl -plaintext unix:///path/to/plugin.sock describe mdemg.Module
   <div class="glossary-entry">
     <dt id="glossary-uxts">UXTS</dt>
     <dd>Universal eXtensible Test Specification</dd>
+  </div>
+  <div class="glossary-entry">
+    <dt id="glossary-xml">XML</dt>
+    <dd>Extensible Markup Language</dd>
+  </div>
+  <div class="glossary-entry">
+    <dt id="glossary-yaml">YAML</dt>
+    <dd>YAML Ain&#39;t Markup Language</dd>
   </div>
   </dl>
 </section>
