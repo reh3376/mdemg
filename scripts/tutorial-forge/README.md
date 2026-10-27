@@ -1,8 +1,15 @@
 # tutorial-forge
 
 Config-driven, repo-agnostic framework that renders a markdown deck into a
-static HTML tutorial package. Any repo can point it at its own deck + config
-and get the same professional presentation layer:
+static HTML tutorial package.
+
+> **For an AI coding agent**: start with [`FSD.md`](./FSD.md). It is the
+> structured, agent-oriented reference (purpose, non-goals, file-by-file
+> contracts, decision tables, failure signatures). This README is the
+> human-oriented quick-start.
+
+Any repo can point it at its own deck + config and get the same professional
+presentation layer:
 
 - **Pre-rendered Mermaid diagrams** — every ```mermaid``` fence is rendered to
   SVG at build time via headless Puppeteer, wrapped in an interactive viewer
