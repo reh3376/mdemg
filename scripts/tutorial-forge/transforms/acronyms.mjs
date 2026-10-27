@@ -27,17 +27,28 @@ export function loadAcronyms(configAcronyms = {}) {
 }
 
 /**
- * Expand each acronym's first `expandCount` occurrences.
+ * Expand or link each acronym based on its position in the document.
+ *
+ * The first `expandCount` occurrences are rewritten to `Expansion (ACRONYM)`.
+ * Every subsequent occurrence is wrapped by `linkGenerator(acronym)` if one
+ * is passed (default: no link, bare acronym). This supports the "define
+ * once, link to glossary afterward" UX.
  *
  * @param {string} deckText         raw markdown
  * @param {object} acronyms         map ACRONYM → expansion
- * @param {number} expandCount      how many times each acronym gets expanded (default 2)
- * @returns {{text: string, applied: Record<string,number>}}
+ * @param {number} expandCount      how many times each acronym gets expanded (default 1)
+ * @param {object} [opts]
+ * @param {function(string):string} [opts.linkGenerator]  called for the Nth+1
+ *   occurrence of each acronym and beyond; returns the replacement HTML.
+ *   When omitted or returning falsy, the acronym stays bare.
+ * @returns {{text: string, applied: Record<string,number>, linked: Record<string,number>, used: string[]}}
  */
-export function expandAcronyms(deckText, acronyms, expandCount = 2) {
+export function expandAcronyms(deckText, acronyms, expandCount = 1, opts = {}) {
   const counts = Object.fromEntries(Object.keys(acronyms).map((k) => [k, 0]));
+  const linkCounts = Object.fromEntries(Object.keys(acronyms).map((k) => [k, 0]));
+  const linkGenerator = typeof opts.linkGenerator === 'function' ? opts.linkGenerator : null;
   if (Object.keys(acronyms).length === 0) {
-    return { text: deckText, applied: counts };
+    return { text: deckText, applied: counts, linked: linkCounts, used: [] };
   }
   // Longest-first so "UVTS" doesn't get eaten by "UV" if "UV" were a key.
   const keys = Object.keys(acronyms).sort((a, b) => b.length - a.length);
@@ -47,18 +58,23 @@ export function expandAcronyms(deckText, acronyms, expandCount = 2) {
     'g',
   );
 
-  // Idempotency pre-pass: for each acronym, count how many "Expansion (ACRONYM)"
-  // forms already exist in the deck. Those count toward the budget — if the
-  // deck already defines LLM twice, we skip further expansion. This lets the
-  // transform run repeatedly across builds without re-expanding.
+  // Idempotency pre-pass: for each acronym, count how many existing
+  // definitions already appear in the deck in either canonical format:
+  //   * "Expansion (ACRONYM)" — the standard inline form.
+  //   * "ACRONYM: Expansion"  — the title/heading form (e.g. "# MDEMG: ...").
+  // Those count toward the per-acronym budget — if the deck already defines
+  // LLM twice via either form, we skip further expansion. The transform
+  // remains idempotent across repeated builds.
   const prebudgetUsed = {};
   for (const key of keys) {
     const expansion = acronyms[key];
-    const expandedForm = `${escapeRe(expansion)} \\(${escapeRe(key)}\\)`;
-    const alreadyRe = new RegExp(expandedForm, 'g');
-    const already = (deckText.match(alreadyRe) ?? []).length;
+    const expandedParenRe = new RegExp(`${escapeRe(expansion)} \\(${escapeRe(key)}\\)`, 'g');
+    const titleFormRe = new RegExp(`\\b${escapeRe(key)}:\\s+${escapeRe(expansion)}\\b`, 'g');
+    const already =
+      (deckText.match(expandedParenRe) ?? []).length +
+      (deckText.match(titleFormRe) ?? []).length;
     prebudgetUsed[key] = already;
-    counts[key] = already; // counted toward budget; not counted as "applied" below
+    counts[key] = already;
   }
 
   const outLines = [];
@@ -107,12 +123,25 @@ export function expandAcronyms(deckText, acronyms, expandCount = 2) {
     for (const m of scan.matchAll(acronymRe)) {
       const tok = m[1];
       const start = m.index;
-      // If the acronym is already in a parenthesized expansion suffix like
-      // "Expansion (ACRONYM)", skip — don't expand again.
+      // Already-defined form "Expansion (ACRONYM)": skip the ACRONYM inside
+      // the parenthesized suffix.
       if (start > 0 && line[start - 1] === '(') continue;
-      if (counts[tok] >= expandCount) continue;
-      counts[tok] += 1;
-      edits.push([start, start + tok.length, `${acronyms[tok]} (${tok})`]);
+      // Title-form definition "ACRONYM: Expansion": the acronym IS the
+      // definition's subject; don't rewrite or link it, otherwise the title
+      // becomes a link to itself (or worse, "Expansion (ACRONYM): Expansion").
+      const after = line.slice(start + tok.length);
+      const titleFormCheck = new RegExp(`^:\\s+${escapeRe(acronyms[tok])}\\b`);
+      if (titleFormCheck.test(after)) continue;
+      if (counts[tok] < expandCount) {
+        counts[tok] += 1;
+        edits.push([start, start + tok.length, `${acronyms[tok]} (${tok})`]);
+      } else if (linkGenerator) {
+        const linkHtml = linkGenerator(tok);
+        if (linkHtml) {
+          linkCounts[tok] += 1;
+          edits.push([start, start + tok.length, linkHtml]);
+        }
+      }
     }
     if (edits.length === 0) {
       outLines.push(line);
@@ -132,7 +161,18 @@ export function expandAcronyms(deckText, acronyms, expandCount = 2) {
     const net = v - (prebudgetUsed[k] ?? 0);
     if (net > 0) applied[k] = net;
   }
-  return { text: outLines.join(''), applied };
+  const linked = {};
+  for (const [k, v] of Object.entries(linkCounts)) {
+    if (v > 0) linked[k] = v;
+  }
+  // Set of acronyms that showed up at least once (expanded OR linked OR
+  // already-present as an "Expansion (ACRONYM)" form) — this drives the
+  // glossary section downstream.
+  const used = new Set();
+  for (const k of Object.keys(applied)) used.add(k);
+  for (const k of Object.keys(linked)) used.add(k);
+  for (const [k, v] of Object.entries(prebudgetUsed)) if (v > 0) used.add(k);
+  return { text: outLines.join(''), applied, linked, used: Array.from(used).sort() };
 }
 
 /**
