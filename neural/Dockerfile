@@ -1,4 +1,6 @@
-FROM python:3.12-slim
+# The base must satisfy requires-python in pyproject.toml (>=3.14 since 2026-10-24);
+# pip refuses the install otherwise and the Docker Publish workflow goes red.
+FROM python:3.14-slim
 WORKDIR /app
 COPY pyproject.toml .
 COPY neural_sidecar/ neural_sidecar/
