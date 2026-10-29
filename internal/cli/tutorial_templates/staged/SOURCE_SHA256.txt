@@ -1,6 +1,8 @@
-# ONBOARDING-TUTORIAL-SERVE-001 drift breadcrumb
-# verified by scripts/verify_tutorial_embed.py (CI gate)
-deck_sha256=5330072b5131904aef6528b5f77452e1210177be572d4c93a67b7ac7eb12b3a1
-css_sha256=c2253a0954560ebc1ff78014b5050d4816b41bdeb75d1efa2503f690ad3e32ec
+# tutorial-forge drift breadcrumb
+# consumer CI gate can hash the configured input files and compare.
+deck_sha256=8e63a24c64afd712027fd9cb7657aed4fcfa871f3d032c5b8657030408250f81
+css_sha256=dc537a60faaf1df07a0cf2b4a0f3ec2b5e4f0f135be12615f03950e6b080f19f
+svg_viewer_sha256=a11ea333dbff84e192785ca413ec467f772a3de5cca29948951955980c486530
 deck_path=docs/onboarding/mdemg-onboarding-deck.md
 css_path=docs/onboarding/slides-overrides.css
+svg_viewer_path=docs/onboarding/svg-viewer.js

@@ -1,4 +1,4 @@
-# U13 — Grafana (7 slides)
+# U13 · Grafana (7 slides)
 
 **Intent**: The 9 dashboards + opinionated "watch these" panel list + how to read p95/mean + alert-link pattern + dashboard governance.
 **Target slides**: 7
@@ -7,36 +7,36 @@
 
 ---
 
-## U13.1 — Section Landing
+## U13.1 · Section Landing
 
-**Title**: `U13 · Grafana — The Historical View`
+**Title**: `U13 · Grafana, The Historical View`
 
 **Body**:
-- Intent: "Grafana is the time-series companion to /ui/. /ui/ answers 'right now'; Grafana answers 'the last 24 hours / 7 days / 30 days.' Nine dashboards covering ~70 panels — but 5 panels carry most operator attention."
+- Intent: "Grafana is the time-series companion to /ui/. /ui/ answers 'right now'; Grafana answers 'the last 24 hours / 7 days / 30 days.' Nine dashboards covering ~70 panels, but 5 panels carry most operator attention."
 - Preview: 9 dashboards → the daily 5 → honest reading patterns → alert panel links → dashboard provenance → gotchas
-- Points back to U1.5 "How does it continuously improve?" — Grafana is the observability substrate for every improvement loop
+- Points back to U1.5 "How does it continuously improve?", Grafana is the observability substrate for every improvement loop
 
 **Provenance**:
-- `deploy/docker/grafana/dashboards/` — 9 JSON dashboards
+- `deploy/docker/grafana/dashboards/`, 9 JSON dashboards
 - CLAUDE.md "DASHBOARD-TRUTH-001/002/003" (metric honesty sprints)
 
 ---
 
-## U13.2 — The 9 Dashboards
+## U13.2 · The 9 Dashboards
 
 **Title**: `The 9 Dashboards`
 
 **Body**:
 - Full inventory (all datasource `timescaledb` literal UID per GRAFANA-SHIP):
-  1. **mdemg-overview** — the home dashboard; request rate, p95 latency, error rate, breakers; carries the arc-trajectory UVTS panel
-  2. **mdemg-jiminy** — follow-rate (classifier + per-class), outcome split, effectiveness, actionable compliance; the JIMINY-CEILING-BREAK-2 trajectory panel lives here
-  3. **mdemg-rsic** — RSIC health dimensions (DH-005), cycle admission, insight stream, confidence gauges
-  4. **mdemg-neo4j** — Neo4j CPU/memory, null-weight edges, orphan ratio, graph node count
-  5. **mdemg-ft-training** — Phase 10 benchmark aggregate, per-task pass rate, FT loop state, FT benchmark staleness, latest benchmark age
-  6. **mdemg-graph-topology** — Hebbian weight entropy, dynamic-edge creation, reinforcement event rate (EVENTGRAPH-001)
-  7. **mdemg-hitl** — grade cadence (auto vs operator), pending drafts, reinforcement applied 7d (HITL-ANALYTICS-TILE-001)
-  8. **mdemg-j17** — J17 protocol compression, trust session count, NLI bias, auto-compact AVG (DASHBOARD-TRUTH-002 fixes)
-  9. **mdemg-llm-routing** — LLM request rate per task, error rate per task (filtered for caller_canceled), latency per task
+  1. **mdemg-overview**: the home dashboard; request rate, p95 latency, error rate, breakers; carries the arc-trajectory UVTS panel
+  2. **mdemg-jiminy**: follow-rate (classifier + per-class), outcome split, effectiveness, actionable compliance; the JIMINY-CEILING-BREAK-2 trajectory panel lives here
+  3. **mdemg-rsic**: RSIC health dimensions (DH-005), cycle admission, insight stream, confidence gauges
+  4. **mdemg-neo4j**: Neo4j CPU/memory, null-weight edges, orphan ratio, graph node count
+  5. **mdemg-ft-training**: Phase 10 benchmark aggregate, per-task pass rate, FT loop state, FT benchmark staleness, latest benchmark age
+  6. **mdemg-graph-topology**: Hebbian weight entropy, dynamic-edge creation, reinforcement event rate (EVENTGRAPH-001)
+  7. **mdemg-hitl**: grade cadence (auto vs operator), pending drafts, reinforcement applied 7d (HITL-ANALYTICS-TILE-001)
+  8. **mdemg-j17**: J17 protocol compression, trust session count, NLI bias, auto-compact AVG (DASHBOARD-TRUTH-002 fixes)
+  9. **mdemg-llm-routing**: LLM request rate per task, error rate per task (filtered for caller_canceled), latency per task
 
 **Provenance**:
 - `deploy/docker/grafana/dashboards/*.json`
@@ -46,7 +46,7 @@
 
 ---
 
-## U13.3 — The Daily 5 Panels
+## U13.3 · The Daily 5 Panels
 
 **Title**: `What To Actually Watch`
 
@@ -57,7 +57,7 @@
   3. **mdemg-jiminy** → **Follow Rate** panel (current ~13%; title embeds JIMINY-CEILING-BREAK-2 target ≥80%)
   4. **mdemg-ft-training** → **Latest Benchmark Age** (green <3d, yellow 3-7d, red >7d; FT-BENCH-REFRESH-001)
   5. **mdemg-neo4j** → **Neo4j Memory + CPU** (CPU AVG >500% over 5min is actionable per ALERT-TRUTH-001; CPU is per-SINGLE-core)
-- Alternative: watch the terminal alerts channel (U16) — the panels and alerts share thresholds, so operator attention stays coherent
+- Alternative: watch the terminal alerts channel (U16), the panels and alerts share thresholds, so operator attention stays coherent
 
 **Provenance**:
 - CLAUDE.md "DASHBOARD-METRICS-DEEP-DIVE-001" (operator-flagged low metrics triage)
@@ -67,18 +67,18 @@
 
 ---
 
-## U13.4 — How To Read A Panel (Honest Metrics)
+## U13.4 · How To Read A Panel (Honest Metrics)
 
 **Title**: `Reading Panels Honestly`
 
 **Body**:
 - Rules per DASHBOARD-TRUTH-001/002/003:
   - Panel titles EMBED design-intent numbers (e.g. "Follow Rate (honest ~13%; target ≥80% via JIMINY-CEILING-BREAK-2)")
-  - `noValue` on gated stats names the gate ("N/A (n<2)" not blank — DASHBOARD-TRUTH-002 Min/Max Trust fix)
+  - `noValue` on gated stats names the gate ("N/A (n<2)" not blank, DASHBOARD-TRUTH-002 Min/Max Trust fix)
   - Multi-row gauges use bargauge or stat-split; NEVER `lastNotNull` reduce (DASHBOARD-TRUTH-002 Retrieval Pipeline Health fix)
   - Latency buckets cover LLM path up to 120s (DASHBOARD-TRUTH-001 extended histograms)
-  - Stat panels showing a RATE use a single windowed aggregate (NEVER per-bucket ratio reduced to lastNotNull — DASHBOARD-TRUTH-001 RSIC Cycle Success Rate fix)
-- Expect to see arc-trajectory numbers (the follow-rate panel's title literally says "arc target ≥80%; see JIMINY-CEILING-BREAK-2") — this is BY DESIGN, not a bug
+  - Stat panels showing a RATE use a single windowed aggregate (NEVER per-bucket ratio reduced to lastNotNull, DASHBOARD-TRUTH-001 RSIC Cycle Success Rate fix)
+- Expect to see arc-trajectory numbers (the follow-rate panel's title literally says "arc target ≥80%; see JIMINY-CEILING-BREAK-2"), this is BY DESIGN, not a bug
 
 **Provenance**:
 - CLAUDE.md "Dashboard metric honesty" sprint family (001 + 002 + 003)
@@ -89,7 +89,7 @@
 
 ---
 
-## U13.5 — Dashboard Governance
+## U13.5 · Dashboard Governance
 
 **Title**: `How Dashboards Stay Honest`
 
@@ -111,13 +111,13 @@
 
 ---
 
-## U13.6 — Alert ↔ Panel Linking
+## U13.6 · Alert ↔ Panel Linking
 
-**Title**: `When Alerts Fire — Where To Look`
+**Title**: `When Alerts Fire, Where To Look`
 
 **Body**:
 - The alerts channel (U16) names the rule; each rule has a corresponding Grafana panel
-- Rule-to-panel map (abbreviated — full in `internal/alert/rules.go`):
+- Rule-to-panel map (abbreviated, full in `internal/alert/rules.go`):
   - `jiminy_follow_rate_classifier_verifiable` → `mdemg-jiminy` Follow Rate panel
   - `ft_benchmark_stale` → `mdemg-ft-training` Latest Benchmark Age panel
   - `scheduled_job_recent_failure` → `mdemg-overview` Scheduled Jobs History
@@ -133,21 +133,21 @@
 
 ---
 
-## U13.7 — Gotchas + Where To Go Deeper
+## U13.7 · Gotchas + Where To Go Deeper
 
-**Title**: `Grafana — Gotchas + More`
+**Title**: `Grafana, Gotchas + More`
 
 **Body**:
 - Gotchas:
   - Grafana admin credential is printed by `mdemg init` ONCE; store it somewhere (operator Keychain / password manager); default URL `http://localhost:3030`
-  - Panels showing "No data" with a known-good query are usually a time-window issue — expand to 24h or 7d
+  - Panels showing "No data" with a known-good query are usually a time-window issue, expand to 24h or 7d
   - Alert-rule changes land in `internal/alert/rules.go` + require server restart; Grafana `mdemg-*` dashboards are read-only (no inline alerting config here)
-  - Dashboard UIDs are STABLE: `mdemg-overview`, `mdemg-jiminy`, etc. — DO NOT RENAME (external bookmarks + alert-link URLs would break)
+  - Dashboard UIDs are STABLE: `mdemg-overview`, `mdemg-jiminy`, etc., DO NOT RENAME (external bookmarks + alert-link URLs would break)
 - Feature docs:
   - CLAUDE.md "Dashboard metric honesty" sprint family (001/002/003)
-  - `docs/features/*.md` — many feature docs include their Grafana panel references
+  - `docs/features/*.md`, many feature docs include their Grafana panel references
 - Where this feeds into: U14 CLI (`mdemg healthz` + `mdemg synergy status` + `mdemg watchdog status` are the three READ CLIs that correspond to Grafana + /ui/ Status), U15 APIs (Grafana reads TSDB directly via `timescaledb` datasource; no API intermediary)
 
 **note**:
-- Operator cue: "Grafana + /ui/ + CLI are the three operator surfaces. Pick the one that matches your TIMESCALE — now (/ui/), minutes (CLI), hours+ (Grafana)."
-- Transition: "U14 next — the CLI command surface, now surveyed in full."
+- Operator cue: "Grafana + /ui/ + CLI are the three operator surfaces. Pick the one that matches your TIMESCALE, now (/ui/), minutes (CLI), hours+ (Grafana)."
+- Transition: "U14 next, the CLI command surface, now surveyed in full."

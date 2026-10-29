@@ -531,25 +531,28 @@ verify-grafana-embed:
 	@echo "  OK — no drift"
 
 # ============================================================
-# ONBOARDING-TUTORIAL-SERVE-001 E1 — Tutorial reveal.js embed sync
+# Tutorial embed sync (powered by tutorial-forge framework)
 # ============================================================
-# The canonical tutorial source is docs/onboarding/mdemg-onboarding-deck.md.
-# `make sync-tutorial-embed` runs `node scripts/tutorial/export.mjs`, which
-# invokes reveal-md to export a static reveal.js bundle, bundles mermaid.min.js
-# (reveal-md references but doesn't copy it in --static mode), and writes a
-# SOURCE_SHA256.txt breadcrumb into internal/cli/tutorial_templates/staged/.
+# tutorial-forge (`scripts/tutorial-forge/`) is a config-driven, repo-agnostic
+# framework. Config for this repo lives at `tutorial.config.json` (deck path,
+# output path, acronym overrides, CSS, SVG viewer).
+#
+# `make sync-tutorial-embed` renders the deck into the configured output dir
+# (`internal/cli/tutorial_templates/staged/`), pre-rendering all mermaid blocks
+# to SVG and expanding acronyms on first use.
+#
 # `make verify-tutorial-embed` is the CI drift gate — if the deck source or
-# the CSS override changed without re-running the sync, the SHA breadcrumb
-# won't match the current source and CI fails merge. Mirrors the GRAFANA-SHIP
+# any configured override file changed without re-running the sync, the SHA
+# breadcrumb won't match and CI fails the merge. Mirrors the GRAFANA-SHIP
 # pattern (RELEASE-HYGIENE-001 E2).
 #
-# One-time setup on a fresh checkout: `cd scripts/tutorial && npm ci`
+# One-time setup on a fresh checkout: `cd scripts/tutorial-forge && npm ci`
 .PHONY: sync-tutorial-embed verify-tutorial-embed
 sync-tutorial-embed:
-	@echo "Syncing internal/cli/tutorial_templates/staged from docs/onboarding/mdemg-onboarding-deck.md..."
-	@test -x scripts/tutorial/node_modules/.bin/reveal-md \
-		|| (echo "reveal-md not installed; run: cd scripts/tutorial && npm ci" && exit 1)
-	@node scripts/tutorial/export.mjs
+	@echo "Syncing internal/cli/tutorial_templates/staged via tutorial-forge..."
+	@test -d scripts/tutorial-forge/node_modules \
+		|| (echo "tutorial-forge deps not installed; run: cd scripts/tutorial-forge && npm ci" && exit 1)
+	@node scripts/tutorial-forge/cli.mjs build --config tutorial.config.json
 	@echo "  done ($$(find internal/cli/tutorial_templates/staged -type f | wc -l | tr -d ' ') files, $$(du -sh internal/cli/tutorial_templates/staged | cut -f1))"
 
 verify-tutorial-embed:
@@ -557,3 +560,18 @@ verify-tutorial-embed:
 	@python3 scripts/verify_tutorial_embed.py \
 		|| (echo ""; echo "DRIFT: run 'make sync-tutorial-embed' and commit the result."; exit 1)
 	@echo "  OK — no drift"
+
+# Produces mdemg-tutorial.zip — a self-contained archive that works by
+# unzipping and double-clicking index.html. Useful when GH Pages isn't
+# the right distribution channel (air-gapped review, email attachment,
+# included in a release artifact, etc.).
+.PHONY: tutorial-zip
+tutorial-zip: sync-tutorial-embed
+	@echo "Packaging tutorial for standalone download..."
+	@tmp=$$(mktemp -d) && \
+		cp -R internal/cli/tutorial_templates/staged "$$tmp/mdemg-tutorial" && \
+		(cd "$$tmp" && zip -qr "$$OLDPWD/mdemg-tutorial.zip" mdemg-tutorial) && \
+		rm -rf "$$tmp"
+	@size=$$(du -h mdemg-tutorial.zip | cut -f1) && \
+		echo "  Wrote mdemg-tutorial.zip ($$size)" && \
+		echo "  To view: unzip mdemg-tutorial.zip && open mdemg-tutorial/index.html"

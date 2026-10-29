@@ -1,8 +1,8 @@
-# Presentation Spec — End-User Path
+# Presentation Spec · End-User Path
 
 **Sprint**: ONBOARDING-TUTORIAL-ENDUSER-001
 **Governance pattern**: adapted from [`../mdemg-onboarding-deck-001/presentation_spec.md`](../mdemg-onboarding-deck-001/presentation_spec.md)
-**Status**: DRAFT — awaiting operator sign-off (E1 gate)
+**Status**: DRAFT, awaiting operator sign-off (E1 gate)
 **Last updated**: 2026-10-26
 
 > This document is the **content contract** for the end-user walkthrough content shipped into `docs/onboarding/mdemg-onboarding-deck.md` behind the `#end-user-path` fork. The dev-path 107-slide deck is governed by its sibling spec in `mdemg-onboarding-deck-001/`; this spec is what the END-USER PATH content is tested against.
@@ -11,16 +11,16 @@
 
 ## 1a. Opening Framing (operator directive 2026-10-26)
 
-The slideshow (both paths — end-user AND dev) opens by answering 4 strategic questions + an integrating slide, and each subsequent section is an in-depth answer to a piece of those questions:
+The slideshow (both paths, end-user AND dev) opens by answering 4 strategic questions + an integrating slide, and each subsequent section is an in-depth answer to a piece of those questions:
 
 1. **What is MDEMG?**
 2. **What problem(s) does it attempt to solve?**
 3. **How does it solve those problems?**
 4. **How does it continuously get better at solving those problems?**
-5. **How does it all work together?** (the integrator — one Mermaid showing the whole loop)
+5. **How does it all work together?** (the integrator, one Mermaid showing the whole loop)
 
 **Where answered**:
-- At the top of each path: U1 (end-user) / F1 (dev) — one slide per question + landing
+- At the top of each path: U1 (end-user) / F1 (dev), one slide per question + landing
 - Then each U-section (resp. F-section) is one or more in-depth answers mapped back to those questions
 
 **End-user U-section → question mapping**:
@@ -40,7 +40,7 @@ Dev-path F1 is already shipped and partially aligned (opens with "What MDEMG Is 
 
 **Target audience**: Operators of a running MDEMG instance.
 - Someone who ran `brew install reh3376/mdemg/mdemg` or `mdemg init --defaults && docker compose up -d`
-- Someone who wants to USE the system — the operator's view
+- Someone who wants to USE the system, the operator's view
 
 The slideshow forks at the landing slide into **2 paths**: end-user (this one) and software dev / contributor (the shipped F1-F10 107-slide dev deck). Each path is comprehensive for the audience of that path (end-user path for operators, dev path for developers/contributors); viewers pick one path and stay in it.
 
@@ -51,9 +51,9 @@ The slideshow forks at the landing slide into **2 paths**: end-user (this one) a
 
 **Posture** (operator-directed 2026-10-26: "extensive and highly informative onboarding mechanism"):
 - **Comprehensive-first, terse-second**: cover every major topic in genuine depth; don't trim for brevity
-- **Operator-task shaped**: show what to click / type / watch — plus the mental model, current state, and gotchas for each topic so the operator truly OWNS the surface
+- **Operator-task shaped**: show what to click / type / watch, plus the mental model, current state, and gotchas for each topic so the operator truly OWNS the surface
 - **CLI-example heavy**: commands + output verbatim remain the backbone
-- **Honest trajectory language**: inherited from dev-path governance — no "by design" framing on sub-target metrics
+- **Honest trajectory language**: inherited from dev-path governance, no "by design" framing on sub-target metrics
 
 ---
 
@@ -63,20 +63,20 @@ The slideshow forks at the landing slide into **2 paths**: end-user (this one) a
 
 - No upper bound on total slide count.
 - No upper bound on Mermaid diagrams, tables, images, code blocks, or any other visual element per slide or per section.
-- No lower bound either — a topic that covers cleanly in 2 slides doesn't need padding to 5.
+- No lower bound either, a topic that covers cleanly in 2 slides doesn't need padding to 5.
 
 **Rule**: each slide / figure / table / diagram EARNS its place by conveying information the viewer needs AND cannot easily get from the preceding slide. If removing an element would leave a gap the viewer can't fill from context, keep it. If it's redundant with the slide before, drop it.
 
 **Depth template** (guide, not straitjacket):
 
 Each major topic (U-section) typically covers:
-1. **Section landing** — what this covers, why it matters
-2. **Mental model** — the mental model the operator should carry away (Mermaid if it genuinely helps)
-3. **Where to see it** — UI tab(s), Grafana panel(s), log patterns
-4. **How to touch it** — CLI commands, API endpoints
-5. **Current state (honest)** — today's state + arc moving the needle (trajectory language)
-6. **Gotchas** — common footguns, misconceptions
-7. **Where to go deeper** — feature doc, CLAUDE.md pin, sprint record
+1. **Section landing**: what this covers, why it matters
+2. **Mental model**: the mental model the operator should carry away (Mermaid if it genuinely helps)
+3. **Where to see it**: UI tab(s), Grafana panel(s), log patterns
+4. **How to touch it**: CLI commands, API endpoints
+5. **Current state (honest)**: today's state + arc moving the needle (trajectory language)
+6. **Gotchas**: common footguns, misconceptions
+7. **Where to go deeper**: feature doc, CLAUDE.md pin, sprint record
 
 **Topics may expand elements as needed**:
 - U3 Memory may need 2-3 Mermaid diagrams (hierarchy + Hebbian flow + consolidation lifecycle) if that's what the operator needs to carry the mental model.
@@ -93,7 +93,7 @@ The current `global_roadmap.md` section breakdown is a **working estimate**, not
 
 Dev deck uses a **5-beat template** (`what / why / how / honest / connect`) because every F-section explains an architectural COMPONENT. The end-user path explains OPERATIONS, which need a different shape.
 
-**End-user slide template** (operator-task slides — ~70% of the deck):
+**End-user slide template** (operator-task slides, ~70% of the deck):
 
 ```
 TITLE: short imperative or question (e.g. "What's Running?", "Opening /ui/", "Reading an Alert")
@@ -115,10 +115,10 @@ note:
 - Factual provenance: CLAUDE.md:line / feature doc / shipped code (stripped from final slide, kept in note block)
 ```
 
-**Section-landing slide template** (one per U-section — ~15% of the deck):
+**Section-landing slide template** (one per U-section, ~15% of the deck):
 
 ```
-TITLE: section number + name (e.g. "U4 · CLI — The ~15 Commands You'll Use")
+TITLE: section number + name (e.g. "U4 · CLI, The ~15 Commands You'll Use")
 
 1-sentence intent for the section ("You'll use these daily; everything else is optional.")
 
@@ -130,7 +130,7 @@ note:
 - Operator pacing cue
 ```
 
-**Pure-info slide template** (TOC, Thank You, pointer slides — ~15% of the deck):
+**Pure-info slide template** (TOC, Thank You, pointer slides, ~15% of the deck):
 
 ```
 TITLE + 1-sentence body + link table or bulleted next-steps.
@@ -138,7 +138,7 @@ TITLE + 1-sentence body + link table or bulleted next-steps.
 
 **Never allowed**:
 - Walls of prose (>3 lines of flat text without a list / code block / diagram break)
-- Slides whose body is purely explanatory ("MDEMG is a cognitive substrate..." — operator doesn't care here; that's dev-path territory)
+- Slides whose body is purely explanatory ("MDEMG is a cognitive substrate...", operator doesn't care here; that's dev-path territory)
 - Slides without a concrete operator action, UI reference, or next-step pointer
 
 ---
@@ -156,33 +156,33 @@ TITLE + 1-sentence body + link table or bulleted next-steps.
 
 - **No cap** (operator directive 2026-10-26). Diagrams earn their place by conveying mental models that prose can't easily carry.
 - **Minimum expected diagrams** (these are the ones the roadmap LOCKS as required; sections may add more as authoring demands):
-  - **U1.6** — the integrated system flow (memory + retrieval + Jiminy + RSIC + UxTS + HITL + retrain fitting together)
-  - **U2** — the 5-container + mdemg server stack sketch
-  - **U3 Memory** — L0→L1→L2+ hierarchy sketch; may need additional diagrams for Hebbian co-activation and consolidation lifecycle
-  - **U4 Jiminy** — guidance → outcome → trust-signal loop
-  - **U5 RSIC** — admission → cycle → outcome loop
-  - **U6 UxTS** — the forcing-function diamond (spec → fixture → runner → CI gate); likely needs a family-map table as well
-  - **U15 APIs + gRPC** — surface map (operators via CLI → REST; plugins/transfer via gRPC); may need per-service protocol diagrams
-  - **U16 Alerts** — override-flow sketch (block → operator → override → audit trail)
+  - **U1.6**: the integrated system flow (memory + retrieval + Jiminy + RSIC + UxTS + HITL + retrain fitting together)
+  - **U2**: the 5-container + mdemg server stack sketch
+  - **U3 Memory**: L0→L1→L2+ hierarchy sketch; may need additional diagrams for Hebbian co-activation and consolidation lifecycle
+  - **U4 Jiminy**: guidance → outcome → trust-signal loop
+  - **U5 RSIC**: admission → cycle → outcome loop
+  - **U6 UxTS**: the forcing-function diamond (spec → fixture → runner → CI gate); likely needs a family-map table as well
+  - **U15 APIs + gRPC**: surface map (operators via CLI → REST; plugins/transfer via gRPC); may need per-service protocol diagrams
+  - **U16 Alerts**: override-flow sketch (block → operator → override → audit trail)
 - Sections that need MORE diagrams for completeness take them. Operator E5 review decides "enough / too much."
 
 ### 4.3 Screenshot policy
 
 - **Default: NO screenshots.** `docs/onboarding/assets/` is empty by design (dev-deck convention); we honor it.
 - **Operator decides at E5 review**: if a /ui/ tab description feels unclear without a visual, operator captures the screenshot THEN, adds it to `assets/`, and E4 re-stitches.
-- Screenshot captures MUST be scrubbed of operator-personal info (no email, no identifiable paths — same hygiene rules as beta-share bundles).
+- Screenshot captures MUST be scrubbed of operator-personal info (no email, no identifiable paths, same hygiene rules as beta-share bundles).
 
 ### 4.4 Section ordering
 
 **Fixed** (operator sign-off at E1 can revise):
 
-1. U1 Welcome — frame the "running stack" mental model first; everything else assumes you can see containers
-2. U2 /ui/ Dashboard — operators arrive at :9999/ui/ via the Grafana link; it's the first thing they click
-3. U3 Grafana — complementary surface to /ui/; the one most operators underuse
-4. U4 CLI — the thing operators type when the UI doesn't cover it
-5. U5 Memory — the thing operators tell OTHER operators about ("you can inspect what MDEMG remembers")
-6. U6 Alerts + Enforcement — the thing operators HANDLE when something's off
-7. U7 Where To Go — honest exit
+1. U1 Welcome, frame the "running stack" mental model first; everything else assumes you can see containers
+2. U2 /ui/ Dashboard, operators arrive at :9999/ui/ via the Grafana link; it's the first thing they click
+3. U3 Grafana, complementary surface to /ui/; the one most operators underuse
+4. U4 CLI, the thing operators type when the UI doesn't cover it
+5. U5 Memory, the thing operators tell OTHER operators about ("you can inspect what MDEMG remembers")
+6. U6 Alerts + Enforcement, the thing operators HANDLE when something's off
+7. U7 Where To Go, honest exit
 
 **Not negotiable**: U6 (Alerts + Enforcement) stays late because operators need the first 5 sections to understand WHAT they're triaging / toggling.
 
@@ -210,7 +210,7 @@ Any slide reading a sub-target metric MUST frame it as trajectory, NOT "by desig
 
 Per the 2026-08-01 `trust-signal-must-be-persisted-never-ignore-honest` directive.
 
-**End-user-specific application**: if a slide shows `Cache Hit Ratio: LOW alert`, name it as "current ~75% vs DH-004 honest baseline" — NOT "LOW by design".
+**End-user-specific application**: if a slide shows `Cache Hit Ratio: LOW alert`, name it as "current ~75% vs DH-004 honest baseline", NOT "LOW by design".
 
 ### 5.3 Deck-rides-the-claim (HARD, forward-only)
 Any shipped sprint that CHANGES an end-user claim (new UI tab, renamed CLI flag, new env var, retired dashboard panel) MUST update the affected U-slide in the same commit.
@@ -222,7 +222,7 @@ The `#end-user-path` anchor on the U1 landing slide MUST survive this sprint and
 
 **Why**: `ONBOARDING-TUTORIAL-SERVE-001` shipped a landing fork slide that links to `#end-user-path`. Renaming the anchor silently breaks the fork; the operator who clicks "End User" lands at the Thank You slide (default fall-through) with no indication of what went wrong.
 
-**Enforcement**: E4 regression check greps `mdemg-onboarding-deck.md` for both `id="end-user-path"` AND `href="#end-user-path"` (or `#end-user-path` in bare markdown link form) — both must be present and well-formed in the resynced embed.
+**Enforcement**: E4 regression check greps `mdemg-onboarding-deck.md` for both `id="end-user-path"` AND `href="#end-user-path"` (or `#end-user-path` in bare markdown link form), both must be present and well-formed in the resynced embed.
 
 ### 5.5 Quarterly refresh (soft)
 End-user content refresh cadence follows dev-deck's quarterly schedule. Owner: reh3376. Refresh checklist to live in `mdemg-onboarding-notes.md` section (shared with dev deck).
@@ -234,13 +234,13 @@ End-user content refresh cadence follows dev-deck's quarterly schedule. Owner: r
 **Any change to this spec** (slide-count envelope, section ordering, per-slide template, Mermaid/screenshot policy) must:
 1. Open a comment or discussion in the sprint tracking surface
 2. Operator sign-off before any U-section roadmap or draft slide changes
-3. Spec version-bumped at TOP of file (currently v1.0 — this document)
+3. Spec version-bumped at TOP of file (currently v1.0, this document)
 4. CLAUDE.md pin re-pointed if invariant changed
 
 **Any change to a U-section's scope** (slide count, section ordering, intent) within the shipped structure:
 1. Must land in `global_roadmap.md` AND the relevant `roadmaps/U*.md` in the same commit
 2. Operator spot-check at E2 covers this during initial authoring; later revisions follow the deck-rides-the-claim rule
-3. If a change WIDENS scope beyond the 45-slide hard upper bound, it's a scope creep — defer to a follow-up sprint
+3. If a change WIDENS scope beyond the 45-slide hard upper bound, it's a scope creep, defer to a follow-up sprint
 
 ---
 

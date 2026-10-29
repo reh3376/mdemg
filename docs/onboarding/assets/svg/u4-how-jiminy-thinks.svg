@@ -1,0 +1,129 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 1260" preserveAspectRatio="xMidYMid meet" role="img" aria-label="How Jiminy Thinks: BEFORE and AFTER phases of the guidance loop">
+  <title>How Jiminy Thinks</title>
+  <desc>Vertical two-phase loop. Before an action, Jiminy retrieves durable rules and synthesizes a directive. After the action, Jiminy classifies compliance and feeds the outcome to trust score, RSIC, and Grafana.</desc>
+
+  <defs>
+    <style>
+      .phase    { font: 600 20px -apple-system, "Inter", "Segoe UI", Arial, sans-serif; fill: #475569; letter-spacing: 0.08em; }
+      .label    { font: 500 20px -apple-system, "Inter", "Segoe UI", Arial, sans-serif; fill: #0f172a; }
+      .sublabel { font: 400 16px -apple-system, "Inter", "Segoe UI", Arial, sans-serif; fill: #475569; }
+      .edge     { font: italic 400 15px -apple-system, "Inter", "Segoe UI", Arial, sans-serif; fill: #475569; }
+      .center   { text-anchor: middle; }
+      .start    { text-anchor: start; }
+    </style>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#64748b"/>
+    </marker>
+
+    <!-- Reusable cylinder: pass x,y,w,h as placeholder; drawn as symbol for clarity -->
+    <symbol id="cylinder" viewBox="0 0 300 70" preserveAspectRatio="none">
+      <!-- Side walls + bottom cap -->
+      <path d="M0,12 L0,58 Q0,70 150,70 Q300,70 300,58 L300,12" fill="#ede9fe" stroke="#6d28d9" stroke-width="2"/>
+      <!-- Back half of top ellipse (dashed subtle, behind) -->
+      <path d="M0,12 Q0,0 150,0 Q300,0 300,12" fill="#ede9fe" stroke="#6d28d9" stroke-width="2"/>
+      <!-- Front half of top ellipse (solid, foreground) -->
+      <path d="M0,12 Q0,24 150,24 Q300,24 300,12" fill="none" stroke="#6d28d9" stroke-width="2"/>
+    </symbol>
+  </defs>
+
+  <rect width="1100" height="1260" fill="#ffffff"/>
+
+  <!-- =========== AGENT (top) =========== -->
+  <rect x="400" y="30" width="300" height="70" rx="35" fill="#fef3c7" stroke="#d97706" stroke-width="2.5"/>
+  <text x="550" y="73" class="label center">Agent decides to act</text>
+
+  <!-- top-of-flow arrow + edge label -->
+  <line x1="550" y1="100" x2="550" y2="162" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="570" y="135" class="edge start">about to run a tool</text>
+
+  <!-- =========== BEFORE PANEL =========== -->
+  <rect x="80" y="175" width="940" height="345" rx="18" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="110" y="205" class="phase">1 · BEFORE  —  GET GUIDANCE</text>
+
+  <!-- POST /latest -->
+  <rect x="400" y="230" width="300" height="60" rx="10" fill="#dbeafe" stroke="#1d4ed8" stroke-width="2"/>
+  <text x="550" y="265" class="label center">POST /v1/jiminy/latest</text>
+
+  <line x1="550" y1="290" x2="550" y2="328" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="570" y="313" class="edge start">query</text>
+
+  <!-- L1 Rules cylinder -->
+  <use href="#cylinder" x="400" y="335" width="300" height="70"/>
+  <text x="550" y="382" class="label center">L1 Rules</text>
+
+  <line x1="550" y1="415" x2="550" y2="443" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="570" y="432" class="edge start">top matching rules</text>
+
+  <!-- Synthesize -->
+  <rect x="400" y="450" width="300" height="60" rx="10" fill="#dbeafe" stroke="#1d4ed8" stroke-width="2"/>
+  <text x="550" y="485" class="label center">Synthesize directive</text>
+
+  <!-- =========== AGENT (middle, after BEFORE panel) =========== -->
+  <line x1="550" y1="520" x2="550" y2="582" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="570" y="555" class="edge start">directive back to agent</text>
+
+  <rect x="400" y="590" width="300" height="70" rx="35" fill="#fef3c7" stroke="#d97706" stroke-width="2.5"/>
+  <text x="550" y="633" class="label center">Agent acts (or doesn't)</text>
+
+  <line x1="550" y1="660" x2="550" y2="717" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="570" y="693" class="edge start">tool executed</text>
+
+  <!-- =========== AFTER PANEL =========== -->
+  <rect x="80" y="730" width="940" height="340" rx="18" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="110" y="760" class="phase">2 · AFTER  —  RECORD OUTCOME</text>
+
+  <!-- POST /feedback -->
+  <rect x="400" y="785" width="300" height="60" rx="10" fill="#dbeafe" stroke="#1d4ed8" stroke-width="2"/>
+  <text x="550" y="820" class="label center">POST /v1/jiminy/feedback</text>
+
+  <line x1="550" y1="845" x2="550" y2="878" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="570" y="866" class="edge start">classify</text>
+
+  <!-- Verdict diamond (wider now to fit label; sublabel moved BELOW) -->
+  <polygon points="550,885 710,920 550,955 390,920" fill="#fee2e2" stroke="#b91c1c" stroke-width="2"/>
+  <text x="550" y="927" class="label center">Verdict</text>
+
+  <!-- Sublabel below the diamond -->
+  <text x="550" y="978" class="sublabel center">followed  ·  ignored  ·  partial  ·  contradicted  ·  n/a</text>
+
+  <line x1="550" y1="988" x2="550" y2="1018" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- constraint_outcomes cylinder -->
+  <use href="#cylinder" x="400" y="1020" width="300" height="70"/>
+  <text x="550" y="1067" class="label center">constraint_outcomes</text>
+
+  <!-- =========== FANOUT: rounded bends via Q curves =========== -->
+  <!-- trunk from constraint_outcomes down into fanout junction -->
+  <line x1="550" y1="1090" x2="550" y2="1115" stroke="#64748b" stroke-width="1.5"/>
+  <!-- horizontal distributor + rounded corners (Q curves) -->
+  <path d="M550,1115 L218,1115 Q200,1115 200,1133 L200,1148" fill="none" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <path d="M550,1115 L550,1148" fill="none" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <path d="M550,1115 L882,1115 Q900,1115 900,1133 L900,1148" fill="none" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <rect x="90" y="1155" width="220" height="55" rx="27" fill="#dcfce7" stroke="#047857" stroke-width="2"/>
+  <text x="200" y="1188" class="label center">Trust score (J17)</text>
+
+  <rect x="440" y="1155" width="220" height="55" rx="27" fill="#dcfce7" stroke="#047857" stroke-width="2"/>
+  <text x="550" y="1188" class="label center">RSIC loop</text>
+
+  <rect x="790" y="1155" width="220" height="55" rx="27" fill="#dcfce7" stroke="#047857" stroke-width="2"/>
+  <text x="900" y="1188" class="label center">Grafana panels</text>
+
+  <!-- =========== LEGEND =========== -->
+  <g transform="translate(80, 1232)">
+    <rect x="0" y="-10" width="30" height="16" rx="8" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/>
+    <text x="40" y="4" class="sublabel start">actor</text>
+
+    <rect x="115" y="-10" width="30" height="16" rx="4" fill="#dbeafe" stroke="#1d4ed8" stroke-width="1.5"/>
+    <text x="155" y="4" class="sublabel start">service</text>
+
+    <ellipse cx="255" cy="-2" rx="18" ry="8" fill="#ede9fe" stroke="#6d28d9" stroke-width="1.5"/>
+    <text x="285" y="4" class="sublabel start">data store</text>
+
+    <polygon points="400,-8 418,-2 400,4 382,-2" fill="#fee2e2" stroke="#b91c1c" stroke-width="1.5"/>
+    <text x="428" y="4" class="sublabel start">decision gate</text>
+
+    <rect x="555" y="-10" width="30" height="16" rx="8" fill="#dcfce7" stroke="#047857" stroke-width="1.5"/>
+    <text x="595" y="4" class="sublabel start">sink / downstream consumer</text>
+  </g>
+</svg>

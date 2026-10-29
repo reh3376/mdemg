@@ -1,27 +1,27 @@
-# U16 — Alerts + Enforcement Escape Hatches (7 slides)
+# U16 · Alerts + Enforcement Escape Hatches (7 slides)
 
 **Intent**: Terminal banner + severity map + alerts channel mechanics + `mdemg jiminy mode` + `mdemg jiminy override` + the auto-execute policy + audit trail.
 **Target slides**: 7
-**Mermaid**: 1 (U16.5 — override flow)
+**Mermaid**: 1 (U16.5, override flow)
 **Natural Q&A anchor**: after U16
 
 ---
 
-## U16.1 — Section Landing
+## U16.1 · Section Landing
 
-**Title**: `U16 · Alerts + Enforcement — Operator Triage`
+**Title**: `U16 · Alerts + Enforcement, Operator Triage`
 
 **Body**:
 - Intent: "This is where you RESPOND. Alerts tell you what's wrong (historical, hours-scale). Enforcement is Jiminy preventing a durable constraint violation (right-now). Both ship escape hatches that preserve operator agency."
 - Preview: alerts channel → terminal banner → severity map → clearing → enforcement in-session → override flow → audit trail
-- Points back to U1.4 "How does it solve them?" — the ENFORCEMENT surface
+- Points back to U1.4 "How does it solve them?", the ENFORCEMENT surface
 
 **Provenance**:
 - CLAUDE.md "Service Alert System (SR-001 + SNA-001)" + "JIMINY-ENFORCE arc"
 
 ---
 
-## U16.2 — The Alerts Channel
+## U16.2 · The Alerts Channel
 
 **Title**: `The Alerts Channel`
 
@@ -29,12 +29,12 @@
 - Storage: `~/.mdemg/alerts/current.json` (configurable via `ALERT_FILE_PATH`); JSON array of alert objects
 - Shape: `{severity, service, title, body, timestamp, cleared_at: null}`
 - Severities (3 shipped):
-  - **CRITICAL** — immediate operator attention; typically triggers macOS notification
-  - **HIGH** — significant degradation; operator-triage within hours
-  - **MEDIUM** — regression trajectory, often arcs-in-progress; operator-aware
-  - **LOW** — informational trajectory (occasional)
+  - **CRITICAL**: immediate operator attention; typically triggers macOS notification
+  - **HIGH**: significant degradation; operator-triage within hours
+  - **MEDIUM**: regression trajectory, often arcs-in-progress; operator-aware
+  - **LOW**: informational trajectory (occasional)
 - Sources (3): RSIC alert actions (U5), circuit breaker state changes (U2), health prober transitions, server-native alert evaluator (24+ TSDB-query rules), Grafana webhook (backward compat)
-- The 44 pending alerts on your session start banner are a mix of MEDIUM (Jiminy follow-rate drops — arcs-in-progress per JIMINY-CEILING-BREAK-2) + HIGH (FT benchmark staleness, scheduled-job-staleness) + LOW (cache hit ratio)
+- The 44 pending alerts on your session start banner are a mix of MEDIUM (Jiminy follow-rate drops, arcs-in-progress per JIMINY-CEILING-BREAK-2) + HIGH (FT benchmark staleness, scheduled-job-staleness) + LOW (cache hit ratio)
 
 **Provenance**:
 - CLAUDE.md "Service Alert System" + "Scheduled-job health (NOSILENT-001)"
@@ -45,19 +45,19 @@
 
 ---
 
-## U16.3 — Terminal Banner Pattern
+## U16.3 · Terminal Banner Pattern
 
 **Title**: `What The Banner Tells You`
 
 **Body**:
 - Session-start hook (`.claude/hooks/session-start.sh`) reads `current.json` and surfaces CRITICAL + HIGH alerts
 - Prompt-context hook (`.claude/hooks/prompt-context.sh`) shows ALL pending alerts every prompt
-- Format: `[SEVERITY] [timestamp] service: title — body`
+- Format: `[SEVERITY] [timestamp] service: title, body`
 - Reading the banner:
   - Group by severity (CRITICAL + HIGH first)
   - Group by service (same service multiple fires = root cause probably one issue)
   - Age matters: a 30-min-old alert is current; a 2-week-old alert is stale (JIMINY-FOLLOW-RATE-REMEASURE-001 trajectory re-check)
-- Clearing: hooks auto-clear surfaced alerts via `POST /v1/alerts/clear` (HOOKSYNC-001 — cleared = delivered)
+- Clearing: hooks auto-clear surfaced alerts via `POST /v1/alerts/clear` (HOOKSYNC-001, cleared = delivered)
 
 **Provenance**:
 - CLAUDE.md "Hook stdin contract (HOOKWIRE-001)" + "Hook channel health (HOOKSYNC-001)"
@@ -68,7 +68,7 @@
 
 ---
 
-## U16.4 — Enforcement In-Session
+## U16.4 · Enforcement In-Session
 
 **Title**: `When Jiminy Blocks You`
 
@@ -98,7 +98,7 @@
 
 ---
 
-## U16.5 — Mermaid #7 — Override Flow
+## U16.5 · Mermaid #7, Override Flow
 
 **Title**: `The Override Escape Hatch`
 
@@ -127,7 +127,7 @@
 
 ---
 
-## U16.6 — RSIC Auto-Execute Policy
+## U16.6 · RSIC Auto-Execute Policy
 
 **Title**: `When The System Mutates Itself`
 
@@ -139,7 +139,7 @@
     - Gated by `FT_LOOP_ENABLED=false` default
   - `adjust_guidance_confidence` (deferred): not auto-executable yet; non-trivially reversible, HITL-only
 - Rule: `archive_*` boolean mutations auto-executable; `adjust_*` scalar mutations require HITL
-- Audit: every auto-execute emits a MEDIUM alert (`rsic-auto-archive` service) with REVERSAL CYPHER in the message body — operator sees + can reverse
+- Audit: every auto-execute emits a MEDIUM alert (`rsic-auto-archive` service) with REVERSAL CYPHER in the message body, operator sees + can reverse
 
 **Provenance**:
 - CLAUDE.md "RSIC auto-execute for enforcement patterns (ENFORCE-AUTO-EXECUTE)" (3/3 of JIMINY-ENFORCE arc)
@@ -149,18 +149,18 @@
 
 ---
 
-## U16.7 — Gotchas + Where To Go Deeper
+## U16.7 · Gotchas + Where To Go Deeper
 
-**Title**: `Alerts + Enforcement — Gotchas + More`
+**Title**: `Alerts + Enforcement, Gotchas + More`
 
 **Body**:
 - Gotchas:
-  - `/v1/alerts/clear` is RECEIPT-OF-DELIVERY, not RESOLUTION — the underlying condition may still be true next evaluation window
-  - 44 pending alerts on your session is NOT a crisis — most are MEDIUM Jiminy follow-rate (arc-in-progress) + HIGH FT benchmark staleness (one issue, re-evaluates hourly)
+  - `/v1/alerts/clear` is RECEIPT-OF-DELIVERY, not RESOLUTION, the underlying condition may still be true next evaluation window
+  - 44 pending alerts on your session is NOT a crisis, most are MEDIUM Jiminy follow-rate (arc-in-progress) + HIGH FT benchmark staleness (one issue, re-evaluates hourly)
   - Enforcement is session-scoped (per `session_id`); multi-agent setups need per-agent session IDs
-  - Overrides expire — forgotten overrides can't silently disable enforcement forever (invariant: duration > 0)
+  - Overrides expire, forgotten overrides can't silently disable enforcement forever (invariant: duration > 0)
   - Auto-execute is OPT-IN; `ENFORCEMENT_AUTO_EXECUTE_ENABLED=false` default
-  - Cooldown-key contract (NOSILENT-001): distinct Services per rule — two rules sharing `(service, severity)` key would suppress each other
+  - Cooldown-key contract (NOSILENT-001): distinct Services per rule, two rules sharing `(service, severity)` key would suppress each other
 - Feature docs:
   - `docs/features/service-alerts.md` (or CLAUDE.md "Service Alert System" section)
   - `docs/features/jiminy-strict.md`
@@ -169,4 +169,4 @@
 
 **note**:
 - Operator cue: "Alerts are HONEST SIGNALS. Enforcement is PREEMPTIVE PROTECTION. Overrides are CONSCIOUS DISAGREEMENT. The three together are the operator's full agency surface."
-- Transition: "U17 next — where to go from here."
+- Transition: "U17 next, where to go from here."
