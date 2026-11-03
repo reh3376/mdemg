@@ -1,17 +1,22 @@
 {
   "name": "tutorial-forge",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
   "description": "Config-driven, repo-agnostic framework that renders a markdown deck into a static HTML tutorial package. Pre-renders mermaid diagrams to SVG, expands acronyms on first use, bundles an interactive zoom/pan SVG viewer, and emits a self-contained static site that any static host can serve.",
   "bin": {
     "tutorial-forge": "./cli.mjs"
   },
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
   "dependencies": {
     "marked": "13.0.3",
-    "mermaid": "11.16.1",
-    "puppeteer": "23.9.0",
-    "highlight.js": "11.11.1",
-    "reveal-md": "6.1.4"
+    "mermaid": "12.2.0",
+    "puppeteer": "25.16.0",
+    "highlight.js": "11.11.1"
+  },
+  "overrides": {
+    "basic-ftp": "^6.2.5"
   }
 }

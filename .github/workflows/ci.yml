@@ -515,13 +515,14 @@ jobs:
         uses: aquasecurity/trivy-action@v0.36.0
         env:
           # scripts/tutorial-forge/ carries build-time dev-tool npm deps
-          # (marked + mermaid + puppeteer + highlight.js + reveal-md's
-          # favicon) only — never shipped to operator runtime, never
-          # processes untrusted input (just the deck markdown we control).
-          # Transitive CVEs in these deps (basic-ftp, body-parser,
-          # extract-zip, etc. via reveal-md's bundler chain) are
-          # false-positives at the shipped-code risk tier. Scanning them
-          # as if they were production surfaces breaks every PR.
+          # (marked + mermaid + puppeteer + highlight.js) only — never
+          # shipped to operator runtime, never processes untrusted input
+          # (just the deck markdown we control). Its lockfile audits clean
+          # since 2026-11-03 (reveal-md dropped, puppeteer/mermaid current,
+          # basic-ftp pinned by an override); any future transitive CVE in
+          # puppeteer's browser-download chain is a false-positive at the
+          # shipped-code risk tier. Scanning them as production surfaces
+          # would break every PR.
           # Renamed from scripts/tutorial on 2026-10-27 as part of the
           # tutorial-forge framework extraction.
           TRIVY_SKIP_DIRS: 'scripts/tutorial-forge'
