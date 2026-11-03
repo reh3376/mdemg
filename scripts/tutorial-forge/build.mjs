@@ -5,7 +5,7 @@
 // Package layout emitted:
 //   <output>/
 //     index.html                    deck as one long readable document
-//     favicon.ico                   (if config.iconPath set)
+//     favicon.ico                   (config.iconPath or the framework default)
 //     SOURCE_SHA256.txt             drift breadcrumb for CI gate
 //     assets/
 //       css/
@@ -44,9 +44,54 @@ const FRAMEWORK_DEFAULTS = {
   svgViewer: join(PKG_DIR, 'templates', 'svg-viewer.js'),
   highlightStyle: join(PKG_DIR, 'node_modules', 'highlight.js', 'styles', 'base16', 'zenburn.min.css'),
   mermaid: join(PKG_DIR, 'node_modules', 'mermaid', 'dist', 'mermaid.min.js'),
-  // reveal-md ships a tiny favicon we can reuse as the framework default.
-  favicon: join(PKG_DIR, 'node_modules', 'reveal-md', 'lib', 'favicon.ico'),
+  // The framework's own 16x16 favicon (the generic icon reveal-md used to
+  // ship; MIT, (c) Lars Kappert). config.iconPath overrides it.
+  favicon: join(PKG_DIR, 'templates', 'favicon.ico'),
 };
+
+// Explicit heading pins travel through the markdown renderer as an inline HTML
+// comment on the heading line (marked passes inline comments through verbatim)
+// and become id attributes in the heading-id pass, so a pin attaches to its
+// heading by position and the heading's text plays no part in the match.
+const PIN_MARKER = (id) => `<!--tf-pin:${id}-->`;
+const PIN_MARKER_RE = /<(h[1-6])>\s*<!--tf-pin:([^>]+)-->\s*/g;
+const PIN_MARKER_LEFTOVER_RE = /\s*<!--tf-pin:[^>]+-->/g;
+
+/**
+ * Put the pin marker on the first ATX heading of `body` (the chunk text after
+ * its pin directive) that is not inside a fenced code block. Returns the
+ * edited text, or null when there is no such heading.
+ */
+function pinFirstHeading(body, id) {
+  const lines = body.split('\n');
+  let fence = null;
+  for (let i = 0; i < lines.length; i += 1) {
+    const fenceMatch = lines[i].match(/^\s{0,3}(`{3,}|~{3,})/);
+    if (fenceMatch) {
+      if (fence === null) fence = fenceMatch[1][0];
+      else if (fenceMatch[1][0] === fence) fence = null;
+      continue;
+    }
+    if (fence !== null) continue;
+    const head = lines[i].match(/^(\s{0,3}#{1,6})[ \t]+(.+)$/);
+    if (head) {
+      lines[i] = `${head[1]} ${PIN_MARKER(id)} ${head[2]}`;
+      return lines.join('\n');
+    }
+  }
+  return null;
+}
+
+const NAMED_ENTITIES = { lt: '<', gt: '>', quot: '"', apos: "'", nbsp: '\u00a0' };
+/** Decode the entities marked emits in text nodes; `&amp;` last so nothing decodes twice. */
+function decodeEntities(s) {
+  const fromCode = (whole, n) => (n <= 0x10ffff ? String.fromCodePoint(n) : whole);
+  return String(s)
+    .replace(/&#(\d+);/g, (m, n) => fromCode(m, Number(n)))
+    .replace(/&#x([0-9a-f]+);/gi, (m, h) => fromCode(m, parseInt(h, 16)))
+    .replace(/&(lt|gt|quot|apos|nbsp);/g, (_m, name) => NAMED_ENTITIES[name])
+    .replace(/&amp;/g, '&');
+}
 
 export function logInfo(msg) {
   console.log(`[tutorial-forge] ${msg}`);
@@ -157,19 +202,33 @@ export async function build(config, configDir) {
   const slideChunks = md.split(/\n---\n/);
   logInfo(`parsed ${slideChunks.length} source chunks`);
 
+  // Explicit pins: a `<!-- .slide: id="X" -->` directive pins id="X" on the
+  // first heading that follows it in its chunk (see pinFirstHeading). A
+  // heading with an escaped character, an acronym expansion or a glossary
+  // link pins exactly like a plain one, and a pin that cannot attach never
+  // blocks a later one.
   const explicitPins = [];
   const mermaidSources = [];
   const MERMAID_PLACEHOLDER = (n) => `@@MERMAID_PLACEHOLDER_${n}@@`;
 
   const processedChunks = slideChunks.map((chunk) => {
     const idMatch = chunk.match(/<!--\s*\.slide:\s*id="([^"]+)"\s*-->/);
-    const slideId = idMatch ? idMatch[1] : null;
-    let body = chunk.replace(/<!--\s*\.slide:[\s\S]*?-->\s*/g, '');
-
-    if (slideId) {
-      const headMatch = body.match(/^(#{1,6})\s+(.+?)\s*$/m);
-      if (headMatch) explicitPins.push({ id: slideId, headingText: headMatch[2].trim() });
+    let body = chunk;
+    if (idMatch) {
+      const slideId = idMatch[1];
+      const directiveEnd = idMatch.index + idMatch[0].length;
+      const pinned = pinFirstHeading(chunk.slice(directiveEnd), slideId);
+      if (pinned === null) {
+        logInfo(`WARNING: pin id="${slideId}" has no heading after it in its section; dropped`);
+      } else {
+        if (explicitPins.some((p) => p.id === slideId)) {
+          logInfo(`WARNING: pin id="${slideId}" is declared more than once; ids must be unique`);
+        }
+        explicitPins.push({ id: slideId });
+        body = chunk.slice(0, directiveEnd) + pinned;
+      }
     }
+    body = body.replace(/<!--\s*\.slide:[\s\S]*?-->\s*/g, '');
 
     // Pull `note: ...` blocks into collapsible <details>.
     const noteMatch = body.match(/\n*note:\s*\n([\s\S]*?)$/);
@@ -286,27 +345,32 @@ ${items}
     return out;
   }
 
-  let pinCursor = 0;
+  // The plain text of a rendered heading: tags stripped, entities decoded,
+  // whitespace collapsed. The one source for slugs and TOC labels, so "Can't"
+  // slugs to "cant" and the TOC escapes its label exactly once.
+  function headingText(innerHtml) {
+    return decodeEntities(stripTags(innerHtml)).replace(/\s+/g, ' ').trim();
+  }
+
+  // Pass A: every pin marker that landed on a heading becomes its id.
+  let pinsAttached = 0;
+  bodyHtml = bodyHtml.replace(PIN_MARKER_RE, (_m, tag, id) => {
+    pinsAttached += 1;
+    return `<${tag} id="${id}">`;
+  });
+  const leftoverMarkers = bodyHtml.match(PIN_MARKER_LEFTOVER_RE);
+  if (leftoverMarkers) {
+    logInfo(`WARNING: ${leftoverMarkers.length} pin marker(s) did not land on a heading; removed`);
+    bodyHtml = bodyHtml.replace(PIN_MARKER_LEFTOVER_RE, '');
+  }
+  if (explicitPins.length > 0) {
+    logInfo(`attached ${pinsAttached} of ${explicitPins.length} explicit heading pins`);
+  }
+  // Pass B: auto-slug every heading that has no id.
   bodyHtml = bodyHtml.replace(
     /<(h[1-6])(?![^>]*\sid=)>([\s\S]*?)<\/\1>/g,
     (match, tag, inner) => {
-      const plain = stripTags(inner).trim();
-      while (pinCursor < explicitPins.length) {
-        const pin = explicitPins[pinCursor];
-        if (pin.headingText === plain) {
-          pinCursor += 1;
-          return `<${tag} id="${pin.id}">${inner}</${tag}>`;
-        }
-        break;
-      }
-      return match;
-    },
-  );
-  bodyHtml = bodyHtml.replace(
-    /<(h[1-6])(?![^>]*\sid=)>([\s\S]*?)<\/\1>/g,
-    (match, tag, inner) => {
-      const plain = stripTags(inner).trim();
-      const id = slugify(plain);
+      const id = slugify(headingText(inner));
       return id ? `<${tag} id="${id}">${inner}</${tag}>` : match;
     },
   );
@@ -333,7 +397,7 @@ ${items}
       allHeadings.push({
         level: Number(m[2]),
         id: m[3],
-        text: stripTags(m[4]).replace(/\s+/g, ' ').trim(),
+        text: headingText(m[4]),
         pos: m.index,
       });
     }

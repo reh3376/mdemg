@@ -47,8 +47,8 @@ cd scripts/tutorial-forge
 npm install
 ```
 
-The dependencies (marked, mermaid, puppeteer, highlight.js, reveal-md for the
-default favicon) install into `scripts/tutorial-forge/node_modules/`. Puppeteer
+The dependencies (marked, mermaid, puppeteer, highlight.js) install into
+`scripts/tutorial-forge/node_modules/`. Puppeteer
 downloads a bundled Chromium on first install (one-time, ~150 MB).
 
 ## Minimal usage
@@ -183,7 +183,8 @@ Content...
 ```
 
 Any TOC link using `#my-stable-anchor` stays valid even if the heading text
-changes later.
+changes later. The pin attaches to the section's first heading by position,
+so the heading text may contain quotes, `&` or acronyms.
 
 ### Speaker notes
 Trailing `note:` block after the main content of a section becomes a
@@ -311,9 +312,19 @@ If you don't provide an override, the framework uses:
 - **SVG viewer**: `scripts/tutorial-forge/templates/svg-viewer.js` (vanilla
   JS, zero deps, toolbar `[+][−][⟳][⤢]`, wheel-zoom at cursor, drag-pan,
   touch pinch, double-click reset, idempotent + MutationObserver-safe)
-- **Favicon**: tiny generic from reveal-md's bundle
+- **Favicon**: `scripts/tutorial-forge/templates/favicon.ico` (16×16 generic
+  icon, originally reveal-md's; MIT)
 - **Acronym dictionary**: `scripts/tutorial-forge/defaults/acronyms.json`
   (~55 industry-standard terms)
+
+## Tests
+
+```bash
+cd scripts/tutorial-forge && npm test
+```
+
+node:test, no Chromium (Mermaid rendering is skipped): heading pins, slugs,
+TOC labels and the favicon default.
 
 ## Reusing across repos
 

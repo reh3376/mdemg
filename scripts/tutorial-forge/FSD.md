@@ -90,7 +90,9 @@ highlighting for fenced code, standard markdown tables/lists/blockquotes.
    - Acronym expansion (idempotent, see §4.2).
 3. Deck is split on `\n---\n` into chunks (one per logical section).
 4. Per chunk:
-   - Extract explicit `<!-- .slide: id="X" -->` directive → record pin.
+   - Extract explicit `<!-- .slide: id="X" -->` directive → mark the chunk's
+     first heading (outside fenced code) with an inline pin comment carrying
+     the id.
    - Extract trailing `note: ...` block → wrap in `<details>`.
    - Replace ```` ```mermaid ```` fences with `@@MERMAID_PLACEHOLDER_N@@` tokens
      (sources collected into array; order preserved).
@@ -99,10 +101,11 @@ highlighting for fenced code, standard markdown tables/lists/blockquotes.
 7. Mermaid pass: Puppeteer renders each source to SVG, writes
    `<output>/assets/svg/mermaid-NN.svg`, swaps each placeholder for a
    `<figure class="svg-figure" tabindex="0"><img …/></figure>`.
-8. Heading-ID pass A: attach explicit pin IDs to matching headings in
-   source order (first unlocked heading whose plain-text matches wins).
-9. Heading-ID pass B: auto-slug every remaining heading. Deck-wide
-   uniqueness via `-2`, `-3`, … suffixes.
+8. Heading-ID pass A: every pin comment that landed on a heading becomes
+   that heading's `id` (by position; the heading's text plays no part).
+9. Heading-ID pass B: auto-slug every remaining heading from its plain
+   text (tags stripped, entities decoded). Deck-wide uniqueness via `-2`,
+   `-3`, … suffixes.
 10. HTML shell assembled around body.
 11. Aux assets copied (`assets/css/{slides-overrides,zenburn.min}.css`,
     `assets/js/svg-viewer.js`, hand-authored assets from `config.assetsDir`,
@@ -112,15 +115,22 @@ highlighting for fenced code, standard markdown tables/lists/blockquotes.
 ### 3.2 Dependency graph (framework → npm)
 
 - `marked@13.0.3` — markdown → HTML.
-- `mermaid@11.16.1` — diagram runtime, read at build time by Puppeteer.
-- `puppeteer@23.9.0` — headless Chromium for Mermaid render. Downloads
+- `mermaid@12.2.0` — diagram runtime, read at build time by Puppeteer.
+- `puppeteer@25.16.0` — headless Chromium for Mermaid render. Downloads
   bundled Chromium (~150 MB) on first `npm install`.
+- Node **22.12 or newer** (puppeteer 25 and mermaid 12 both require it);
+  the deploy workflow (§16.3) pins Node 22.
+- `package.json` `overrides` pins `basic-ftp` to a fixed release under
+  puppeteer's proxy chain (GHSA-c475-qrg2-pj4r); the framework never opens
+  an FTP connection. With it, `npm audit` reports 0 findings.
 - `highlight.js@11.11.1` — ships `zenburn.min.css` only (code renders at
   serve time via plain `<pre><code class="language-…">` which browsers
   highlight if a code engine is loaded; the framework's bundle does not
   include highlight.js runtime — the ULTRA-light choice).
-- `reveal-md@6.1.4` — kept for its bundled `favicon.ico` only. Zero runtime
-  use. Can be removed if a framework consumer provides its own icon.
+
+`npm test` runs the framework's own tests (`test/`, node:test, no Chromium:
+Mermaid rendering is skipped). They hold the heading-id, TOC-label and
+favicon contracts of §7.1, §15.2 and §4.5.
 
 ## 4. File reference
 
@@ -264,10 +274,11 @@ use for production builds.
 | `templates/default.css` | Dark-theme CSS, 1400px max-width centered, `.svg-figure` styling, speaker-notes, slide-break rules | Yes: `config.cssPath` |
 | `templates/svg-viewer.js` | Interactive viewer: toolbar `[+][−][⟳][⤢]`, wheel-zoom at cursor, drag-pan, touch pinch, double-click reset, fullscreen; MutationObserver-safe idempotent attach | Yes: `config.svgViewerPath` |
 | `defaults/acronyms.json` | ~55 industry-standard terms (AI, API, CLI, CSS, HTML, HITL, LLM, …) | Via `config.acronyms.extra` (adds) and `config.acronyms.disabled` (removes) |
+| `templates/favicon.ico` | 16×16 generic icon (the one reveal-md shipped; MIT, © Lars Kappert) | Yes: `config.iconPath` |
 
-Framework defaults for `highlight.js/styles/base16/zenburn.min.css`,
-mermaid.min.js, and favicon.ico are read from `node_modules/`. These are
-NOT user-configurable except by config.iconPath for the favicon.
+Framework defaults for `highlight.js/styles/base16/zenburn.min.css` and
+mermaid.min.js are read from `node_modules/`. These are NOT
+user-configurable.
 
 ## 5. Configuration schema
 
@@ -281,7 +292,7 @@ interface TutorialConfig {
 
   // Shell / branding
   title?: string;               // default: 'Tutorial' — <title> element text
-  iconPath?: string;            // default: framework favicon from reveal-md
+  iconPath?: string;            // default: templates/favicon.ico
 
   // Overrides (fall back to framework defaults when absent)
   cssPath?: string;             // default: templates/default.css
@@ -292,7 +303,7 @@ interface TutorialConfig {
 
   // Acronym transform
   acronyms?: {
-    expandCount?: number;       // default: 1 — first N occurrences get "Expansion (ACRONYM)"
+    expandCount?: number;       // default: 2 — first N occurrences get "Expansion (ACRONYM)"
     extra?: Record<string, string>;  // merged over defaults/acronyms.json
     disabled?: string[];        // acronyms dropped from merged dict
     glossary?: {
@@ -435,11 +446,20 @@ This fails fast if someone edits the deck without re-running the sync.
 
 Any `#`-`######` heading gets an `id` attribute. Resolution precedence:
 
-1. **Explicit pin**: a `<!-- .slide: id="X" -->` directive IMMEDIATELY
-   preceding (within the same section) will attach `id="X"` to the heading
-   whose plain text matches, in source order.
-2. **Auto-slug**: lowercased, stripped of non-word chars, whitespace →
-   dashes, deduplicated with `-2`, `-3`, … suffixes.
+1. **Explicit pin**: a `<!-- .slide: id="X" -->` directive anywhere in a
+   section (between two `---` separators) attaches `id="X"` to that
+   section's first heading outside fenced code. The pin attaches by
+   position, so the heading text may contain anything: quotes, `&`, `<`,
+   inline code, a dictionary acronym (expanded or glossary-linked). A
+   section with a pin but no heading logs a warning and drops the pin; a
+   dropped pin never blocks a later one. Pin ids must be unique (a repeat
+   logs a warning).
+2. **Auto-slug**: the heading's plain text (tags stripped, HTML entities
+   decoded), lowercased, stripped of non-word chars, whitespace → dashes,
+   deduplicated with `-2`, `-3`, … suffixes. `## Can't` → `cant`.
+
+The TOC sidebar (§15) labels every entry with the same plain text,
+HTML-escaped once, so `Can't` reads `Can't` in the sidebar.
 
 **Agent must know**: TOC fragment links like `#my-section` work ONLY if the
 heading they target has that exact id. Changing a heading's wording
@@ -580,6 +600,8 @@ appear at all in the deck, it appears 0 times.
 | --- | --- |
 | `# Heading` (no pin above) | Auto-slug id = `heading`; dedup suffix if collides |
 | `<!-- .slide: id="foo" -->\n# Heading` | id = `foo` (explicit pin) |
+| `<!-- .slide: id="foo" -->\n# Can't & Won't (LLM)` | id = `foo`; the pin attaches by position, so the apostrophe, the `&` and the acronym link do not matter; TOC label `Can't & Won't (LLM)` |
+| `# Can't` (no pin above) | Auto-slug id = `cant` (entities decoded before slugging) |
 | ```` ```mermaid\nfoo\n``` ```` | Rendered to `assets/svg/mermaid-01.svg`; replaced with `.svg-figure` wrapper |
 | `` `inline code` `` | Passthrough; acronym transform skips contents |
 | `[link](https://…/UVTS)` | `UVTS` in URL is skipped (link-URL mask); link text IS scanned |
@@ -669,12 +691,14 @@ no npm registry publish yet. Agents upgrading should:
 1. Pull the latest `scripts/tutorial-forge/` from the source repo.
 2. Diff `package.json` for dep version changes.
 3. `cd scripts/tutorial-forge && npm install` to update node_modules.
-4. Run `make sync-tutorial-embed` to regenerate the output.
-5. Run `make verify-tutorial-embed` to confirm.
-6. Commit the regenerated output.
+4. `npm test` there (the framework's own tests).
+5. Run `make sync-tutorial-embed` to regenerate the output.
+6. Run `make verify-tutorial-embed` to confirm.
+7. Commit the regenerated output.
 
 Breaking changes are indicated by MINOR bumps in `package.json`'s `version`
-field (currently `0.1.0`). The framework is pre-1.0; any change may break.
+field (currently `1.1.0`; 1.1.0 changed auto-slugs of headings that contain
+an HTML-escaped character, e.g. `can39t` → `cant`).
 
 ## 15. Persistent TOC sidebar (REQUIRED)
 
@@ -707,6 +731,8 @@ by targeting `body:not(.has-toc)`.
   wrappers; each item is one `<a href="#id">`.
 - Author-authored `<!-- .slide: id="X" -->` pins propagate correctly
   because the TOC reads the final resolved id from the body HTML.
+- The label is the heading's plain text (tags stripped, entities decoded),
+  HTML-escaped once on output.
 
 ### 15.3 Graphs sub-section
 
@@ -784,7 +810,175 @@ in §15.1–§15.4.
 
 ---
 
-## 16. What this document is NOT
+## 16. Publishing the tutorial to GitHub Pages
+
+**Target state**: a consumer repo publishes its rendered tutorial to a
+public URL like `https://<owner>.github.io/<repo>/` where anyone can view
+it without installing anything. Reference deployment:
+`https://reh3376.github.io/mdemg/`.
+
+The pattern below is what the mdemg reference implementation uses. Every
+tutorial-forge consumer repo (including the standalone forge repo itself,
+once it ships an example tutorial) should wire it in the same shape.
+
+### 16.1 Prerequisites
+
+- The repo is public (private repos need a GH Enterprise plan for Pages).
+- Pages is enabled with GitHub Actions as the source (one-time repo-admin
+  action; see §16.2).
+- A `tutorial.config.json` at the repo root resolves to a buildable deck.
+
+### 16.2 Enable Pages (one-time, operator / repo-admin)
+
+Via the GitHub REST API (works with `gh auth login` holding `repo` +
+`workflow` scope):
+
+```bash
+gh api -X POST repos/<owner>/<repo>/pages -f build_type=workflow
+```
+
+Successful response includes `html_url` (the public URL), `build_type:
+workflow`, and `https_enforced: true`.
+
+Equivalent UI path (if the API call fails or isn't desired): Repo →
+Settings → Pages → Source: "GitHub Actions". No branch or folder is
+selected — the workflow produces the artifact.
+
+### 16.3 Deploy workflow (`.github/workflows/deploy-tutorial.yml`)
+
+Verbatim shape used in mdemg; copy as-is into any consumer repo, adjust
+only `cache-dependency-path` + `working-directory` if the forge lives
+somewhere other than `scripts/tutorial-forge/`:
+
+```yaml
+name: Deploy Tutorial
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/onboarding/**'
+      - 'scripts/tutorial-forge/**'
+      - 'tutorial.config.json'
+      - '.github/workflows/deploy-tutorial.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-tutorial-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: 'scripts/tutorial-forge/package-lock.json'
+      - name: Install tutorial-forge deps
+        working-directory: scripts/tutorial-forge
+        run: npm ci
+      - name: Build tutorial
+        run: node scripts/tutorial-forge/cli.mjs build --config tutorial.config.json
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: internal/cli/tutorial_templates/staged   # ← point at config.output
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4
+```
+
+**Path adjustments** when adopting into a different repo:
+
+- `cache-dependency-path` + `working-directory`: match where you dropped
+  the forge (`scripts/tutorial-forge/`, `tooling/tutorial-forge/`, or just
+  the repo root in a standalone forge repo).
+- `upload-pages-artifact.path`: must equal `config.output` from
+  `tutorial.config.json`. The example demo writes to `build/tutorial-static`;
+  mdemg writes to `internal/cli/tutorial_templates/staged`.
+
+**For a standalone forge repo** publishing its own example as the demo
+site: the forge lives at the repo root (no nesting), so change the two
+`scripts/tutorial-forge/` prefixes to `./` (or omit entirely in
+`working-directory`). The deck source and config path still need
+adjusting to point at the example (`example/deck.md`,
+`example/tutorial.config.json`, output `example/dist`).
+
+### 16.4 First-push behavior
+
+A new fork or first-time-contributor repo may queue the workflow at
+`action_required` status; the operator approves once via the Actions
+tab's "Approve and run" button. Subsequent pushes run without prompt.
+
+After successful deploy:
+
+- `https://<owner>.github.io/<repo>/` serves the rendered `index.html`.
+- `last-modified` HTTP header on the response matches the deploy time.
+- Auto-republishes on every main-branch push that touches a path in the
+  workflow trigger's `paths:` filter.
+
+### 16.5 Verification contract (agent-usable)
+
+After the first successful deploy, these invariants hold:
+
+```javascript
+assert HTTP(https://<owner>.github.io/<repo>/) === 200;
+const html = fetch(above);
+assert html.includes('<main class="deck">');       // Section 1 shape
+assert html.includes('class="deck-toc"');           // Section 15 TOC
+assert !html.includes('mermaid.min.js');            // Section 1 pre-render
+```
+
+If (3) fails or the URL 404s, check the Actions tab for a failed deploy
+run — typical causes are a Puppeteer Chromium download timeout (retry)
+or an incorrect `path:` in `upload-pages-artifact` (output dir mismatch
+with `config.output`).
+
+### 16.6 Rollback
+
+Re-deploy a prior known-good commit via `workflow_dispatch` with the
+desired ref. Pages serves whatever the latest deploy published — there
+is no "versioned Pages release" concept. Keep the deck source + config
+versioned in git; redeploying from an older commit is one `git revert`
++ push away.
+
+### 16.7 Scope boundary
+
+tutorial-forge is responsible for building the static artifact and
+documenting the deploy pattern. It does NOT ship the GH Pages workflow
+file itself — each consumer repo authors its own
+`.github/workflows/deploy-tutorial.yml` using the template above,
+because:
+
+- The workflow's trigger `paths:` filter needs to name the consumer's
+  own deck/config locations.
+- The `upload-pages-artifact.path` depends on each consumer's
+  `config.output`.
+- Different consumer repos may want different triggers (schedule,
+  release, manual-only).
+
+An agent asked to "set up Pages" for a tutorial-forge consumer should
+copy §16.3 into the consumer's `.github/workflows/deploy-tutorial.yml`,
+adjust paths, enable Pages via §16.2's API call, and verify §16.5's
+invariants after the first push.
+
+---
+
+## 17. What this document is NOT
 
 - Not a tutorial on how to USE the shipped MDEMG tutorial. For that, run
   mdemg and visit `/ui/tutorial/`.

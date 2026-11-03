@@ -45,13 +45,18 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          # puppeteer 25 and mermaid 12 need Node 22.12+.
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: 'scripts/tutorial-forge/package-lock.json'
 
       - name: Install tutorial-forge dependencies
         working-directory: scripts/tutorial-forge
         run: npm ci
+
+      - name: Test tutorial-forge
+        working-directory: scripts/tutorial-forge
+        run: npm test
 
       - name: Build tutorial
         env:
