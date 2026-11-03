@@ -784,7 +784,175 @@ in §15.1–§15.4.
 
 ---
 
-## 16. What this document is NOT
+## 16. Publishing the tutorial to GitHub Pages
+
+**Target state**: a consumer repo publishes its rendered tutorial to a
+public URL like `https://<owner>.github.io/<repo>/` where anyone can view
+it without installing anything. Reference deployment:
+`https://reh3376.github.io/mdemg/`.
+
+The pattern below is what the mdemg reference implementation uses. Every
+tutorial-forge consumer repo (including the standalone forge repo itself,
+once it ships an example tutorial) should wire it in the same shape.
+
+### 16.1 Prerequisites
+
+- The repo is public (private repos need a GH Enterprise plan for Pages).
+- Pages is enabled with GitHub Actions as the source (one-time repo-admin
+  action; see §16.2).
+- A `tutorial.config.json` at the repo root resolves to a buildable deck.
+
+### 16.2 Enable Pages (one-time, operator / repo-admin)
+
+Via the GitHub REST API (works with `gh auth login` holding `repo` +
+`workflow` scope):
+
+```bash
+gh api -X POST repos/<owner>/<repo>/pages -f build_type=workflow
+```
+
+Successful response includes `html_url` (the public URL), `build_type:
+workflow`, and `https_enforced: true`.
+
+Equivalent UI path (if the API call fails or isn't desired): Repo →
+Settings → Pages → Source: "GitHub Actions". No branch or folder is
+selected — the workflow produces the artifact.
+
+### 16.3 Deploy workflow (`.github/workflows/deploy-tutorial.yml`)
+
+Verbatim shape used in mdemg; copy as-is into any consumer repo, adjust
+only `cache-dependency-path` + `working-directory` if the forge lives
+somewhere other than `scripts/tutorial-forge/`:
+
+```yaml
+name: Deploy Tutorial
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/onboarding/**'
+      - 'scripts/tutorial-forge/**'
+      - 'tutorial.config.json'
+      - '.github/workflows/deploy-tutorial.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-tutorial-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: 'scripts/tutorial-forge/package-lock.json'
+      - name: Install tutorial-forge deps
+        working-directory: scripts/tutorial-forge
+        run: npm ci
+      - name: Build tutorial
+        run: node scripts/tutorial-forge/cli.mjs build --config tutorial.config.json
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: internal/cli/tutorial_templates/staged   # ← point at config.output
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4
+```
+
+**Path adjustments** when adopting into a different repo:
+
+- `cache-dependency-path` + `working-directory`: match where you dropped
+  the forge (`scripts/tutorial-forge/`, `tooling/tutorial-forge/`, or just
+  the repo root in a standalone forge repo).
+- `upload-pages-artifact.path`: must equal `config.output` from
+  `tutorial.config.json`. The example demo writes to `build/tutorial-static`;
+  mdemg writes to `internal/cli/tutorial_templates/staged`.
+
+**For a standalone forge repo** publishing its own example as the demo
+site: the forge lives at the repo root (no nesting), so change the two
+`scripts/tutorial-forge/` prefixes to `./` (or omit entirely in
+`working-directory`). The deck source and config path still need
+adjusting to point at the example (`example/deck.md`,
+`example/tutorial.config.json`, output `example/dist`).
+
+### 16.4 First-push behavior
+
+A new fork or first-time-contributor repo may queue the workflow at
+`action_required` status; the operator approves once via the Actions
+tab's "Approve and run" button. Subsequent pushes run without prompt.
+
+After successful deploy:
+
+- `https://<owner>.github.io/<repo>/` serves the rendered `index.html`.
+- `last-modified` HTTP header on the response matches the deploy time.
+- Auto-republishes on every main-branch push that touches a path in the
+  workflow trigger's `paths:` filter.
+
+### 16.5 Verification contract (agent-usable)
+
+After the first successful deploy, these invariants hold:
+
+```javascript
+assert HTTP(https://<owner>.github.io/<repo>/) === 200;
+const html = fetch(above);
+assert html.includes('<main class="deck">');       // Section 1 shape
+assert html.includes('class="deck-toc"');           // Section 15 TOC
+assert !html.includes('mermaid.min.js');            // Section 1 pre-render
+```
+
+If (3) fails or the URL 404s, check the Actions tab for a failed deploy
+run — typical causes are a Puppeteer Chromium download timeout (retry)
+or an incorrect `path:` in `upload-pages-artifact` (output dir mismatch
+with `config.output`).
+
+### 16.6 Rollback
+
+Re-deploy a prior known-good commit via `workflow_dispatch` with the
+desired ref. Pages serves whatever the latest deploy published — there
+is no "versioned Pages release" concept. Keep the deck source + config
+versioned in git; redeploying from an older commit is one `git revert`
++ push away.
+
+### 16.7 Scope boundary
+
+tutorial-forge is responsible for building the static artifact and
+documenting the deploy pattern. It does NOT ship the GH Pages workflow
+file itself — each consumer repo authors its own
+`.github/workflows/deploy-tutorial.yml` using the template above,
+because:
+
+- The workflow's trigger `paths:` filter needs to name the consumer's
+  own deck/config locations.
+- The `upload-pages-artifact.path` depends on each consumer's
+  `config.output`.
+- Different consumer repos may want different triggers (schedule,
+  release, manual-only).
+
+An agent asked to "set up Pages" for a tutorial-forge consumer should
+copy §16.3 into the consumer's `.github/workflows/deploy-tutorial.yml`,
+adjust paths, enable Pages via §16.2's API call, and verify §16.5's
+invariants after the first push.
+
+---
+
+## 17. What this document is NOT
 
 - Not a tutorial on how to USE the shipped MDEMG tutorial. For that, run
   mdemg and visit `/ui/tutorial/`.
