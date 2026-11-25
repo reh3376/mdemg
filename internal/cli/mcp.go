@@ -20,8 +20,9 @@ import (
 )
 
 const (
-	defaultMCPEndpoint = "http://localhost:9999"
-	defaultSpaceID     = "ide-agent"
+	defaultMCPEndpoint  = "http://localhost:9999"
+	defaultSpaceID      = "ide-agent"
+	defaultMCPSessionID = "mcp-agent" // session_id for memory_observe/memory_correct when the caller omits one
 )
 
 // mcpServer holds MCP server state (avoids global variables)
@@ -98,6 +99,8 @@ func runMCPServer(cmd *cobra.Command, args []string) error {
 
 	// Register all tools
 	mcpSrv.registerMemoryStoreToool(s)
+	mcpSrv.registerMemoryObserveTool(s)
+	mcpSrv.registerMemoryCorrectTool(s)
 	mcpSrv.registerMemoryRecallTool(s)
 	mcpSrv.registerMemoryAssociateTool(s)
 	mcpSrv.registerMemoryRejectTool(s)
@@ -152,7 +155,9 @@ func (m *mcpServer) registerMemoryStoreToool(s *server.MCPServer) {
 - User preferences and conventions
 - Project-specific knowledge
 
-The memory system will automatically generate embeddings and link related concepts.`),
+The memory system will automatically generate embeddings and link related concepts.
+Stored content is searchable memory only: it never becomes a Jiminy rule. To record
+a rule or decision that Jiminy should enforce, use memory_observe or memory_correct.`),
 		mcp.WithString("content",
 			mcp.Required(),
 			mcp.Description("The content to remember. Be specific and include context.")),
@@ -229,6 +234,159 @@ func (m *mcpServer) memoryStoreHandler(ctx context.Context, request mcp.CallTool
 		nodeID, int(embDims), path)
 
 	return mcp.NewToolResultText(result), nil
+}
+
+// resolveSession returns the caller's session_id, or the MCP default.
+func resolveSession(args map[string]any) string {
+	if sid, _ := args["session_id"].(string); sid != "" {
+		return sid
+	}
+	return defaultMCPSessionID
+}
+
+// memory_observe - Record an observation through the conversation path, where
+// rule wording is detected and promoted to an enforced Jiminy rule.
+func (m *mcpServer) registerMemoryObserveTool(s *server.MCPServer) {
+	tool := mcp.NewTool("memory_observe",
+		mcp.WithDescription(`Record a decision, rule, or preference so Jiminy can enforce it.
+
+Unlike memory_store, this goes through /v1/conversation/observe, where rule wording
+("must", "never", "always", "required", "should") is detected. Detected rules become
+enforced Jiminy rules at the next consolidation: they surface as guidance and, for
+agents with Jiminy hooks, block violating edits after being ignored twice in a session.
+
+Because detection is word-based, any content containing that wording can become a
+rule. Record one rule per call, and use memory_store for notes that are not rules.`),
+		mcp.WithString("content",
+			mcp.Required(),
+			mcp.Description("The decision or rule, stated plainly (e.g., 'Services must never write to billing_ledger directly; use LedgerService')")),
+		mcp.WithString("obs_type",
+			mcp.Description("Observation type (default 'decision'). Use 'constraint' for hard rules, 'preference' for preferences. Types progress, error, task, and context are never promoted to rules.")),
+		mcp.WithString("tags",
+			mcp.Description("Comma-separated tags for categorization")),
+		mcp.WithBoolean("pinned",
+			mcp.Description("Make the observation permanent and non-decaying (default false)")),
+		mcp.WithString("session_id",
+			mcp.Description("Session ID for this observation (default: "+defaultMCPSessionID+")")),
+		mcp.WithString("space_id",
+			mcp.Description(spaceParamDesc)),
+	)
+
+	s.AddTool(tool, m.memoryObserveHandler)
+}
+
+func (m *mcpServer) memoryObserveHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	args := getArgs(request)
+
+	content, _ := args["content"].(string)
+	if content == "" {
+		return newToolResultError("content is required"), nil
+	}
+	obsType, _ := args["obs_type"].(string)
+	if obsType == "" {
+		obsType = "decision"
+	}
+
+	observeReq := map[string]any{
+		"space_id":   m.resolveSpace(args),
+		"session_id": resolveSession(args),
+		"content":    content,
+		"obs_type":   obsType,
+	}
+	if tagsStr, _ := args["tags"].(string); tagsStr != "" {
+		var tags []string
+		for _, t := range strings.Split(tagsStr, ",") {
+			if t = strings.TrimSpace(t); t != "" {
+				tags = append(tags, t)
+			}
+		}
+		if len(tags) > 0 {
+			observeReq["tags"] = tags
+		}
+	}
+	if pinned, _ := args["pinned"].(bool); pinned {
+		observeReq["pinned"] = true
+	}
+
+	resp, err := m.callMDEMG("/v1/conversation/observe", observeReq)
+	if err != nil {
+		return newToolResultError(fmt.Sprintf("Failed to record observation: %v", err)), nil
+	}
+
+	obsID, _ := resp["obs_id"].(string)
+	nodeID, _ := resp["node_id"].(string)
+
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "Observation recorded.\nObs ID: %s\nNode ID: %s\n", obsID, nodeID)
+	detected, _ := resp["detected_constraints"].([]any)
+	if len(detected) == 0 {
+		sb.WriteString("No rule wording detected: stored as a note, not a Jiminy rule.")
+	} else {
+		for _, d := range detected {
+			dc, _ := d.(map[string]any)
+			cType, _ := dc["constraint_type"].(string)
+			conf, _ := dc["confidence"].(float64)
+			fmt.Fprintf(&sb, "Rule detected: %s (confidence %.2f). It becomes an enforced Jiminy rule at the next consolidation.\n", cType, conf)
+		}
+	}
+
+	return mcp.NewToolResultText(strings.TrimRight(sb.String(), "\n")), nil
+}
+
+// memory_correct - Record an explicit correction (incorrect -> correct), which
+// becomes a Jiminy correction rule at the next consolidation.
+func (m *mcpServer) registerMemoryCorrectTool(s *server.MCPServer) {
+	tool := mcp.NewTool("memory_correct",
+		mcp.WithDescription(`Record a correction: what was done or believed incorrectly, and what is correct.
+
+Corrections go through /v1/conversation/correct and become Jiminy correction rules at
+the next consolidation, surfacing as guidance when similar work comes up.`),
+		mcp.WithString("incorrect",
+			mcp.Required(),
+			mcp.Description("What was wrong (the approach or belief to avoid)")),
+		mcp.WithString("correct",
+			mcp.Required(),
+			mcp.Description("What is correct (the approach to use instead)")),
+		mcp.WithString("context",
+			mcp.Description("Where or when this applies (optional)")),
+		mcp.WithString("session_id",
+			mcp.Description("Session ID for this correction (default: "+defaultMCPSessionID+")")),
+		mcp.WithString("space_id",
+			mcp.Description(spaceParamDesc)),
+	)
+
+	s.AddTool(tool, m.memoryCorrectHandler)
+}
+
+func (m *mcpServer) memoryCorrectHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	args := getArgs(request)
+
+	incorrect, _ := args["incorrect"].(string)
+	correct, _ := args["correct"].(string)
+	if incorrect == "" || correct == "" {
+		return newToolResultError("incorrect and correct are required"), nil
+	}
+
+	correctReq := map[string]any{
+		"space_id":   m.resolveSpace(args),
+		"session_id": resolveSession(args),
+		"incorrect":  incorrect,
+		"correct":    correct,
+	}
+	if c, _ := args["context"].(string); c != "" {
+		correctReq["context"] = c
+	}
+
+	resp, err := m.callMDEMG("/v1/conversation/correct", correctReq)
+	if err != nil {
+		return newToolResultError(fmt.Sprintf("Failed to record correction: %v", err)), nil
+	}
+
+	obsID, _ := resp["obs_id"].(string)
+	nodeID, _ := resp["node_id"].(string)
+	return mcp.NewToolResultText(fmt.Sprintf(
+		"Correction recorded.\nObs ID: %s\nNode ID: %s\nIt becomes a Jiminy correction rule at the next consolidation.",
+		obsID, nodeID)), nil
 }
 
 // memory_recall - Retrieve relevant memories based on the current context

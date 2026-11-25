@@ -4718,14 +4718,17 @@ Returns an HTML page with an embedded D3-based topology visualization, served di
 
 ## MCP Server Tools
 
-The MDEMG MCP server provides 20 tools for IDE integration. Start with `mdemg mcp` (stdio mode) or `mdemg serve --mcp` (co-launch with HTTP server).
+The MDEMG MCP server provides 26 tools for IDE integration. Start with `mdemg mcp` (stdio mode) or `mdemg serve --mcp` (co-launch with HTTP server).
 
 **Memory Tools:**
 | Tool | Description |
 |------|-------------|
-| `memory_store` | Store an observation in the knowledge graph |
+| `memory_store` | Store searchable memory in the knowledge graph (never becomes a Jiminy rule) |
+| `memory_observe` | Record a decision or rule via `/v1/conversation/observe`; rule wording becomes an enforced Jiminy rule at the next consolidation |
+| `memory_correct` | Record a correction (incorrect → correct) via `/v1/conversation/correct`; becomes a Jiminy correction rule |
 | `memory_recall` | Semantic search across the knowledge graph |
 | `memory_associate` | Create typed edges between nodes |
+| `memory_reject` | Mark a memory as wrong (negative feedback; weakens or contradicts its links) |
 | `memory_reflect` | Generate a reflection on a topic |
 | `memory_status` | Get space health and statistics |
 | `memory_symbols` | Search extracted code symbols |
@@ -4759,6 +4762,9 @@ The MDEMG MCP server provides 20 tools for IDE integration. Start with `mdemg mc
 |------|-------------|
 | `validate_changes` | Validate proposed changes against learned constraints |
 | `jiminy_guide` | Get proactive guidance for the current context |
+| `jiminy_strict` | Toggle Jiminy strict mode for a session |
+| `eventgraph_reinforcement_neighborhood` | Hebbian reinforcement events around a memory |
+| `eventgraph_guidance_outcome_neighborhood` | Followed/ignored/contradicted outcomes for rules near a memory |
 
 **Connection:** `mdemg mcp` runs in stdio mode. The MCP server connects to the MDEMG HTTP API (resolved via `MDEMG_ENDPOINT`, `.mdemg.port` file, or `LISTEN_ADDR`). Configure in `.claude/mcp.json` or your IDE's MCP settings.
 
