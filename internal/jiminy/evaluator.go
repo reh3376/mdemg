@@ -265,6 +265,7 @@ func revalidateResults(result *llmEvalResult, constraintMap map[string]Evaluatio
 		}
 
 		item.Type = original.Type
+		item.ConstraintCode = original.ConstraintCode
 		cType := constraintTypeFromContent(original.Content)
 
 		if cType == "must" || cType == "must_not" {
@@ -289,6 +290,7 @@ func revalidateResults(result *llmEvalResult, constraintMap map[string]Evaluatio
 		}
 		if original, found := constraintMap[w.ConstraintNodeID]; found {
 			item.Type = original.Type
+			item.ConstraintCode = original.ConstraintCode
 		} else {
 			item.Type = GuidanceCorrection
 		}

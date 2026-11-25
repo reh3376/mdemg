@@ -176,6 +176,116 @@ func TestMemoryStore_Contract(t *testing.T) {
 	}
 }
 
+// --- memory_observe ---
+
+func TestMemoryObserve_Contract(t *testing.T) {
+	b := &mcpTestBackend{response: map[string]any{
+		"obs_id": "o_test", "node_id": "n_test",
+		"detected_constraints": []any{map[string]any{"constraint_type": "must_not", "confidence": 0.95}},
+	}}
+	m := newTestMCPServer(t, b, "env-space")
+
+	res, err := m.memoryObserveHandler(context.Background(), toolRequest(map[string]any{
+		"content": "services must never write billing_ledger directly", "tags": "a, b", "pinned": true,
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	call := b.lastCall(t)
+	if call.Path != "/v1/conversation/observe" || call.Method != http.MethodPost {
+		t.Errorf("call = %s %s, want POST /v1/conversation/observe", call.Method, call.Path)
+	}
+	if call.Body["space_id"] != "env-space" {
+		t.Errorf("space_id = %v, want env default", call.Body["space_id"])
+	}
+	if call.Body["session_id"] != defaultMCPSessionID {
+		t.Errorf("session_id = %v, want %q", call.Body["session_id"], defaultMCPSessionID)
+	}
+	if call.Body["obs_type"] != "decision" {
+		t.Errorf("obs_type = %v, want default decision", call.Body["obs_type"])
+	}
+	if call.Body["pinned"] != true {
+		t.Errorf("pinned = %v, want true", call.Body["pinned"])
+	}
+	if tags, _ := call.Body["tags"].([]any); len(tags) != 2 {
+		t.Errorf("tags = %v", call.Body["tags"])
+	}
+	text := resultText(t, res)
+	if !strings.Contains(text, "n_test") || !strings.Contains(text, "Rule detected: must_not") {
+		t.Errorf("result missing node id or rule detection: %q", text)
+	}
+
+	// explicit obs_type, session, and space win; no detection reported as a note
+	b.response = map[string]any{"obs_id": "o2", "node_id": "n2"}
+	res, err = m.memoryObserveHandler(context.Background(), toolRequest(map[string]any{
+		"content": "x", "obs_type": "constraint", "session_id": "s1", "space_id": "other-space",
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	call = b.lastCall(t)
+	if call.Body["obs_type"] != "constraint" || call.Body["session_id"] != "s1" || call.Body["space_id"] != "other-space" {
+		t.Errorf("explicit args lost: %v", call.Body)
+	}
+	if _, ok := call.Body["pinned"]; ok {
+		t.Errorf("pinned should be omitted when unset: %v", call.Body)
+	}
+	if !strings.Contains(resultText(t, res), "No rule wording detected") {
+		t.Errorf("result should say no rule detected: %q", resultText(t, res))
+	}
+
+	// missing content → tool error, no HTTP call
+	before := len(b.calls)
+	res, _ = m.memoryObserveHandler(context.Background(), toolRequest(map[string]any{}))
+	if !res.IsError {
+		t.Error("missing content should be a tool error")
+	}
+	if len(b.calls) != before {
+		t.Error("validation failure must not reach the backend")
+	}
+}
+
+// --- memory_correct ---
+
+func TestMemoryCorrect_Contract(t *testing.T) {
+	b := &mcpTestBackend{response: map[string]any{"obs_id": "o_c", "node_id": "n_c"}}
+	m := newTestMCPServer(t, b, "env-space")
+
+	res, err := m.memoryCorrectHandler(context.Background(), toolRequest(map[string]any{
+		"incorrect": "used UUID", "correct": "use CUIDv2", "context": "identifiers",
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	call := b.lastCall(t)
+	if call.Path != "/v1/conversation/correct" || call.Method != http.MethodPost {
+		t.Errorf("call = %s %s, want POST /v1/conversation/correct", call.Method, call.Path)
+	}
+	for k, want := range map[string]any{
+		"space_id": "env-space", "session_id": defaultMCPSessionID,
+		"incorrect": "used UUID", "correct": "use CUIDv2", "context": "identifiers",
+	} {
+		if call.Body[k] != want {
+			t.Errorf("%s = %v, want %v", k, call.Body[k], want)
+		}
+	}
+	if !strings.Contains(resultText(t, res), "n_c") {
+		t.Errorf("result missing node id: %q", resultText(t, res))
+	}
+
+	// either required field missing → tool error, no HTTP call
+	before := len(b.calls)
+	for _, args := range []map[string]any{{"incorrect": "x"}, {"correct": "y"}} {
+		res, _ = m.memoryCorrectHandler(context.Background(), toolRequest(args))
+		if !res.IsError {
+			t.Errorf("args %v should be a tool error", args)
+		}
+	}
+	if len(b.calls) != before {
+		t.Error("validation failure must not reach the backend")
+	}
+}
+
 // --- memory_recall ---
 
 func TestMemoryRecall_Contract(t *testing.T) {

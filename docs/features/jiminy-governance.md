@@ -65,7 +65,7 @@ So context reaches the agent two ways — pulled (MCP/HTTP via the skill) and pu
 | File | Role |
 |---|---|
 | `.mcp.json` (repo root, tracked) | Registers the `mdemg` MCP server (`mdemg mcp`, stdio). |
-| `internal/cli/mcp.go` | The MCP server implementation (`mdemg mcp`): 20 tools incl. `jiminy_guide`, `validate_changes`, `memory_*`. |
+| `internal/cli/mcp.go` | The MCP server implementation (`mdemg mcp`): 26 tools incl. `jiminy_guide`, `validate_changes`, `memory_observe` (records rules Jiminy enforces), `memory_*`. |
 | `cmd/mcp-server/main.go` | MCP server entrypoint. |
 
 ### Hooks — tracked source (installed by `mdemg hooks install`)

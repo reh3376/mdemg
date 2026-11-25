@@ -134,6 +134,33 @@ func TestRevalidateResults_KeepMustAsViolation(t *testing.T) {
 	}
 }
 
+// The strict classifier keys deny reasons and operator overrides on
+// item.ConstraintCode; without it a deny cites the node:<id> pseudo-code.
+func TestRevalidateResults_CarriesConstraintCode(t *testing.T) {
+	result := &llmEvalResult{
+		Violations: []llmEvalViolation{
+			{ConstraintNodeID: "c1", Description: "direct ledger write", Reasoning: "r", Remediation: "use LedgerService"},
+		},
+		Warnings: []llmEvalViolation{
+			{ConstraintNodeID: "c2", Description: "near miss", Reasoning: "r", Remediation: "x"},
+		},
+	}
+	constraintMap := map[string]EvaluationItem{
+		"c1": {Type: GuidanceConstraint, Content: "[must_not] Write billing_ledger directly", SourceNode: "c1", ConstraintCode: "never-direct-billing-ledger-write"},
+		"c2": {Type: GuidanceConstraint, Content: "[should] Prefer REST", SourceNode: "c2", ConstraintCode: "prefer-rest"},
+	}
+	items := revalidateResults(result, constraintMap)
+	if len(items) != 2 {
+		t.Fatalf("expected 2 items, got %d", len(items))
+	}
+	if items[0].ConstraintCode != "never-direct-billing-ledger-write" {
+		t.Errorf("violation ConstraintCode = %q, want never-direct-billing-ledger-write", items[0].ConstraintCode)
+	}
+	if items[1].ConstraintCode != "prefer-rest" {
+		t.Errorf("warning ConstraintCode = %q, want prefer-rest", items[1].ConstraintCode)
+	}
+}
+
 func TestRevalidateResults_UnknownNodeDemoted(t *testing.T) {
 	result := &llmEvalResult{
 		Violations: []llmEvalViolation{
